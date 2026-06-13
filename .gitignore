@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+results.csv
+scripts/results.csv
+data/uploads/
+**/__pycache__/
