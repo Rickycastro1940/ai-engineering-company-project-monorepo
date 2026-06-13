@@ -7,11 +7,11 @@ from pathlib import Path
 
 def _load_incident_analyzer():
     repo_root = Path(__file__).resolve().parents[1]
-    incident_analyzer_root = repo_root / "incident-analyzer"
-    if str(incident_analyzer_root) not in sys.path:
-        sys.path.insert(0, str(incident_analyzer_root))
+    api_root = repo_root / "services" / "api"
+    if str(api_root) not in sys.path:
+        sys.path.insert(0, str(api_root))
 
-    from src.analyzer import IncidentAnalyzer  # pylint: disable=import-error
+    from analyzer import IncidentAnalyzer  # pylint: disable=import-error
 
     return IncidentAnalyzer
 
