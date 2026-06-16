@@ -1,6 +1,6 @@
 # API Service
 
-This folder exposes the incident analyzer backend under the required monorepo path.
+This folder exposes the incident analyzer backend and inventory API under the required monorepo path.
 
 ## Local development
 
@@ -22,9 +22,39 @@ The root-level `api/` package is a compatibility shim that re-exports this servi
 python services/api/main.py
 ```
 
-## Endpoints
+## Inventory endpoints
 
-The FastAPI app includes:
+Inventory data is stored in [`products.csv`](../../products.csv) at the repository root.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/inventory` | List all products |
+| `POST` | `/inventory` | Add a product (`name`, `quantity`, `unit`) |
+| `PATCH` | `/inventory/{product_id}` | Update stock by `delta` (+ incoming, − outgoing) |
+| `GET` | `/inventory/alerts` | Products below threshold (default `10`) |
+
+### Examples
+
+```bash
+curl http://127.0.0.1:8000/inventory
+
+curl -X POST http://127.0.0.1:8000/inventory \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Olive Oil","quantity":15,"unit":"liters"}'
+
+curl -X PATCH http://127.0.0.1:8000/inventory/1 \
+  -H "Content-Type: application/json" \
+  -d '{"delta":5}'
+
+curl http://127.0.0.1:8000/inventory/alerts
+curl "http://127.0.0.1:8000/inventory/alerts?threshold=20"
+```
+
+Interactive docs: `http://127.0.0.1:8000/docs`
+
+## Incident analysis endpoints
+
+The FastAPI app also includes:
 
 - `POST /api/incidents/anylayze`
 - `POST /api/incidents/anylayze/upload`
