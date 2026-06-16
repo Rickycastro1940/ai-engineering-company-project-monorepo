@@ -135,3 +135,20 @@ The FastAPI app also includes:
 - `GET /api/incidents/results/export`
 
 Aliases for `/analyze` endpoints are also available.
+
+## Evaluation checklist
+
+How to verify each rubric item:
+
+| # | Criterion | How to verify |
+|---|-----------|---------------|
+| 1 | Four FastAPI inventory endpoints | `curl` examples above + `http://127.0.0.1:8000/docs` |
+| 2 | `products.csv` survives restart | `POST` a product, restart `uvicorn`, `GET /inventory` — product still present |
+| 3 | Agent loop (Observe → Think → Act → Update → Repeat) | See `run_agent_turn()` in [`agent.py`](../../agent.py) |
+| 4 | Tools with name, description, typed params | `TOOLS` constant in [`agent.py`](../../agent.py) |
+| 5 | Agent calls correct API on tool selection | `execute_tool()` maps each tool to `/inventory` routes |
+| 6 | Tool result injected before next LLM call | `messages.append({"role": "tool", ...})` in `run_agent_turn()` |
+| 7 | `conversation_log.csv` with 4 fields per event | Run agent; check `actor,message,tool_call,timestamp` columns |
+| 8 | Log append-only across sessions | Run `python agent.py` twice; rows accumulate, never overwritten |
+| 9 | Multi-step interaction | Ask: *"Add 3 units of Olive Oil in liters, then tell me which products are low on stock."* — log shows `add_product` then `get_low_stock_alerts` |
+| 10 | No agent framework | Plain Python loop only; no LangChain/LlamaIndex/AutoGen in `requirements.txt` |

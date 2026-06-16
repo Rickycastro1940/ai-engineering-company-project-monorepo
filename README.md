@@ -62,6 +62,8 @@ Full details (inventory endpoints, conversation log, curl examples): [`services/
 
 **Agent implementation:** [`agent.py`](./agent.py) uses a **manual agent loop in plain Python** (observe → think → act → update). It does **not** use LangChain, LlamaIndex, AutoGen, or any other agent framework — only the OpenAI-compatible Groq client for LLM calls.
 
+**Evaluation:** See the [evaluation checklist](./services/api/README.md#evaluation-checklist) in `services/api/README.md` for how to verify all rubric criteria.
+
 ---
 
 ## How to think about this monorepo
