@@ -14,6 +14,10 @@ uvicorn api.app:app --reload
 python agent.py
 ```
 
+The agent runs an interactive CLI backed by Groq. It defines the inventory API endpoints as LLM tools, keeps conversation history in memory for the session, and appends every turn to `conversation_log.csv`.
+
+Set `GROQ_API_KEY` in a root `.env` file before starting the agent.
+
 The root-level `api/` package is a compatibility shim that re-exports this service's FastAPI app so `uvicorn api.app:app` works from the repo root.
 
 ## Alternative run command
