@@ -28,6 +28,10 @@ This repository is the **starter template** for transversal projects. You will w
 5. **Start implementing** in the right folder — do not dump everything in the root.
 6. **Document** what you add: each new app, service, agent, or pipeline gets a subfolder + README.
 
+### Run locally (Phase 1)
+
+See [`services/api/README.md`](./services/api/README.md) for the dual-terminal API + agent workflow (`uvicorn api.app:app --reload` and `python agent.py`).
+
 ---
 
 ## How to think about this monorepo
