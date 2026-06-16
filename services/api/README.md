@@ -18,6 +18,26 @@ The agent runs an interactive CLI backed by Groq. It defines the inventory API e
 
 Set `GROQ_API_KEY` in a root `.env` file before starting the agent.
 
+## Conversation log
+
+The agent appends every event to [`conversation_log.csv`](../../conversation_log.csv) at the repository root. The file is **append-only** and persists across sessions (new rows are never overwritten).
+
+| Column | Description |
+|--------|-------------|
+| `actor` | Who produced the event: `user`, `agent`, `tool`, or `system` |
+| `message` | User text, agent reply, or JSON tool result |
+| `tool_call` | JSON tool request from the agent, or tool name on result rows |
+| `timestamp` | UTC ISO-8601 timestamp |
+
+Example flow for one user question:
+
+```text
+user   | List all products              |              | 2026-...
+agent  |                                | {"name":"list_inventory","arguments":{}} | 2026-...
+tool   | [{"product_id":1,...}]         | list_inventory | 2026-...
+agent  | We have Tomatoes, Mozzarella... |              | 2026-...
+```
+
 The root-level `api/` package is a compatibility shim that re-exports this service's FastAPI app so `uvicorn api.app:app` works from the repo root.
 
 ## Alternative run command

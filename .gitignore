@@ -4,5 +4,7 @@ __pycache__/
 .venv/
 results.csv
 scripts/results.csv
+conversation_log.csv
+conversation_log.csv.bak
 data/uploads/
 **/__pycache__/

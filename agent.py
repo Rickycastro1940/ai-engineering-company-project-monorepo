@@ -21,7 +21,8 @@ API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 CONVERSATION_LOG = Path("conversation_log.csv")
-LOG_HEADERS = ["timestamp", "session_id", "role", "message"]
+LOG_HEADERS = ["actor", "message", "tool_call", "timestamp"]
+EXPECTED_LOG_HEADER = ",".join(LOG_HEADERS)
 
 SYSTEM_PROMPT = """You are an inventory management assistant for a restaurant company.
 You help staff check stock, add products, update quantities, and review low-stock alerts.
@@ -92,7 +93,20 @@ TOOLS: list[dict[str, Any]] = [
 ]
 
 
-def append_conversation(session_id: str, role: str, message: str) -> None:
+def _ensure_log_schema() -> None:
+    if not CONVERSATION_LOG.exists() or CONVERSATION_LOG.stat().st_size == 0:
+        return
+    first_line = CONVERSATION_LOG.read_text(encoding="utf-8").splitlines()[0]
+    if first_line == EXPECTED_LOG_HEADER:
+        return
+    backup = CONVERSATION_LOG.with_suffix(".csv.bak")
+    if backup.exists():
+        backup.unlink()
+    CONVERSATION_LOG.rename(backup)
+    print(f"Backed up old log to {backup}")
+
+
+def log_event(actor: str, message: str = "", tool_call: str = "") -> None:
     file_exists = CONVERSATION_LOG.exists() and CONVERSATION_LOG.stat().st_size > 0
     with CONVERSATION_LOG.open("a", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=LOG_HEADERS)
@@ -100,10 +114,10 @@ def append_conversation(session_id: str, role: str, message: str) -> None:
             writer.writeheader()
         writer.writerow(
             {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "session_id": session_id,
-                "role": role,
+                "actor": actor,
                 "message": message,
+                "tool_call": tool_call,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
         )
 
@@ -170,7 +184,7 @@ def _assistant_message_payload(message: Any) -> dict[str, Any]:
     return payload
 
 
-def run_agent_turn(client: OpenAI, messages: list[dict[str, Any]], session_id: str) -> str:
+def run_agent_turn(client: OpenAI, messages: list[dict[str, Any]]) -> str:
     while True:
         response = client.chat.completions.create(
             model=GROQ_MODEL,
@@ -183,7 +197,7 @@ def run_agent_turn(client: OpenAI, messages: list[dict[str, Any]], session_id: s
 
         if not message.tool_calls:
             final_response = message.content or ""
-            append_conversation(session_id, "assistant", final_response)
+            log_event("agent", message=final_response)
             return final_response
 
         for tool_call in message.tool_calls:
@@ -193,14 +207,14 @@ def run_agent_turn(client: OpenAI, messages: list[dict[str, Any]], session_id: s
             except json.JSONDecodeError:
                 tool_args = {}
 
-            append_conversation(
-                session_id,
-                "tool_call",
-                json.dumps({"name": tool_name, "arguments": tool_args}),
+            log_event(
+                "agent",
+                message=message.content or "",
+                tool_call=json.dumps({"name": tool_name, "arguments": tool_args}),
             )
             tool_result = execute_tool(tool_name, tool_args)
             tool_content = json.dumps(tool_result)
-            append_conversation(session_id, "tool", tool_content)
+            log_event("tool", message=tool_content, tool_call=tool_name)
             messages.append(
                 {
                     "role": "tool",
@@ -230,6 +244,7 @@ def main() -> int:
         )
         return 1
 
+    _ensure_log_schema()
     session_id = str(uuid.uuid4())
     client = OpenAI(api_key=GROQ_API_KEY, base_url="https://api.groq.com/openai/v1")
     messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -237,30 +252,31 @@ def main() -> int:
     print(f"Inventory Agent (session {session_id})")
     print(f"API: {API_BASE_URL} | Model: {GROQ_MODEL}")
     print("Type your message and press Enter. Type 'exit' or 'quit' to end.\n")
-    append_conversation(session_id, "system", f"Started inventory agent session at {API_BASE_URL}")
+    log_event("system", message=f"Session started at {API_BASE_URL}")
 
     while True:
         try:
             user_input = input("You: ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\nGoodbye.")
+            log_event("system", message="Session ended")
             break
 
         if not user_input:
             continue
         if user_input.lower() in {"exit", "quit"}:
             print("Goodbye.")
-            append_conversation(session_id, "system", "Session ended by user")
+            log_event("system", message="Session ended by user")
             break
 
         messages.append({"role": "user", "content": user_input})
-        append_conversation(session_id, "user", user_input)
+        log_event("user", message=user_input)
 
         try:
-            response = run_agent_turn(client, messages, session_id)
+            response = run_agent_turn(client, messages)
         except Exception as error:
             print(f"Agent error: {error}", file=sys.stderr)
-            append_conversation(session_id, "system", f"Agent error: {error}")
+            log_event("system", message=f"Agent error: {error}")
             continue
 
         print(f"Agent: {response}\n")
