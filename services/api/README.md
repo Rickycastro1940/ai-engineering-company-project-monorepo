@@ -2,7 +2,55 @@
 
 This folder exposes the incident analyzer backend and inventory API under the required monorepo path.
 
-## Local development
+## Launch guide
+
+### Prerequisites
+
+1. Install dependencies from the repository root:
+
+```bash
+pip install -r requirements.txt
+```
+
+2. Create a `.env` file at the repository root with your Groq API key:
+
+```env
+GROQ_API_KEY=your_key_here
+```
+
+Do not commit `.env` — it is listed in `.gitignore`.
+
+### Start order (required)
+
+**The API must be running before the agent starts.** Use two terminals from the repository root:
+
+```bash
+# Terminal 1 — start the API first
+uvicorn api.app:app --reload
+```
+
+Wait until you see `Application startup complete`, then:
+
+```bash
+# Terminal 2 — start the agent
+python agent.py
+```
+
+If Terminal 2 starts before the API is ready, `agent.py` prints an error and exits:
+
+```text
+Could not reach the API. Start it first with: uvicorn api.app:app --reload
+```
+
+### Agent design note
+
+The inventory agent in [`agent.py`](../../agent.py) is implemented **manually in plain Python**:
+
+- No LangChain, LlamaIndex, AutoGen, or similar frameworks
+- Tool definitions, the observe/think/act/update loop, API calls, and CLI are all written directly in `agent.py`
+- The only external LLM dependency is the OpenAI-compatible Groq client (`openai` package)
+
+## Local development summary
 
 From repository root, use two terminals:
 

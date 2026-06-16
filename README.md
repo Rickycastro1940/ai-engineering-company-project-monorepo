@@ -28,9 +28,39 @@ This repository is the **starter template** for transversal projects. You will w
 5. **Start implementing** in the right folder — do not dump everything in the root.
 6. **Document** what you add: each new app, service, agent, or pipeline gets a subfolder + README.
 
-### Run locally (Phase 1)
+### Run locally (API + Agent)
 
-See [`services/api/README.md`](./services/api/README.md) for the dual-terminal API + agent workflow (`uvicorn api.app:app --reload` and `python agent.py`).
+**The API must be running before you start the agent.** Start Terminal 1 first, wait until the server is up, then start Terminal 2.
+
+#### 1. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+#### 2. Configure environment
+
+Create a `.env` file at the repository root (never commit it):
+
+```env
+GROQ_API_KEY=your_key_here
+```
+
+#### 3. Launch both processes (two terminals)
+
+```bash
+# Terminal 1 — start the API first
+uvicorn api.app:app --reload
+
+# Terminal 2 — start the agent after the API is running
+python agent.py
+```
+
+The agent checks that `http://127.0.0.1:8000` is reachable on startup. If the API is not running, it exits with an error instead of continuing.
+
+Full details (inventory endpoints, conversation log, curl examples): [`services/api/README.md`](./services/api/README.md).
+
+**Agent implementation:** [`agent.py`](./agent.py) uses a **manual agent loop in plain Python** (observe → think → act → update). It does **not** use LangChain, LlamaIndex, AutoGen, or any other agent framework — only the OpenAI-compatible Groq client for LLM calls.
 
 ---
 

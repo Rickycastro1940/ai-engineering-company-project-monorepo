@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+"""Inventory agent with a manual observe/think/act/update loop in plain Python.
+
+No agent frameworks (LangChain, LlamaIndex, AutoGen, etc.) — only the Groq
+OpenAI-compatible client for LLM requests and stdlib/urllib for API calls.
+"""
 import csv
 import json
 import os
@@ -205,6 +210,8 @@ def run_agent_turn(client: OpenAI, messages: list[dict[str, Any]]) -> str:
             try:
                 tool_args = json.loads(tool_call.function.arguments or "{}")
             except json.JSONDecodeError:
+                tool_args = {}
+            if tool_args is None:
                 tool_args = {}
 
             log_event(
