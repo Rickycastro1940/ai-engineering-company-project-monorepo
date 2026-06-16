@@ -30,6 +30,8 @@ This repository is the **starter template** for transversal projects. You will w
 
 ### Run locally (API + Agent)
 
+**Entry points:** [`api/app.py`](api/app.py) (FastAPI inventory API) and [`agent.py`](agent.py) (Groq CLI agent).
+
 **The API must be running before you start the agent.** Start Terminal 1 first, wait until the server is up, then start Terminal 2.
 
 #### 1. Install dependencies
