@@ -20,6 +20,15 @@ GROQ_API_KEY=your_key_here
 
 Do not commit `.env` — it is listed in `.gitignore`.
 
+For password reset emails, add a Resend API key and sender details to the same `.env` file:
+
+```env
+RESEND_API_KEY=your_resend_api_key
+RESET_EMAIL_FROM=Company Security <onboarding@resend.dev>
+FRONTEND_URL=http://127.0.0.1:8000
+PASSWORD_RESET_SECRET=replace_with_a_long_random_secret
+```
+
 ### Start order (required)
 
 **The API must be running before the agent starts.** Use two terminals from the repository root:
@@ -126,20 +135,23 @@ Interactive docs: `http://127.0.0.1:8000/docs`
 
 ## Auth and password reset endpoints
 
-Auth data is stored as JSON under `data/auth/` by default. Passwords are hashed with PBKDF2, and password reset tokens are stored as SHA-256 hashes. The reset email outbox for local development is written to `data/auth/password_reset_outbox.json`.
+Auth data is stored as JSON under `data/auth/` by default. Passwords are hashed with PBKDF2, and HMAC-signed password reset tokens are stored as SHA-256 hashes. Reset emails are sent through Resend using `RESEND_API_KEY`; delivery attempts are also recorded in `data/auth/password_reset_outbox.json` for local inspection.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/auth/register` | Create an account with `email` and `password` |
 | `POST` | `/auth/login` | Validate an email/password pair |
-| `POST` | `/auth/forgot-password` | Generate a single-use reset token for an email, returning a generic response |
-| `POST` | `/auth/reset-password` | Set a new password using a reset token |
+| `POST` | `/auth/forgot-password` | Generate a single-use reset token for `{ "email": "..." }`, send the reset email, and return a generic `200` response |
+| `POST` | `/auth/reset-password` | Validate `{ "token": "...", "new_password": "..." }`, set the new password, and invalidate outstanding tokens |
 
 Useful local environment variables:
 
 - `AUTH_DATA_DIR`: override the JSON storage directory, useful for tests.
 - `AUTH_INCLUDE_RESET_LINK_IN_RESPONSE=true`: include the reset URL in the forgot-password API response for local/manual testing.
+- `RESEND_API_KEY`: required Resend API key for transactional reset emails.
+- `RESET_EMAIL_FROM`: verified Resend sender address. Defaults to `Company Security <onboarding@resend.dev>`.
 - `FRONTEND_URL`: optional public frontend origin used when generating reset links.
+- `PASSWORD_RESET_SECRET`: HMAC secret used to sign reset tokens. Set a long random value outside local development.
 
 Static auth screens are served with the web UI:
 
