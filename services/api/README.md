@@ -16,6 +16,7 @@ pip install -r requirements.txt
 
 ```env
 GROQ_API_KEY=your_key_here
+JWT_SECRET_KEY=replace_with_a_long_random_secret
 ```
 
 Do not commit `.env` — it is listed in `.gitignore`.
@@ -138,6 +139,46 @@ Interactive docs: `http://127.0.0.1:8000/docs`
 |--------|----------|-------------|
 | `GET` | `/health` | Minimal liveness response for monitors |
 | `GET` | `/api/status` | API metadata and advertised backend capabilities |
+
+## User and auth endpoints
+
+User records are stored in a local SQLite database at `data/company_api.db`.
+The table includes `id`, `email`, `hashed_password`, `is_active`, `is_admin`, and `created_at`.
+The database file is a runtime artifact and is ignored by git.
+
+The first registered user is created as an admin bootstrap account. Later users are regular active users unless an admin changes their status or role.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/users` | Register a new user. The API hashes the password before storing it. |
+| `POST` | `/auth/token` | Exchange email/password form credentials for a bearer token. |
+| `GET` | `/users` | List all users. Requires a bearer token. |
+| `GET` | `/users/{id}` | Get one user. Requires a bearer token. |
+| `PUT` | `/users/{id}` | Update a user. Requires the same user or an admin. Only admins can change `is_active` or `is_admin`. |
+| `DELETE` | `/users/{id}` | Delete a user. Requires the same user or an admin. |
+
+### Examples
+
+```bash
+curl -X POST http://127.0.0.1:8000/users \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"secret-password"}'
+
+TOKEN=$(
+  curl -s -X POST http://127.0.0.1:8000/auth/token \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -d "username=admin@example.com&password=secret-password" \
+  | python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])'
+)
+
+curl http://127.0.0.1:8000/users \
+  -H "Authorization: Bearer $TOKEN"
+
+curl -X PUT http://127.0.0.1:8000/users/1 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"new-admin@example.com"}'
+```
 
 ## Incident analysis endpoints
 

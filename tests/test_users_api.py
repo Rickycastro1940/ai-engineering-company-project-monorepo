@@ -1,0 +1,126 @@
+from __future__ import annotations
+
+import importlib
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from api.app import app  # pylint: disable=wrong-import-position
+
+users = importlib.import_module("users")
+
+
+class UsersApiTestCase(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.original_database_path = users.DATABASE_PATH
+        users.DATABASE_PATH = Path(self.temp_dir.name) / "company_api.db"
+        self.client = TestClient(app)
+
+    def tearDown(self) -> None:
+        users.DATABASE_PATH = self.original_database_path
+        self.temp_dir.cleanup()
+
+    def _register(self, email: str, password: str = "secret-password") -> dict:
+        response = self.client.post("/users", json={"email": email, "password": password})
+        self.assertEqual(response.status_code, 201)
+        return response.json()
+
+    def _token(self, email: str, password: str = "secret-password") -> str:
+        response = self.client.post("/auth/token", data={"username": email, "password": password})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["token_type"], "bearer")
+        return payload["access_token"]
+
+    def _auth_headers(self, email: str, password: str = "secret-password") -> dict[str, str]:
+        return {"Authorization": f"Bearer {self._token(email, password)}"}
+
+    def test_register_hashes_password_and_bootstraps_first_admin(self) -> None:
+        user = self._register("Admin@Example.com")
+
+        self.assertEqual(user["email"], "admin@example.com")
+        self.assertTrue(user["is_active"])
+        self.assertTrue(user["is_admin"])
+        self.assertIn("created_at", user)
+        self.assertNotIn("hashed_password", user)
+
+        stored = users.get_user_by_email("admin@example.com")
+        self.assertIsNotNone(stored)
+        assert stored is not None
+        self.assertNotEqual(stored["hashed_password"], "secret-password")
+        self.assertTrue(users.verify_password("secret-password", stored["hashed_password"]))
+
+    def test_duplicate_email_is_rejected(self) -> None:
+        self._register("user@example.com")
+
+        response = self.client.post("/users", json={"email": "USER@example.com", "password": "secret-password"})
+
+        self.assertEqual(response.status_code, 409)
+
+    def test_protected_user_routes_require_bearer_token(self) -> None:
+        self._register("user@example.com")
+
+        response = self.client.get("/users")
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_authenticated_user_can_list_and_read_users(self) -> None:
+        admin = self._register("admin@example.com")
+        member = self._register("member@example.com")
+
+        list_response = self.client.get("/users", headers=self._auth_headers("admin@example.com"))
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual([user["id"] for user in list_response.json()], [admin["id"], member["id"]])
+
+        read_response = self.client.get(f"/users/{member['id']}", headers=self._auth_headers("member@example.com"))
+        self.assertEqual(read_response.status_code, 200)
+        self.assertEqual(read_response.json()["email"], "member@example.com")
+
+    def test_user_can_update_self_but_not_escalate_or_update_others(self) -> None:
+        admin = self._register("admin@example.com")
+        member = self._register("member@example.com")
+        other = self._register("other@example.com")
+        member_headers = self._auth_headers("member@example.com")
+
+        self_update = self.client.put(
+            f"/users/{member['id']}",
+            json={"email": "new-member@example.com", "password": "new-secret-password"},
+            headers=member_headers,
+        )
+        self.assertEqual(self_update.status_code, 200)
+        self.assertEqual(self_update.json()["email"], "new-member@example.com")
+
+        escalation = self.client.put(f"/users/{member['id']}", json={"is_admin": True}, headers=member_headers)
+        self.assertEqual(escalation.status_code, 403)
+
+        other_update = self.client.put(f"/users/{other['id']}", json={"email": "blocked@example.com"}, headers=member_headers)
+        self.assertEqual(other_update.status_code, 403)
+
+        admin_update = self.client.put(
+            f"/users/{other['id']}",
+            json={"is_active": False, "is_admin": True},
+            headers=self._auth_headers("admin@example.com"),
+        )
+        self.assertEqual(admin_update.status_code, 200)
+        self.assertFalse(admin_update.json()["is_active"])
+        self.assertTrue(admin_update.json()["is_admin"])
+
+        admin_delete = self.client.delete(f"/users/{other['id']}", headers=self._auth_headers("admin@example.com"))
+        self.assertEqual(admin_delete.status_code, 200)
+        self.assertEqual(admin_delete.json()["id"], other["id"])
+
+        missing = self.client.get(f"/users/{other['id']}", headers=self._auth_headers("admin@example.com"))
+        self.assertEqual(missing.status_code, 404)
+        self.assertTrue(admin["is_admin"])
+
+
+if __name__ == "__main__":
+    unittest.main()

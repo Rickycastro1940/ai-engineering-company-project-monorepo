@@ -31,6 +31,8 @@ def build_status() -> dict[str, str | list[str]]:
             "inventory",
             "inventory-summary",
             "incident-analysis",
+            "user-auth",
+            "user-crud",
             "static-web-ui",
         ],
     }
