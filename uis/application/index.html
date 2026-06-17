@@ -166,7 +166,7 @@
     table {
       width: 100%;
       border-collapse: collapse;
-      min-width: 920px;
+      min-width: 1120px;
     }
 
     th,
@@ -340,11 +340,14 @@
             <table>
               <thead>
                 <tr>
+                  <th>ID</th>
                   <th>Name</th>
                   <th>Country</th>
                   <th>Categories</th>
                   <th>Current rate</th>
+                  <th>Last rate update</th>
                   <th>Status</th>
+                  <th>Updated at</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -428,7 +431,7 @@
 
       if (!suppliers.length) {
         const emptyRow = document.createElement('tr');
-        emptyRow.innerHTML = '<td colspan="6">No suppliers match the current filters.</td>';
+        emptyRow.innerHTML = '<td colspan="9">No suppliers match the current filters.</td>';
         rowsNode.appendChild(emptyRow);
         return;
       }
@@ -443,11 +446,14 @@
         const nextStatus = supplier.status === 'active' ? 'suspended' : 'active';
 
         row.innerHTML = `
+          <td>${supplier.id}</td>
           <td>${supplier.name}</td>
           <td>${supplier.country}</td>
           <td><div class="categories">${categoryBadges}</div></td>
           <td>${Number(supplier.rate).toFixed(2)}</td>
+          <td>${supplier.last_rate_update_date}</td>
           <td><span class="badge ${supplier.status}">${statusLabels[supplier.status] || supplier.status}</span></td>
+          <td>${formatDateTime(supplier.updated_at)}</td>
           <td>
             <div class="row-actions">
               <form class="rate-update" data-rate-id="${supplier.id}">
@@ -480,6 +486,13 @@
         supplier.id === updatedSupplier.id ? updatedSupplier : supplier
       ));
       renderSuppliers();
+    };
+
+    const formatDateTime = (value) => {
+      if (!value) {
+        return '';
+      }
+      return String(value).replace('T', ' ').replace(/\.\d+/, '');
     };
 
     form.addEventListener('submit', async (event) => {
