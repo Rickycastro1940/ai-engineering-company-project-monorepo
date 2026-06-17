@@ -102,7 +102,10 @@ Inventory data is stored in [`products.csv`](../../products.csv) at the reposito
 |--------|----------|-------------|
 | `GET` | `/inventory` | List all products |
 | `POST` | `/inventory` | Add a product (`name`, `quantity`, `unit`) |
+| `GET` | `/inventory/summary` | Aggregate product count, totals by unit, and low-stock count |
+| `GET` | `/inventory/{product_id}` | Fetch one product by ID |
 | `PATCH` | `/inventory/{product_id}` | Update stock by `delta` (+ incoming, − outgoing) |
+| `DELETE` | `/inventory/{product_id}` | Remove one product by ID |
 | `GET` | `/inventory/alerts` | Products below threshold (default `10`) |
 
 ### Examples
@@ -114,15 +117,27 @@ curl -X POST http://127.0.0.1:8000/inventory \
   -H "Content-Type: application/json" \
   -d '{"name":"Olive Oil","quantity":15,"unit":"liters"}'
 
+curl http://127.0.0.1:8000/inventory/summary
+curl http://127.0.0.1:8000/inventory/1
+
 curl -X PATCH http://127.0.0.1:8000/inventory/1 \
   -H "Content-Type: application/json" \
   -d '{"delta":5}'
+
+curl -X DELETE http://127.0.0.1:8000/inventory/1
 
 curl http://127.0.0.1:8000/inventory/alerts
 curl "http://127.0.0.1:8000/inventory/alerts?threshold=20"
 ```
 
 Interactive docs: `http://127.0.0.1:8000/docs`
+
+## Service status endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Minimal liveness response for monitors |
+| `GET` | `/api/status` | API metadata and advertised backend capabilities |
 
 ## Incident analysis endpoints
 
