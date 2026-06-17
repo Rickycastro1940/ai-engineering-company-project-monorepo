@@ -157,7 +157,7 @@ The first registered user is created as an admin bootstrap account. Later users 
 | `POST` | `/auth/login` | Exchange JSON email/password credentials for a bearer token. |
 | `POST` | `/auth/token` | Exchange OAuth2 form credentials for a bearer token. |
 | `GET` | `/auth/me` | Return the currently authenticated user's profile. Requires a bearer token. |
-| `GET` | `/users` | List all users. Requires an admin bearer token. |
+| `GET` | `/users` | List all users. Requires a bearer token. |
 | `GET` | `/users/{id}` | Get one user. Requires the same user or an admin. |
 | `PUT` | `/users/{id}` | Update a user. Requires the same user or an admin. Only admins can change `is_active` or `is_admin`. |
 | `DELETE` | `/users/{id}` | Delete a user. Requires the same user or an admin. |

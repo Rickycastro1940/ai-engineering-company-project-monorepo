@@ -169,14 +169,15 @@ class UsersApiTestCase(unittest.TestCase):
         self.assertEqual(admin_read_response.status_code, 200)
         self.assertEqual(admin_read_response.json()["email"], "member@example.com")
 
-    def test_non_admin_cannot_list_or_read_other_users(self) -> None:
+    def test_authenticated_user_can_list_but_not_read_other_users(self) -> None:
         self._register("admin@example.com")
         member = self._register("member@example.com")
         other = self._register("other@example.com")
         member_headers = self._auth_headers("member@example.com")
 
         list_response = self.client.get("/users", headers=member_headers)
-        self.assertEqual(list_response.status_code, 403)
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(len(list_response.json()), 3)
 
         read_other_response = self.client.get(f"/users/{other['id']}", headers=member_headers)
         self.assertEqual(read_other_response.status_code, 403)

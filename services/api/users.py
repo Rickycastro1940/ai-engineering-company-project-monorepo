@@ -232,11 +232,6 @@ def _require_self_or_admin(user_id: int, current_user: dict[str, Any]) -> None:
         raise HTTPException(status_code=403, detail="Not enough permissions")
 
 
-def _require_admin(current_user: dict[str, Any]) -> None:
-    if not current_user["is_admin"]:
-        raise HTTPException(status_code=403, detail="Not enough permissions")
-
-
 def _build_auth_response(user: dict[str, Any]) -> dict[str, Any]:
     return {
         "access_token": create_access_token(str(user["id"])),
@@ -287,7 +282,6 @@ def register_user(body: UserCreate) -> dict[str, Any]:
 
 @router.get("/users", response_model=list[UserPublic])
 def read_users(current_user: dict[str, Any] = Depends(get_current_user)) -> list[dict[str, Any]]:
-    _require_admin(current_user)
     return [_public_user(user) for user in list_users()]
 
 
