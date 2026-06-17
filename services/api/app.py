@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from inventory import router as inventory_router
 from pydantic import BaseModel, Field
+from suppliers import router as suppliers_router
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 UI_ROOT = REPO_ROOT / "uis" / "web"
@@ -88,6 +89,7 @@ def _register_analyze_routes(app: FastAPI, route_prefix: str) -> None:
 
 app = FastAPI(title="Company Incident File Analyzer", version="1.0.0")
 app.include_router(inventory_router)
+app.include_router(suppliers_router)
 _register_analyze_routes(app, "anylayze")
 _register_analyze_routes(app, "analyze")
 

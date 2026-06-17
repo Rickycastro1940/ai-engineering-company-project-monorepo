@@ -1,16 +1,11 @@
 from __future__ import annotations
 
-import json
-import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 from tinydb import Query, TinyDB
 
-from .suppliers import SupplierCreate, SupplierResponse
-
-DEFAULT_DB_PATH = Path(__file__).with_name("suppliers_db.json")
+from .suppliers import SupplierCreate, SupplierResponse, _db_path, _model_dump
 
 INITIAL_SUPPLIERS: list[SupplierCreate] = [
     SupplierCreate(
@@ -176,29 +171,6 @@ INITIAL_SUPPLIERS: list[SupplierCreate] = [
 ]
 
 
-def _db_path() -> Path:
-    configured_path = os.environ.get("SUPPLIERS_DB_PATH")
-    if configured_path:
-        return Path(configured_path).expanduser().resolve()
-    return DEFAULT_DB_PATH
-
-
-def _model_dump(model: SupplierCreate | SupplierResponse) -> dict[str, Any]:
-    if hasattr(model, "model_dump"):
-        return model.model_dump(mode="json")
-    return json.loads(model.json())
-
-
-def _next_supplier_id(existing_records: list[dict[str, Any]]) -> int:
-    ids: list[int] = []
-    for record in existing_records:
-        try:
-            ids.append(int(record["id"]))
-        except (KeyError, TypeError, ValueError):
-            continue
-    return max(ids, default=0) + 1
-
-
 def seed_suppliers(db_path: Path | None = None) -> int:
     target_path = db_path or _db_path()
     target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -207,20 +179,20 @@ def seed_suppliers(db_path: Path | None = None) -> int:
 
     with TinyDB(target_path) as db:
         table = db.table("suppliers")
-        next_id = _next_supplier_id(table.all())
 
         for supplier in INITIAL_SUPPLIERS:
             if table.contains((supplier_query.name == supplier.name) & (supplier_query.country == supplier.country)):
                 continue
 
+            payload = _model_dump(supplier)
+            doc_id = table.insert(payload)
             response = SupplierResponse(
-                id=next_id,
+                id=doc_id,
                 updated_at=datetime.now(timezone.utc),
-                **_model_dump(supplier),
+                **payload,
             )
-            table.insert(_model_dump(response))
+            table.update(_model_dump(response), doc_ids=[doc_id])
             inserted_count += 1
-            next_id += 1
 
     return inserted_count
 
