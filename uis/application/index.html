@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Brasaland Supplier Directory</title>
+  <style>
+    :root {
+      --bg: #f7f1e8;
+      --card: #fffaf2;
+      --ink: #1f2933;
+      --muted: #65758b;
+      --line: #ddcdb8;
+      --brand: #b84f2a;
+      --brand-dark: #8f3a1c;
+      --ok: #147d4d;
+      --ok-bg: #dff6e8;
+      --warn: #9b3d2b;
+      --warn-bg: #ffe4dd;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: 240px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .menu {
+      background: #29150d;
+      color: #fff;
+      padding: 24px 18px;
+    }
+
+    .menu h1 {
+      font-size: 1.25rem;
+      margin: 0 0 24px;
+    }
+
+    .menu a {
+      display: block;
+      padding: 12px 14px;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.12);
+      font-weight: 700;
+    }
+
+    main {
+      padding: 28px;
+    }
+
+    .hero {
+      margin-bottom: 20px;
+    }
+
+    .hero h2 {
+      margin: 0 0 8px;
+      font-size: 2rem;
+      color: var(--brand-dark);
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(280px, 420px) minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 10px 24px rgba(41, 21, 13, 0.08);
+    }
+
+    .card h3 {
+      margin: 0 0 14px;
+    }
+
+    label {
+      display: block;
+      margin: 12px 0 6px;
+      font-weight: 700;
+    }
+
+    input,
+    select,
+    button {
+      width: 100%;
+      min-height: 40px;
+      border: 1px solid #bfae93;
+      border-radius: 10px;
+      padding: 9px 10px;
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      background: var(--brand);
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: var(--brand-dark);
+    }
+
+    button.secondary {
+      background: #f0dfcc;
+      color: var(--ink);
+    }
+
+    button.secondary:hover {
+      background: #e3ccb0;
+    }
+
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .message {
+      min-height: 22px;
+      margin-top: 12px;
+      color: var(--muted);
+    }
+
+    .message.error {
+      color: var(--warn);
+      font-weight: 700;
+    }
+
+    .message.success {
+      color: var(--ok);
+      font-weight: 700;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 920px;
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid var(--line);
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f1e2cf;
+      color: #412013;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    tr.suspended {
+      background: #fff5f2;
+      color: #6d3a31;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .badge.active {
+      background: var(--ok-bg);
+      color: var(--ok);
+    }
+
+    .badge.suspended {
+      background: var(--warn-bg);
+      color: var(--warn);
+    }
+
+    .categories {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .category {
+      background: #f0dfcc;
+      border-radius: 999px;
+      padding: 3px 7px;
+      font-size: 0.8rem;
+    }
+
+    .row-actions {
+      display: grid;
+      gap: 8px;
+      min-width: 180px;
+    }
+
+    .rate-update {
+      display: grid;
+      grid-template-columns: 1fr 76px;
+      gap: 6px;
+    }
+
+    @media (max-width: 980px) {
+      .app-shell,
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .menu {
+        position: static;
+      }
+
+      .filters {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <nav class="menu" aria-label="Application menu">
+      <h1>Brasaland Digital</h1>
+      <a href="#supplier-directory">Supplier directory</a>
+    </nav>
+
+    <main>
+      <section class="hero" id="supplier-directory">
+        <h2>Supplier Directory</h2>
+        <p>Manage Brasaland suppliers across Colombia and Florida, including categories, rates, and active/suspended status.</p>
+      </section>
+
+      <div class="grid">
+        <section class="card" aria-labelledby="new-supplier-title">
+          <h3 id="new-supplier-title">Register supplier</h3>
+          <form id="supplier-form">
+            <label for="name">Name</label>
+            <input id="name" name="name" required />
+
+            <label for="country">Country</label>
+            <select id="country" name="country" required>
+              <option value="">Select a country</option>
+              <option value="Colombia">Colombia</option>
+              <option value="United States">United States</option>
+            </select>
+
+            <label for="product-categories">Product category</label>
+            <select id="product-categories" name="product_categories" required>
+              <option value="">Select a category</option>
+              <option value="proteins">Proteins</option>
+              <option value="produce">Produce</option>
+              <option value="pantry">Pantry</option>
+              <option value="beverages">Beverages</option>
+              <option value="packaging">Packaging</option>
+              <option value="cleaning">Cleaning</option>
+            </select>
+
+            <label for="rate">Current rate</label>
+            <input id="rate" name="rate" type="number" min="0.01" step="0.01" required />
+
+            <label for="last-rate-update-date">Last rate update date</label>
+            <input id="last-rate-update-date" name="last_rate_update_date" type="date" required />
+
+            <label for="status">Status</label>
+            <select id="status" name="status" required>
+              <option value="active">Active</option>
+              <option value="suspended">Suspended</option>
+            </select>
+
+            <button type="submit">Register supplier</button>
+          </form>
+          <p id="form-message" class="message" role="status"></p>
+        </section>
+
+        <section class="card" aria-labelledby="directory-title">
+          <h3 id="directory-title">Directory</h3>
+          <div class="filters" aria-label="Supplier filters">
+            <div>
+              <label for="filter-country">Filter by country</label>
+              <select id="filter-country">
+                <option value="">All countries</option>
+                <option value="Colombia">Colombia</option>
+                <option value="United States">United States</option>
+              </select>
+            </div>
+            <div>
+              <label for="filter-category">Filter by category</label>
+              <select id="filter-category">
+                <option value="">All categories</option>
+                <option value="proteins">Proteins</option>
+                <option value="produce">Produce</option>
+                <option value="pantry">Pantry</option>
+                <option value="beverages">Beverages</option>
+                <option value="packaging">Packaging</option>
+                <option value="cleaning">Cleaning</option>
+              </select>
+            </div>
+            <div>
+              <label>&nbsp;</label>
+              <button class="secondary" id="clear-filters" type="button">Clear filters</button>
+            </div>
+          </div>
+
+          <p id="list-message" class="message" role="status"></p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Country</th>
+                  <th>Categories</th>
+                  <th>Current rate</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="supplier-rows"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const categories = {
+      proteins: 'Proteins',
+      produce: 'Produce',
+      pantry: 'Pantry',
+      beverages: 'Beverages',
+      packaging: 'Packaging',
+      cleaning: 'Cleaning',
+    };
+
+    const statusLabels = {
+      active: 'Active',
+      suspended: 'Suspended',
+    };
+
+    const form = document.getElementById('supplier-form');
+    const formMessage = document.getElementById('form-message');
+    const listMessage = document.getElementById('list-message');
+    const rowsNode = document.getElementById('supplier-rows');
+    const filterCountry = document.getElementById('filter-country');
+    const filterCategory = document.getElementById('filter-category');
+    const clearFiltersButton = document.getElementById('clear-filters');
+    const dateInput = document.getElementById('last-rate-update-date');
+
+    let suppliers = [];
+
+    dateInput.value = new Date().toISOString().slice(0, 10);
+
+    const setMessage = (node, text, type = '') => {
+      node.textContent = text;
+      node.className = `message ${type}`.trim();
+    };
+
+    const apiRequest = async (url, options = {}) => {
+      const response = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(options.headers || {}),
+        },
+        ...options,
+      });
+
+      const contentType = response.headers.get('content-type') || '';
+      const payload = contentType.includes('application/json') ? await response.json() : null;
+
+      if (!response.ok) {
+        const detail = Array.isArray(payload?.detail)
+          ? payload.detail.map((item) => item.msg).join('; ')
+          : payload?.detail || `Request failed with status ${response.status}`;
+        throw new Error(detail);
+      }
+
+      return payload;
+    };
+
+    const buildQueryString = () => {
+      const params = new URLSearchParams();
+      if (filterCountry.value) {
+        params.set('country', filterCountry.value);
+      }
+      if (filterCategory.value) {
+        params.set('product_category', filterCategory.value);
+      }
+      const queryString = params.toString();
+      return queryString ? `?${queryString}` : '';
+    };
+
+    const renderSuppliers = () => {
+      rowsNode.innerHTML = '';
+
+      if (!suppliers.length) {
+        const emptyRow = document.createElement('tr');
+        emptyRow.innerHTML = '<td colspan="6">No suppliers match the current filters.</td>';
+        rowsNode.appendChild(emptyRow);
+        return;
+      }
+
+      suppliers.forEach((supplier) => {
+        const row = document.createElement('tr');
+        row.className = supplier.status === 'suspended' ? 'suspended' : '';
+
+        const categoryBadges = supplier.product_categories
+          .map((category) => `<span class="category">${categories[category] || category}</span>`)
+          .join('');
+        const nextStatus = supplier.status === 'active' ? 'suspended' : 'active';
+
+        row.innerHTML = `
+          <td>${supplier.name}</td>
+          <td>${supplier.country}</td>
+          <td><div class="categories">${categoryBadges}</div></td>
+          <td>${Number(supplier.rate).toFixed(2)}</td>
+          <td><span class="badge ${supplier.status}">${statusLabels[supplier.status] || supplier.status}</span></td>
+          <td>
+            <div class="row-actions">
+              <form class="rate-update" data-rate-id="${supplier.id}">
+                <input aria-label="New rate for ${supplier.name}" type="number" min="0.01" step="0.01" value="${supplier.rate}" required />
+                <button type="submit">Update</button>
+              </form>
+              <button class="secondary status-toggle" type="button" data-status-id="${supplier.id}" data-next-status="${nextStatus}">
+                Mark ${statusLabels[nextStatus]}
+              </button>
+            </div>
+          </td>
+        `;
+        rowsNode.appendChild(row);
+      });
+    };
+
+    const loadSuppliers = async () => {
+      setMessage(listMessage, 'Loading suppliers...');
+      try {
+        suppliers = await apiRequest(`/suppliers${buildQueryString()}`);
+        renderSuppliers();
+        setMessage(listMessage, `${suppliers.length} supplier(s) loaded.`, 'success');
+      } catch (error) {
+        setMessage(listMessage, error.message, 'error');
+      }
+    };
+
+    const replaceSupplier = (updatedSupplier) => {
+      suppliers = suppliers.map((supplier) => (
+        supplier.id === updatedSupplier.id ? updatedSupplier : supplier
+      ));
+      renderSuppliers();
+    };
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      setMessage(formMessage, 'Registering supplier...');
+
+      const data = new FormData(form);
+      const payload = {
+        name: data.get('name').trim(),
+        country: data.get('country'),
+        product_categories: [data.get('product_categories')],
+        rate: Number(data.get('rate')),
+        last_rate_update_date: data.get('last_rate_update_date'),
+        status: data.get('status'),
+      };
+
+      try {
+        await apiRequest('/suppliers', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        form.reset();
+        dateInput.value = new Date().toISOString().slice(0, 10);
+        setMessage(formMessage, 'Supplier registered successfully.', 'success');
+        await loadSuppliers();
+      } catch (error) {
+        setMessage(formMessage, error.message, 'error');
+      }
+    });
+
+    rowsNode.addEventListener('submit', async (event) => {
+      const rateForm = event.target.closest('[data-rate-id]');
+      if (!rateForm) {
+        return;
+      }
+      event.preventDefault();
+
+      const supplierId = Number(rateForm.dataset.rateId);
+      const rate = Number(rateForm.querySelector('input').value);
+      setMessage(listMessage, 'Updating supplier rate...');
+
+      try {
+        const updatedSupplier = await apiRequest(`/suppliers/${supplierId}/rate`, {
+          method: 'PATCH',
+          body: JSON.stringify({ rate }),
+        });
+        replaceSupplier(updatedSupplier);
+        setMessage(listMessage, 'Supplier rate updated.', 'success');
+      } catch (error) {
+        setMessage(listMessage, error.message, 'error');
+      }
+    });
+
+    rowsNode.addEventListener('click', async (event) => {
+      const button = event.target.closest('[data-status-id]');
+      if (!button) {
+        return;
+      }
+
+      const supplierId = Number(button.dataset.statusId);
+      const status = button.dataset.nextStatus;
+      setMessage(listMessage, 'Updating supplier status...');
+
+      try {
+        const updatedSupplier = await apiRequest(`/suppliers/${supplierId}/status`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status }),
+        });
+        replaceSupplier(updatedSupplier);
+        setMessage(listMessage, 'Supplier status updated.', 'success');
+      } catch (error) {
+        setMessage(listMessage, error.message, 'error');
+      }
+    });
+
+    filterCountry.addEventListener('change', loadSuppliers);
+    filterCategory.addEventListener('change', loadSuppliers);
+    clearFiltersButton.addEventListener('click', () => {
+      filterCountry.value = '';
+      filterCategory.value = '';
+      loadSuppliers();
+    });
+
+    loadSuppliers();
+  </script>
+</body>
+</html>

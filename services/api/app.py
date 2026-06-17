@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from suppliers import router as suppliers_router
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-UI_ROOT = REPO_ROOT / "uis" / "web"
+UI_ROOT = REPO_ROOT / "uis" / "application"
 UPLOAD_DIR = REPO_ROOT / "data" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 Engine = Literal["native", "pandas"]
