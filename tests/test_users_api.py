@@ -4,9 +4,11 @@ import importlib
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from jose import jwt
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -14,6 +16,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from api.app import app  # pylint: disable=wrong-import-position
 
+auth = importlib.import_module("auth")
 users = importlib.import_module("users")
 
 
@@ -116,6 +119,25 @@ class UsersApiTestCase(unittest.TestCase):
         ]
         for response in protected_requests:
             self.assertEqual(response.status_code, 401)
+
+    def test_protected_route_rejects_malformed_token(self) -> None:
+        self._register("user@example.com")
+
+        response = self.client.get("/auth/me", headers={"Authorization": "Bearer not-a-valid-jwt"})
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_protected_route_rejects_expired_token(self) -> None:
+        user = self._register("user@example.com")
+        expired_token = jwt.encode(
+            {"sub": str(user["id"]), "exp": datetime.now(timezone.utc) - timedelta(minutes=1)},
+            auth.SECRET_KEY,
+            algorithm=auth.ALGORITHM,
+        )
+
+        response = self.client.get("/auth/me", headers={"Authorization": f"Bearer {expired_token}"})
+
+        self.assertEqual(response.status_code, 401)
 
     def test_authenticated_user_can_list_and_read_users(self) -> None:
         admin = self._register("admin@example.com")
