@@ -265,6 +265,7 @@
       <div class="grid">
         <section class="card" aria-labelledby="new-supplier-title">
           <h3 id="new-supplier-title">Register supplier</h3>
+          <p>Uses <code>POST /suppliers</code> and displays API validation errors if the request is rejected.</p>
           <form id="supplier-form">
             <label for="name">Name</label>
             <input id="name" name="name" required />
@@ -306,6 +307,7 @@
 
         <section class="card" aria-labelledby="directory-title">
           <h3 id="directory-title">Directory</h3>
+          <p>Filters call <code>GET /suppliers</code>; row controls call <code>PATCH /suppliers/{id}/rate</code> and <code>PATCH /suppliers/{id}/status</code>.</p>
           <div class="filters" aria-label="Supplier filters">
             <div>
               <label for="filter-country">Filter by country</label>
