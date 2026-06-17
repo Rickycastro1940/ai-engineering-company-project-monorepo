@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reset your password</title>
+  <link rel="stylesheet" href="/auth.css" />
+</head>
+<body>
+  <main class="wrap">
+    <section class="card">
+      <h1>Reset your password</h1>
+
+      <div id="missing-token" class="banner error" hidden>
+        <p>This reset link is missing its token.</p>
+        <p><a href="/forgot-password">Request a new reset link</a>.</p>
+      </div>
+
+      <form id="reset-form" novalidate>
+        <label for="password">New password</label>
+        <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required />
+
+        <label for="confirm">Confirm new password</label>
+        <input id="confirm" name="confirm" type="password" autocomplete="new-password" minlength="8" required />
+
+        <button id="submit" type="submit">Update password</button>
+      </form>
+
+      <div id="error-box" class="banner error" hidden>
+        <p id="error-message"></p>
+        <p><a href="/forgot-password">Request a new reset link</a>.</p>
+      </div>
+
+      <p id="status" class="status"></p>
+    </section>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+
+    const form = document.getElementById('reset-form');
+    const missingToken = document.getElementById('missing-token');
+    const errorBox = document.getElementById('error-box');
+    const errorMessage = document.getElementById('error-message');
+    const statusNode = document.getElementById('status');
+
+    if (!token) {
+      form.hidden = true;
+      missingToken.hidden = false;
+    }
+
+    const showError = (message) => {
+      errorMessage.textContent = message;
+      errorBox.hidden = false;
+    };
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      errorBox.hidden = true;
+      statusNode.className = 'status';
+
+      const password = document.getElementById('password').value;
+      const confirm = document.getElementById('confirm').value;
+
+      if (password.length < 8) {
+        showError('Your password must be at least 8 characters long.');
+        return;
+      }
+      if (password !== confirm) {
+        showError('The two passwords do not match.');
+        return;
+      }
+
+      statusNode.textContent = 'Updating password...';
+      try {
+        const response = await fetch('/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, password }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.detail || 'This reset link is invalid or has expired.');
+        }
+        statusNode.textContent = '';
+        window.location.href = '/login?reset=success';
+      } catch (error) {
+        statusNode.textContent = '';
+        showError(error.message);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+body {
+  margin: 0;
+  font-family: "Trebuchet MS", "Gill Sans", sans-serif;
+  background: #f4f1e8;
+  color: #1b2a41;
+}
+.wrap {
+  max-width: 460px;
+  margin: 48px auto;
+  padding: 20px;
+}
+.card {
+  border: 1px solid #d8ccb6;
+  border-radius: 12px;
+  padding: 24px;
+  background: #fffaf1;
+}
+h1 {
+  margin-top: 0;
+  color: #b84f2a;
+}
+label {
+  display: block;
+  margin-top: 12px;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid #bfae93;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+input:disabled {
+  background: #efe9dc;
+  color: #8a8273;
+}
+button {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 16px;
+  padding: 11px;
+  background: #b84f2a;
+  color: #fff;
+  font-weight: 700;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+button:disabled {
+  background: #cda18f;
+  cursor: not-allowed;
+}
+.links {
+  margin-top: 16px;
+}
+.links a {
+  color: #b84f2a;
+  font-weight: 600;
+}
+.status {
+  margin-top: 12px;
+  min-height: 18px;
+}
+.status.error {
+  color: #b22222;
+}
+.status.success {
+  color: #2e7d32;
+}
+.banner {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 8px;
+}
+.banner.success {
+  background: #e6f4ea;
+  border: 1px solid #2e7d32;
+  color: #1e5a26;
+}
+.banner.error {
+  background: #fbe9e7;
+  border: 1px solid #b22222;
+  color: #8c1d1d;
+}
+.banner p {
+  margin: 4px 0;
+}
+.banner a {
+  color: inherit;
+  font-weight: 700;
+}

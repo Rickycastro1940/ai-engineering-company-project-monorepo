@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Log in</title>
+  <link rel="stylesheet" href="/auth.css" />
+</head>
+<body>
+  <main class="wrap">
+    <section class="card">
+      <h1>Log in</h1>
+      <p id="banner" class="banner" hidden></p>
+
+      <form id="login-form" novalidate>
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="username" required />
+
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+
+        <button id="submit" type="submit">Log in</button>
+      </form>
+
+      <p class="links">
+        <a id="forgot-link" href="/forgot-password">Forgot your password?</a>
+      </p>
+      <p id="status" class="status"></p>
+    </section>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const banner = document.getElementById('banner');
+    if (params.get('reset') === 'success') {
+      banner.textContent = 'Your password has been reset. Please log in with your new password.';
+      banner.classList.add('success');
+      banner.hidden = false;
+    }
+
+    const form = document.getElementById('login-form');
+    const statusNode = document.getElementById('status');
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      statusNode.textContent = 'Signing in...';
+      statusNode.className = 'status';
+      try {
+        const response = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: document.getElementById('email').value,
+            password: document.getElementById('password').value,
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.detail || 'Login failed.');
+        }
+        statusNode.textContent = data.message || 'Logged in successfully.';
+        statusNode.className = 'status success';
+      } catch (error) {
+        statusNode.textContent = error.message;
+        statusNode.className = 'status error';
+      }
+    });
+  </script>
+</body>
+</html>
