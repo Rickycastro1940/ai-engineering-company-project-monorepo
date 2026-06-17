@@ -124,6 +124,35 @@ curl "http://127.0.0.1:8000/inventory/alerts?threshold=20"
 
 Interactive docs: `http://127.0.0.1:8000/docs`
 
+## Authentication / password reset
+
+Password-reset endpoints and pages. Users are stored in `users.csv` at the repo root
+(passwords hashed with PBKDF2-SHA256); reset tokens are stored in `password_resets.csv`
+(git-ignored, runtime only). Reset emails are sent through [Resend](https://resend.com).
+
+### Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/auth/forgot-password` | Body `{email}`. Always returns `200` with a generic message (no account enumeration). If the email is registered, issues a token and emails a reset link. |
+| `POST` | `/auth/reset-password` | Body `{token, password}`. Sets the new password and invalidates the token on success. Returns `400` for invalid/expired/used tokens. |
+| `POST` | `/auth/login` | Body `{email, password}`. Returns `200` on valid credentials, `401` otherwise. |
+
+### Pages (served as static HTML)
+
+- `/forgot-password` — request a reset link; shows a confirmation regardless of result.
+- `/reset-password?token=...` — set a new password; redirects to `/login` on success, shows an error with a link back to `/forgot-password` on failure.
+- `/login` — includes a "Forgot your password?" link.
+
+### Configuration (all from environment variables — never hardcoded)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `RESEND_API_KEY` | (none) | Resend API key. If unset, the email send is skipped (the endpoint still returns `200`). |
+| `RESET_EMAIL_FROM` | `onboarding@resend.dev` | Sender address. The Resend test sender only delivers to the account owner; verify a domain to send elsewhere. |
+| `APP_BASE_URL` | `http://127.0.0.1:8000` | Base URL used to build the reset link. |
+| `RESET_TOKEN_TTL_MINUTES` | `30` | Reset-token lifetime in minutes. |
+
 ## Incident analysis endpoints
 
 The FastAPI app also includes:

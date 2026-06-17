@@ -1,0 +1,2 @@
+email,password_hash
+user@example.com,pbkdf2_sha256$200000$1sbWSgJ24wdLEucKclinNw==$bSyF1PfWpTrYsp7YXO+0curAAYVLsadoL3moc1JN3fQ=
