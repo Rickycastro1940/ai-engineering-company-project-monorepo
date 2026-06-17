@@ -16,9 +16,12 @@ pip install -r requirements.txt
 
 ```env
 GROQ_API_KEY=your_key_here
+JWT_SECRET_KEY=replace_with_a_long_random_secret
+ACCESS_TOKEN_EXPIRE_MINUTES=30
 ```
 
 Do not commit `.env` — it is listed in `.gitignore`.
+`JWT_SECRET_KEY` is read from the environment for token signing. If it is omitted, the API generates a temporary in-memory secret for local development, which means existing tokens are invalidated when the process restarts.
 
 ### Start order (required)
 
@@ -102,7 +105,10 @@ Inventory data is stored in [`products.csv`](../../products.csv) at the reposito
 |--------|----------|-------------|
 | `GET` | `/inventory` | List all products |
 | `POST` | `/inventory` | Add a product (`name`, `quantity`, `unit`) |
+| `GET` | `/inventory/summary` | Aggregate product count, totals by unit, and low-stock count |
+| `GET` | `/inventory/{product_id}` | Fetch one product by ID |
 | `PATCH` | `/inventory/{product_id}` | Update stock by `delta` (+ incoming, − outgoing) |
+| `DELETE` | `/inventory/{product_id}` | Remove one product by ID |
 | `GET` | `/inventory/alerts` | Products below threshold (default `10`) |
 
 ### Examples
@@ -114,15 +120,73 @@ curl -X POST http://127.0.0.1:8000/inventory \
   -H "Content-Type: application/json" \
   -d '{"name":"Olive Oil","quantity":15,"unit":"liters"}'
 
+curl http://127.0.0.1:8000/inventory/summary
+curl http://127.0.0.1:8000/inventory/1
+
 curl -X PATCH http://127.0.0.1:8000/inventory/1 \
   -H "Content-Type: application/json" \
   -d '{"delta":5}'
+
+curl -X DELETE http://127.0.0.1:8000/inventory/1
 
 curl http://127.0.0.1:8000/inventory/alerts
 curl "http://127.0.0.1:8000/inventory/alerts?threshold=20"
 ```
 
 Interactive docs: `http://127.0.0.1:8000/docs`
+
+## Service status endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Minimal liveness response for monitors |
+| `GET` | `/api/status` | API metadata and advertised backend capabilities |
+
+## User and auth endpoints
+
+User records are stored in a local SQLite database at `data/company_api.db`.
+The table includes `id`, `email`, `hashed_password`, `is_active`, `is_admin`, and `created_at`.
+The database file is a runtime artifact and is ignored by git.
+
+The first registered user is created as an admin bootstrap account. Later users are regular active users unless an admin changes their status or role.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/users` | Register a new user. The API hashes the password before storing it. |
+| `POST` | `/auth/register` | Register a new user and return a bearer token immediately. |
+| `POST` | `/auth/login` | Exchange JSON email/password credentials for a bearer token. |
+| `POST` | `/auth/token` | Exchange OAuth2 form credentials for a bearer token. |
+| `GET` | `/auth/me` | Return the currently authenticated user's profile. Requires a bearer token. |
+| `GET` | `/users` | List all users. Requires a bearer token. |
+| `GET` | `/users/{id}` | Get one user. Requires the same user or an admin. |
+| `PUT` | `/users/{id}` | Update a user. Requires the same user or an admin. Only admins can change `is_active` or `is_admin`. |
+| `DELETE` | `/users/{id}` | Delete a user. Requires the same user or an admin. |
+
+### Examples
+
+```bash
+curl -X POST http://127.0.0.1:8000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"secret-password"}'
+
+TOKEN=$(
+  curl -s -X POST http://127.0.0.1:8000/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"email":"admin@example.com","password":"secret-password"}' \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])'
+)
+
+curl http://127.0.0.1:8000/auth/me \
+  -H "Authorization: Bearer $TOKEN"
+
+curl http://127.0.0.1:8000/users \
+  -H "Authorization: Bearer $TOKEN"
+
+curl -X PUT http://127.0.0.1:8000/users/1 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"new-admin@example.com"}'
+```
 
 ## Incident analysis endpoints
 
