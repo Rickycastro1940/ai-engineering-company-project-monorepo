@@ -8,3 +8,4 @@ conversation_log.csv
 conversation_log.csv.bak
 data/uploads/
 **/__pycache__/
+*.egg-info/
