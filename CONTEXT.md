@@ -166,6 +166,66 @@ Construir progresivamente una plataforma digital integrada para Brasaland, aline
 - Integraciones con POS heterogeneos por pais.
 - Mantener consistencia de marca y operacion entre locales.
 
+## Modelo de proveedores
+
+El directorio de proveedores de Brasaland usa estos campos exactos para el modelo `Supplier`:
+
+| Campo | Tipo | Reglas |
+| --- | --- | --- |
+| `name` | string | Nombre del proveedor. Requerido y no vacio. |
+| `country` | string | Pais operativo del proveedor. Requerido y no vacio. Los datos iniciales usan `Colombia` y `United States`. |
+| `product_categories` | list[string] | Una o mas categorias validas de producto. |
+| `rate` | number | Tarifa actual del proveedor. Debe ser mayor que `0`. |
+| `last_rate_update_date` | date | Fecha de la ultima actualizacion de tarifa en formato `YYYY-MM-DD`. |
+| `status` | string | Estado operativo del proveedor. Debe ser uno de los estados permitidos. |
+| `id` | integer | Generado por TinyDB al insertar. No lo envia el cliente. |
+| `updated_at` | datetime | Generado por el sistema al crear o modificar. No lo envia el cliente. |
+
+### Categorias validas de proveedores
+
+Los valores permitidos para `product_categories` son exactamente:
+
+- `proteins`
+- `produce`
+- `pantry`
+- `beverages`
+- `packaging`
+- `cleaning`
+
+### Estados permitidos de proveedores
+
+Los valores permitidos para `status` son exactamente:
+
+- `active`
+- `suspended`
+
+### Proveedores iniciales del seeder
+
+El seeder debe cargar estos 20 proveedores iniciales. La combinacion `name` + `country` identifica duplicados para evitar insertar el mismo proveedor mas de una vez.
+
+| name | country | product_categories | rate | last_rate_update_date | status |
+| --- | --- | --- | ---: | --- | --- |
+| Carnes Antioquia | Colombia | `proteins` | 4.65 | 2026-05-20 | active |
+| Avicola Las Palmas | Colombia | `proteins` | 3.90 | 2026-05-18 | active |
+| Pescados del Caribe | Colombia | `proteins` | 5.20 | 2026-04-30 | suspended |
+| Verduras Oriente | Colombia | `produce` | 1.45 | 2026-06-01 | active |
+| Frutas Medellin | Colombia | `produce` | 1.30 | 2026-05-29 | active |
+| Granos Andinos | Colombia | `pantry` | 2.10 | 2026-05-10 | active |
+| Salsas La Brasa | Colombia | `pantry` | 1.90 | 2026-05-24 | active |
+| Bebidas Tropicales | Colombia | `beverages` | 1.75 | 2026-05-21 | active |
+| Empaques EcoBogota | Colombia | `packaging` | 0.28 | 2026-06-02 | active |
+| Limpieza Profesional | Colombia | `cleaning` | 0.55 | 2026-05-17 | active |
+| Florida Prime Meats | United States | `proteins` | 5.80 | 2026-05-22 | active |
+| Sunshine Poultry | United States | `proteins` | 4.40 | 2026-05-26 | active |
+| Gulf Seafood Supply | United States | `proteins` | 6.30 | 2026-04-28 | suspended |
+| Miami Fresh Produce | United States | `produce` | 1.85 | 2026-06-03 | active |
+| Orlando Citrus Farms | United States | `produce` | 1.60 | 2026-05-31 | active |
+| Latin Pantry Imports | United States | `pantry` | 2.75 | 2026-05-13 | active |
+| Brasa Sauce Co. | United States | `pantry` | 2.20 | 2026-05-27 | active |
+| Florida Beverage Partners | United States | `beverages` | 1.95 | 2026-05-19 | active |
+| Gulf Coast Packaging | United States | `packaging` | 0.32 | 2026-06-04 | active |
+| Clean Kitchen Supply | United States | `cleaning` | 0.70 | 2026-05-15 | active |
+
 ## Oportunidades de IA prioritarias
 
 - Prediccion de demanda de ingredientes por local y franja horaria.
