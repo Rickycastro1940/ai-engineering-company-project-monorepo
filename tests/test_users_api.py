@@ -105,11 +105,17 @@ class UsersApiTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
 
     def test_protected_user_routes_require_bearer_token(self) -> None:
-        self._register("user@example.com")
+        user = self._register("user@example.com")
 
-        response = self.client.get("/users")
-
-        self.assertEqual(response.status_code, 401)
+        protected_requests = [
+            self.client.get("/auth/me"),
+            self.client.get("/users"),
+            self.client.get(f"/users/{user['id']}"),
+            self.client.put(f"/users/{user['id']}", json={"email": "blocked@example.com"}),
+            self.client.delete(f"/users/{user['id']}"),
+        ]
+        for response in protected_requests:
+            self.assertEqual(response.status_code, 401)
 
     def test_authenticated_user_can_list_and_read_users(self) -> None:
         admin = self._register("admin@example.com")
@@ -122,6 +128,25 @@ class UsersApiTestCase(unittest.TestCase):
         read_response = self.client.get(f"/users/{member['id']}", headers=self._auth_headers("member@example.com"))
         self.assertEqual(read_response.status_code, 200)
         self.assertEqual(read_response.json()["email"], "member@example.com")
+
+        admin_read_response = self.client.get(f"/users/{member['id']}", headers=self._auth_headers("admin@example.com"))
+        self.assertEqual(admin_read_response.status_code, 200)
+        self.assertEqual(admin_read_response.json()["email"], "member@example.com")
+
+    def test_non_admin_cannot_list_or_read_other_users(self) -> None:
+        self._register("admin@example.com")
+        member = self._register("member@example.com")
+        other = self._register("other@example.com")
+        member_headers = self._auth_headers("member@example.com")
+
+        list_response = self.client.get("/users", headers=member_headers)
+        self.assertEqual(list_response.status_code, 403)
+
+        read_other_response = self.client.get(f"/users/{other['id']}", headers=member_headers)
+        self.assertEqual(read_other_response.status_code, 403)
+
+        read_self_response = self.client.get(f"/users/{member['id']}", headers=member_headers)
+        self.assertEqual(read_self_response.status_code, 200)
 
     def test_user_can_update_self_but_not_escalate_or_update_others(self) -> None:
         admin = self._register("admin@example.com")
