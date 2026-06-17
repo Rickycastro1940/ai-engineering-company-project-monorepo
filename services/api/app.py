@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Literal
 
 from analyzer import IncidentAnalyzer
+from auth import router as auth_router
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -87,6 +88,7 @@ def _register_analyze_routes(app: FastAPI, route_prefix: str) -> None:
         return summary
 
 app = FastAPI(title="Company Incident File Analyzer", version="1.0.0")
+app.include_router(auth_router)
 app.include_router(inventory_router)
 _register_analyze_routes(app, "anylayze")
 _register_analyze_routes(app, "analyze")
