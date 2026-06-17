@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 from datetime import datetime, timedelta, timezone
 
 import bcrypt as _bcrypt
@@ -16,9 +17,22 @@ if not hasattr(_bcrypt, "__about__"):
 
     _bcrypt.__about__ = _BcryptAbout()
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-this-development-secret")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+
+
+def _load_secret_key() -> str:
+    configured_secret = os.getenv("JWT_SECRET_KEY")
+    if configured_secret:
+        return configured_secret
+    return secrets.token_urlsafe(32)
+
+
+def _load_access_token_expire_minutes() -> int:
+    return int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+
+
+SECRET_KEY = _load_secret_key()
+ACCESS_TOKEN_EXPIRE_MINUTES = _load_access_token_expire_minutes()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

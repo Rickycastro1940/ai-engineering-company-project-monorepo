@@ -17,9 +17,11 @@ pip install -r requirements.txt
 ```env
 GROQ_API_KEY=your_key_here
 JWT_SECRET_KEY=replace_with_a_long_random_secret
+ACCESS_TOKEN_EXPIRE_MINUTES=30
 ```
 
 Do not commit `.env` — it is listed in `.gitignore`.
+`JWT_SECRET_KEY` is read from the environment for token signing. If it is omitted, the API generates a temporary in-memory secret for local development, which means existing tokens are invalidated when the process restarts.
 
 ### Start order (required)
 

@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from jose import jwt
@@ -45,6 +46,19 @@ class UsersApiTestCase(unittest.TestCase):
 
     def _auth_headers(self, email: str, password: str = "secret-password") -> dict[str, str]:
         return {"Authorization": f"Bearer {self._token(email, password)}"}
+
+    def test_jwt_configuration_comes_from_environment_without_hardcoded_secret(self) -> None:
+        with patch.dict("os.environ", {"JWT_SECRET_KEY": "test-secret-from-env"}, clear=False):
+            self.assertEqual(auth._load_secret_key(), "test-secret-from-env")
+
+        with patch.dict("os.environ", {"ACCESS_TOKEN_EXPIRE_MINUTES": "7"}, clear=False):
+            self.assertEqual(auth._load_access_token_expire_minutes(), 7)
+
+        with patch.dict("os.environ", {}, clear=True):
+            generated_secret = auth._load_secret_key()
+
+        self.assertNotEqual(generated_secret, "change-this-development-secret")
+        self.assertGreaterEqual(len(generated_secret), 32)
 
     def test_register_hashes_password_and_bootstraps_first_admin(self) -> None:
         user = self._register("Admin@Example.com")
