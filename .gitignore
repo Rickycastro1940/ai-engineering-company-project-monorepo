@@ -7,4 +7,5 @@ scripts/results.csv
 conversation_log.csv
 conversation_log.csv.bak
 data/uploads/
+data/auth/
 **/__pycache__/
