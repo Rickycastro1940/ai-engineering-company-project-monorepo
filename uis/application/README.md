@@ -1,6 +1,6 @@
 # Brasaland application UI
 
-This static frontend provides the Brasaland supplier directory.
+This static frontend provides the Brasaland supplier directory at `app/suppliers/`.
 
 ## Features
 
@@ -21,4 +21,4 @@ uv run seed
 uvicorn api.app:app --reload
 ```
 
-Then open `http://127.0.0.1:8000/`.
+Then open `http://127.0.0.1:8000/app/suppliers/`.

@@ -5,7 +5,8 @@ from pathlib import Path
 
 from tinydb import Query, TinyDB
 
-from .suppliers import SupplierCreate, SupplierResponse, _db_path, _model_dump
+from .database import db_path, model_dump
+from .models import SupplierCreate, SupplierResponse
 
 INITIAL_SUPPLIERS: list[SupplierCreate] = [
     SupplierCreate(
@@ -171,8 +172,8 @@ INITIAL_SUPPLIERS: list[SupplierCreate] = [
 ]
 
 
-def seed_suppliers(db_path: Path | None = None) -> int:
-    target_path = db_path or _db_path()
+def seed_suppliers(target_db_path: Path | None = None) -> int:
+    target_path = target_db_path or db_path()
     target_path.parent.mkdir(parents=True, exist_ok=True)
     supplier_query = Query()
     inserted_count = 0
@@ -184,14 +185,14 @@ def seed_suppliers(db_path: Path | None = None) -> int:
             if table.contains((supplier_query.name == supplier.name) & (supplier_query.country == supplier.country)):
                 continue
 
-            payload = _model_dump(supplier)
+            payload = model_dump(supplier)
             doc_id = table.insert(payload)
             response = SupplierResponse(
                 id=doc_id,
                 updated_at=datetime.now(timezone.utc),
                 **payload,
             )
-            table.update(_model_dump(response), doc_ids=[doc_id])
+            table.update(model_dump(response), doc_ids=[doc_id])
             inserted_count += 1
 
     return inserted_count
