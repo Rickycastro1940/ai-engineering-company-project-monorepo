@@ -151,7 +151,10 @@ The first registered user is created as an admin bootstrap account. Later users 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/users` | Register a new user. The API hashes the password before storing it. |
-| `POST` | `/auth/token` | Exchange email/password form credentials for a bearer token. |
+| `POST` | `/auth/register` | Register a new user and return a bearer token immediately. |
+| `POST` | `/auth/login` | Exchange JSON email/password credentials for a bearer token. |
+| `POST` | `/auth/token` | Exchange OAuth2 form credentials for a bearer token. |
+| `GET` | `/auth/me` | Return the currently authenticated user's profile. Requires a bearer token. |
 | `GET` | `/users` | List all users. Requires a bearer token. |
 | `GET` | `/users/{id}` | Get one user. Requires a bearer token. |
 | `PUT` | `/users/{id}` | Update a user. Requires the same user or an admin. Only admins can change `is_active` or `is_admin`. |
@@ -160,16 +163,19 @@ The first registered user is created as an admin bootstrap account. Later users 
 ### Examples
 
 ```bash
-curl -X POST http://127.0.0.1:8000/users \
+curl -X POST http://127.0.0.1:8000/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"admin@example.com","password":"secret-password"}'
 
 TOKEN=$(
-  curl -s -X POST http://127.0.0.1:8000/auth/token \
-    -H "Content-Type: application/x-www-form-urlencoded" \
-    -d "username=admin@example.com&password=secret-password" \
-  | python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])'
+  curl -s -X POST http://127.0.0.1:8000/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"email":"admin@example.com","password":"secret-password"}' \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])'
 )
+
+curl http://127.0.0.1:8000/auth/me \
+  -H "Authorization: Bearer $TOKEN"
 
 curl http://127.0.0.1:8000/users \
   -H "Authorization: Bearer $TOKEN"

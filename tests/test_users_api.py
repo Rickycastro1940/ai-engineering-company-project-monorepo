@@ -65,6 +65,45 @@ class UsersApiTestCase(unittest.TestCase):
 
         self.assertEqual(response.status_code, 409)
 
+    def test_auth_register_returns_token_and_current_profile(self) -> None:
+        register_response = self.client.post(
+            "/auth/register",
+            json={"email": "new-user@example.com", "password": "secret-password"},
+        )
+        self.assertEqual(register_response.status_code, 201)
+        payload = register_response.json()
+        self.assertEqual(payload["token_type"], "bearer")
+        self.assertTrue(payload["access_token"])
+        self.assertEqual(payload["user"]["email"], "new-user@example.com")
+        self.assertNotIn("hashed_password", payload["user"])
+
+        me_response = self.client.get("/auth/me", headers={"Authorization": f"Bearer {payload['access_token']}"})
+        self.assertEqual(me_response.status_code, 200)
+        self.assertEqual(me_response.json()["email"], "new-user@example.com")
+
+    def test_auth_login_accepts_json_credentials(self) -> None:
+        self._register("user@example.com")
+
+        response = self.client.post(
+            "/auth/login",
+            json={"email": "user@example.com", "password": "secret-password"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["token_type"], "bearer")
+        self.assertTrue(payload["access_token"])
+
+    def test_auth_login_rejects_invalid_credentials(self) -> None:
+        self._register("user@example.com")
+
+        response = self.client.post(
+            "/auth/login",
+            json={"email": "user@example.com", "password": "wrong-password"},
+        )
+
+        self.assertEqual(response.status_code, 401)
+
     def test_protected_user_routes_require_bearer_token(self) -> None:
         self._register("user@example.com")
 

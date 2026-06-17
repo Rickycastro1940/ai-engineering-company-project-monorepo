@@ -28,6 +28,11 @@ class UserUpdate(BaseModel):
     is_admin: bool | None = None
 
 
+class LoginRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+    password: str = Field(min_length=8)
+
+
 class UserPublic(BaseModel):
     id: int
     email: str
@@ -39,6 +44,10 @@ class UserPublic(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class AuthResponse(TokenResponse):
+    user: UserPublic
 
 
 def _connect() -> sqlite3.Connection:
@@ -223,6 +232,14 @@ def _require_self_or_admin(user_id: int, current_user: dict[str, Any]) -> None:
         raise HTTPException(status_code=403, detail="Not enough permissions")
 
 
+def _build_auth_response(user: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "access_token": create_access_token(str(user["id"])),
+        "token_type": "bearer",
+        "user": _public_user(user),
+    }
+
+
 @router.post("/auth/token", response_model=TokenResponse)
 def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()) -> dict[str, str]:
     user = authenticate_user(form_data.username, form_data.password)
@@ -233,6 +250,29 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()) -> 
             headers={"WWW-Authenticate": "Bearer"},
         )
     return {"access_token": create_access_token(str(user["id"])), "token_type": "bearer"}
+
+
+@router.post("/auth/login", response_model=TokenResponse)
+def login(body: LoginRequest) -> dict[str, str]:
+    user = authenticate_user(body.email, body.password)
+    if user is None or not user["is_active"]:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return {"access_token": create_access_token(str(user["id"])), "token_type": "bearer"}
+
+
+@router.post("/auth/register", response_model=AuthResponse, status_code=201)
+def register_and_login(body: UserCreate) -> dict[str, Any]:
+    user = create_user(body.email, body.password, is_admin=count_users() == 0)
+    return _build_auth_response(user)
+
+
+@router.get("/auth/me", response_model=UserPublic)
+def read_current_user(current_user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
+    return _public_user(current_user)
 
 
 @router.post("/users", response_model=UserPublic, status_code=201)
