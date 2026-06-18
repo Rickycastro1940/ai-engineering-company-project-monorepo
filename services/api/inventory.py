@@ -3,14 +3,15 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from auth import get_current_user
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PRODUCTS_FILE = REPO_ROOT / "products.csv"
 FIELDNAMES = ["product_id", "name", "quantity", "unit"]
 
-router = APIRouter(prefix="/inventory", tags=["inventory"])
+router = APIRouter(prefix="/inventory", tags=["inventory"], dependencies=[Depends(get_current_user)])
 
 
 class ProductCreate(BaseModel):

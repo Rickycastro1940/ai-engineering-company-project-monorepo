@@ -5,8 +5,10 @@ import tempfile
 from pathlib import Path
 from typing import Literal
 
+from auth import get_current_user, router as auth_router
 from analyzer import IncidentAnalyzer
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from inventory import router as inventory_router
@@ -47,17 +49,22 @@ def _run_analysis(input_path: Path, output_path: Path, engine: Engine) -> dict:
 
 def _register_analyze_routes(app: FastAPI, route_prefix: str) -> None:
     @app.post(f"/api/incidents/{route_prefix}")
-    def analyze(request: AnalyzeRequest):
+    def analyze(request: AnalyzeRequest, _current_user: dict = Depends(get_current_user)):
         out = _resolve_repo_path(request.output_file)
         _run_analysis(_resolve_repo_path(request.input_file), out, request.engine)
         return FileResponse(path=out, filename=out.name, media_type="text/csv")
 
     @app.post(f"/api/incidents/{route_prefix}/summary")
-    def analyze_summary(request: AnalyzeRequest):
+    def analyze_summary(request: AnalyzeRequest, _current_user: dict = Depends(get_current_user)):
         return _run_analysis(_resolve_repo_path(request.input_file), _resolve_repo_path(request.output_file), request.engine)
 
     @app.post(f"/api/incidents/{route_prefix}/upload")
-    async def analyze_upload(file: UploadFile = File(...), output_file: str = Form(default="results.csv"), engine: Engine = Form(default="native")):
+    async def analyze_upload(
+        file: UploadFile = File(...),
+        output_file: str = Form(default="results.csv"),
+        engine: Engine = Form(default="native"),
+        _current_user: dict = Depends(get_current_user),
+    ):
         if not file.filename or not file.filename.lower().endswith(".csv"):
             raise HTTPException(status_code=400, detail="Only CSV uploads are supported")
         temp_dir = Path(tempfile.mkdtemp(prefix="incident-upload-", dir=UPLOAD_DIR))
@@ -72,7 +79,12 @@ def _register_analyze_routes(app: FastAPI, route_prefix: str) -> None:
         return FileResponse(path=output_path, filename=output_path.name, media_type="text/csv")
 
     @app.post(f"/api/incidents/{route_prefix}/upload/summary")
-    async def analyze_upload_summary(file: UploadFile = File(...), output_file: str = Form(default="results.csv"), engine: Engine = Form(default="native")):
+    async def analyze_upload_summary(
+        file: UploadFile = File(...),
+        output_file: str = Form(default="results.csv"),
+        engine: Engine = Form(default="native"),
+        _current_user: dict = Depends(get_current_user),
+    ):
         if not file.filename or not file.filename.lower().endswith(".csv"):
             raise HTTPException(status_code=400, detail="Only CSV uploads are supported")
         temp_dir = Path(tempfile.mkdtemp(prefix="incident-upload-", dir=UPLOAD_DIR))
@@ -87,12 +99,20 @@ def _register_analyze_routes(app: FastAPI, route_prefix: str) -> None:
         return summary
 
 app = FastAPI(title="Company Incident File Analyzer", version="1.0.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.include_router(auth_router)
 app.include_router(inventory_router)
 _register_analyze_routes(app, "anylayze")
 _register_analyze_routes(app, "analyze")
 
 @app.get("/api/incidents/results/export")
-def export_results(output_file: str = "results.csv"):
+def export_results(output_file: str = "results.csv", _current_user: dict = Depends(get_current_user)):
     output_path = _resolve_repo_path(output_file)
     if not output_path.exists():
         raise HTTPException(status_code=404, detail=f"Results file not found: {output_file}")
