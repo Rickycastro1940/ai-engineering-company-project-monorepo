@@ -69,7 +69,7 @@ export default function RegisterPage() {
       <section className="card narrow">
         <p className="eyebrow">New user</p>
         <h1>Create an account</h1>
-        <form onSubmit={handleSubmit} className="form-stack">
+        <form onSubmit={handleSubmit} className="form-stack" noValidate>
           <label>
             Name
             <input value={name} onChange={(event) => setName(event.target.value)} aria-invalid={Boolean(fieldErrors.name)} required />
