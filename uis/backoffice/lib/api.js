@@ -34,7 +34,7 @@ export async function apiRequest(path, options = {}) {
     headers,
   });
 
-  if (response.status === 401 && typeof window !== "undefined") {
+  if (response.status === 401 && token && typeof window !== "undefined") {
     clearToken();
     window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname)}`);
   }
