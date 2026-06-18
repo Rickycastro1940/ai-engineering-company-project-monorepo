@@ -29,6 +29,7 @@ class AuthApiTest(unittest.TestCase):
         )
         self.assertEqual(registered.status_code, 201)
         token = registered.json()["token"]
+        user_id = registered.json()["user"]["id"]
         self.assertEqual(registered.json()["user"]["email"], self.email)
 
         headers = {"Authorization": f"Bearer {token}"}
@@ -36,7 +37,7 @@ class AuthApiTest(unittest.TestCase):
         self.assertEqual(inventory.status_code, 200)
         self.assertGreaterEqual(len(inventory.json()), 1)
 
-        updated_profile = self.client.patch("/auth/me", headers=headers, json={"name": "Operations Lead"})
+        updated_profile = self.client.put(f"/users/{user_id}", headers=headers, json={"name": "Operations Lead"})
         self.assertEqual(updated_profile.status_code, 200)
         self.assertEqual(updated_profile.json()["name"], "Operations Lead")
 

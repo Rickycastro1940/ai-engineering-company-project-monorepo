@@ -1,6 +1,14 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 const TOKEN_KEY = "auth_token";
 
+export class ApiError extends Error {
+  constructor(message, details = null) {
+    super(message);
+    this.name = "ApiError";
+    this.details = details;
+  }
+}
+
 export function getStoredToken() {
   if (typeof window === "undefined") {
     return null;
@@ -41,13 +49,15 @@ export async function apiRequest(path, options = {}) {
 
   if (!response.ok) {
     let message = "The request failed.";
+    let details = null;
     try {
       const body = await response.json();
-      message = body.detail || message;
+      details = body.detail || null;
+      message = Array.isArray(details) ? "Please correct the highlighted fields." : details || message;
     } catch (_error) {
       message = await response.text();
     }
-    throw new Error(message);
+    throw new ApiError(message, details);
   }
 
   if (response.status === 204) {

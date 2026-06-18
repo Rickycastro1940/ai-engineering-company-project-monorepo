@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Literal
 
-from auth import get_current_user, router as auth_router
+from auth import get_current_user, router as auth_router, users_router
 from analyzer import IncidentAnalyzer
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -107,6 +107,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(auth_router)
+app.include_router(users_router)
 app.include_router(inventory_router)
 _register_analyze_routes(app, "anylayze")
 _register_analyze_routes(app, "analyze")

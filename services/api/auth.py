@@ -22,6 +22,7 @@ HASH_ITERATIONS = 200_000
 
 bearer_scheme = HTTPBearer(auto_error=False)
 router = APIRouter(prefix="/auth", tags=["auth"])
+users_router = APIRouter(prefix="/users", tags=["users"])
 
 
 class RegisterRequest(BaseModel):
@@ -117,7 +118,7 @@ def create_token(user: dict[str, Any]) -> str:
 
 
 def _public_user(user: dict[str, Any]) -> dict[str, str]:
-    return {"email": user["email"], "name": user["name"], "created_at": user["created_at"]}
+    return {"id": user["email"], "email": user["email"], "name": user["name"], "created_at": user["created_at"]}
 
 
 def _auth_response(user: dict[str, Any]) -> dict[str, Any]:
@@ -176,6 +177,17 @@ def read_profile(current_user: dict[str, Any] = Depends(get_current_user)) -> di
 
 @router.patch("/me")
 def update_profile(body: ProfileUpdateRequest, current_user: dict[str, Any] = Depends(get_current_user)) -> dict[str, str]:
+    users = _read_users()
+    user = users[current_user["email"]]
+    user["name"] = body.name.strip()
+    _write_users(users)
+    return _public_user(user)
+
+
+@users_router.put("/{user_id}")
+def update_user(user_id: str, body: ProfileUpdateRequest, current_user: dict[str, Any] = Depends(get_current_user)) -> dict[str, str]:
+    if user_id != current_user["email"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot update another user")
     users = _read_users()
     user = users[current_user["email"]]
     user["name"] = body.name.strip()

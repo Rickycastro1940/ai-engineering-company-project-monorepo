@@ -14,7 +14,8 @@ export default function NavBar() {
       <div className="nav-actions">
         {isAuthenticated ? (
           <>
-            <Link href="/profile">{user?.name || "Profile"}</Link>
+            <Link href="/account/profile">{user?.name || "Profile"}</Link>
+            <Link href="/account/change-password">Change password</Link>
             <button type="button" className="link-button" onClick={logout}>
               Logout
             </button>
