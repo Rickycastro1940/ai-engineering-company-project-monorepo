@@ -26,8 +26,10 @@ class AnalyzeRequest(BaseModel):
 def _resolve_repo_path(path_value: str) -> Path:
     candidate = Path(path_value)
     resolved = candidate.resolve() if candidate.is_absolute() else (REPO_ROOT / candidate).resolve()
-    if not str(resolved).startswith(str(REPO_ROOT.resolve())):
-        raise HTTPException(status_code=400, detail="Path must stay inside the repository")
+    try:
+        resolved.relative_to(REPO_ROOT.resolve())
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail="Path must stay inside the repository") from error
     return resolved
 
 def _run_analysis(input_path: Path, output_path: Path, engine: Engine) -> dict:
@@ -38,6 +40,8 @@ def _run_analysis(input_path: Path, output_path: Path, engine: Engine) -> dict:
         analyzer.export_summary_to_csv(output_path)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+    except OSError as error:
+        raise HTTPException(status_code=500, detail="Unable to read input or write analysis output") from error
     summary = analyzer.build_summary()
     try:
         summary["output_file"] = str(output_path.relative_to(REPO_ROOT))
@@ -58,10 +62,11 @@ def _register_analyze_routes(app: FastAPI, route_prefix: str) -> None:
 
     @app.post(f"/api/incidents/{route_prefix}/upload")
     async def analyze_upload(file: UploadFile = File(...), output_file: str = Form(default="results.csv"), engine: Engine = Form(default="native")):
-        if not file.filename or not file.filename.lower().endswith(".csv"):
+        safe_filename = Path(file.filename or "").name
+        if not safe_filename or not safe_filename.lower().endswith(".csv"):
             raise HTTPException(status_code=400, detail="Only CSV uploads are supported")
         temp_dir = Path(tempfile.mkdtemp(prefix="incident-upload-", dir=UPLOAD_DIR))
-        input_path = temp_dir / file.filename
+        input_path = temp_dir / safe_filename
         output_path = _resolve_repo_path(output_file)
         try:
             with input_path.open("wb") as handle:
@@ -69,14 +74,16 @@ def _register_analyze_routes(app: FastAPI, route_prefix: str) -> None:
             _run_analysis(input_path, output_path, engine)
         finally:
             await file.close()
+            shutil.rmtree(temp_dir, ignore_errors=True)
         return FileResponse(path=output_path, filename=output_path.name, media_type="text/csv")
 
     @app.post(f"/api/incidents/{route_prefix}/upload/summary")
     async def analyze_upload_summary(file: UploadFile = File(...), output_file: str = Form(default="results.csv"), engine: Engine = Form(default="native")):
-        if not file.filename or not file.filename.lower().endswith(".csv"):
+        safe_filename = Path(file.filename or "").name
+        if not safe_filename or not safe_filename.lower().endswith(".csv"):
             raise HTTPException(status_code=400, detail="Only CSV uploads are supported")
         temp_dir = Path(tempfile.mkdtemp(prefix="incident-upload-", dir=UPLOAD_DIR))
-        input_path = temp_dir / file.filename
+        input_path = temp_dir / safe_filename
         output_path = _resolve_repo_path(output_file)
         try:
             with input_path.open("wb") as handle:
@@ -84,6 +91,7 @@ def _register_analyze_routes(app: FastAPI, route_prefix: str) -> None:
             summary = _run_analysis(input_path, output_path, engine)
         finally:
             await file.close()
+            shutil.rmtree(temp_dir, ignore_errors=True)
         return summary
 
 app = FastAPI(title="Company Incident File Analyzer", version="1.0.0")
