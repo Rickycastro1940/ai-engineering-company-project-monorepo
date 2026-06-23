@@ -258,7 +258,12 @@
       if (!rawMessage || /unexpected token|syntaxerror|error\s*\d{3}|internal server error/i.test(rawMessage)) {
         return fallbackMessage;
       }
-      return rawMessage;
+      if (/input file not found/i.test(rawMessage)) {
+        return 'We could not find the input CSV. Check the path and try again.';
+      }
+      return rawMessage
+        .replace(/\/workspace\/([^\s]+)/g, '$1')
+        .replace(/\/tmp\/[^\s]+/g, 'a temporary file');
     };
 
     const parseJsonResponse = async (response) => {
