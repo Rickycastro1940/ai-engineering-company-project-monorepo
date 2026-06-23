@@ -138,7 +138,10 @@ def _api_request(method: str, path: str, body: dict[str, Any] | None = None) -> 
     try:
         with urllib.request.urlopen(request) as response:
             raw = response.read().decode("utf-8")
-            return json.loads(raw) if raw else {}
+            try:
+                return json.loads(raw) if raw else {}
+            except json.JSONDecodeError as error:
+                return {"error": True, "status_code": response.status, "detail": f"API returned invalid JSON: {error}"}
     except urllib.error.HTTPError as error:
         detail = error.read().decode("utf-8")
         try:
@@ -146,7 +149,7 @@ def _api_request(method: str, path: str, body: dict[str, Any] | None = None) -> 
         except json.JSONDecodeError:
             parsed = {"detail": detail or error.reason}
         return {"error": True, "status_code": error.code, "detail": parsed}
-    except urllib.error.URLError as error:
+    except (TimeoutError, urllib.error.URLError) as error:
         return {
             "error": True,
             "status_code": 0,
@@ -154,19 +157,66 @@ def _api_request(method: str, path: str, body: dict[str, Any] | None = None) -> 
         }
 
 
-def execute_tool(name: str, arguments: dict[str, Any]) -> Any:
+def _tool_error(detail: str) -> dict[str, Any]:
+    return {"error": True, "detail": detail}
+
+
+def _integer_argument(arguments: dict[str, Any], key: str, *, required: bool = True, default: int | None = None) -> tuple[int | None, str | None]:
+    if key not in arguments:
+        if required:
+            return None, f"Missing required argument: {key}"
+        return default, None
+    value = arguments[key]
+    if isinstance(value, bool):
+        return None, f"Argument {key} must be an integer"
+    try:
+        return int(value), None
+    except (TypeError, ValueError):
+        return None, f"Argument {key} must be an integer"
+
+
+def _text_argument(arguments: dict[str, Any], key: str) -> tuple[str | None, str | None]:
+    value = arguments.get(key)
+    if not isinstance(value, str) or not value.strip():
+        return None, f"Argument {key} must be a non-empty string"
+    return value.strip(), None
+
+
+def execute_tool(name: str, arguments: Any) -> Any:
+    if not isinstance(arguments, dict):
+        return _tool_error("Tool arguments must be a JSON object")
     if name == "list_inventory":
         return _api_request("GET", "/inventory")
     if name == "add_product":
-        return _api_request("POST", "/inventory", arguments)
+        product_name, error = _text_argument(arguments, "name")
+        if error:
+            return _tool_error(error)
+        quantity, error = _integer_argument(arguments, "quantity")
+        if error:
+            return _tool_error(error)
+        if quantity is not None and quantity < 0:
+            return _tool_error("Argument quantity must be greater than or equal to 0")
+        unit, error = _text_argument(arguments, "unit")
+        if error:
+            return _tool_error(error)
+        return _api_request("POST", "/inventory", {"name": product_name, "quantity": quantity, "unit": unit})
     if name == "update_stock":
-        product_id = arguments["product_id"]
-        return _api_request("PATCH", f"/inventory/{product_id}", {"delta": arguments["delta"]})
+        product_id, error = _integer_argument(arguments, "product_id")
+        if error:
+            return _tool_error(error)
+        delta, error = _integer_argument(arguments, "delta")
+        if error:
+            return _tool_error(error)
+        return _api_request("PATCH", f"/inventory/{product_id}", {"delta": delta})
     if name == "get_low_stock_alerts":
-        threshold = arguments.get("threshold", 10)
+        threshold, error = _integer_argument(arguments, "threshold", required=False, default=10)
+        if error:
+            return _tool_error(error)
+        if threshold is not None and threshold < 0:
+            return _tool_error("Argument threshold must be greater than or equal to 0")
         query = urllib.parse.urlencode({"threshold": threshold})
         return _api_request("GET", f"/inventory/alerts?{query}")
-    return {"error": True, "detail": f"Unknown tool: {name}"}
+    return _tool_error(f"Unknown tool: {name}")
 
 
 def _assistant_message_payload(message: Any) -> dict[str, Any]:

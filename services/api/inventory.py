@@ -4,7 +4,7 @@ import csv
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PRODUCTS_FILE = REPO_ROOT / "products.csv"
@@ -18,6 +18,14 @@ class ProductCreate(BaseModel):
     quantity: int = Field(ge=0)
     unit: str = Field(min_length=1)
 
+    @field_validator("name", "unit")
+    @classmethod
+    def strip_required_text(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Value must not be blank")
+        return stripped
+
 
 class StockDelta(BaseModel):
     delta: int
@@ -26,9 +34,12 @@ class StockDelta(BaseModel):
 def _ensure_products_file() -> None:
     if PRODUCTS_FILE.exists():
         return
-    with PRODUCTS_FILE.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=FIELDNAMES)
-        writer.writeheader()
+    try:
+        with PRODUCTS_FILE.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=FIELDNAMES)
+            writer.writeheader()
+    except OSError as error:
+        raise HTTPException(status_code=500, detail="Unable to initialize inventory file") from error
 
 
 def load_products() -> list[dict[str, str | int]]:
@@ -56,8 +67,9 @@ def load_products() -> list[dict[str, str | int]]:
 
 
 def save_products(products: list[dict[str, str | int]]) -> None:
+    temp_file = PRODUCTS_FILE.with_suffix(f"{PRODUCTS_FILE.suffix}.tmp")
     try:
-        with PRODUCTS_FILE.open("w", newline="", encoding="utf-8") as handle:
+        with temp_file.open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=FIELDNAMES)
             writer.writeheader()
             for product in products:
@@ -69,8 +81,15 @@ def save_products(products: list[dict[str, str | int]]) -> None:
                         "unit": product["unit"],
                     }
                 )
+        temp_file.replace(PRODUCTS_FILE)
     except OSError as error:
         raise HTTPException(status_code=500, detail="Unable to write inventory file") from error
+    finally:
+        if temp_file.exists():
+            try:
+                temp_file.unlink()
+            except OSError:
+                pass
 
 
 def _find_product(products: list[dict[str, str | int]], product_id: int) -> dict[str, str | int] | None:
@@ -83,7 +102,7 @@ def _find_product(products: list[dict[str, str | int]], product_id: int) -> dict
 def create_product(name: str, quantity: int, unit: str) -> dict[str, str | int]:
     products = load_products()
     next_id = max((int(product["product_id"]) for product in products), default=0) + 1
-    product = {"product_id": next_id, "name": name.strip(), "quantity": quantity, "unit": unit.strip()}
+    product = {"product_id": next_id, "name": name, "quantity": quantity, "unit": unit}
     products.append(product)
     save_products(products)
     return product
