@@ -305,6 +305,14 @@
       selectedFileNode.textContent = file ? `Selected: ${file.name}` : 'No file selected.';
     };
 
+    const clearSummary = () => {
+      summarySection.style.display = 'none';
+      generalMetricsNode.innerHTML = '';
+      categoryBreakdownNode.innerHTML = '';
+      satisfactionMetricsNode.innerHTML = '';
+      satisfactionBreakdownNode.innerHTML = '';
+    };
+
     const renderSummary = (payload) => {
       const metrics = payload?.general_metrics || {};
       generalMetricsNode.innerHTML = '';
@@ -428,6 +436,7 @@
         engine: document.getElementById('engine').value,
       };
       const retry = () => runButton.click();
+      clearSummary();
       setStatus('loading', 'Running analysis...', '', null);
       setButtonsDisabled(true);
       try {
@@ -460,6 +469,7 @@
         return;
       }
       const retry = () => uploadButton.click();
+      clearSummary();
       setStatus('loading', 'Uploading and analyzing CSV...', '', null);
       setButtonsDisabled(true);
       try {
