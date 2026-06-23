@@ -47,6 +47,16 @@
       border: none;
       cursor: pointer;
     }
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.65;
+    }
+    .secondary-button {
+      width: auto;
+      min-width: 140px;
+      margin-top: 8px;
+      background: #1b2a41;
+    }
     .upload-zone {
       margin-top: 12px;
       border: 2px dashed #bfae93;
@@ -109,6 +119,34 @@
       min-height: 18px;
       color: #5b6878;
     }
+    #status.error {
+      color: #8f2d1c;
+    }
+    #status.success {
+      color: #286140;
+    }
+    .spinner {
+      display: inline-block;
+      width: 0.9rem;
+      height: 0.9rem;
+      margin-right: 6px;
+      border: 2px solid #d8ccb6;
+      border-top-color: #b84f2a;
+      border-radius: 50%;
+      vertical-align: -2px;
+      animation: spin 0.8s linear infinite;
+    }
+    .status-actions {
+      min-height: 42px;
+    }
+    .hidden {
+      display: none;
+    }
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
   </style>
 </head>
 <body>
@@ -118,7 +156,7 @@
       <p>Upload or select a CSV, run analysis, visualize summary, and export CSV.</p>
 
       <label for="input">Input CSV path</label>
-      <input id="input" value="data/incidents.csv" />
+      <input id="input" value="scripts/incidents-COMPANY.csv" />
 
       <label for="output">Output CSV path</label>
       <input id="output" value="results.csv" />
@@ -138,7 +176,10 @@
       <button id="upload-run" type="button">Upload CSV and Analyze</button>
       <button id="download-last" type="button">Download Last Results CSV</button>
       <p id="selected-file">No file selected.</p>
-      <p id="status"></p>
+      <p id="status" role="status" aria-live="polite">Ready to analyze a CSV.</p>
+      <div class="status-actions">
+        <button id="status-action" class="secondary-button hidden" type="button"></button>
+      </div>
 
       <section id="summary" class="summary">
         <h2>General Metrics</h2>
@@ -171,6 +212,7 @@
     const fileInput = document.getElementById('file-input');
     const selectedFileNode = document.getElementById('selected-file');
     const statusNode = document.getElementById('status');
+    const statusActionButton = document.getElementById('status-action');
     const summarySection = document.getElementById('summary');
     const generalMetricsNode = document.getElementById('general-metrics');
     const categoryBreakdownNode = document.getElementById('category-breakdown');
@@ -178,6 +220,80 @@
     const satisfactionBreakdownNode = document.getElementById('satisfaction-breakdown');
 
     let selectedFile = null;
+    let lastOutputFile = '';
+
+    const setButtonsDisabled = (disabled) => {
+      [runButton, uploadButton, downloadLastButton, downloadSummaryButton].forEach((button) => {
+        button.disabled = disabled;
+      });
+    };
+
+    const setStatus = (state, message, actionLabel, actionHandler) => {
+      statusNode.className = state === 'error' ? 'error' : state === 'success' ? 'success' : '';
+      statusNode.innerHTML = '';
+      if (state === 'loading') {
+        const spinner = document.createElement('span');
+        spinner.className = 'spinner';
+        spinner.setAttribute('aria-hidden', 'true');
+        statusNode.appendChild(spinner);
+      }
+      statusNode.appendChild(document.createTextNode(message));
+      statusActionButton.classList.toggle('hidden', !actionLabel);
+      statusActionButton.textContent = actionLabel || '';
+      statusActionButton.onclick = actionHandler || null;
+    };
+
+    const friendlyDetail = (detail) => {
+      if (Array.isArray(detail)) {
+        return detail.map((item) => item?.msg || item?.type || 'Please check the highlighted input.').join(' ');
+      }
+      if (detail && typeof detail === 'object') {
+        return detail.message || detail.detail || 'The server could not complete the request.';
+      }
+      return typeof detail === 'string' ? detail : '';
+    };
+
+    const humanizeError = (error, fallbackMessage) => {
+      const rawMessage = error?.userMessage || error?.message || '';
+      if (!rawMessage || /unexpected token|syntaxerror|error\s*\d{3}|internal server error/i.test(rawMessage)) {
+        return fallbackMessage;
+      }
+      return rawMessage;
+    };
+
+    const parseJsonResponse = async (response) => {
+      try {
+        return await response.json();
+      } catch (error) {
+        const friendly = new Error('The server returned a response the page could not read. Please try again.');
+        friendly.cause = error;
+        throw friendly;
+      }
+    };
+
+    const readApiError = async (response, fallbackMessage) => {
+      try {
+        const payload = await response.json();
+        const message = friendlyDetail(payload?.detail) || fallbackMessage;
+        return new Error(message);
+      } catch (error) {
+        if (error instanceof SyntaxError) {
+          return new Error(fallbackMessage);
+        }
+        return error;
+      }
+    };
+
+    const downloadBlob = (blob, filename) => {
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.href = url;
+      link.download = filename || 'results.csv';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    };
 
     const setSelectedFile = (file) => {
       selectedFile = file;
@@ -185,44 +301,97 @@
     };
 
     const renderSummary = (payload) => {
-      const metrics = payload.general_metrics || {};
+      const metrics = payload?.general_metrics || {};
       generalMetricsNode.innerHTML = '';
-      [['Total Processed', metrics.total_processed], ['Valid Records', metrics.valid_records], ['Invalid Records', metrics.invalid_records]].forEach(([label, value]) => {
+      [['Total Processed', metrics.total_processed ?? 0], ['Valid Records', metrics.valid_records ?? 0], ['Invalid Records', metrics.invalid_records ?? 0]].forEach(([label, value]) => {
         const card = document.createElement('div');
         card.className = 'metric-card';
-        card.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
+        const labelNode = document.createElement('div');
+        labelNode.className = 'label';
+        labelNode.textContent = label;
+        const valueNode = document.createElement('div');
+        valueNode.className = 'value';
+        valueNode.textContent = String(value);
+        card.append(labelNode, valueNode);
         generalMetricsNode.appendChild(card);
       });
 
       categoryBreakdownNode.innerHTML = '';
-      Object.entries(payload.category_breakdown || {}).sort((a, b) => a[0].localeCompare(b[0])).forEach(([category, count]) => {
+      Object.entries(payload?.category_breakdown || {}).sort((a, b) => a[0].localeCompare(b[0])).forEach(([category, count]) => {
         const row = document.createElement('tr');
-        row.innerHTML = `<td>${category}</td><td>${count}</td>`;
+        const categoryCell = document.createElement('td');
+        categoryCell.textContent = category || 'Uncategorized';
+        const countCell = document.createElement('td');
+        countCell.textContent = String(count ?? 0);
+        row.append(categoryCell, countCell);
         categoryBreakdownNode.appendChild(row);
       });
 
-      const index = payload.satisfaction_index || {};
+      const index = payload?.satisfaction_index || {};
       satisfactionMetricsNode.innerHTML = '';
-      [['Scored Cases', index.scored_cases], ['Average Score', Number(index.average_score || 0).toFixed(2)]].forEach(([label, value]) => {
+      [['Scored Cases', index.scored_cases ?? 0], ['Average Score', Number(index.average_score ?? 0).toFixed(2)]].forEach(([label, value]) => {
         const card = document.createElement('div');
         card.className = 'metric-card';
-        card.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
+        const labelNode = document.createElement('div');
+        labelNode.className = 'label';
+        labelNode.textContent = label;
+        const valueNode = document.createElement('div');
+        valueNode.className = 'value';
+        valueNode.textContent = String(value);
+        card.append(labelNode, valueNode);
         satisfactionMetricsNode.appendChild(card);
       });
 
       satisfactionBreakdownNode.innerHTML = '';
-      Object.entries(index.score_distribution || {}).forEach(([score, count]) => {
+      Object.entries(index?.score_distribution || {}).forEach(([score, count]) => {
         const row = document.createElement('tr');
-        row.innerHTML = `<td>${score}</td><td>${count}</td>`;
+        const scoreCell = document.createElement('td');
+        scoreCell.textContent = String(score ?? 'Unknown');
+        const countCell = document.createElement('td');
+        countCell.textContent = String(count ?? 0);
+        row.append(scoreCell, countCell);
         satisfactionBreakdownNode.appendChild(row);
       });
 
       summarySection.style.display = 'block';
     };
 
-    const downloadOutput = (outputFile) => {
-      const encoded = encodeURIComponent(outputFile || document.getElementById('output').value || 'results.csv');
-      window.location.href = `/api/incidents/results/export?output_file=${encoded}`;
+    const fetchJson = async (url, options, fallbackMessage, networkMessage) => {
+      let response;
+      try {
+        response = await fetch(url, options);
+      } catch (error) {
+        const friendly = new Error(networkMessage);
+        friendly.cause = error;
+        throw friendly;
+      }
+      if (!response.ok) {
+        throw await readApiError(response, fallbackMessage);
+      }
+      return parseJsonResponse(response);
+    };
+
+    const downloadOutput = async (outputFile) => {
+      const requestedOutput = outputFile || lastOutputFile || document.getElementById('output').value || 'results.csv';
+      const encoded = encodeURIComponent(requestedOutput);
+      let response;
+      try {
+        response = await fetch(`/api/incidents/results/export?output_file=${encoded}`);
+      } catch (error) {
+        const friendly = new Error('The results file could not be downloaded. Check your connection and try again.');
+        friendly.cause = error;
+        throw friendly;
+      }
+      if (!response.ok) {
+        throw await readApiError(response, 'The results file is not available yet. Run analysis, then try downloading again.');
+      }
+      try {
+        return await response.blob();
+      } catch (error) {
+        const friendly = new Error('The results file could not be read by the browser. Please retry the download.');
+        friendly.cause = error;
+        throw friendly;
+      }
     };
 
     uploadZone.addEventListener('click', () => fileInput.click());
@@ -248,62 +417,94 @@
     });
 
     runButton.addEventListener('click', async () => {
-      statusNode.textContent = 'Running analysis...';
       const payload = {
         input_file: document.getElementById('input').value,
         output_file: document.getElementById('output').value,
         engine: document.getElementById('engine').value,
       };
+      const retry = () => runButton.click();
+      setStatus('loading', 'Running analysis...', '', null);
+      setButtonsDisabled(true);
       try {
-        const response = await fetch('/api/incidents/anylayze/summary', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (!response.ok) {
-          const error = await response.json().catch(() => ({}));
-          throw new Error(error.detail || 'Analysis failed');
-        }
-        const summary = await response.json();
+        const summary = await fetchJson(
+          '/api/incidents/anylayze/summary',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          },
+          'The CSV could not be analyzed. Check the file path and try again.',
+          'The analysis service could not be reached. Check your connection and try again.',
+        );
         renderSummary(summary);
-        downloadOutput(summary.output_file || payload.output_file);
-        statusNode.textContent = 'Analysis complete. CSV downloaded.';
+        lastOutputFile = summary?.output_file || payload.output_file || lastOutputFile;
+        const blob = await downloadOutput(lastOutputFile);
+        downloadBlob(blob, lastOutputFile.split('/').pop() || 'results.csv');
+        setStatus('success', 'Analysis complete. CSV downloaded.', '', null);
       } catch (error) {
-        statusNode.textContent = String(error.message || error);
+        const message = humanizeError(error, 'The CSV could not be analyzed. Check the file path and try again.');
+        setStatus('error', `${message} You can retry after checking the CSV settings.`, 'Retry analysis', retry);
+      } finally {
+        setButtonsDisabled(false);
       }
     });
 
     uploadButton.addEventListener('click', async () => {
       if (!selectedFile) {
-        statusNode.textContent = 'Please select a CSV file first.';
+        setStatus('error', 'Please select a CSV file first. Use the upload area, then run the upload analysis again.', 'Select CSV', () => fileInput.click());
         return;
       }
-      statusNode.textContent = 'Uploading and analyzing CSV...';
+      const retry = () => uploadButton.click();
+      setStatus('loading', 'Uploading and analyzing CSV...', '', null);
+      setButtonsDisabled(true);
       try {
         const formData = new FormData();
         formData.append('file', selectedFile);
         formData.append('output_file', document.getElementById('output').value || 'results.csv');
         formData.append('engine', document.getElementById('engine').value || 'native');
 
-        const response = await fetch('/api/incidents/anylayze/upload/summary', {
-          method: 'POST',
-          body: formData,
-        });
-        if (!response.ok) {
-          const error = await response.json().catch(() => ({}));
-          throw new Error(error.detail || 'Upload analysis failed');
-        }
-        const summary = await response.json();
+        const summary = await fetchJson(
+          '/api/incidents/anylayze/upload/summary',
+          {
+            method: 'POST',
+            body: formData,
+          },
+          'The uploaded CSV could not be analyzed. Choose a valid CSV and try again.',
+          'The upload service could not be reached. Check your connection and try again.',
+        );
         renderSummary(summary);
-        downloadOutput(summary.output_file);
-        statusNode.textContent = 'Upload analysis complete. CSV downloaded.';
+        lastOutputFile = summary?.output_file || document.getElementById('output').value || lastOutputFile;
+        const blob = await downloadOutput(lastOutputFile);
+        downloadBlob(blob, lastOutputFile.split('/').pop() || 'results.csv');
+        setStatus('success', 'Upload analysis complete. CSV downloaded.', '', null);
       } catch (error) {
-        statusNode.textContent = String(error.message || error);
+        const message = humanizeError(error, 'The uploaded CSV could not be analyzed. Choose a valid CSV and try again.');
+        setStatus('error', `${message} You can retry with the selected file or choose another CSV.`, 'Retry upload', retry);
+      } finally {
+        setButtonsDisabled(false);
       }
     });
 
-    downloadLastButton.addEventListener('click', () => downloadOutput());
-    downloadSummaryButton.addEventListener('click', () => downloadOutput());
+    const handleDownloadClick = async () => {
+      const retry = () => handleDownloadClick();
+      setStatus('loading', 'Downloading results CSV...', '', null);
+      setButtonsDisabled(true);
+      try {
+        const blob = await downloadOutput();
+        const currentOutput = lastOutputFile || document.getElementById('output').value || 'results.csv';
+        const filename = currentOutput.split('/').pop() || 'results.csv';
+        downloadBlob(blob, filename);
+        setStatus('success', 'Results CSV downloaded.', '', null);
+      } catch (error) {
+        const message = humanizeError(error, 'The results file is not available yet. Run analysis, then try downloading again.');
+        setStatus('error', `${message} Run analysis or retry the download.`, 'Retry download', retry);
+      } finally {
+        setButtonsDisabled(false);
+      }
+    };
+
+    downloadLastButton.addEventListener('click', handleDownloadClick);
+    downloadSummaryButton.addEventListener('click', handleDownloadClick);
   </script>
 </body>
 </html>
