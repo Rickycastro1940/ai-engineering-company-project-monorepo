@@ -1,0 +1,101 @@
+incident_id,date,location_id,category,description,status,customer_id,satisfaction_score,reporter_id
+BRS-000001,2026-06-02,COL-02,ABASTECIMIENTO,Late produce delivery affected prep schedule,CERRADO,CLI-000001,2,MGR-02
+BRS-000002,2026-06-03,COL-03,QUEJA_CLIENTE,Customer complained about slow service at counter,DESCARTADO,CLI-000002,,MGR-03
+BRS-000003,2026-06-04,COL-04,CALIDAD_ALIMENTO,Undercooked chicken report from dine-in guest,ABIERTO,CLI-000003,,MGR-04
+BRS-000004,2026-06-05,COL-05,PERSONAL,Shift handover conflict between kitchen and front staff,CERRADO,CLI-000004,5,MGR-05
+BRS-000005,2026-06-06,COL-06,EQUIPAMIENTO,Grill temperature spike reported during lunch service,DESCARTADO,CLI-000005,,MGR-06
+BRS-000006,2026-06-07,COL-07,ABASTECIMIENTO,Late produce delivery affected prep schedule,ABIERTO,CLI-000006,,MGR-07
+BRS-000007,2026-06-08,,QUEJA_CLIENTE,Customer complained about slow service at counter,CERRADO,CLI-000007,,MGR-08
+BRS-000008,2026-06-09,COL-09,INVALID_CAT,Undercooked chicken report from dine-in guest,DESCARTADO,CLI-000008,,MGR-09
+BRS-000009,2026-06-10,COL-10,PERSONAL,bad,ABIERTO,CLI-000009,,MGR-10
+BRS-000010,2026-06-11,COL-11,EQUIPAMIENTO,Grill temperature spike reported during lunch service,CERRADO,CLI-000010,,MGR-11
+BRS-000011,2026-06-12,COL-12,ABASTECIMIENTO,Late produce delivery affected prep schedule,DESCARTADO,CLI-000011,,MGR-12
+BRS-000012,2026-06-13,COL-13,QUEJA_CLIENTE,Customer complained about slow service at counter,ABIERTO,CLI-000012,,MGR-01
+BRS-000013,2026-06-14,COL-14,CALIDAD_ALIMENTO,Undercooked chicken report from dine-in guest,CERRADO,CLI-000013,4,MGR-02
+BRS-000014,2026-06-15,COL-15,PERSONAL,Shift handover conflict between kitchen and front staff,DESCARTADO,CLI-000014,,MGR-03
+BRS-000015,2026-06-16,COL-16,EQUIPAMIENTO,Grill temperature spike reported during lunch service,ABIERTO,CLI-000015,,MGR-04
+BRS-000016,2026-06-17,COL-17,ABASTECIMIENTO,Late produce delivery affected prep schedule,CERRADO,CLI-000016,2,MGR-05
+BRS-000017,2026-06-18,COL-18,QUEJA_CLIENTE,Customer complained about slow service at counter,DESCARTADO,CLI-000017,,MGR-06
+BRS-000018,2026-06-19,COL-19,CALIDAD_ALIMENTO,Undercooked chicken report from dine-in guest,ABIERTO,CLI-000018,,MGR-07
+BRS-000019,2026-06-20,COL-20,PERSONAL,Shift handover conflict between kitchen and front staff,CERRADO,CLI-000019,5,MGR-08
+BRS-000020,2026-06-21,COL-01,EQUIPAMIENTO,Grill temperature spike reported during lunch service,DESCARTADO,CLI-000020,,MGR-09
+BRS-000021,2026-06-22,COL-02,ABASTECIMIENTO,Late produce delivery affected prep schedule,ABIERTO,CLI-000021,,MGR-10
+BRS-000022,2026-06-23,COL-03,QUEJA_CLIENTE,Customer complained about slow service at counter,CERRADO,CLI-000022,3,MGR-11
+BRS-000023,2026-06-24,COL-04,CALIDAD_ALIMENTO,Undercooked chicken report from dine-in guest,DESCARTADO,CLI-000023,,MGR-12
+BRS-000024,2026-06-25,COL-05,PERSONAL,Shift handover conflict between kitchen and front staff,ABIERTO,CLI-000024,,MGR-01
+BRS-000025,2026-06-26,COL-06,EQUIPAMIENTO,Grill temperature spike reported during lunch service,CERRADO,CLI-000025,1,MGR-02
+BRS-000026,2026-06-27,COL-07,ABASTECIMIENTO,Late produce delivery affected prep schedule,DESCARTADO,CLI-000026,,MGR-03
+BRS-000027,2026-06-28,COL-08,QUEJA_CLIENTE,Customer complained about slow service at counter,ABIERTO,CLI-000027,,MGR-04
+BRS-000028,2026-06-01,COL-09,CALIDAD_ALIMENTO,Undercooked chicken report from dine-in guest,CERRADO,CLI-000028,4,MGR-05
+BRS-000029,2026-06-02,COL-10,PERSONAL,Shift handover conflict between kitchen and front staff,DESCARTADO,CLI-000029,,MGR-06
+BRS-000030,2026-06-03,COL-11,EQUIPAMIENTO,Grill temperature spike reported during lunch service,ABIERTO,CLI-000030,,MGR-07
+BRS-000031,2026-06-04,COL-12,ABASTECIMIENTO,Late produce delivery affected prep schedule,CERRADO,CLI-000031,2,MGR-08
+BRS-000032,2026-06-05,COL-13,QUEJA_CLIENTE,Customer complained about slow service at counter,DESCARTADO,CLI-000032,,MGR-09
+BRS-000033,2026-06-06,COL-14,CALIDAD_ALIMENTO,Undercooked chicken report from dine-in guest,ABIERTO,CLI-000033,,MGR-10
+BRS-000034,2026-06-07,COL-15,PERSONAL,Shift handover conflict between kitchen and front staff,CERRADO,CLI-000034,5,MGR-11
+BRS-000035,2026-06-08,COL-16,EQUIPAMIENTO,Grill temperature spike reported during lunch service,DESCARTADO,CLI-000035,,MGR-12
+BRS-000036,2026-06-09,COL-17,ABASTECIMIENTO,Late produce delivery affected prep schedule,ABIERTO,CLI-000036,,MGR-01
+BRS-000037,2026-06-10,COL-18,QUEJA_CLIENTE,Customer complained about slow service at counter,CERRADO,CLI-000037,3,MGR-02
+BRS-000038,2026-06-11,COL-19,CALIDAD_ALIMENTO,Undercooked chicken report from dine-in guest,DESCARTADO,CLI-000038,,MGR-03
+BRS-000039,2026-06-12,COL-20,PERSONAL,Shift handover conflict between kitchen and front staff,ABIERTO,CLI-000039,,MGR-04
+BRS-000040,2026-06-13,COL-01,EQUIPAMIENTO,Grill temperature spike reported during lunch service,CERRADO,CLI-000040,1,MGR-05
+BRS-000041,2026-06-14,COL-02,ABASTECIMIENTO,Late produce delivery affected prep schedule,DESCARTADO,CLI-000041,,MGR-06
+BRS-000042,2026-06-15,COL-03,QUEJA_CLIENTE,Customer complained about slow service at counter,ABIERTO,CLI-000042,,MGR-07
+BRS-000043,2026-06-16,COL-04,CALIDAD_ALIMENTO,Undercooked chicken report from dine-in guest,CERRADO,CLI-000043,4,MGR-08
+BRS-000044,2026-06-17,COL-05,PERSONAL,Shift handover conflict between kitchen and front staff,DESCARTADO,CLI-000044,,MGR-09
+BRS-000045,2026-06-18,COL-06,EQUIPAMIENTO,Grill temperature spike reported during lunch service,ABIERTO,CLI-000045,,MGR-10
+BRS-000046,2026-06-19,COL-07,ABASTECIMIENTO,Late produce delivery affected prep schedule,CERRADO,CLI-000046,2,MGR-11
+BRS-000047,2026-06-20,COL-08,QUEJA_CLIENTE,Customer complained about slow service at counter,DESCARTADO,CLI-000047,,MGR-12
+BRS-000048,2026-06-21,COL-09,CALIDAD_ALIMENTO,Undercooked chicken report from dine-in guest,ABIERTO,CLI-000048,,MGR-01
+BRS-000049,2026-06-22,COL-10,PERSONAL,Shift handover conflict between kitchen and front staff,CERRADO,CLI-000049,5,MGR-02
+BRS-000050,2026-06-23,COL-11,EQUIPAMIENTO,Grill temperature spike reported during lunch service,DESCARTADO,CLI-000050,,MGR-03
+BRS-000051,2026-06-24,COL-12,ABASTECIMIENTO,Late produce delivery affected prep schedule,ABIERTO,CLI-000051,,MGR-04
+BRS-000052,2026-06-25,COL-13,QUEJA_CLIENTE,Customer complained about slow service at counter,CERRADO,CLI-000052,3,MGR-05
+BRS-000053,2026-06-26,COL-14,CALIDAD_ALIMENTO,Undercooked chicken report from dine-in guest,DESCARTADO,CLI-000053,,MGR-06
+BRS-000054,2026-06-27,COL-15,PERSONAL,Shift handover conflict between kitchen and front staff,ABIERTO,CLI-000054,,MGR-07
+BRS-000055,2026-06-28,COL-16,EQUIPAMIENTO,Grill temperature spike reported during lunch service,CERRADO,CLI-000055,1,MGR-08
+BRS-000056,2026-06-01,COL-17,ABASTECIMIENTO,Late produce delivery affected prep schedule,DESCARTADO,CLI-000056,,MGR-09
+BRS-000057,2026-06-02,COL-18,QUEJA_CLIENTE,Customer complained about slow service at counter,ABIERTO,CLI-000057,,MGR-10
+BRS-000058,2026-06-03,COL-19,CALIDAD_ALIMENTO,Undercooked chicken report from dine-in guest,CERRADO,CLI-000058,4,MGR-11
+BRS-000059,2026-06-04,COL-20,PERSONAL,Shift handover conflict between kitchen and front staff,DESCARTADO,CLI-000059,,MGR-12
+BRS-000060,2026-06-05,COL-01,EQUIPAMIENTO,Grill temperature spike reported during lunch service,ABIERTO,CLI-000060,,MGR-01
+BRS-000061,2026-06-06,COL-02,ABASTECIMIENTO,Late produce delivery affected prep schedule,CERRADO,CLI-000061,2,MGR-02
+BRS-000062,2026-06-07,COL-03,QUEJA_CLIENTE,Customer complained about slow service at counter,DESCARTADO,CLI-000062,,MGR-03
+BRS-000063,2026-06-08,COL-04,CALIDAD_ALIMENTO,Undercooked chicken report from dine-in guest,ABIERTO,CLI-000063,,MGR-04
+BRS-000064,2026-06-09,COL-05,PERSONAL,Shift handover conflict between kitchen and front staff,CERRADO,CLI-000064,5,MGR-05
+BRS-000065,2026-06-10,COL-06,EQUIPAMIENTO,Grill temperature spike reported during lunch service,DESCARTADO,CLI-000065,,MGR-06
+BRS-000066,2026-06-11,COL-07,ABASTECIMIENTO,Late produce delivery affected prep schedule,ABIERTO,CLI-000066,,MGR-07
+BRS-000067,2026-06-12,COL-08,QUEJA_CLIENTE,Customer complained about slow service at counter,CERRADO,CLI-000067,3,MGR-08
+BRS-000068,2026-06-13,COL-09,CALIDAD_ALIMENTO,Undercooked chicken report from dine-in guest,DESCARTADO,CLI-000068,,MGR-09
+BRS-000069,2026-06-14,COL-10,PERSONAL,Shift handover conflict between kitchen and front staff,ABIERTO,CLI-000069,,MGR-10
+BRS-000070,2026-06-15,COL-11,EQUIPAMIENTO,Grill temperature spike reported during lunch service,CERRADO,CLI-000070,1,MGR-11
+BRS-000071,2026-06-16,COL-12,ABASTECIMIENTO,Late produce delivery affected prep schedule,DESCARTADO,CLI-000071,,MGR-12
+BRS-000072,2026-06-17,COL-13,QUEJA_CLIENTE,Customer complained about slow service at counter,ABIERTO,CLI-000072,,MGR-01
+BRS-000073,2026-06-18,COL-14,CALIDAD_ALIMENTO,Undercooked chicken report from dine-in guest,CERRADO,CLI-000073,4,MGR-02
+BRS-000074,2026-06-19,COL-15,PERSONAL,Shift handover conflict between kitchen and front staff,DESCARTADO,CLI-000074,,MGR-03
+BRS-000075,2026-06-20,COL-16,EQUIPAMIENTO,Grill temperature spike reported during lunch service,ABIERTO,CLI-000075,,MGR-04
+BRS-000076,2026-06-21,COL-17,ABASTECIMIENTO,Late produce delivery affected prep schedule,CERRADO,CLI-000076,2,MGR-05
+BRS-000077,2026-06-22,COL-18,QUEJA_CLIENTE,Customer complained about slow service at counter,DESCARTADO,CLI-000077,,MGR-06
+BRS-000078,2026-06-23,COL-19,CALIDAD_ALIMENTO,Undercooked chicken report from dine-in guest,ABIERTO,CLI-000078,,MGR-07
+BRS-000079,2026-06-24,COL-20,PERSONAL,Shift handover conflict between kitchen and front staff,CERRADO,CLI-000079,5,MGR-08
+BRS-000080,2026-06-25,COL-01,EQUIPAMIENTO,Grill temperature spike reported during lunch service,DESCARTADO,CLI-000080,,MGR-09
+BRS-000081,2026-06-26,COL-02,ABASTECIMIENTO,Late produce delivery affected prep schedule,ABIERTO,CLI-000081,,MGR-10
+BRS-000082,2026-06-27,COL-03,QUEJA_CLIENTE,Customer complained about slow service at counter,CERRADO,CLI-000082,3,MGR-11
+BRS-000083,2026-06-28,COL-04,CALIDAD_ALIMENTO,Undercooked chicken report from dine-in guest,DESCARTADO,CLI-000083,,MGR-12
+BRS-000084,2026-06-01,COL-05,PERSONAL,Shift handover conflict between kitchen and front staff,ABIERTO,CLI-000084,,MGR-01
+BRS-000085,2026-06-02,COL-06,EQUIPAMIENTO,Grill temperature spike reported during lunch service,CERRADO,CLI-000085,1,MGR-02
+BRS-000086,2026-06-03,COL-07,ABASTECIMIENTO,Late produce delivery affected prep schedule,DESCARTADO,CLI-000086,,MGR-03
+BRS-000087,2026-06-04,COL-08,QUEJA_CLIENTE,Customer complained about slow service at counter,ABIERTO,CLI-000087,,MGR-04
+BRS-000088,2026-06-05,COL-09,CALIDAD_ALIMENTO,Undercooked chicken report from dine-in guest,CERRADO,CLI-000088,4,MGR-05
+BRS-000089,2026-06-06,COL-10,PERSONAL,Shift handover conflict between kitchen and front staff,DESCARTADO,CLI-000089,,MGR-06
+BRS-000090,2026-06-07,COL-11,EQUIPAMIENTO,Grill temperature spike reported during lunch service,ABIERTO,CLI-000090,,MGR-07
+BRS-000091,2026-06-08,COL-12,ABASTECIMIENTO,Late produce delivery affected prep schedule,CERRADO,CLI-000091,2,MGR-08
+BRS-000092,2026-06-09,COL-13,QUEJA_CLIENTE,Customer complained about slow service at counter,DESCARTADO,CLI-000092,,MGR-09
+BRS-000093,2026-06-10,COL-14,CALIDAD_ALIMENTO,Undercooked chicken report from dine-in guest,ABIERTO,CLI-000093,,MGR-10
+BRS-000094,2026-06-11,COL-15,PERSONAL,Shift handover conflict between kitchen and front staff,CERRADO,CLI-000094,5,MGR-11
+BRS-000095,2026-06-12,COL-16,EQUIPAMIENTO,Grill temperature spike reported during lunch service,DESCARTADO,CLI-000095,,MGR-12
+BRS-000096,2026-06-13,COL-17,ABASTECIMIENTO,Late produce delivery affected prep schedule,ABIERTO,CLI-000096,,MGR-01
+BRS-000097,2026-06-14,COL-18,QUEJA_CLIENTE,Customer complained about slow service at counter,CERRADO,CLI-000097,3,MGR-02
+BRS-000098,2026-06-15,COL-19,CALIDAD_ALIMENTO,Undercooked chicken report from dine-in guest,DESCARTADO,CLI-000098,,MGR-03
+BRS-000099,2026-06-16,COL-20,PERSONAL,Shift handover conflict between kitchen and front staff,ABIERTO,CLI-000099,,MGR-04
+BRS-000100,2026-06-17,COL-01,EQUIPAMIENTO,Grill temperature spike reported during lunch service,CERRADO,CLI-000100,1,MGR-05

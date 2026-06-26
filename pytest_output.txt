@@ -1,0 +1,110 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.0.3, pluggy-1.6.0
+rootdir: /workspaces/ai-engineering-company-project-monorepo
+plugins: anyio-4.13.0
+collected 0 items / 4 errors
+
+==================================== ERRORS ====================================
+______________ ERROR collecting services/api/tests/test_login.py _______________
+ImportError while importing test module '/workspaces/ai-engineering-company-project-monorepo/services/api/tests/test_login.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/usr/lib/python3.12/importlib/__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+services/api/tests/test_login.py:3: in <module>
+    from main import authenticate_user, InvalidCredentialsError, ValidationError
+services/api/main.py:8: in <module>
+    from auth import register_user, authenticate_user
+E   ImportError: cannot import name 'register_user' from 'auth' (/workspaces/ai-engineering-company-project-monorepo/shared/auth.py)
+_____________ ERROR collecting services/api/tests/test_register.py _____________
+.venv/lib/python3.12/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+.venv/lib/python3.12/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/usr/lib/python3.12/importlib/__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1331: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:935: in _load_unlocked
+    ???
+.venv/lib/python3.12/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+services/api/tests/test_register.py:4: in <module>
+    from app import register_user, UserDuplicateError, ValidationError
+E     File "/workspaces/ai-engineering-company-project-monorepo/services/api/app.py", line 1
+E       from app import ...
+E                       ^^^
+E   SyntaxError: invalid syntax
+______________ ERROR collecting services/api/tests/test_token.py _______________
+.venv/lib/python3.12/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+.venv/lib/python3.12/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/usr/lib/python3.12/importlib/__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1331: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:935: in _load_unlocked
+    ???
+.venv/lib/python3.12/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+services/api/tests/test_token.py:3: in <module>
+    from app import create_access_token, decode_and_verify_token, TokenExpiredError, InvalidTokenError
+E     File "/workspaces/ai-engineering-company-project-monorepo/services/api/app.py", line 1
+E       from app import ...
+E                       ^^^
+E   SyntaxError: invalid syntax
+________________ ERROR collecting tests/test_error_handling.py _________________
+.venv/lib/python3.12/site-packages/_pytest/python.py:507: in importtestmodule
+    mod = import_path(
+.venv/lib/python3.12/site-packages/_pytest/pathlib.py:587: in import_path
+    importlib.import_module(module_name)
+/usr/lib/python3.12/importlib/__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen importlib._bootstrap>:1387: in _gcd_import
+    ???
+<frozen importlib._bootstrap>:1360: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1331: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:935: in _load_unlocked
+    ???
+.venv/lib/python3.12/site-packages/_pytest/assertion/rewrite.py:197: in exec_module
+    exec(co, module.__dict__)
+tests/test_error_handling.py:15: in <module>
+    from api.app import app  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^^^
+api/app.py:28: in <module>
+    app = _load_services_api_app()
+          ^^^^^^^^^^^^^^^^^^^^^^^^
+api/app.py:24: in _load_services_api_app
+    spec.loader.exec_module(module)
+E     File "/workspaces/ai-engineering-company-project-monorepo/services/api/app.py", line 1
+E       from app import ...
+E                       ^^^
+E   SyntaxError: invalid syntax
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /workspaces/ai-engineering-company-project-monorepo/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+ERROR services/api/tests/test_login.py
+ERROR services/api/tests/test_register.py
+ERROR services/api/tests/test_token.py
+ERROR tests/test_error_handling.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 4 errors during collection !!!!!!!!!!!!!!!!!!!!
+========================= 1 warning, 4 errors in 1.06s =========================

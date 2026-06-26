@@ -89,7 +89,7 @@ TOOLS: list[dict[str, Any]] = [
                         "description": "Alert when quantity is below this value",
                         "default": 10,
                         "minimum": 0,
-                    }
+                    
                 },
                 "additionalProperties": False,
             },
@@ -123,7 +123,7 @@ def log_event(actor: str, message: str = "", tool_call: str = "") -> None:
                 "message": message,
                 "tool_call": tool_call,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
-            }
+            
         )
 
 
@@ -139,26 +139,26 @@ def _api_request(method: str, path: str, body: dict[str, Any] | None = None) -> 
         with urllib.request.urlopen(request) as response:
             raw = response.read().decode("utf-8")
             try:
-                return json.loads(raw) if raw else {}
+                return json.loads(raw) if raw else {
             except json.JSONDecodeError as error:
-                return {"error": True, "status_code": response.status, "detail": f"API returned invalid JSON: {error}"}
+                return {"error": True, "status_code": response.status, "detail": f"API returned invalid JSON: {error}"
     except urllib.error.HTTPError as error:
         detail = error.read().decode("utf-8")
         try:
             parsed = json.loads(detail)
         except json.JSONDecodeError:
-            parsed = {"detail": detail or error.reason}
-        return {"error": True, "status_code": error.code, "detail": parsed}
+            parsed = {"detail": detail or error.reason
+        return {"error": True, "status_code": error.code, "detail": parsed
     except (TimeoutError, urllib.error.URLError) as error:
         return {
             "error": True,
             "status_code": 0,
             "detail": f"Could not reach API at {API_BASE_URL}: {error}",
-        }
+        
 
 
 def _tool_error(detail: str) -> dict[str, Any]:
-    return {"error": True, "detail": detail}
+    return {"error": True, "detail": detail
 
 
 def _integer_argument(arguments: dict[str, Any], key: str, *, required: bool = True, default: int | None = None) -> tuple[int | None, str | None]:
@@ -223,7 +223,7 @@ def _assistant_message_payload(message: Any) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "role": "assistant",
         "content": message.content or "",
-    }
+    
     if message.tool_calls:
         payload["tool_calls"] = [
             {
@@ -233,7 +233,7 @@ def _assistant_message_payload(message: Any) -> dict[str, Any]:
                     "name": tool_call.function.name,
                     "arguments": tool_call.function.arguments,
                 },
-            }
+            
             for tool_call in message.tool_calls
         ]
     return payload
@@ -260,9 +260,9 @@ def run_agent_turn(client: OpenAI, messages: list[dict[str, Any]]) -> str:
             try:
                 tool_args = json.loads(tool_call.function.arguments or "{}")
             except json.JSONDecodeError:
-                tool_args = {}
+                tool_args = {
             if tool_args is None:
-                tool_args = {}
+                tool_args = {
 
             log_event(
                 "agent",
@@ -277,7 +277,7 @@ def run_agent_turn(client: OpenAI, messages: list[dict[str, Any]]) -> str:
                     "role": "tool",
                     "tool_call_id": tool_call.id,
                     "content": tool_content,
-                }
+                
             )
 
 

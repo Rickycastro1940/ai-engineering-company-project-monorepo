@@ -70,7 +70,7 @@ class IncidentAnalyzer:
                 "average_score": average_score,
                 "score_distribution": dict(sorted(score_counter.items(), key=lambda x: int(x[0]))),
             },
-        }
+        
 
     def build_console_summary(self) -> str:
         summary = self.build_summary()

@@ -59,7 +59,7 @@ def load_products() -> list[dict[str, str | int]]:
                     "name": row["name"],
                     "quantity": int(row["quantity"]),
                     "unit": row["unit"],
-                }
+                
             )
         except (KeyError, TypeError, ValueError) as error:
             raise HTTPException(status_code=500, detail="Invalid inventory data in products.csv") from error
@@ -79,7 +79,7 @@ def save_products(products: list[dict[str, str | int]]) -> None:
                         "name": product["name"],
                         "quantity": product["quantity"],
                         "unit": product["unit"],
-                    }
+                    
                 )
         temp_file.replace(PRODUCTS_FILE)
     except OSError as error:
@@ -102,7 +102,7 @@ def _find_product(products: list[dict[str, str | int]], product_id: int) -> dict
 def create_product(name: str, quantity: int, unit: str) -> dict[str, str | int]:
     products = load_products()
     next_id = max((int(product["product_id"]) for product in products), default=0) + 1
-    product = {"product_id": next_id, "name": name, "quantity": quantity, "unit": unit}
+    product = {"product_id": next_id, "name": name, "quantity": quantity, "unit": unit
     products.append(product)
     save_products(products)
     return product
