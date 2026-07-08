@@ -7,6 +7,7 @@ from typing import Literal
  
 
 from analyzer import IncidentAnalyzer
+from database import create_db_and_tables
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -88,6 +89,7 @@ def _register_analyze_routes(app: FastAPI, route_prefix: str) -> None:
         return summary
 
 app = FastAPI(title="Company Incident File Analyzer", version="1.0.0")
+create_db_and_tables()
 app.include_router(inventory_router)
 _register_analyze_routes(app, "anylayze")
 _register_analyze_routes(app, "analyze")

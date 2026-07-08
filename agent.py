@@ -246,7 +246,7 @@ def main() -> int:
 
     if not check_api_available():
         print(
-            "Could not reach the API. Start it first with: uvicorn api.app:app --reload",
+            "Could not reach the API. Start it first with: python -m uvicorn api.app:app --reload",
             file=sys.stderr,
         )
         return 1

@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field
-from typing import List, Optional
 from datetime import datetime
 from enum import Enum
+from typing import List, Optional
+
+from pydantic import BaseModel, Field
 
 class OrderType(str, Enum):
     INBOUND = "INBOUND"
@@ -10,13 +11,17 @@ class OrderType(str, Enum):
 class ProductBase(BaseModel):
     sku: str
     name: str
+    category: str = "-"
     description: Optional[str] = None
-    price: float = Field(..., gt=0)
+    price: float = Field(default=0, ge=0)
+    quantity: int = Field(default=0, ge=0)
+    unit: str = "unit"
 
 class ProductCreate(ProductBase):
     pass
 
 class ProductResponse(ProductBase):
+    id: int
     product_id: str
     current_stock: int = 0
 
@@ -24,18 +29,21 @@ class ProductResponse(ProductBase):
         from_attributes = True
 
 class OrderItemBase(BaseModel):
-    product_id: str
+    product_id: int
     quantity: int = Field(..., gt=0)
 
 class OrderItemCreate(OrderItemBase):
     pass
 
 class OrderItemResponse(OrderItemBase):
-    pass
+    sku: Optional[str] = None
+    name: Optional[str] = None
+    unit: Optional[str] = None
+    price: Optional[float] = None
 
 class OrderBase(BaseModel):
-    type: OrderType
-    items: List[OrderItemCreate]
+    product_id: int
+    quantity: int = Field(..., gt=0)
 
 class OrderCreate(OrderBase):
     pass

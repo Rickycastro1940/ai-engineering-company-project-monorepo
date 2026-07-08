@@ -26,7 +26,7 @@ Do not commit `.env` — it is listed in `.gitignore`.
 
 ```bash
 # Terminal 1 — start the API first
-uvicorn api.app:app --reload
+python -m uvicorn api.app:app --reload
 ```
 
 Wait until you see `Application startup complete`, then:
@@ -39,7 +39,7 @@ python agent.py
 If Terminal 2 starts before the API is ready, `agent.py` prints an error and exits:
 
 ```text
-Could not reach the API. Start it first with: uvicorn api.app:app --reload
+Could not reach the API. Start it first with: python -m uvicorn api.app:app --reload
 ```
 
 ### Agent design note
@@ -56,7 +56,7 @@ From repository root, use two terminals:
 
 ```bash
 # Terminal 1 — start the API
-uvicorn api.app:app --reload
+python -m uvicorn api.app:app --reload
 
 # Terminal 2 — start the agent
 python agent.py
