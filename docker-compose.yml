@@ -1,0 +1,31 @@
+networks:
+  app-network:
+    driver: bridge
+
+services:
+  api:
+    build: ./services
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./services:/app
+    networks:
+      - app-network
+
+  uis:
+    build: ./uis
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+    volumes:
+      - ./uis:/app
+      - ./services/api/uis/backoffice:/app/backoffice
+      - /app/web/node_modules
+      - /app/backoffice/node_modules
+    environment:
+      - NEXT_PUBLIC_INVENTORY_API_URL=http://api:8000
+      - INTERNAL_API_URL=http://api:8000
+    depends_on:
+      - api
+    networks:
+      - app-network

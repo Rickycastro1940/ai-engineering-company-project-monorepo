@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { inventoryApi, Product } from '../../../../../lib/inventory';
+import inventoryApi from '../../../../../../lib/inventory';
 
 const TOKEN_KEYS = ['token', 'access_token', 'authToken'];
 const LOGIN_PATH = '/login';

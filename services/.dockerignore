@@ -1,0 +1,34 @@
+__pycache__
+*.pyc
+.env*
+tests/
+*.log
+EOFls -la .dockerignore && cat .dockerignore
+cd /workspaces/ai-engineering-company-project-monorepo
+cat << 'EOF' > docker-compose.yml
+version: '3.8'
+
+services:
+  api:
+    build: ./services
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./services:/app
+    env_file:
+      - .env
+
+  uis:
+    build: ./uis
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+    volumes:
+      - ./uis:/app
+      # Anonymous volumes to prevent the host from overwriting the container's installed node_modules
+      - /app/web/node_modules
+      - /app/backoffice/node_modules
+    env_file:
+      - .env
+    depends_on:
+      - api
