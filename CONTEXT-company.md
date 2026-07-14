@@ -1,6 +1,6 @@
 # Company Context (API + UI Aligned)
 
-This file defines the canonical domain vocabulary for this repository.
+This file defines the canonical domain vocabulary for this{PageDown} repository.
 Entity names, field keys, and UI labels below must be used exactly as written.
 
 ## Domain Scope
