@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 .env
+.env.local
 .venv/
 results.csv
 scripts/results.csv
@@ -8,3 +9,6 @@ conversation_log.csv
 conversation_log.csv.bak
 data/uploads/
 **/__pycache__/
+uis/backoffice/node_modules/
+uis/backoffice/dist/
+*.pycat

@@ -1,16 +1,38 @@
-# Your company context
+# CONTEXT — Brasaland (Telemetry)
 
-**Replace this file** with the CONTEXT for your assigned company:
+Source: course CONTEXT for telemetry projects. Full inventory/ops constraints for capture, storage, and reporting.
 
-- **Brasaland** — `CONTEXT-brasaland-briefing.md` (grilled food restaurant chain, Colombia + Florida)
-- **TrackFlow** — `CONTEXT-trackflow-briefing.md` (last-mile delivery and warehouse, Mexico + Spain)
-- **Nexova** — `CONTEXT-nexova-briefing.md` (HR consulting and talent acquisition, Chile + Argentina)
-- **HealthCore** — `CONTEXT-healthcore-briefing.md` (outpatient healthcare clinic network, US + UK)
+## Company
 
-Your instructor or milestone materials will point you to the correct CONTEXT file. Copy its contents here so that all project work and AI assistance use the same domain data, field names, and constraints.
+Brasaland is a grilled-food restaurant chain with 14 locations across Colombia and Florida. The inventory management system controls ingredients (meats, vegetables, sauces, beverages, packaging). Telemetry Plan, capture, storage, and technical report revolve around that system.
 
----
+## Inventory entities
 
-_Until you add your context, keep this placeholder so the repo structure is clear._
+| Entity | Meaning |
+| --- | --- |
+| `Product` | Ingredient/supply (e.g. beef loin, house sauce) with unit and category |
+| `InboundOrder` | Goods received from a supplier at a location |
+| `OutboundOrder` | Consumption in prep, or recorded waste |
+| `location` | One of 14 locations (`CO` / `US` + city) |
+| `supplier` | ~20 suppliers, different per country |
 
-_Estas instrucciones también están disponibles en [español](./CONTEXT.es.md)._
+## Mandatory telemetry metrics
+
+| `event_type` | Fires when… |
+| --- | --- |
+| `inbound_order_created` | Location registers supplier arrival |
+| `outbound_order_created` | Location registers prep consumption |
+| `stock_waste_registered` | Waste (expired / kitchen_error / theft_suspected) |
+| `stock_threshold_triggered` | Stock below configured minimum |
+| `direct_stock_edit_rejected` | Direct stock edit blocked by system |
+| `ingredient_price_variance_detected` | Inbound unit cost varies abnormally vs history |
+
+Minimum inventory `properties`: `location_id`, `country` (`CO`/`US`), `product_id`, `product_category`, `quantity`, `unit`, `currency` (`COP`/`USD`); waste also `reason`. No employee names or customer data.
+
+## Business constraints
+
+- Record amounts in local currency; do not convert in the telemetry layer.
+- Stock changes only via inbound/outbound orders, traceable to a user.
+- UI language events are independent from location `country`.
+
+See also: `docs/telemetry/telemetry-plan.md` and `docs/telemetry/event-schemas.json`.

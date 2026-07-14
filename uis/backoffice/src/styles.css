@@ -1,0 +1,71 @@
+:root {
+  color: #142017;
+  background: #f3f6f2;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+.top,
+.nav,
+.section,
+.status {
+  padding: 1rem 1.25rem;
+}
+
+.top {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  background: #1f3d2b;
+  color: #f5fbf6;
+}
+
+.top .muted {
+  opacity: 0.8;
+  margin-right: auto;
+}
+
+.nav {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  background: #e4ebe3;
+  border-bottom: 1px solid #c9d4c8;
+}
+
+.nav button,
+.actions button,
+.top button,
+#login-form button,
+.section button {
+  border: 0;
+  border-radius: 0.4rem;
+  padding: 0.55rem 0.9rem;
+  background: #2f6b45;
+  color: white;
+  cursor: pointer;
+}
+
+.nav button.active {
+  background: #174428;
+}
+
+.actions {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 28rem;
+}
+
+#login-form {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 22rem;
+}
+
+.status {
+  min-height: 1.5rem;
+  color: #245536;
+}

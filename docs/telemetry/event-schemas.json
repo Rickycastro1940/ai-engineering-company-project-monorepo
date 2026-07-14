@@ -1,0 +1,286 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Brasaland telemetry event schemas",
+  "schemaVersion": "1.0.0",
+  "definitions": {
+    "eventEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "eventId",
+        "timestamp",
+        "sessionId",
+        "userId",
+        "event_type",
+        "schemaVersion",
+        "requestId",
+        "properties"
+      ],
+      "properties": {
+        "eventId": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "sessionId": { "type": "string", "minLength": 1 },
+        "userId": { "type": "string", "minLength": 1 },
+        "event_type": {
+          "type": "string",
+          "pattern": "^[a-z]+(_[a-z0-9]+)+$"
+        },
+        "schemaVersion": { "type": "string", "const": "1.0.0" },
+        "requestId": { "type": "string", "minLength": 1 },
+        "properties": { "type": "object" }
+      }
+    },
+    "inventoryBaseProperties": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "location_id",
+        "country",
+        "product_id",
+        "product_category",
+        "quantity",
+        "unit",
+        "currency"
+      ],
+      "properties": {
+        "location_id": { "type": "string" },
+        "country": { "type": "string", "enum": ["CO", "US"] },
+        "product_id": { "type": "string" },
+        "product_category": { "type": "string" },
+        "quantity": { "type": "number" },
+        "unit": { "type": "string" },
+        "currency": { "type": "string", "enum": ["COP", "USD"] },
+        "supplier_id": { "type": "string" }
+      }
+    }
+  },
+  "events": {
+    "inbound_order_created": {
+      "class": "mandatory",
+      "allOf": [
+        { "$ref": "#/definitions/eventEnvelope" },
+        {
+          "properties": {
+            "event_type": { "const": "inbound_order_created" },
+            "properties": {
+              "allOf": [
+                { "$ref": "#/definitions/inventoryBaseProperties" },
+                {
+                  "required": ["supplier_id"],
+                  "properties": { "supplier_id": { "type": "string" } }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "outbound_order_created": {
+      "class": "mandatory",
+      "allOf": [
+        { "$ref": "#/definitions/eventEnvelope" },
+        {
+          "properties": {
+            "event_type": { "const": "outbound_order_created" },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "location_id",
+                "country",
+                "product_id",
+                "product_category",
+                "quantity",
+                "unit",
+                "currency"
+              ],
+              "properties": {
+                "location_id": { "type": "string" },
+                "country": { "type": "string", "enum": ["CO", "US"] },
+                "product_id": { "type": "string" },
+                "product_category": { "type": "string" },
+                "quantity": { "type": "number" },
+                "unit": { "type": "string" },
+                "currency": { "type": "string", "enum": ["COP", "USD"] }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "stock_waste_registered": {
+      "class": "mandatory",
+      "allOf": [
+        { "$ref": "#/definitions/eventEnvelope" },
+        {
+          "properties": {
+            "event_type": { "const": "stock_waste_registered" },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "location_id",
+                "country",
+                "product_id",
+                "product_category",
+                "quantity",
+                "unit",
+                "currency",
+                "reason"
+              ],
+              "properties": {
+                "location_id": { "type": "string" },
+                "country": { "type": "string", "enum": ["CO", "US"] },
+                "product_id": { "type": "string" },
+                "product_category": { "type": "string" },
+                "quantity": { "type": "number" },
+                "unit": { "type": "string" },
+                "currency": { "type": "string", "enum": ["COP", "USD"] },
+                "reason": {
+                  "type": "string",
+                  "enum": ["expired", "kitchen_error", "theft_suspected"]
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "stock_threshold_triggered": {
+      "class": "mandatory",
+      "allOf": [
+        { "$ref": "#/definitions/eventEnvelope" },
+        {
+          "properties": {
+            "event_type": { "const": "stock_threshold_triggered" },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "location_id",
+                "country",
+                "product_id",
+                "product_category",
+                "current_stock",
+                "threshold",
+                "unit",
+                "currency"
+              ],
+              "properties": {
+                "location_id": { "type": "string" },
+                "country": { "type": "string", "enum": ["CO", "US"] },
+                "product_id": { "type": "string" },
+                "product_category": { "type": "string" },
+                "current_stock": { "type": "number" },
+                "threshold": { "type": "number" },
+                "unit": { "type": "string" },
+                "currency": { "type": "string", "enum": ["COP", "USD"] }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "direct_stock_edit_rejected": {
+      "class": "mandatory",
+      "allOf": [
+        { "$ref": "#/definitions/eventEnvelope" },
+        {
+          "properties": {
+            "event_type": { "const": "direct_stock_edit_rejected" },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["location_id", "product_id", "reason"],
+              "properties": {
+                "location_id": { "type": "string" },
+                "product_id": { "type": "string" },
+                "reason": { "type": "string" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ingredient_price_variance_detected": {
+      "class": "mandatory",
+      "allOf": [
+        { "$ref": "#/definitions/eventEnvelope" },
+        {
+          "properties": {
+            "event_type": { "const": "ingredient_price_variance_detected" },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "location_id",
+                "country",
+                "product_id",
+                "supplier_id",
+                "unit_cost",
+                "historical_unit_cost",
+                "variance_pct",
+                "currency"
+              ],
+              "properties": {
+                "location_id": { "type": "string" },
+                "country": { "type": "string", "enum": ["CO", "US"] },
+                "product_id": { "type": "string" },
+                "supplier_id": { "type": "string" },
+                "unit_cost": { "type": "number" },
+                "historical_unit_cost": { "type": "number" },
+                "variance_pct": { "type": "number" },
+                "currency": { "type": "string", "enum": ["COP", "USD"] }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "order_validation_failed": {
+      "class": "identified",
+      "category": "business",
+      "propertiesAllowlist": ["product_id", "reason", "location_id"]
+    },
+    "login_failed": {
+      "class": "identified",
+      "category": "authentication",
+      "propertiesAllowlist": ["reason"]
+    },
+    "session_expired": {
+      "class": "identified",
+      "category": "authentication",
+      "propertiesAllowlist": ["route"]
+    },
+    "api_latency_recorded": {
+      "class": "identified",
+      "category": "performance",
+      "propertiesAllowlist": ["endpoint", "method", "duration_ms", "status_code"]
+    },
+    "page_load_timed": {
+      "class": "identified",
+      "category": "performance",
+      "propertiesAllowlist": ["route", "duration_ms"]
+    },
+    "frontend_error_caught": {
+      "class": "identified",
+      "category": "errors",
+      "propertiesAllowlist": ["message", "route"]
+    },
+    "section_viewed": {
+      "class": "identified",
+      "category": "navigation",
+      "propertiesAllowlist": ["section", "route"]
+    },
+    "flow_abandoned": {
+      "class": "identified",
+      "category": "navigation",
+      "propertiesAllowlist": ["flow", "step", "route"]
+    },
+    "web_vital_reported": {
+      "class": "identified",
+      "category": "performance",
+      "propertiesAllowlist": ["name", "value", "route"]
+    }
+  }
+}
