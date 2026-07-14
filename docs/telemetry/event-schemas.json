@@ -1,0 +1,152 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Standard Event Envelope",
+  "type": "object",
+  "required": [
+    "eventId", "timestamp", "sessionId", "userId",
+    "event_type", "schemaVersion", "requestId", "properties"
+  ],
+  "properties": {
+    "eventId": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "sessionId": { "type": "string" },
+    "userId": { "type": "string" },
+    "event_type": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$",
+      "enum": [
+        "product_viewed",
+        "incident_analysis_triggered",
+        "inventory_order_processed",
+        "stock_threshold_triggered",
+        "direct_stock_edit_rejected",
+        "session_expired",
+        "incident_analysis_completed"
+      ],
+      "description": "Telemetry event name in entity_action format (snake_case)."
+    },
+    "schemaVersion": { "type": "string" },
+    "requestId": { "type": "string" },
+    "properties": { "type": "object" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "event_type": { "const": "product_viewed" } } },
+      "then": {
+        "properties": {
+          "properties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "incident_analysis_triggered" } } },
+      "then": {
+        "properties": {
+          "properties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["engine"],
+            "properties": {
+              "engine": { "type": "string", "enum": ["native", "pandas"] },
+              "input_file": { "type": "string" },
+              "output_file": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "inventory_order_processed" } } },
+      "then": {
+        "properties": {
+          "properties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["product_id", "quantity", "type", "created_by", "created_at"],
+            "properties": {
+              "product_id": { "type": "string" },
+              "quantity": { "type": "integer" },
+              "type": { "type": "string" },
+              "created_by": { "type": "string" },
+              "created_at": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "stock_threshold_triggered" } } },
+      "then": {
+        "properties": {
+          "properties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["product_id", "sku", "current_stock"],
+            "properties": {
+              "product_id": { "type": "string" },
+              "sku": { "type": "string" },
+              "current_stock": { "type": "integer" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "direct_stock_edit_rejected" } } },
+      "then": {
+        "properties": {
+          "properties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["product_id", "quantity", "created_by", "reason"],
+            "properties": {
+              "product_id": { "type": "string" },
+              "quantity": { "type": "integer" },
+              "created_by": { "type": "string" },
+              "reason": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "session_expired" } } },
+      "then": {
+        "properties": {
+          "properties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {}
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "incident_analysis_completed" } } },
+      "then": {
+        "properties": {
+          "properties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["job_id", "Total Processed", "Valid Records", "Invalid Records", "Scored Cases", "Average Score"],
+            "properties": {
+              "job_id": { "type": "string" },
+              "Total Processed": { "type": "integer" },
+              "Valid Records": { "type": "integer" },
+              "Invalid Records": { "type": "integer" },
+              "Scored Cases": { "type": "integer" },
+              "Average Score": { "type": "number" }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
