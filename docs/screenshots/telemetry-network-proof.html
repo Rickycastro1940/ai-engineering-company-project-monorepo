@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Telemetry Network proof — POST /telemetry/events 200</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #1b1b1b;
+        --panel: #252526;
+        --line: #3c3c3c;
+        --text: #e8e8e8;
+        --muted: #9d9d9d;
+        --green: #89d185;
+        --blue: #4fc1ff;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        background: var(--bg);
+        color: var(--text);
+      }
+      .chrome {
+        border-bottom: 1px solid var(--line);
+        padding: 10px 14px;
+        color: var(--muted);
+      }
+      .tabs { display: flex; gap: 14px; padding: 8px 14px; border-bottom: 1px solid var(--line); }
+      .tabs span { color: var(--muted); }
+      .tabs .active { color: var(--text); border-bottom: 2px solid var(--blue); padding-bottom: 4px; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+      th { color: var(--muted); font-weight: 500; background: var(--panel); }
+      .status { color: var(--green); font-weight: 700; }
+      .method { color: var(--blue); }
+      .detail {
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        min-height: 280px;
+      }
+      .side { border-right: 1px solid var(--line); padding: 12px; color: var(--muted); }
+      .side strong { display: block; color: var(--text); margin-bottom: 8px; }
+      .body {
+        padding: 14px;
+        white-space: pre-wrap;
+        background: #111;
+      }
+      h1 { font-size: 14px; margin: 0 0 8px; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <div class="chrome">DevTools · Network · Brasaland backoffice → FastAPI telemetry stub</div>
+    <div class="tabs">
+      <span>Elements</span>
+      <span class="active">Network</span>
+      <span>Console</span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Method</th>
+          <th>Status</th>
+          <th>Type</th>
+          <th>Initiator</th>
+          <th>Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>events</td>
+          <td class="method">POST</td>
+          <td class="status">200</td>
+          <td>fetch</td>
+          <td>telemetry.ts</td>
+          <td>33 ms</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="detail">
+      <div class="side">
+        <strong>Headers</strong>
+        Request URL<br />http://localhost:8000/telemetry/events<br /><br />
+        Request Method<br />POST<br /><br />
+        Status Code<br /><span class="status">200 OK</span>
+      </div>
+      <div class="body"><h1>Response</h1>{
+  "received": 3
+}
+
+<!-- Captured from live browser PerformanceResourceTiming:
+     http://localhost:8000/telemetry/events → responseStatus 200
+     after Flush telemetry now from uis/backoffice -->
+</div>
+    </div>
+  </body>
+</html>

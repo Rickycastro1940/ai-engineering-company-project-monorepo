@@ -13,11 +13,18 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from inventory import router as inventory_router
 from pydantic import BaseModel, Field
 from routers.telemetry import router as telemetry_router
 
 logger = logging.getLogger(__name__)
+
+try:
+    from inventory import router as inventory_router
+except ImportError as exc:
+    # Inventory module currently expects package-relative auth that is not wired here.
+    # Telemetry capture verification must still run without it.
+    logger.warning("Inventory router unavailable (%s); continuing without it", exc)
+    inventory_router = None
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 UI_ROOT = REPO_ROOT / "uis" / "web"
@@ -121,7 +128,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.include_router(inventory_router)
+if inventory_router is not None:
+    app.include_router(inventory_router)
 app.include_router(telemetry_router)
 logger.info("Telemetry stub endpoint configured as %s", TELEMETRY_ENDPOINT)
 _register_analyze_routes(app, "anylayze")

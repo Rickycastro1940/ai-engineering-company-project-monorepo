@@ -5,10 +5,9 @@ Implements the frontend half of **Company's Telemetry – Frontend capture** for
 ## Setup
 
 ```bash
-# Terminal 1 — FastAPI stub
-cd services/api
+# Terminal 1 — FastAPI stub (from monorepo root)
 export TELEMETRY_ENDPOINT=http://localhost:8000/telemetry/events
-python main.py
+python3 -m uvicorn api.app:app --host 127.0.0.1 --port 8000
 
 # Terminal 2 — backoffice
 cd uis/backoffice

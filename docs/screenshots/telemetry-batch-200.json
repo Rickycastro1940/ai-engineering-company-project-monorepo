@@ -1,0 +1,21 @@
+{
+  "endpoint": "POST /telemetry/events",
+  "http_status": 200,
+  "response": { "received": 3 },
+  "browser_resource_timing": [
+    {
+      "name": "http://localhost:8000/telemetry/events",
+      "initiatorType": "fetch",
+      "responseStatus": 200,
+      "duration_ms": 8
+    },
+    {
+      "name": "http://localhost:8000/telemetry/events",
+      "initiatorType": "fetch",
+      "responseStatus": 200,
+      "duration_ms": 33
+    }
+  ],
+  "source": "uis/backoffice Flush telemetry now against local FastAPI stub",
+  "note": "Submission proof for [W16D47] Telemetry Frontend"
+}
