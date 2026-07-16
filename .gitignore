@@ -3,11 +3,15 @@ __pycache__/
 .env
 .env.local
 .venv/
+.pytest_cache/
 results.csv
 scripts/results.csv
 conversation_log.csv
 conversation_log.csv.bak
 data/uploads/
+data/pipelines/job_runs.json
+data/pipelines/job_runs.json.lock
+data/pipelines/last_run.json
 **/__pycache__/
 uis/backoffice/node_modules/
 uis/backoffice/dist/
