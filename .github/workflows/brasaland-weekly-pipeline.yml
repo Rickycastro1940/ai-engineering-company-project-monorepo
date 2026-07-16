@@ -1,0 +1,62 @@
+# Brasaland weekly business performance pipeline
+#
+# Cron (UTC): 0 9 * * 1 — every Monday at 09:00 UTC ("Monday morning")
+# Source of truth: data/pipelines/schedule.py → CRON_EXPRESSION
+#
+# Manual override: Actions → "Brasaland weekly pipeline" → Run workflow
+name: Brasaland weekly pipeline
+
+on:
+  schedule:
+    # Monday 09:00 UTC
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+    inputs:
+      as_of:
+        description: "UTC date (YYYY-MM-DD) used to resolve the previous week (optional)"
+        required: false
+        type: string
+      dry_run:
+        description: "Print week window only; skip pipeline execution"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  run-weekly-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install prefect supabase
+
+      - name: Show configured schedule
+        run: |
+          python - <<'PY'
+          from data.pipelines.schedule import schedule_metadata
+          print(schedule_metadata())
+          PY
+
+      - name: Run scheduled pipeline
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          ARGS=()
+          if [ -n "${{ inputs.as_of }}" ]; then
+            ARGS+=(--as-of "${{ inputs.as_of }}")
+          fi
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            ARGS+=(--dry-run)
+          fi
+          python scripts/run_scheduled_pipeline.py "${ARGS[@]}"
