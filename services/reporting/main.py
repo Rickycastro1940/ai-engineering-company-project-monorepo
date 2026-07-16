@@ -1,9 +1,11 @@
 import os
 import json
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from supabase import create_client, Client
 from dotenv import load_dotenv
+
 from data.pipelines.pipeline import run_pipeline
 
 load_dotenv()
@@ -63,3 +65,6 @@ def get_latest_run():
             return json.load(f)
     except FileNotFoundError:
         return {"message": "No pipeline runs recorded yet."}
+
+# Mount the frontend UI (must be at the bottom)
+app.mount("/", StaticFiles(directory="uis/backoffice", html=True), name="ui")
