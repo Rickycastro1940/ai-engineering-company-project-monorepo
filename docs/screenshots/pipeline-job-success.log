@@ -1,0 +1,4 @@
+=== SUCCESS LOG ===
+[success-demo] acquired processing lock for brasaland_weekly_performance_pipeline / 2026-07-06 — holding 0.2s
+[success-demo] work finished
+[success-demo] done status=completed job_id=135013f0-eb13-43ad-a452-d66abea1b668 target_date=2026-07-06
