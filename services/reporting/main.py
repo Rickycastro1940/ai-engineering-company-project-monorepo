@@ -1,12 +1,14 @@
 import os
 import json
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
-from data.pipelines.pipeline import run_pipeline
+from services.tasks import run_weekly_pipeline
+from services.task_status import get_task_payload
 
 load_dotenv()
 
@@ -51,12 +53,18 @@ def get_weekly_performance(week_start: str = None):
     }
 
 @app.post("/reporting/pipeline-runs")
-def trigger_pipeline(request: PipelineTriggerRequest):
-    try:
-        run_pipeline(request.start_date, request.end_date)
-        return {"status": "success", "message": f"Pipeline executed for {request.start_date} to {request.end_date}"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+def trigger_pipeline(payload: PipelineTriggerRequest):
+    """Enqueue the weekly pipeline as a Celery task; return immediately."""
+    async_result = run_weekly_pipeline.delay(payload.start_date, payload.end_date)
+    return JSONResponse(
+        status_code=202,
+        content={"task_id": async_result.id},
+    )
+
+@app.get("/tasks/{task_id}")
+def get_task_status(task_id: str):
+    """Return Celery task status/result from the Redis result backend."""
+    return get_task_payload(task_id)
 
 @app.get("/reporting/pipeline-runs/latest")
 def get_latest_run():

@@ -66,6 +66,46 @@ Full details (inventory endpoints, conversation log, curl examples): [`services/
 
 **Evaluation:** See the [evaluation checklist](./services/api/README.md#evaluation-checklist) in `services/api/README.md` for how to verify all rubric criteria.
 
+### Celery worker (Message Queues and Async Tasks)
+
+The Celery **worker is an independent process** — it does **not** run inside the FastAPI app. FastAPI only enqueues tasks (`POST /reporting/pipeline-runs` → `202` + `task_id`); the worker consumes them from Redis.
+
+Config: [`services/celery_app.py`](./services/celery_app.py) · Task: [`services/tasks.py`](./services/tasks.py) · More detail: [`services/README.md`](./services/README.md).
+
+#### Start the worker
+
+```bash
+# 1) Broker (Redis) — required
+docker compose up -d redis
+
+# 2) Worker as its own process (separate terminal from uvicorn)
+export REDIS_URL=redis://localhost:6379/0
+uv run celery -A services.celery_app worker --loglevel=info -E
+```
+
+Or run Redis + Flower + worker together:
+
+```bash
+docker compose up -d redis flower worker
+```
+
+Flower UI (optional): http://localhost:5555 — shows **queued**, **in-progress**, and **completed** tasks (worker runs with `-E` / task events enabled).
+
+Each task attempt logs `task_id`, `attempt`, `status`, and `duration_ms`; failures also log the full `error` message.
+
+#### Stop the worker
+
+```bash
+# If started with uv/celery in a terminal: Ctrl+C
+
+# If started with Docker Compose:
+docker compose stop worker
+# or tear down the stack:
+docker compose down
+```
+
+Poll task status from the API (separate from the worker process): `GET /tasks/{task_id}`.
+
 ---
 
 ## How to think about this monorepo
