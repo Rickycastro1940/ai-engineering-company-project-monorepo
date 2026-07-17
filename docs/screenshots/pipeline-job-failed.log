@@ -1,0 +1,5 @@
+=== FAILED LOG ===
+raised: simulated DB timeout
+job status: failed
+error_message: simulated DB timeout
+target_date: 2026-07-20

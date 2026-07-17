@@ -1,0 +1,6 @@
+location_id,week_start,country,currency,total_purchase_cost,total_waste_cost,waste_ratio,stockout_events_count,price_alert_events_count
+loc-br-sao-01,2026-07-06,Brazil,BRL,18450.00,922.50,0.0500,3,1
+loc-br-rio-02,2026-07-06,Brazil,BRL,15210.75,1140.80,0.0750,5,2
+loc-co-bog-01,2026-07-06,Colombia,COP,9800.00,392.00,0.0400,1,0
+loc-mx-cdmx-01,2026-07-06,Mexico,MXN,12100.50,847.04,0.0700,4,3
+loc-pe-lim-01,2026-07-06,Peru,PEN,7650.00,229.50,0.0300,0,1
