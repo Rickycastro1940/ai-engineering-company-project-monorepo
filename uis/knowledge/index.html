@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brasaland Knowledge Assistant</title>
+    <link rel="stylesheet" href="/backoffice/theme.css">
+    <script src="/backoffice/theme.js"></script>
+</head>
+<body>
+    <main class="page">
+        <div class="page-header">
+            <h1>Brasaland Knowledge Assistant</h1>
+            <button type="button" class="theme-toggle" data-theme-toggle aria-label="Toggle light or dark mode">Dark mode</button>
+        </div>
+
+        <nav class="nav-links" aria-label="Backoffice navigation">
+            <a href="/backoffice/">KPI Dashboard</a>
+            <a href="/backoffice/telemetry.html">Telemetry</a>
+            <a href="/knowledge/">Knowledge Assistant</a>
+        </nav>
+
+        <p class="subtitle">Ask about supplier ordering, waste protocol, loyalty program, and menu allergens.</p>
+
+        <form id="query-form">
+            <label for="question" class="subtitle">Your question</label>
+            <textarea id="question" placeholder="e.g., What is the minimum stock rule for proteins?" required></textarea>
+            <button type="submit" class="btn-primary" id="submit-btn">Ask Assistant</button>
+        </form>
+
+        <p id="status" class="status-busy" role="status" aria-live="polite"></p>
+        <div id="error" class="alert-error" role="alert" aria-live="assertive" style="display:none;"></div>
+        <div id="answer-box" class="answer-panel" style="display:none;">
+            <h2>Answer</h2>
+            <p id="answer"></p>
+        </div>
+    </main>
+
+    <script>
+        const form = document.getElementById('query-form');
+        const questionInput = document.getElementById('question');
+        const submitBtn = document.getElementById('submit-btn');
+        const statusEl = document.getElementById('status');
+        const errorEl = document.getElementById('error');
+        const answerBox = document.getElementById('answer-box');
+        const answerEl = document.getElementById('answer');
+
+        function showError(message) {
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+            answerBox.style.display = 'none';
+            answerEl.textContent = '';
+        }
+
+        function setLoading(isLoading) {
+            submitBtn.disabled = isLoading;
+            questionInput.disabled = isLoading;
+            statusEl.setAttribute('aria-busy', isLoading ? 'true' : 'false');
+            statusEl.textContent = isLoading
+                ? 'Searching knowledge base and generating answer...'
+                : '';
+        }
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const question = questionInput.value.trim();
+            if (!question) return;
+
+            setLoading(true);
+            errorEl.style.display = 'none';
+            answerBox.style.display = 'none';
+            answerEl.textContent = '';
+
+            try {
+                const response = await fetch('/knowledge/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question }),
+                });
+
+                let payload = {};
+                try {
+                    payload = await response.json();
+                } catch {
+                    payload = {};
+                }
+
+                if (!response.ok) {
+                    const detail = payload.detail;
+                    const message = typeof detail === 'string'
+                        ? detail
+                        : Array.isArray(detail)
+                            ? detail.map((item) => item.msg || String(item)).join('; ')
+                            : `Request failed (${response.status})`;
+                    throw new Error(message);
+                }
+
+                const answer = typeof payload.answer === 'string' ? payload.answer.trim() : '';
+                if (!answer) {
+                    throw new Error('The server returned an empty answer. Please try again.');
+                }
+
+                answerEl.textContent = answer;
+                answerBox.style.display = 'block';
+            } catch (err) {
+                showError(err.message || 'An unexpected error occurred. Please try again.');
+            } finally {
+                setLoading(false);
+            }
+        });
+    </script>
+</body>
+</html>
