@@ -1,8 +1,22 @@
 # `data/process` folder
 
-This folder contains **processed/intermediate data** and/or artifacts produced by pipelines (for example: clean datasets, features, aggregates, intermediate tables, or transformation outputs).
+This folder contains **processed/intermediate data** and artifacts produced by pipelines.
 
-- **Main purpose**: clearly separate “raw” data from data ready for analysis, modeling, or app consumption.
-- **Recommendation**: document which pipeline produces each artifact, its schema, refresh cadence, and how quality is validated (checks, constraints, data tests).
+## Brasaland RAG indexer
+
+Index the company knowledge base into Qdrant:
+
+```bash
+# Prerequisites: docker compose up -d qdrant  +  real keys in root .env
+uv run python data/process/rag.py
+```
+
+Expect **38** semantic chunks in collection `brasaland_kb` (see `CONTEXT.md` / `CONTEXT-company.md`).
+
+Offline smoke (no 4Geeks key; deterministic fake vectors — not for evaluation):
+
+```bash
+uv run python scripts/smoke_index_rag.py
+```
 
 > _Spanish version: [README.es.md](./README.es.md)._

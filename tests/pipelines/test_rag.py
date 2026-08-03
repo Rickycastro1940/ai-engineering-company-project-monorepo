@@ -116,7 +116,7 @@ def test_query_returns_fallback_when_no_chunks(mock_retrieve, mock_generation_cl
 
     answer = query("Unknown topic?")
 
-    assert answer == "There is not enough information available to answer this question."
+    assert answer == "There is not enough information available."
     mock_generation_client.chat.completions.create.assert_not_called()
 
 

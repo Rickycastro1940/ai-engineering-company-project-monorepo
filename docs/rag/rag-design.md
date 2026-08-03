@@ -157,7 +157,7 @@ Business rules (from `CONTEXT-company.md`):
 - Never invent company facts, numbers, or percentages.
 - Never claim zero allergen risk or 100% safety.
 - Preserve USD $ / COP $ exactly.
-- Insufficient context → *"There is not enough information available."*
+- Insufficient context → exactly *"There is not enough information available."* (matches `CONTEXT-company.md` / `CONTEXT.md`)
 
 ---
 

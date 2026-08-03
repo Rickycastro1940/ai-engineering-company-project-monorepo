@@ -74,7 +74,7 @@ def query(question: str) -> str:
     retrieved_chunks = retrieve(question, k=DEFAULT_K, min_score=MIN_SCORE)
 
     if not retrieved_chunks:
-        return "There is not enough information available to answer this question."
+        return "There is not enough information available."
 
     context = "\n\n".join(
         [
