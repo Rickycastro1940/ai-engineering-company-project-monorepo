@@ -1,4 +1,40 @@
-............................                                             [100%]
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0 -- /workspace/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /workspace
+configfile: pyproject.toml
+plugins: anyio-4.14.2, langsmith-0.10.15
+collecting ... collected 28 items
+
+tests/pipelines/test_agent_endpoint.py::test_agent_query_endpoint_invokes_graph_only PASSED [  3%]
+tests/pipelines/test_agent_endpoint.py::test_agent_query_empty_question_returns_clear_400 PASSED [  7%]
+tests/pipelines/test_agent_endpoint.py::test_agent_query_graph_failure_returns_clear_500_without_stack PASSED [ 10%]
+tests/pipelines/test_agent_endpoint.py::test_agent_coexists_with_health_and_traces_routes PASSED [ 14%]
+tests/pipelines/test_agent_graph.py::test_graph_compiles_successfully PASSED [ 17%]
+tests/pipelines/test_agent_graph.py::test_compile_fails_clearly_on_missing_required_node PASSED [ 21%]
+tests/pipelines/test_agent_graph.py::test_agent_state_is_minimal_and_has_no_history_field PASSED [ 25%]
+tests/pipelines/test_agent_graph.py::test_eval_retrieve_runs_before_generate PASSED [ 28%]
+tests/pipelines/test_agent_graph.py::test_eval_empty_question_skips_retrieve PASSED [ 32%]
+tests/pipelines/test_agent_graph.py::test_eval_no_context_when_retrieve_empty PASSED [ 35%]
+tests/pipelines/test_agent_graph.py::test_eval_answer_grounded_in_context_knowledge_base PASSED [ 39%]
+tests/pipelines/test_agent_graph.py::test_eval_grounding_from_saved_trace_artifact PASSED [ 42%]
+tests/pipelines/test_agent_graph.py::test_generate_answer_is_separate_from_retrieve PASSED [ 46%]
+tests/pipelines/test_agent_graph.py::test_node_contract_graph_never_calls_monolithic_query PASSED [ 50%]
+tests/pipelines/test_agent_graph.py::test_query_skips_retrieve_when_chunks_provided PASSED [ 53%]
+tests/pipelines/test_agent_graph.py::test_checkpointing_persists_thread_state PASSED [ 57%]
+tests/pipelines/test_agent_graph.py::test_every_run_produces_queryable_trace PASSED [ 60%]
+tests/pipelines/test_agent_grounding.py::test_grounding_facts_exist_in_context_company_and_kb PASSED [ 64%]
+tests/pipelines/test_agent_grounding.py::test_agent_and_rag_share_generate_answer_function PASSED [ 67%]
+tests/pipelines/test_agent_grounding.py::test_grounded_trace_passes_acceptance_gate PASSED [ 71%]
+tests/pipelines/test_agent_grounding.py::test_ungrounded_answer_fails_even_with_perfect_trace PASSED [ 75%]
+tests/pipelines/test_agent_grounding.py::test_allergen_policy_forbids_zero_risk_claims PASSED [ 78%]
+tests/pipelines/test_agent_grounding.py::test_foreign_source_document_fails_grounding_gate PASSED [ 82%]
+tests/pipelines/test_agent_grounding.py::test_sample_grounding_artifact_remains_grounded PASSED [ 85%]
+tests/pipelines/test_rag.py::test_retrieve_filters_by_min_score PASSED   [ 89%]
+tests/pipelines/test_rag.py::test_query_orchestrates_retrieve_then_generate PASSED [ 92%]
+tests/pipelines/test_rag.py::test_query_returns_fallback_when_no_chunks PASSED [ 96%]
+tests/pipelines/test_rag.py::test_generate_answer_does_not_call_retrieve PASSED [100%]
+
 =============================== warnings summary ===============================
 .venv/lib/python3.12/site-packages/fastapi/testclient.py:1
   /workspace/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
@@ -10,4 +46,4 @@
     show_warning(
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-28 passed, 3 warnings in 1.40s
+======================== 28 passed, 3 warnings in 1.39s ========================
