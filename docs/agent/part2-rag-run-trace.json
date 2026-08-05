@@ -1,5 +1,5 @@
 {
-  "trace_id": "9c716b87f3e247e5b4b927fff5197066",
+  "trace_id": "9e5ac6418a154371abdf42b6115e3438",
   "status": "ok",
   "question": "What is the minimum stock rule for proteins?",
   "answer": "Every Brasaland location must keep at least 3 days of main protein inventory.",
@@ -21,12 +21,14 @@
       "sequence": 2,
       "status": "ok",
       "duration_ms": 0,
-      "notes": "route=retrieve needs_ticket=False needs_rag=True",
+      "notes": "route=retrieve needs_ticket=False needs_inventory=False needs_rag=True",
       "output": {
         "route": "retrieve",
         "needs_ticket": false,
+        "needs_inventory": false,
         "needs_rag": true,
         "ticket_query": null,
+        "inventory_query": null,
         "decision": "rag"
       }
     },
@@ -58,14 +60,15 @@
         "grounded": true,
         "source": "rag",
         "used_ticket": false,
+        "used_inventory": false,
         "context_sources": [
           "supplier-ordering"
         ]
       }
     }
   ],
-  "started_at": "2026-08-05T21:46:38.469757+00:00",
-  "ended_at": "2026-08-05T21:46:38.473792+00:00",
+  "started_at": "2026-08-05T22:10:37.083455+00:00",
+  "ended_at": "2026-08-05T22:10:37.087883+00:00",
   "duration_ms": 4,
   "node_order": [
     "receive_question",
