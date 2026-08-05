@@ -1,8 +1,8 @@
 {
-  "trace_id": "66b68eb17fbd421f821f505ed35cab7d",
+  "trace_id": "5aa1d204e80449db945b74c3ab9b5046",
   "status": "ok",
   "question": "What is the status of ticket BRS-000002 and the minimum stock rule for proteins?",
-  "answer": "Every Brasaland location must keep at least 3 days of main protein inventory.\n\nLive ticket data:\nTicket BRS-000002: status=ABIERTO, category=ABASTECIMIENTO, date=2026-06-01, location=COL-02, source=incident_manager. Description: Late produce delivery",
+  "answer": "Every Brasaland location must keep at least 3 days of main protein inventory. Emergency orders over 500 USD need approval from Lucía Fernández.\n\nLive ticket data:\nTicket BRS-000002: status=ABIERTO, category=ABASTECIMIENTO, date=2026-06-01, location=COL-02, source=incident_manager. Description: Late produce delivery",
   "error": null,
   "steps": [
     {
@@ -85,7 +85,7 @@
       "duration_ms": 0,
       "notes": "grounded answer from retrieved KB context",
       "output": {
-        "answer_len": 250,
+        "answer_len": 316,
         "grounded": true,
         "source": "rag",
         "used_ticket": true,
@@ -96,9 +96,9 @@
       }
     }
   ],
-  "started_at": "2026-08-05T22:16:51.784644+00:00",
-  "ended_at": "2026-08-05T22:16:51.789638+00:00",
-  "duration_ms": 5,
+  "started_at": "2026-08-05T22:24:45.219893+00:00",
+  "ended_at": "2026-08-05T22:24:45.224654+00:00",
+  "duration_ms": 4,
   "node_order": [
     "receive_question",
     "decide_route",
