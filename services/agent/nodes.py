@@ -2,13 +2,14 @@
 
 Required nodes (Part 1 + Part 2)
 --------------------------------
-1. ``receive_question`` — accepts/normalizes the user question and classifies
-   whether RAG, the ticket tool, or both are needed.
-2. ``retrieve`` — calls ``data.pipelines.rag.retrieve`` (reuse, do not duplicate).
-3. ``generate`` — calls ``data.pipelines.rag.generate_answer(question, context)``
+1. ``receive_question`` — accepts/normalizes the user question.
+2. ``decide_route`` — conditional router: RAG, ticket tool, or both (from
+   question content; user does not pick the source).
+3. ``retrieve`` — calls ``data.pipelines.rag.retrieve`` (reuse, do not duplicate).
+4. ``generate`` — calls ``data.pipelines.rag.generate_answer(question, context)``
    with the chunks the retrieve node already produced.
-4. ``lookup_ticket`` — read-only ticket tool against the incident manager.
-5. ``answer_ticket`` / ``ticket_fallback`` — honest ticket answers / recovery.
+5. ``lookup_ticket`` — read-only ticket tool against the incident manager.
+6. ``answer_ticket`` / ``ticket_fallback`` — honest ticket answers / recovery.
 
 Never call the monolithic ``query()`` (retrieve + generate) inside a node.
 """
@@ -54,7 +55,7 @@ def _step(
 
 
 def receive_question(state: AgentState) -> dict[str, Any]:
-    """Node 1 — receive the question and decide RAG vs ticket tool (or both)."""
+    """Node 1 — receive/normalize the question only (no source decision here)."""
     started = time.perf_counter()
     question = (state.get("question") or "").strip()
     if not question:
@@ -75,19 +76,15 @@ def receive_question(state: AgentState) -> dict[str, Any]:
                     "error",
                     started,
                     notes="empty question",
-                    output={"accepted": False, "needs_ticket": False, "needs_rag": False},
+                    output={"accepted": False},
                 )
             ],
         }
 
-    decision = classify_sources(question)
     return {
         "question": question,
-        "route": decision["route"],
+        "route": "decide",
         "error": None,
-        "needs_ticket": decision["needs_ticket"],
-        "needs_rag": decision["needs_rag"],
-        "ticket_query": decision["ticket_query"],
         "ticket_result": None,
         "sources_used": [],
         "steps": [
@@ -96,14 +93,54 @@ def receive_question(state: AgentState) -> dict[str, Any]:
                 "receive_question",
                 "ok",
                 started,
-                notes=f"question accepted route={decision['route']}",
+                notes="question accepted; next=decide_route",
+                output={"accepted": True, "question_len": len(question)},
+            )
+        ],
+    }
+
+
+def decide_route_node(state: AgentState) -> dict[str, Any]:
+    """Conditional router — choose ticket tool, RAG, or both from the question.
+
+    The user never specifies which source to use. This node inspects the
+    question text and sets ``route`` to:
+
+    - ``ticket`` — live incident lookup only (``lookup_ticket``)
+    - ``retrieve`` — RAG only
+    - ``both`` — ticket tool first, then RAG
+    """
+    started = time.perf_counter()
+    question = state.get("question") or ""
+    decision = classify_sources(question)
+    return {
+        "route": decision["route"],
+        "needs_ticket": decision["needs_ticket"],
+        "needs_rag": decision["needs_rag"],
+        "ticket_query": decision["ticket_query"],
+        "steps": [
+            _step(
+                state,
+                "decide_route",
+                "ok",
+                started,
+                notes=(
+                    f"route={decision['route']} "
+                    f"needs_ticket={decision['needs_ticket']} "
+                    f"needs_rag={decision['needs_rag']}"
+                ),
                 output={
-                    "accepted": True,
-                    "question_len": len(question),
+                    "route": decision["route"],
                     "needs_ticket": decision["needs_ticket"],
                     "needs_rag": decision["needs_rag"],
-                    "route": decision["route"],
                     "ticket_query": decision["ticket_query"],
+                    "decision": (
+                        "ticket_tool"
+                        if decision["route"] == "ticket"
+                        else "rag"
+                        if decision["route"] == "retrieve"
+                        else "ticket_tool_and_rag"
+                    ),
                 },
             )
         ],

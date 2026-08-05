@@ -149,9 +149,11 @@ def test_eval_retrieve_runs_before_generate(trace_dir: Path):
     # Evals run against the persisted trace — not a second live execution.
     trace = load_trace(result["trace_id"], trace_dir=trace_dir)
     _assert_trace_retrieve_before_generate(trace)
-    assert trace["steps"][1]["node_name"] == "retrieve"
-    assert trace["steps"][2]["node_name"] == "generate"
-    assert trace["steps"][1]["output"]["chunk_count"] == 1
+    assert "decide_route" in trace["node_order"]
+    retrieve_step = next(s for s in trace["steps"] if s["node_name"] == "retrieve")
+    generate_step = next(s for s in trace["steps"] if s["node_name"] == "generate")
+    assert retrieve_step["output"]["chunk_count"] == 1
+    assert generate_step["node_name"] == "generate"
 
 
 def test_eval_empty_question_skips_retrieve(trace_dir: Path):
@@ -164,6 +166,7 @@ def test_eval_empty_question_skips_retrieve(trace_dir: Path):
     assert trace["status"] == "error"
     assert trace["error"] == "empty_question"
     assert trace["node_order"] == ["receive_question", "empty_question"]
+    assert "decide_route" not in trace["node_order"]
     assert "retrieve" not in trace["node_order"]
     assert "generate" not in trace["node_order"]
 
@@ -181,9 +184,15 @@ def test_eval_no_context_when_retrieve_empty(trace_dir: Path):
     trace = load_trace(result["trace_id"], trace_dir=trace_dir)
     assert trace["status"] == "ok"
     assert trace["answer"] == NO_CONTEXT_ANSWER
-    assert trace["node_order"] == ["receive_question", "retrieve", "no_context"]
+    assert trace["node_order"] == [
+        "receive_question",
+        "decide_route",
+        "retrieve",
+        "no_context",
+    ]
     assert "generate" not in trace["node_order"]
-    assert trace["steps"][1]["output"]["chunk_count"] == 0
+    retrieve_step = next(s for s in trace["steps"] if s["node_name"] == "retrieve")
+    assert retrieve_step["output"]["chunk_count"] == 0
 
 
 def test_eval_answer_grounded_in_context_knowledge_base(trace_dir: Path):
@@ -210,7 +219,8 @@ def test_eval_answer_grounded_in_context_knowledge_base(trace_dir: Path):
     assert facts["stock_rule"] in answer
     assert facts["person"] in answer
     assert facts["threshold"] in answer
-    assert facts["source_document"] in trace["steps"][1]["output"]["sources"]
+    retrieve_step = next(s for s in trace["steps"] if s["node_name"] == "retrieve")
+    assert facts["source_document"] in retrieve_step["output"]["sources"]
 
     artifact = Path("data/process/agent-traces")
     artifact.mkdir(parents=True, exist_ok=True)
@@ -229,7 +239,8 @@ def test_eval_grounding_from_saved_trace_artifact():
     answer = trace.get("answer") or ""
     assert facts["stock_rule"] in answer
     assert facts["person"] in answer or "Lucia Fernandez" in answer
-    assert facts["source_document"] in (trace["steps"][1]["output"].get("sources") or [])
+    retrieve_step = next(s for s in trace["steps"] if s["node_name"] == "retrieve")
+    assert facts["source_document"] in (retrieve_step["output"].get("sources") or [])
 
 
 def test_generate_answer_is_separate_from_retrieve():
@@ -270,7 +281,12 @@ def test_node_contract_graph_never_calls_monolithic_query():
     question_arg, context_arg = mock_generate.call_args.args[:2]
     assert question_arg == "What is the minimum stock rule for proteins?"
     assert context_arg == [PROTEIN_STOCK_CHUNK]
-    assert result["node_order"] == ["receive_question", "retrieve", "generate"]
+    assert result["node_order"] == [
+        "receive_question",
+        "decide_route",
+        "retrieve",
+        "generate",
+    ]
 
 
 def test_query_skips_retrieve_when_chunks_provided():
@@ -344,11 +360,19 @@ def test_every_run_produces_queryable_trace(trace_dir: Path):
 
     trace = load_trace(result["trace_id"], trace_dir=trace_dir)
     assert trace["trace_id"] == result["trace_id"]
-    assert trace["node_order"] == ["receive_question", "retrieve", "generate"]
-    assert len(trace["steps"]) == 3
+    assert trace["node_order"] == [
+        "receive_question",
+        "decide_route",
+        "retrieve",
+        "generate",
+    ]
+    assert len(trace["steps"]) == 4
     assert trace["steps"][0]["node_name"] == "receive_question"
-    assert trace["steps"][1]["output"]["chunk_count"] == 1
-    assert trace["steps"][2]["notes"] == "grounded answer from retrieved KB context"
+    assert trace["steps"][1]["node_name"] == "decide_route"
+    retrieve_step = next(s for s in trace["steps"] if s["node_name"] == "retrieve")
+    assert retrieve_step["output"]["chunk_count"] == 1
+    generate_step = next(s for s in trace["steps"] if s["node_name"] == "generate")
+    assert generate_step["notes"] == "grounded answer from retrieved KB context"
     # Trace file is queryable from disk (not just console print).
     assert (trace_dir / f"{result['trace_id']}.json").is_file()
 

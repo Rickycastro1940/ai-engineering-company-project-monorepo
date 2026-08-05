@@ -15,10 +15,11 @@ LangGraph orchestration around the existing Brasaland RAG flow, plus a
   if set. Never hardcode tokens.
 - [x] **Fallback** — timeout / not-found / service error → honest message,
   never an invented status (`ticket_fallback` node).
-- [x] **Routing** — `receive_question` classifies RAG vs ticket vs both from
-  the question text (no user hint required).
+- [x] **Routing** — explicit `decide_route` node + conditional edges choose RAG,
+  ticket tool, or both from the question text (no user hint required).
+- [x] **Ticket tool node** — `lookup_ticket` on the compiled graph (HTTP GET only).
 - [x] **Traces** — `sources_used` + `node_order` show which source(s) ran
-  and in what order.
+  and in what order (including `decide_route` → `lookup_ticket` / `retrieve`).
 - [x] **Evals** — `tests/pipelines/test_agent_tools.py` (tool-required,
   RAG-required, fallback).
 
@@ -28,13 +29,18 @@ LangGraph orchestration around the existing Brasaland RAG flow, plus a
 START → receive_question
             │
             ├── empty ──────────────► empty_question → END
-            ├── ticket / both ──────► lookup_ticket
-            │                              │
-            │                              ├── ticket_answer → answer_ticket → END
-            │                              ├── ticket_fallback → END
-            │                              └── retrieve (when needs_rag / both)
-            └── retrieve (RAG only) ─► retrieve → generate | no_context | ticket_* → END
+            └── decide_route  (conditional agent: ticket | rag | both)
+                      │
+                      ├── ticket / both ──────► lookup_ticket  ← tool node
+                      │                              │
+                      │                              ├── ticket_answer → answer_ticket → END
+                      │                              ├── ticket_fallback → END
+                      │                              └── retrieve (when needs_rag / both)
+                      └── retrieve (RAG only) ─► generate | no_context | ticket_* → END
 ```
+
+`decide_route` inspects the question and chooses the ticket tool **instead of**
+or **in addition to** the RAG — the user never names the source.
 
 ## Ticket tool contract
 

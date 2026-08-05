@@ -214,10 +214,21 @@ def test_eval_tool_required_question_uses_ticket_not_rag(trace_dir: Path):
         isinstance(called, dict) and called.get("ticket_id") == "BRS-000002"
     )
     trace = load_trace(result["trace_id"], trace_dir=trace_dir)
+    assert trace["node_order"] == [
+        "receive_question",
+        "decide_route",
+        "lookup_ticket",
+        "answer_ticket",
+    ]
     assert "lookup_ticket" in trace["node_order"]
+    assert "decide_route" in trace["node_order"]
     assert "retrieve" not in trace["node_order"]
     assert "generate" not in trace["node_order"]
     assert "answer_ticket" in trace["node_order"]
+    decide = next(s for s in trace["steps"] if s["node_name"] == "decide_route")
+    assert decide["output"]["decision"] == "ticket_tool"
+    assert decide["output"]["needs_ticket"] is True
+    assert decide["output"]["needs_rag"] is False
     assert trace["sources_used"] == ["ticket"]
     assert "ABIERTO" in (trace["answer"] or "")
     assert "BRS-000002" in (trace["answer"] or "")
@@ -238,8 +249,17 @@ def test_eval_rag_required_question_skips_ticket_tool(trace_dir: Path):
 
     mock_lookup.assert_not_called()
     trace = load_trace(result["trace_id"], trace_dir=trace_dir)
-    assert trace["node_order"] == ["receive_question", "retrieve", "generate"]
+    assert trace["node_order"] == [
+        "receive_question",
+        "decide_route",
+        "retrieve",
+        "generate",
+    ]
     assert "lookup_ticket" not in trace["node_order"]
+    assert "decide_route" in trace["node_order"]
+    decide = next(s for s in trace["steps"] if s["node_name"] == "decide_route")
+    assert decide["output"]["decision"] == "rag"
+    assert decide["output"]["needs_ticket"] is False
     assert trace["sources_used"] == ["rag"]
     assert "3 days" in (trace["answer"] or "")
 
@@ -269,6 +289,44 @@ def test_eval_ticket_fallback_when_service_unavailable(trace_dir: Path):
     # Never invent a concrete ticket status on failure.
     assert "status=abierto" not in answer
     assert "status=cerrado" not in answer
+
+
+def test_eval_decide_route_both_runs_ticket_then_rag(trace_dir: Path):
+    """Conditional agent can use the ticket tool *in addition to* the RAG."""
+    ok_result = TicketLookupOutput(ok=True, tickets=[SAMPLE_TICKET], error=None)
+    result = _run_and_save_trace(
+        "What is the status of ticket BRS-000002 and what is the minimum stock rule for proteins?",
+        trace_dir,
+        **{
+            "services.agent.nodes.lookup_ticket": lambda q: ok_result,
+            "services.agent.nodes.retrieve": lambda q: [PROTEIN_STOCK_CHUNK],
+            "services.agent.nodes.generate_answer": lambda q, ctx: GROUNDED_ANSWER,
+        },
+    )
+    trace = load_trace(result["trace_id"], trace_dir=trace_dir)
+    order = trace["node_order"]
+    assert order.index("decide_route") < order.index("lookup_ticket")
+    assert order.index("lookup_ticket") < order.index("retrieve")
+    assert order.index("retrieve") < order.index("generate")
+    decide = next(s for s in trace["steps"] if s["node_name"] == "decide_route")
+    assert decide["output"]["decision"] == "ticket_tool_and_rag"
+    assert decide["output"]["needs_ticket"] is True
+    assert decide["output"]["needs_rag"] is True
+    assert trace["sources_used"] == ["ticket", "rag"]
+    assert "3 days" in (trace["answer"] or "")
+    assert "BRS-000002" in (trace["answer"] or "") or "ABIERTO" in (trace["answer"] or "")
+
+
+def test_graph_registers_lookup_ticket_and_decide_route_nodes():
+    """Graph must include the ticket tool node and the conditional router."""
+    from services.agent.graph import REQUIRED_NODES, build_agent_graph
+
+    graph = build_agent_graph()
+    registered = set(graph.nodes.keys())
+    assert "lookup_ticket" in registered
+    assert "decide_route" in registered
+    assert "lookup_ticket" in REQUIRED_NODES
+    assert "decide_route" in REQUIRED_NODES
 
 
 def test_tool_is_read_only_get_only():

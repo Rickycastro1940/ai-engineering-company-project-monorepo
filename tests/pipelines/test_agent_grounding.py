@@ -89,17 +89,23 @@ def test_grounded_trace_passes_acceptance_gate(trace_dir: Path):
     )
     trace = load_trace(result["trace_id"], trace_dir=trace_dir)
     assert_trace_grounded(trace)
-    assert_sources_from_company_kb(trace["steps"][1]["output"]["sources"])
+    retrieve_step = next(s for s in trace["steps"] if s["node_name"] == "retrieve")
+    assert_sources_from_company_kb(retrieve_step["output"]["sources"])
     assert_answer_grounded_in_supplier_policy(trace["answer"])
+    assert "decide_route" in trace["node_order"]
 
 
 def test_ungrounded_answer_fails_even_with_perfect_trace():
     """Acceptance gate: perfect node order is not enough if answer ignores CONTEXT."""
     perfect_looking_trace = {
-        "node_order": ["receive_question", "retrieve", "generate"],
+        "node_order": ["receive_question", "decide_route", "retrieve", "generate"],
         "answer": UNGROUNDED_ANSWER,
         "steps": [
             {"node_name": "receive_question", "output": {}},
+            {
+                "node_name": "decide_route",
+                "output": {"decision": "rag", "needs_ticket": False, "needs_rag": True},
+            },
             {
                 "node_name": "retrieve",
                 "output": {"sources": ["supplier-ordering"], "chunk_count": 1},

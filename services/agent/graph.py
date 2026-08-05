@@ -21,6 +21,7 @@ from langgraph.graph import END, START, StateGraph
 
 from services.agent.nodes import (
     answer_ticket_node,
+    decide_route_node,
     empty_question_node,
     generate_node,
     lookup_ticket_node,
@@ -34,6 +35,7 @@ from services.agent.tracing import TraceRecord, save_trace
 
 REQUIRED_NODES = (
     "receive_question",
+    "decide_route",
     "retrieve",
     "generate",
     "no_context",
@@ -52,10 +54,18 @@ class GraphStructureError(ValueError):
 
 
 def _after_receive(state: AgentState) -> str:
-    """Conditional edge: empty / ticket / rag / both."""
+    """Conditional edge: empty question → error path; else → decide_route."""
+    return "empty_question" if state.get("route") == "empty" else "decide_route"
+
+
+def _after_decide_route(state: AgentState) -> str:
+    """Conditional edge: ticket tool, RAG, or both (tool first, then RAG).
+
+    ``decide_route`` sets ``route`` from the question content:
+    - ``ticket`` / ``both`` → ``lookup_ticket`` (tool node)
+    - ``retrieve`` → RAG ``retrieve`` node
+    """
     route = state.get("route") or ""
-    if route == "empty":
-        return "empty_question"
     if route in ("ticket", "both"):
         return "lookup_ticket"
     return "retrieve"
@@ -86,9 +96,27 @@ def _after_retrieve(state: AgentState) -> str:
 
 
 def build_agent_graph() -> StateGraph:
-    """Assemble nodes + conditional edges (not yet compiled)."""
+    """Assemble nodes + conditional edges (not yet compiled).
+
+    Topology (Part 2)
+    -----------------
+    ::
+
+        START → receive_question
+                    │
+                    ├── empty ──────────────► empty_question → END
+                    └── decide_route  (conditional agent)
+                              │
+                              ├── ticket / both ─► lookup_ticket  (tool node)
+                              │                         │
+                              │                         ├── answer_ticket → END
+                              │                         ├── ticket_fallback → END
+                              │                         └── retrieve (when both)
+                              └── retrieve (RAG only) ─► generate | no_context | …
+    """
     graph = StateGraph(AgentState)
     graph.add_node("receive_question", receive_question)
+    graph.add_node("decide_route", decide_route_node)
     graph.add_node("lookup_ticket", lookup_ticket_node)
     graph.add_node("answer_ticket", answer_ticket_node)
     graph.add_node("ticket_fallback", ticket_fallback_node)
@@ -103,6 +131,14 @@ def build_agent_graph() -> StateGraph:
         _after_receive,
         {
             "empty_question": "empty_question",
+            "decide_route": "decide_route",
+        },
+    )
+    # Conditional agent: ticket tool instead of / in addition to RAG.
+    graph.add_conditional_edges(
+        "decide_route",
+        _after_decide_route,
+        {
             "lookup_ticket": "lookup_ticket",
             "retrieve": "retrieve",
         },

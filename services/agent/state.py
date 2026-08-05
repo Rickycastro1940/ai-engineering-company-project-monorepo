@@ -26,11 +26,11 @@ class AgentState(TypedDict, total=False):
         Machine-readable error code when a node fails (never a stack trace).
     route:
         Explicit routing signal used by conditional edges
-        (``empty`` | ``retrieve`` | ``ticket`` | ``both`` | ``generate`` |
-        ``no_context`` | ``ticket_answer`` | ``ticket_fallback`` | ``error`` |
-        ``done``).
+        (``empty`` | ``decide`` | ``retrieve`` | ``ticket`` | ``both`` |
+        ``generate`` | ``no_context`` | ``ticket_answer`` | ``ticket_fallback`` |
+        ``error`` | ``done``).
     needs_ticket / needs_rag:
-        Source flags set by ``receive_question`` for conditional edges / traces.
+        Source flags set by ``decide_route`` for conditional edges / traces.
     ticket_query:
         Serialized ``TicketLookupInput`` when the ticket tool should run.
     ticket_result:

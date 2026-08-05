@@ -22,20 +22,20 @@ Optional `INCIDENT_API_TOKEN` / `INCIDENT_API_KEY` are forwarded as Bearer if se
 
 - Question: status of ticket `BRS-000002`
 - Tool called live `GET http://127.0.0.1:8000/api/incidents/BRS-000002` (no mocked ticket rows)
-- `node_order`: `receive_question` → `lookup_ticket` → `answer_ticket`
+- `node_order`: `receive_question` → `decide_route` → `lookup_ticket` → `answer_ticket`
 - `sources_used`: `["ticket"]`
 - Answer fields match `scripts/incidents-COMPANY.csv` (`ABIERTO`, `ABASTECIMIENTO`, …)
 
 ### Tool-run (ticket source)
 
 - Question: status of ticket `BRS-000002`
-- `node_order`: `receive_question` → `lookup_ticket` → `answer_ticket`
+- `node_order`: `receive_question` → `decide_route` → `lookup_ticket` → `answer_ticket`
 - `sources_used`: `["ticket"]`
 
 ### RAG-run (knowledge base)
 
 - Question: minimum stock rule for proteins
-- `node_order`: `receive_question` → `retrieve` → `generate`
+- `node_order`: `receive_question` → `decide_route` → `retrieve` → `generate`
 - `sources_used`: `["rag"]`
 
 ### Evals
