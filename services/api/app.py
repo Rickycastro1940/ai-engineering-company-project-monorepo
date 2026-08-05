@@ -1,19 +1,25 @@
 from __future__ import annotations
 
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 from typing import Literal
- 
 
 from analyzer import IncidentAnalyzer
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from inventory import router as inventory_router
 from pydantic import BaseModel, Field
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+try:
+    from inventory import router as inventory_router
+except Exception:  # noqa: BLE001 — inventory module may be mid-migration
+    inventory_router = None
 UI_ROOT = REPO_ROOT / "uis" / "web"
 UPLOAD_DIR = REPO_ROOT / "data" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -88,9 +94,19 @@ def _register_analyze_routes(app: FastAPI, route_prefix: str) -> None:
         return summary
 
 app = FastAPI(title="Company Incident File Analyzer", version="1.0.0")
-app.include_router(inventory_router)
+if inventory_router is not None:
+    app.include_router(inventory_router)
 _register_analyze_routes(app, "anylayze")
 _register_analyze_routes(app, "analyze")
+
+# LangGraph support agent (Part 1) — thin HTTP adapter over the compiled graph.
+from services.agent.graph import get_compiled_graph  # noqa: E402
+from services.agent.router import router as agent_router  # noqa: E402
+from services.api.routers.knowledge import router as knowledge_router  # noqa: E402
+
+get_compiled_graph()
+app.include_router(agent_router)
+app.include_router(knowledge_router)
 
 @app.get("/api/incidents/results/export")
 def export_results(output_file: str = "results.csv"):
