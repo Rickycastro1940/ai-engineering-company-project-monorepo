@@ -33,17 +33,20 @@ _RAG_HINTS = (
     "how should",
     "how to",
     "minimum stock",
+    "stock rule",
     "supplier",
     "proveedor",
     "approval",
     "lucía",
     "lucia",
+    "fernández",
+    "fernandez",
     "procurement",
     "knowledge",
     "handbook",
     "guideline",
-    "what is the",
-    "what are the",
+    "protein",
+    "emergency order",
 )
 
 

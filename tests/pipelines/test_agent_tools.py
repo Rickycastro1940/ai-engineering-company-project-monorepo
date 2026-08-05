@@ -208,7 +208,11 @@ def test_eval_tool_required_question_uses_ticket_not_rag(trace_dir: Path):
         )
 
     mock_retrieve.assert_not_called()
-    mock_lookup.assert_called_once()
+    assert mock_lookup.call_count == 1
+    called = mock_lookup.call_args.args[0]
+    assert getattr(called, "ticket_id", None) == "BRS-000002" or (
+        isinstance(called, dict) and called.get("ticket_id") == "BRS-000002"
+    )
     trace = load_trace(result["trace_id"], trace_dir=trace_dir)
     assert "lookup_ticket" in trace["node_order"]
     assert "retrieve" not in trace["node_order"]
@@ -252,7 +256,7 @@ def test_eval_ticket_fallback_when_service_unavailable(trace_dir: Path):
         "services.agent.nodes.retrieve"
     ) as mock_retrieve:
         result = _run_and_save_trace(
-            "What is the status of ticket BRS-000002?",
+            "Status of ticket BRS-000002?",
             trace_dir,
         )
 
