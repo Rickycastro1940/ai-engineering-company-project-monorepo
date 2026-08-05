@@ -334,10 +334,14 @@ def run_agent(question: str, *, thread_id: str | None = None) -> dict[str, Any]:
         route=final.get("route"),
         sources_used=sources_used,
         needs_ticket=bool(final.get("needs_ticket")),
+        needs_inventory=bool(final.get("needs_inventory")),
         needs_rag=bool(final.get("needs_rag")),
     )
     save_trace(record)
 
+    from services.agent.tracing import enrich_trace_sources
+
+    source_fields = enrich_trace_sources(node_order=node_order, sources_used=sources_used)
     return {
         "trace_id": trace_id,
         "status": status,
@@ -345,5 +349,7 @@ def run_agent(question: str, *, thread_id: str | None = None) -> dict[str, Any]:
         "error": public_error,
         "steps": steps,
         "node_order": node_order,
-        "sources_used": sources_used,
+        "sources_used": source_fields["sources_used"],
+        "sources_order": source_fields["sources_order"],
+        "source_summary": source_fields["source_summary"],
     }

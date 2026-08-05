@@ -50,18 +50,22 @@ def agent_query(payload: AgentQueryRequest) -> AgentQueryResponse:
 def get_traces(
     limit: int = 20,
     node: str | None = None,
+    source: str | None = None,
     status: str | None = None,
     question_contains: str | None = None,
 ) -> list[dict]:
     """List/query recent run traces (newest first).
 
     Optional filters make the store queryable after the run — e.g.
-    ``?node=retrieve&status=ok``.
+    ``?source=ticket`` (tool used), ``?source=rag``, ``?node=retrieve``.
+    Each trace includes ``sources_order`` / ``source_summary`` showing whether
+    the RAG, a tool, or both were used and in what order.
     """
     limit = max(1, min(limit, 100))
-    if node or status or question_contains:
+    if node or source or status or question_contains:
         return query_traces(
             node=node,
+            source=source,
             status=status,
             question_contains=question_contains,
             limit=limit,

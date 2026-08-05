@@ -12,36 +12,42 @@ Inventory GETs (`GET /inventory/products`) likewise require **no auth** today.
 
 ## Tracing and evaluation (extended from Part 1)
 
-- [x] **Each run's trace shows RAG / tool / both and order** via `sources_used` + `node_order` (+ per-step `output.source`).
+- [x] **Each run's trace shows RAG / tool / both and order** via:
+  - `sources_order` — e.g. `["ticket"]`, `["rag"]`, `["ticket", "rag"]`
+  - `source_summary` — e.g. `ticket_only`, `rag_only`, `ticket_then_rag`
+  - `node_order` / `steps[].sequence` — full node sequence
 - [x] **Eval — tool required (not RAG):** `test_eval_tool_required_question_uses_ticket_not_rag`
 - [x] **Eval — RAG required (not a tool):** `test_eval_rag_required_question_skips_ticket_tool`
 - [x] **Optional fallback eval:** `test_eval_ticket_fallback_when_service_unavailable`
 
-Query after a run: `GET /agent/traces?node=lookup_ticket` or `query_traces(node="retrieve")`.
+Query after a run: `GET /agent/traces?source=ticket` or `?source=rag`.
 
 ## Artifacts
 
 | Artifact | Path |
 |----------|------|
-| Tool-run trace | [`docs/agent/part2-tool-run-trace.json`](part2-tool-run-trace.json) |
+| Tool-run trace (`ticket_only`) | [`docs/agent/part2-tool-run-trace.json`](part2-tool-run-trace.json) |
+| RAG-run trace (`rag_only`) | [`docs/agent/part2-rag-run-trace.json`](part2-rag-run-trace.json) |
+| Both-run trace (`ticket_then_rag`) | [`docs/agent/part2-both-run-trace.json`](part2-both-run-trace.json) |
 | Live tool-run | [`docs/agent/part2-live-tool-run-trace.json`](part2-live-tool-run-trace.json) |
-| RAG-run trace | [`docs/agent/part2-rag-run-trace.json`](part2-rag-run-trace.json) |
 | Fallback-run trace | [`docs/agent/part2-fallback-run-trace.json`](part2-fallback-run-trace.json) |
 | Eval output | [`docs/agent/part2-eval-output.txt`](part2-eval-output.txt) |
 
 ### Tool-run (ticket — not RAG)
 
 - Question: status of ticket `BRS-000002`
+- `sources_order`: `["ticket"]` · `source_summary`: `ticket_only`
 - `node_order`: `receive_question` → `decide_route` → `lookup_ticket` → `answer_ticket`
-- `sources_used`: `["ticket"]`
-- No `retrieve` / `generate`
 
 ### RAG-run (knowledge base — not a tool)
 
 - Question: minimum stock rule for proteins
+- `sources_order`: `["rag"]` · `source_summary`: `rag_only`
 - `node_order`: `receive_question` → `decide_route` → `retrieve` → `generate`
-- `sources_used`: `["rag"]`
-- No `lookup_ticket` / `lookup_inventory`
+
+### Both-run (tool then RAG)
+
+- `sources_order`: `["ticket", "rag"]` · `source_summary`: `ticket_then_rag`
 
 ### Fallback-run (incident service unavailable)
 

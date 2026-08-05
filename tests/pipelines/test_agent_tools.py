@@ -303,6 +303,8 @@ def test_eval_tool_required_question_uses_ticket_not_rag(trace_dir: Path):
     assert decide["output"]["needs_ticket"] is True
     assert decide["output"]["needs_rag"] is False
     assert trace["sources_used"] == ["ticket"]
+    assert trace["sources_order"] == ["ticket"]
+    assert trace["source_summary"] == "ticket_only"
     assert "ABIERTO" in (trace["answer"] or "")
     assert "BRS-000002" in (trace["answer"] or "")
     assert "ABASTECIMIENTO" in (trace["answer"] or "")
@@ -334,6 +336,8 @@ def test_eval_rag_required_question_skips_ticket_tool(trace_dir: Path):
     assert decide["output"]["decision"] == "rag"
     assert decide["output"]["needs_ticket"] is False
     assert trace["sources_used"] == ["rag"]
+    assert trace["sources_order"] == ["rag"]
+    assert trace["source_summary"] == "rag_only"
     assert "3 days" in (trace["answer"] or "")
 
 
@@ -387,6 +391,8 @@ def test_eval_decide_route_both_runs_ticket_then_rag(trace_dir: Path):
     assert decide["output"]["needs_ticket"] is True
     assert decide["output"]["needs_rag"] is True
     assert trace["sources_used"] == ["ticket", "rag"]
+    assert trace["sources_order"] == ["ticket", "rag"]
+    assert trace["source_summary"] == "ticket_then_rag"
     assert "3 days" in (trace["answer"] or "")
     assert "BRS-000002" in (trace["answer"] or "") or "ABIERTO" in (trace["answer"] or "")
 
@@ -416,6 +422,57 @@ def test_tool_is_read_only_get_only():
         transport=httpx.MockTransport(handler),
     )
     assert methods == ["GET"]
+
+
+def test_derive_sources_order_from_node_order():
+    """Trace helper: node_order → which source(s) ran and in what order."""
+    from services.agent.tracing import derive_sources_order, summarize_sources
+
+    assert derive_sources_order(
+        ["receive_question", "decide_route", "lookup_ticket", "answer_ticket"]
+    ) == ["ticket"]
+    assert summarize_sources(["ticket"]) == "ticket_only"
+
+    assert derive_sources_order(
+        ["receive_question", "decide_route", "retrieve", "generate"]
+    ) == ["rag"]
+    assert summarize_sources(["rag"]) == "rag_only"
+
+    assert derive_sources_order(
+        [
+            "receive_question",
+            "decide_route",
+            "lookup_ticket",
+            "retrieve",
+            "generate",
+        ]
+    ) == ["ticket", "rag"]
+    assert summarize_sources(["ticket", "rag"]) == "ticket_then_rag"
+
+    assert derive_sources_order(
+        ["receive_question", "decide_route", "lookup_inventory", "answer_inventory"]
+    ) == ["inventory"]
+
+
+def test_every_run_trace_exposes_sources_order_and_summary(trace_dir: Path):
+    """Acceptance: each persisted trace clearly shows RAG / tool / both + order."""
+    from services.agent.tracing import query_traces
+
+    ok_result = TicketLookupOutput(ok=True, tickets=[SAMPLE_TICKET], error=None)
+    result = _run_and_save_trace(
+        "What is the status of ticket BRS-000002?",
+        trace_dir,
+        **{"services.agent.nodes.lookup_ticket": lambda q, **_: ok_result},
+    )
+    trace = load_trace(result["trace_id"], trace_dir=trace_dir)
+    for key in ("sources_order", "sources_used", "source_summary", "node_order"):
+        assert key in trace
+    assert trace["sources_order"] == ["ticket"]
+    assert trace["source_summary"] == "ticket_only"
+    assert result["source_summary"] == "ticket_only"
+
+    hits = query_traces(source="ticket", trace_dir=trace_dir)
+    assert any(t["trace_id"] == result["trace_id"] for t in hits)
 
 
 def test_timeout_constant_is_explicit_and_numeric():
