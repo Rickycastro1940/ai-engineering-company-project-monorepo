@@ -27,10 +27,12 @@ LangGraph orchestration around the existing Brasaland RAG flow, plus a
   ticket tool, inventory tool, or combinations from the question text.
 - [x] **Ticket tool node** — `lookup_ticket` on the compiled graph (HTTP GET only).
 - [x] **Inventory tool node** — `lookup_inventory` on the compiled graph.
-- [x] **Traces** — `sources_used` + `node_order` show which source(s) ran
-  and in what order (including `decide_route` → `lookup_ticket` / `retrieve`).
-- [x] **Evals** — `tests/pipelines/test_agent_tools.py` (tool-required,
-  RAG-required, fallback).
+- [x] **Traces** — each run records `sources_used` (`ticket` / `inventory` /
+  `rag`) and `node_order` so reviewers can see which source(s) ran and in
+  what order; queryable via `GET /agent/traces?node=lookup_ticket`.
+- [x] **Evals** — ≥2 routing evals (tool-required vs RAG-required) plus
+  optional fallback when the incident service is unavailable
+  (`tests/pipelines/test_agent_tools.py`).
 
 ## Agent routing (Part 2)
 
