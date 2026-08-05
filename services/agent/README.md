@@ -22,6 +22,7 @@ explicit, checkpointed, traceable graph.
 - [x] **Queryable traces** — every run writes JSON with `node_order` + `steps[].output` under `data/process/agent-traces/`; query via `query_traces()` / `GET /agent/traces?node=retrieve` / `scripts/query_agent_trace.py`
 - [x] **Evals** — `tests/pipelines/test_agent_graph.py` (single command below); includes grounding
 - [x] **Endpoint** — `POST /agent/query` invokes the compiled graph only (coexists with `POST /knowledge/query`); failures return clear messages, never stack traces
+- [x] **Grounding** — same `retrieve` / `generate_answer` as RAG; CONTEXT-company.md acceptance gate in `tests/pipelines/test_agent_grounding.py`
 
 ## Graph
 

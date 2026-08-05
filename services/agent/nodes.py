@@ -137,12 +137,34 @@ def retrieve_node(state: AgentState) -> dict[str, Any]:
 def generate_node(state: AgentState) -> dict[str, Any]:
     """Node 3 — generate the final answer from already-retrieved context.
 
-    Calls ``generate_answer(question, context)`` only. Does not call ``retrieve``
-    or the monolithic ``query()``.
+    Calls ``generate_answer(question, context)`` only — the same grounded
+    generation step used by the legacy RAG ``query()`` path. Does not call
+    ``retrieve`` or the monolithic ``query()``. Empty context is refused
+    upstream via ``no_context`` so we never invent company facts.
     """
     started = time.perf_counter()
+    chunks = state.get("retrieved") or []
+    if not chunks:
+        # Defense in depth: never generate without KB context.
+        from data.pipelines.rag import NO_CONTEXT_ANSWER as _NO
+
+        return {
+            "answer": _NO,
+            "error": None,
+            "route": "done",
+            "steps": [
+                _step(
+                    state,
+                    "generate",
+                    "ok",
+                    started,
+                    notes="refused generation without retrieved context",
+                    output={"answer": _NO, "grounded": False},
+                )
+            ],
+        }
     try:
-        answer = generate_answer(state["question"], state.get("retrieved") or [])
+        answer = generate_answer(state["question"], chunks)
     except Exception as exc:  # noqa: BLE001
         return {
             "answer": None,
@@ -168,8 +190,12 @@ def generate_node(state: AgentState) -> dict[str, Any]:
                 "generate",
                 "ok",
                 started,
-                notes="grounded answer",
-                output={"answer_len": len(answer or "")},
+                notes="grounded answer from retrieved KB context",
+                output={
+                    "answer_len": len(answer or ""),
+                    "grounded": True,
+                    "context_sources": [c.get("source_document") for c in chunks],
+                },
             )
         ],
     }

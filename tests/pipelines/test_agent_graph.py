@@ -348,7 +348,7 @@ def test_every_run_produces_queryable_trace(trace_dir: Path):
     assert len(trace["steps"]) == 3
     assert trace["steps"][0]["node_name"] == "receive_question"
     assert trace["steps"][1]["output"]["chunk_count"] == 1
-    assert trace["steps"][2]["notes"] == "grounded answer"
+    assert trace["steps"][2]["notes"] == "grounded answer from retrieved KB context"
     # Trace file is queryable from disk (not just console print).
     assert (trace_dir / f"{result['trace_id']}.json").is_file()
 
