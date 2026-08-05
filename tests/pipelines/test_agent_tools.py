@@ -178,6 +178,45 @@ def test_lookup_ticket_not_found_is_honest():
     assert result.ok is False
     assert result.error == "not_found"
     assert result.tickets == []
+    assert "couldn't confirm" in (result.message or "").casefold()
+    assert "status=abierto" not in (result.message or "").casefold()
+
+
+def test_eval_ticket_not_found_uses_fallback_never_invents_status(trace_dir: Path):
+    """Graph fallback when the ticket does not exist — honest answer only."""
+    missing = TicketLookupOutput(
+        ok=False,
+        tickets=[],
+        error="not_found",
+        message=(
+            f"{TICKET_FALLBACK_MESSAGE} "
+            "Ticket BRS-999999 was not found in the incident manager."
+        ),
+    )
+    with patch("services.agent.nodes.lookup_ticket", return_value=missing), patch(
+        "services.agent.nodes.retrieve"
+    ) as mock_retrieve:
+        result = _run_and_save_trace(
+            "What is the status of ticket BRS-999999?",
+            trace_dir,
+        )
+
+    mock_retrieve.assert_not_called()
+    trace = load_trace(result["trace_id"], trace_dir=trace_dir)
+    assert trace["node_order"] == [
+        "receive_question",
+        "decide_route",
+        "lookup_ticket",
+        "ticket_fallback",
+    ]
+    answer = (trace["answer"] or "").casefold()
+    assert "couldn't confirm that ticket's status right now" in answer
+    assert "status=abierto" not in answer
+    assert "status=cerrado" not in answer
+    assert "status=descartado" not in answer
+    fallback_step = next(s for s in trace["steps"] if s["node_name"] == "ticket_fallback")
+    assert fallback_step["output"]["invented_status"] is False
+    assert fallback_step["output"]["reason"] == "not_found"
 
 
 def test_classify_routes_ticket_question_to_tool_not_rag():
@@ -286,10 +325,11 @@ def test_eval_ticket_fallback_when_service_unavailable(trace_dir: Path):
     assert "ticket_fallback" in trace["node_order"]
     assert "lookup_ticket" in trace["node_order"]
     answer = (trace["answer"] or "").casefold()
-    assert "couldn't confirm" in answer or "could not find" in answer
+    assert "couldn't confirm that ticket's status right now" in answer
     # Never invent a concrete ticket status on failure.
     assert "status=abierto" not in answer
     assert "status=cerrado" not in answer
+    assert "status=descartado" not in answer
 
 
 def test_eval_decide_route_both_runs_ticket_then_rag(trace_dir: Path):

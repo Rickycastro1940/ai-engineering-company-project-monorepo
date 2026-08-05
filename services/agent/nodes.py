@@ -28,6 +28,7 @@ from services.agent.tools.ticket_lookup import (
     TICKET_FALLBACK_MESSAGE,
     TICKET_LOOKUP_TIMEOUT_SECONDS,
     format_ticket_answer,
+    honest_ticket_fallback_answer,
     lookup_ticket,
 )
 
@@ -250,16 +251,31 @@ def answer_ticket_node(state: AgentState) -> dict[str, Any]:
 
 
 def ticket_fallback_node(state: AgentState) -> dict[str, Any]:
-    """Honest recovery when the ticket tool times out, errors, or finds nothing."""
+    """Fallback path — tool failed or ticket missing; never invent a status.
+
+    Routes here from ``lookup_ticket`` when the incident call times out, errors,
+    returns 404 / empty, or input is invalid. The answer always includes
+    ``I couldn't confirm that ticket's status right now`` and never fabricates
+    ABIERTO / CERRADO / DESCARTADO.
+    """
     started = time.perf_counter()
     raw = state.get("ticket_result") or {}
     try:
         result = TicketLookupOutput.model_validate(raw)
-        answer = format_ticket_answer(result)
+        answer = honest_ticket_fallback_answer(result)
         error_code = result.error or "service_error"
     except Exception:  # noqa: BLE001
         answer = TICKET_FALLBACK_MESSAGE
         error_code = "service_error"
+
+    # Defense in depth: fallback answers must never look like a live status.
+    lowered = answer.casefold()
+    if any(
+        marker in lowered
+        for marker in ("status=abierto", "status=cerrado", "status=descartado")
+    ):
+        answer = TICKET_FALLBACK_MESSAGE
+
     return {
         "answer": answer,
         "error": None,  # operational fallback is a successful honest answer
@@ -270,11 +286,13 @@ def ticket_fallback_node(state: AgentState) -> dict[str, Any]:
                 "ticket_fallback",
                 "ok",
                 started,
-                notes=f"ticket fallback reason={error_code}",
+                notes=f"ticket fallback reason={error_code} (no invented status)",
                 output={
                     "source": "ticket_fallback",
                     "reason": error_code,
                     "answer": answer,
+                    "invented_status": False,
+                    "fallback_message": TICKET_FALLBACK_MESSAGE,
                 },
             )
         ],

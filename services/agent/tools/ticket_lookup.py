@@ -62,9 +62,21 @@ DEFAULT_INCIDENT_API_BASE = "http://127.0.0.1:8000"
 INCIDENTS_LIST_PATH = "/api/incidents"
 INCIDENT_BY_ID_PATH_TEMPLATE = "/api/incidents/{incident_id}"
 
+# Honest fallback when the tool times out, errors, or the ticket does not exist.
+# Never invent a status / category / date — this exact phrase is the recovery answer.
 TICKET_FALLBACK_MESSAGE = (
     "I couldn't confirm that ticket's status right now. "
     "Please try again shortly or check the incident manager directly."
+)
+
+# Status values that must never appear in a fallback answer (would imply invention).
+_INVENTED_STATUS_MARKERS = (
+    "status=abierto",
+    "status=cerrado",
+    "status=descartado",
+    "status: abierto",
+    "status: cerrado",
+    "status: descartado",
 )
 
 
@@ -98,17 +110,16 @@ def _record_from_payload(payload: dict[str, Any]) -> TicketRecord:
 
 
 def format_ticket_answer(output: TicketLookupOutput) -> str:
-    """Render an honest natural-language answer from a tool result (no invention)."""
+    """Render an honest natural-language answer from a tool result (no invention).
+
+    On any failure (timeout, service error, missing ticket) returns
+    ``TICKET_FALLBACK_MESSAGE`` — never a made-up status/category/date.
+    """
     if not output.ok:
-        if output.error == "not_found":
-            return (
-                output.message
-                or "I could not find that ticket in the incident manager."
-            )
-        return output.message or TICKET_FALLBACK_MESSAGE
+        return honest_ticket_fallback_answer(output)
 
     if not output.tickets:
-        return "No tickets matched those filters in the incident manager."
+        return honest_ticket_fallback_answer(output)
 
     lines: list[str] = []
     for ticket in output.tickets:
@@ -120,6 +131,33 @@ def format_ticket_answer(output: TicketLookupOutput) -> str:
             f"Description: {ticket.description}"
         )
     return "\n".join(lines)
+
+
+def honest_ticket_fallback_answer(output: TicketLookupOutput | None = None) -> str:
+    """Canonical fallback text when the tool fails or the ticket does not exist.
+
+    Always includes ``I couldn't confirm that ticket's status right now``.
+    Never fabricates ABIERTO / CERRADO / DESCARTADO (or any other status).
+    """
+    base = TICKET_FALLBACK_MESSAGE
+    if output is not None and output.error == "not_found":
+        # Keep the required honest phrase; optionally name the missing id.
+        detail = (output.message or "").strip()
+        if detail and "couldn't confirm" not in detail.casefold():
+            # Prefixed so the course-required phrase is always present.
+            answer = f"{TICKET_FALLBACK_MESSAGE} {detail}"
+        else:
+            answer = detail or base
+    else:
+        answer = (output.message if output and output.message else None) or base
+        if "couldn't confirm" not in answer.casefold():
+            answer = TICKET_FALLBACK_MESSAGE
+
+    lowered = answer.casefold()
+    for marker in _INVENTED_STATUS_MARKERS:
+        if marker in lowered:
+            return TICKET_FALLBACK_MESSAGE
+    return answer
 
 
 def _failed(
@@ -198,8 +236,8 @@ def lookup_ticket(
                         started,
                         error="not_found",
                         message=(
-                            f"I could not find ticket {ticket_id} "
-                            "in the incident manager."
+                            f"{TICKET_FALLBACK_MESSAGE} "
+                            f"Ticket {ticket_id} was not found in the incident manager."
                         ),
                     )
                 if response.status_code in (401, 403):

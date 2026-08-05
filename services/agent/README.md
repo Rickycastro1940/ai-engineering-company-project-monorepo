@@ -15,8 +15,10 @@ LangGraph orchestration around the existing Brasaland RAG flow, plus a
 - [x] **Auth** — incident GETs currently require **no auth**. Optional
   `INCIDENT_API_TOKEN` / `INCIDENT_API_KEY` env vars are forwarded as Bearer
   if set. Never hardcode tokens.
-- [x] **Fallback** — timeout / not-found / service error → honest message,
-  never an invented status (`ticket_fallback` node).
+- [x] **Fallback** — `ticket_fallback` node when the tool times out, errors, or
+  the ticket does not exist. Answer always includes
+  *"I couldn't confirm that ticket's status right now"* — never a made-up
+  status (`ABIERTO` / `CERRADO` / …).
 - [x] **Routing** — explicit `decide_route` node + conditional edges choose RAG,
   ticket tool, or both from the question text (no user hint required).
 - [x] **Ticket tool node** — `lookup_ticket` on the compiled graph (HTTP GET only).
