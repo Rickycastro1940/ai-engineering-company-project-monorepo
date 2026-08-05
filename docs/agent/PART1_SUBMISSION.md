@@ -2,27 +2,29 @@
 
 **PR:** https://github.com/Rickycastro1940/ai-engineering-company-project-monorepo/pull/18  
 **Branch:** `cursor/langgraph-agent-migration-b1ec`  
-**Label:** `part-1-langgraph`  
-**Base:** `main` (independent from Part 2)
+**Label:** `part-1-langgraph`
 
 ## Required structure
 
 ```text
-data/
-  pipelines/          ← setup/embed/retrieve/query (+ generate_answer), reused
-services/
-  agent/              ← LangGraph state, nodes, graph, endpoint
-tests/
-  pipelines/          ← agent + RAG evals
+data/pipelines/     ← RAG functions reused
+services/agent/     ← LangGraph graph, nodes, endpoint
+tests/pipelines/    ← agent evals
 ```
 
-## Required artifacts
+## Required PR artifacts
 
-1. **Full-run trace export:** [`full-run-trace.json`](./full-run-trace.json)  
-   Also: `data/process/agent-traces/sample-grounding-eval.json`
-2. **Eval console output:** [`eval-output.txt`](./eval-output.txt)  
-   Command: `uv run pytest tests/pipelines/ -q` → **28 passed**
+### 1. Screenshot / export of a full-run trace
 
-## Checkpoint sample
+- **Screenshot:** [`full-run-trace-screenshot.png`](./full-run-trace-screenshot.png)
+- **JSON export:** [`full-run-trace.json`](./full-run-trace.json)
+- Also: `data/process/agent-traces/sample-grounding-eval.json`
 
-`data/process/agent-traces/sample-checkpoint-history.json`
+Nodes for this run: `receive_question` → `retrieve` → `generate`  
+Question: minimum protein stock rule · Answer grounded in supplier-ordering / Lucía Fernández / 3 days / 500 USD
+
+### 2. Output of running the evals
+
+- **Console file:** [`eval-output.txt`](./eval-output.txt)
+- Command: `uv run pytest tests/pipelines/ -v --tb=no`
+- Result: **28 passed**
