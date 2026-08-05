@@ -219,20 +219,53 @@ def test_eval_ticket_not_found_uses_fallback_never_invents_status(trace_dir: Pat
     assert fallback_step["output"]["reason"] == "not_found"
 
 
-def test_classify_routes_ticket_question_to_tool_not_rag():
-    decision = classify_sources("What is the status of ticket BRS-000002?")
-    assert decision["needs_ticket"] is True
-    assert decision["needs_rag"] is False
-    assert decision["route"] == "ticket"
-    assert decision["ticket_query"]["ticket_id"] == "BRS-000002"
+def test_agent_routing_auto_decides_without_user_source_hint():
+    """Rubric: agent decides RAG / tool / both from the question alone."""
+    ticket = classify_sources("What is the status of ticket BRS-000002?")
+    assert ticket["route"] == "ticket"
+    assert ticket["needs_ticket"] is True and ticket["needs_rag"] is False
+
+    inventory = classify_sources("Do we have stock of tomatoes?")
+    assert inventory["route"] == "inventory"
+    assert inventory["needs_inventory"] is True and inventory["needs_rag"] is False
+
+    rag = classify_sources("What is the minimum stock rule for proteins?")
+    assert rag["route"] == "retrieve"
+    assert rag["needs_rag"] is True and rag["needs_ticket"] is False
+
+    both = classify_sources(
+        "What is the status of ticket BRS-000002 and the minimum stock rule for proteins?"
+    )
+    assert both["needs_ticket"] is True and both["needs_rag"] is True
+    assert both["route"] == "both"
 
 
-def test_classify_routes_policy_question_to_rag_not_tool():
-    decision = classify_sources("What is the minimum stock rule for proteins?")
-    assert decision["needs_rag"] is True
-    assert decision["needs_ticket"] is False
-    assert decision["route"] == "retrieve"
-    assert decision["ticket_query"] is None
+def test_tools_have_single_responsibility_ticket_vs_inventory():
+    """Rubric: never one tool that looks up tickets or inventory depending on case."""
+    from services.agent.graph import REQUIRED_NODES, build_agent_graph
+
+    nodes = set(build_agent_graph().nodes.keys())
+    assert "lookup_ticket" in nodes and "lookup_inventory" in nodes
+    assert "lookup_ticket" in REQUIRED_NODES and "lookup_inventory" in REQUIRED_NODES
+
+    ticket_src = (
+        Path(__file__).resolve().parents[2]
+        / "services"
+        / "agent"
+        / "tools"
+        / "ticket_lookup.py"
+    ).read_text(encoding="utf-8")
+    inv_src = (
+        Path(__file__).resolve().parents[2]
+        / "services"
+        / "agent"
+        / "tools"
+        / "inventory_lookup.py"
+    ).read_text(encoding="utf-8")
+    assert "/api/incidents" in ticket_src
+    assert "/inventory/products" not in ticket_src
+    assert "/inventory/products" in inv_src
+    assert "/api/incidents" not in inv_src
 
 
 def test_eval_tool_required_question_uses_ticket_not_rag(trace_dir: Path):

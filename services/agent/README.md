@@ -32,24 +32,33 @@ LangGraph orchestration around the existing Brasaland RAG flow, plus a
 - [x] **Evals** — `tests/pipelines/test_agent_tools.py` (tool-required,
   RAG-required, fallback).
 
+## Agent routing (Part 2)
+
+- [x] **Auto-decide** — `decide_route` inspects the question and chooses RAG,
+  a tool, or both. The user never names the source.
+- [x] **One job per tool** — `lookup_ticket` only hits incidents;
+  `lookup_inventory` only hits inventory. Never a combined “look up tickets
+  or inventory” tool.
+
 ## Graph (Part 2)
 
 ```text
 START → receive_question
             │
             ├── empty ──────────────► empty_question → END
-            └── decide_route  (conditional agent: ticket | rag | both)
+            └── decide_route  (auto: ticket | inventory | rag | combinations)
                       │
-                      ├── ticket / both ──────► lookup_ticket  ← tool node
+                      ├── ticket / both / … ──► lookup_ticket  ← incidents only
                       │                              │
-                      │                              ├── ticket_answer → answer_ticket → END
-                      │                              ├── ticket_fallback → END
-                      │                              └── retrieve (when needs_rag / both)
-                      └── retrieve (RAG only) ─► generate | no_context | ticket_* → END
+                      │                              ├── (+ inventory) → lookup_inventory
+                      │                              ├── answer_ticket / ticket_fallback
+                      │                              └── retrieve (when also needs RAG)
+                      ├── inventory / … ──────► lookup_inventory  ← products only
+                      │                              │
+                      │                              ├── answer_inventory / inventory_fallback
+                      │                              └── retrieve (when also needs RAG)
+                      └── retrieve (RAG only) ─► generate | no_context | …
 ```
-
-`decide_route` inspects the question and chooses the ticket tool **instead of**
-or **in addition to** the RAG — the user never names the source.
 
 ## Ticket tool contract
 
