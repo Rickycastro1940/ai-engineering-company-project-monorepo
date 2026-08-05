@@ -13,9 +13,18 @@ Optional `INCIDENT_API_TOKEN` / `INCIDENT_API_KEY` are forwarded as Bearer if se
 
 | Artifact | Path |
 |----------|------|
-| Tool-run trace | [`docs/agent/part2-tool-run-trace.json`](part2-tool-run-trace.json) |
+| Tool-run trace (mocked HTTP shape) | [`docs/agent/part2-tool-run-trace.json`](part2-tool-run-trace.json) |
+| **Live** tool-run (real `GET /api/incidents/{id}`) | [`docs/agent/part2-live-tool-run-trace.json`](part2-live-tool-run-trace.json) |
 | RAG-run trace | [`docs/agent/part2-rag-run-trace.json`](part2-rag-run-trace.json) |
 | Eval output | [`docs/agent/part2-eval-output.txt`](part2-eval-output.txt) |
+
+### Live tool-run (incident manager HTTP)
+
+- Question: status of ticket `BRS-000002`
+- Tool called live `GET http://127.0.0.1:8000/api/incidents/BRS-000002` (no mocked ticket rows)
+- `node_order`: `receive_question` → `lookup_ticket` → `answer_ticket`
+- `sources_used`: `["ticket"]`
+- Answer fields match `scripts/incidents-COMPANY.csv` (`ABIERTO`, `ABASTECIMIENTO`, …)
 
 ### Tool-run (ticket source)
 

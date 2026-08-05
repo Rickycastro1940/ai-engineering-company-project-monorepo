@@ -1,0 +1,79 @@
+{
+  "trace_id": "476872b7a05b4617af4cb0aaad31cf7f",
+  "status": "ok",
+  "question": "What is the status of ticket BRS-000002?",
+  "answer": "Ticket BRS-000002: status=ABIERTO, category=ABASTECIMIENTO, date=2026-06-01, location=COL-02, source=incident_manager. Description: Late produce delivery",
+  "error": null,
+  "steps": [
+    {
+      "node_name": "receive_question",
+      "sequence": 1,
+      "status": "ok",
+      "duration_ms": 0,
+      "notes": "question accepted route=ticket",
+      "output": {
+        "accepted": true,
+        "question_len": 40,
+        "needs_ticket": true,
+        "needs_rag": false,
+        "route": "ticket",
+        "ticket_query": {
+          "ticket_id": "BRS-000002",
+          "status": null,
+          "category": null,
+          "location_id": null,
+          "date_from": null,
+          "date_to": null
+        }
+      }
+    },
+    {
+      "node_name": "lookup_ticket",
+      "sequence": 2,
+      "status": "ok",
+      "duration_ms": 15,
+      "notes": "ticket tool ok=True error=None count=1 next=ticket_answer",
+      "output": {
+        "source": "ticket",
+        "ok": true,
+        "error": null,
+        "ticket_count": 1,
+        "ticket_ids": [
+          "BRS-000002"
+        ],
+        "statuses": [
+          "ABIERTO"
+        ],
+        "duration_ms": 15,
+        "next_route": "ticket_answer"
+      }
+    },
+    {
+      "node_name": "answer_ticket",
+      "sequence": 3,
+      "status": "ok",
+      "duration_ms": 0,
+      "notes": "answer from live incident manager",
+      "output": {
+        "source": "ticket",
+        "answer": "Ticket BRS-000002: status=ABIERTO, category=ABASTECIMIENTO, date=2026-06-01, location=COL-02, source=incident_manager. Description: Late produce delivery",
+        "ticket_count": 1
+      }
+    }
+  ],
+  "started_at": "2026-08-05T21:41:14.897966+00:00",
+  "ended_at": "2026-08-05T21:41:14.918265+00:00",
+  "duration_ms": 20,
+  "node_order": [
+    "receive_question",
+    "lookup_ticket",
+    "answer_ticket"
+  ],
+  "retrieved_count": 0,
+  "route": "done",
+  "sources_used": [
+    "ticket"
+  ],
+  "needs_ticket": true,
+  "needs_rag": false
+}
