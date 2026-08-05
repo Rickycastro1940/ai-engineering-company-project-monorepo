@@ -21,6 +21,7 @@ explicit, checkpointed, traceable graph.
 - [x] **Checkpointing** — `MemorySaver` after every node; inspect via `inspect_checkpoints(thread_id)` / `get_state`
 - [x] **Queryable traces** — every run writes JSON with `node_order` + `steps[].output` under `data/process/agent-traces/`; query via `query_traces()` / `GET /agent/traces?node=retrieve` / `scripts/query_agent_trace.py`
 - [x] **Evals** — `tests/pipelines/test_agent_graph.py` (single command below); includes grounding
+- [x] **Endpoint** — `POST /agent/query` invokes the compiled graph only (coexists with `POST /knowledge/query`); failures return clear messages, never stack traces
 
 ## Graph
 

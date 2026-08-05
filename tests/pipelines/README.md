@@ -27,4 +27,5 @@ LLM/Qdrant call every time. Grounding remains an acceptance gate.
 | `test_eval_answer_grounded_in_context_knowledge_base` | answer cites **CONTEXT-company.md** facts (3 days, Lucía Fernández, 500 USD) |
 | `test_eval_grounding_from_saved_trace_artifact` | same grounding checks on a saved JSON trace (no live run) |
 | `test_every_run_produces_queryable_trace` | JSON trace on disk with node order + outputs |
+| `test_agent_endpoint.py` | `POST /agent/query` thin adapter + clear errors (no stack traces) |
 | `test_rag.py` | existing RAG retrieve/`query`/`generate_answer` unit tests still pass |
