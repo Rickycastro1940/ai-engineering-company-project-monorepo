@@ -102,17 +102,11 @@ _register_analyze_routes(app, "analyze")
 # LangGraph support agent (Part 1) — thin HTTP adapter over the compiled graph.
 from services.agent.graph import get_compiled_graph  # noqa: E402
 from services.agent.router import router as agent_router  # noqa: E402
+from services.api.routers.knowledge import router as knowledge_router  # noqa: E402
 
 get_compiled_graph()
 app.include_router(agent_router)
-
-# Existing RAG endpoint (monolithic query) — kept for backward compatibility.
-try:
-    from scripts.services.routers.knowledge import router as knowledge_router  # noqa: E402
-
-    app.include_router(knowledge_router)
-except Exception:  # noqa: BLE001 — optional if knowledge shim is unavailable
-    pass
+app.include_router(knowledge_router)
 
 @app.get("/api/incidents/results/export")
 def export_results(output_file: str = "results.csv"):

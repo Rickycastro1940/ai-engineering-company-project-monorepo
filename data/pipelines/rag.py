@@ -14,7 +14,22 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from qdrant_client import QdrantClient
 
-from data.process.rag import COLLECTION_NAME, embed
+from data.process.rag import COLLECTION_NAME, embed, setup
+
+# Re-export indexing helpers so the course contract
+# (setup / embed / retrieve / query living under data/pipelines/) is met.
+# Implementations of setup + embed stay in data.process.rag to avoid duplication.
+__all__ = [
+    "COLLECTION_NAME",
+    "DEFAULT_K",
+    "MIN_SCORE",
+    "NO_CONTEXT_ANSWER",
+    "embed",
+    "generate_answer",
+    "query",
+    "retrieve",
+    "setup",
+]
 
 load_dotenv()
 
