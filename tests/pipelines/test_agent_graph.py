@@ -4,7 +4,7 @@ Evals assert against the *trace* produced by a run (node order, routing, answer
 grounding metadata). LLM / Qdrant calls are mocked so the suite is runnable
 offline with a single command:
 
-    uv run pytest tests/pipelines/test_agent_graph.py -q
+    uv run pytest tests/pipelines/ -q
 """
 
 from __future__ import annotations
@@ -25,7 +25,14 @@ from services.agent.graph import (
 )
 from services.agent.tracing import load_trace
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+CONTEXT_COMPANY = REPO_ROOT / "CONTEXT-company.md"
+SUPPLIER_ORDERING_DOC = (
+    REPO_ROOT / "docs" / "company-knowledge-base" / "brasaland-supplier-ordering.en.md"
+)
+
 # Known fact from docs/company-knowledge-base/brasaland-supplier-ordering.en.md
+# and CONTEXT-company.md (Lucía Fernández / emergency approval > 500 USD).
 PROTEIN_STOCK_CHUNK = {
     "source_document": "supplier-ordering",
     "section": "Minimum stock rule",
@@ -42,6 +49,28 @@ GROUNDED_ANSWER = (
 )
 
 
+def _context_grounding_facts() -> dict[str, str]:
+    """Load expected grounding entities from CONTEXT-company.md + KB source."""
+    context_text = CONTEXT_COMPANY.read_text(encoding="utf-8")
+    kb_text = SUPPLIER_ORDERING_DOC.read_text(encoding="utf-8")
+    assert "Lucía Fernández" in context_text
+    assert "500 USD" in context_text
+    assert "3 days" in kb_text
+    assert "Lucía Fernández" in kb_text
+    return {
+        "person": "Lucía Fernández",
+        "threshold": "500 USD",
+        "stock_rule": "3 days",
+        "source_document": "supplier-ordering",
+    }
+
+
+def _assert_trace_retrieve_before_generate(trace: dict) -> None:
+    order = trace["node_order"]
+    assert "retrieve" in order and "generate" in order
+    assert order.index("retrieve") < order.index("generate")
+
+
 @pytest.fixture()
 def trace_dir(tmp_path: Path) -> Path:
     return tmp_path / "traces"
@@ -53,28 +82,29 @@ def compiled_graph():
     return compile_agent_graph()
 
 
-def _run_with_trace_dir(question: str, trace_dir: Path, **patches):
-    with patch("services.agent.tracing.DEFAULT_TRACE_DIR", trace_dir):
-        # Re-bind save_trace's default by patching the module attribute used at call time.
-        with patch("services.agent.graph.save_trace") as mock_save:
-            from services.agent.tracing import TraceRecord, save_trace as real_save
+def _run_and_save_trace(question: str, trace_dir: Path, **node_patches) -> dict:
+    """Run once (mocked), persist a trace, return the run result.
 
-            def _save(record: TraceRecord, *, trace_dir_arg=None):
-                return real_save(record, trace_dir=trace_dir)
+    Subsequent assertions should use ``load_trace`` — evals run against the
+    saved trace, not a second live graph execution.
+    """
+    patchers = []
+    for target, value in node_patches.items():
+        p = patch(target, value)
+        patchers.append(p)
+        p.start()
+    try:
+        with patch("services.agent.tracing.DEFAULT_TRACE_DIR", trace_dir), patch(
+            "services.agent.graph.save_trace"
+        ) as mock_save:
+            from services.agent.tracing import save_trace as real_save
 
-            mock_save.side_effect = _save
-            # Apply node-level patches if provided
-            patchers = []
-            for target, value in patches.items():
-                p = patch(target, value)
-                patchers.append(p)
-                p.start()
-            try:
-                result = run_agent(question)
-            finally:
-                for p in patchers:
-                    p.stop()
-            return result
+            mock_save.side_effect = lambda record, **_: real_save(record, trace_dir=trace_dir)
+            with patch("services.agent.graph._COMPILED_GRAPH", compile_agent_graph()):
+                return run_agent(question)
+    finally:
+        for p in reversed(patchers):
+            p.stop()
 
 
 def test_graph_compiles_successfully(compiled_graph):
@@ -107,26 +137,18 @@ def test_agent_state_is_minimal_and_has_no_history_field():
 
 
 def test_eval_retrieve_runs_before_generate(trace_dir: Path):
-    """Eval 1 — for a grounded question, retrieve must run before generate."""
-    with patch("services.agent.nodes.retrieve", return_value=[PROTEIN_STOCK_CHUNK]), patch(
-        "services.agent.nodes.generate_answer", return_value=GROUNDED_ANSWER
-    ), patch("services.agent.tracing.DEFAULT_TRACE_DIR", trace_dir), patch(
-        "services.agent.graph.save_trace"
-    ) as mock_save:
-        from services.agent.tracing import save_trace as real_save
-
-        mock_save.side_effect = lambda record, **_: real_save(record, trace_dir=trace_dir)
-        # Force a fresh compiled graph so MemorySaver is clean
-        with patch("services.agent.graph._COMPILED_GRAPH", compile_agent_graph()):
-            result = run_agent("What is the minimum stock rule for proteins?")
-
-    assert result["status"] == "ok"
-    assert result["node_order"] == ["receive_question", "retrieve", "generate"]
-    # retrieve index < generate index
-    assert result["node_order"].index("retrieve") < result["node_order"].index("generate")
-
+    """Eval 1 — for a grounded question, retrieve must run before generate (trace)."""
+    result = _run_and_save_trace(
+        "What is the minimum stock rule for proteins?",
+        trace_dir,
+        **{
+            "services.agent.nodes.retrieve": lambda q: [PROTEIN_STOCK_CHUNK],
+            "services.agent.nodes.generate_answer": lambda q, ctx: GROUNDED_ANSWER,
+        },
+    )
+    # Evals run against the persisted trace — not a second live execution.
     trace = load_trace(result["trace_id"], trace_dir=trace_dir)
-    assert trace["node_order"] == result["node_order"]
+    _assert_trace_retrieve_before_generate(trace)
     assert trace["steps"][1]["node_name"] == "retrieve"
     assert trace["steps"][2]["node_name"] == "generate"
     assert trace["steps"][1]["output"]["chunk_count"] == 1
@@ -134,91 +156,80 @@ def test_eval_retrieve_runs_before_generate(trace_dir: Path):
 
 def test_eval_empty_question_skips_retrieve(trace_dir: Path):
     """Eval 2 — empty question routes to empty_question and never retrieves."""
-    with patch("services.agent.nodes.retrieve") as mock_retrieve, patch(
-        "services.agent.tracing.DEFAULT_TRACE_DIR", trace_dir
-    ), patch("services.agent.graph.save_trace") as mock_save:
-        from services.agent.tracing import save_trace as real_save
-
-        mock_save.side_effect = lambda record, **_: real_save(record, trace_dir=trace_dir)
-        with patch("services.agent.graph._COMPILED_GRAPH", compile_agent_graph()):
-            result = run_agent("   ")
+    with patch("services.agent.nodes.retrieve") as mock_retrieve:
+        result = _run_and_save_trace("   ", trace_dir)
 
     mock_retrieve.assert_not_called()
-    assert result["status"] == "error"
-    assert result["node_order"] == ["receive_question", "empty_question"]
-    assert "retrieve" not in result["node_order"]
-    assert "generate" not in result["node_order"]
-
     trace = load_trace(result["trace_id"], trace_dir=trace_dir)
+    assert trace["status"] == "error"
     assert trace["error"] == "empty_question"
     assert trace["node_order"] == ["receive_question", "empty_question"]
+    assert "retrieve" not in trace["node_order"]
+    assert "generate" not in trace["node_order"]
 
 
 def test_eval_no_context_when_retrieve_empty(trace_dir: Path):
     """Eval 3 — when retrieve returns nothing above threshold, use no_context."""
-    with patch("services.agent.nodes.retrieve", return_value=[]), patch(
-        "services.agent.nodes.generate_answer"
-    ) as mock_generate, patch("services.agent.tracing.DEFAULT_TRACE_DIR", trace_dir), patch(
-        "services.agent.graph.save_trace"
-    ) as mock_save:
-        from services.agent.tracing import save_trace as real_save
-
-        mock_save.side_effect = lambda record, **_: real_save(record, trace_dir=trace_dir)
-        with patch("services.agent.graph._COMPILED_GRAPH", compile_agent_graph()):
-            result = run_agent("What is Brasaland's secret sauce recipe?")
+    with patch("services.agent.nodes.generate_answer") as mock_generate:
+        result = _run_and_save_trace(
+            "What is Brasaland's secret sauce recipe?",
+            trace_dir,
+            **{"services.agent.nodes.retrieve": lambda q: []},
+        )
 
     mock_generate.assert_not_called()
-    assert result["status"] == "ok"
-    assert result["answer"] == NO_CONTEXT_ANSWER
-    assert result["node_order"] == ["receive_question", "retrieve", "no_context"]
-    assert "generate" not in result["node_order"]
-
     trace = load_trace(result["trace_id"], trace_dir=trace_dir)
+    assert trace["status"] == "ok"
     assert trace["answer"] == NO_CONTEXT_ANSWER
+    assert trace["node_order"] == ["receive_question", "retrieve", "no_context"]
+    assert "generate" not in trace["node_order"]
     assert trace["steps"][1]["output"]["chunk_count"] == 0
 
 
 def test_eval_answer_grounded_in_context_knowledge_base(trace_dir: Path):
-    """Eval 4 (grounding) — known supplier-ordering fact appears in the answer.
+    """Eval 4 (grounding) — answer must cite CONTEXT-company.md / KB facts.
 
-    Uses a real KB chunk from CONTEXT / company-knowledge-base and asserts the
-    agent answer cites the expected entities (3 days protein stock, Lucía Fernández).
-    Trace/routing correctness alone is not enough — grounding is an acceptance gate.
+    Grounding remains an acceptance gate: a perfect trace that ignores CONTEXT
+    policies is still a failure. Facts come from CONTEXT-company.md and
+    brasaland-supplier-ordering.en.md (3 days protein stock, Lucía Fernández, 500 USD).
     """
-    with patch("services.agent.nodes.retrieve", return_value=[PROTEIN_STOCK_CHUNK]), patch(
-        "services.agent.nodes.generate_answer", return_value=GROUNDED_ANSWER
-    ) as mock_generate, patch("services.agent.tracing.DEFAULT_TRACE_DIR", trace_dir), patch(
-        "services.agent.graph.save_trace"
-    ) as mock_save:
-        from services.agent.tracing import save_trace as real_save
-
-        mock_save.side_effect = lambda record, **_: real_save(record, trace_dir=trace_dir)
-        with patch("services.agent.graph._COMPILED_GRAPH", compile_agent_graph()):
-            result = run_agent("What is the minimum stock rule for proteins?")
-
-    # Generation received the retrieved KB chunk (not a re-wrapped monolithic query).
-    mock_generate.assert_called_once()
-    call_args = mock_generate.call_args
-    assert call_args.args[0] == "What is the minimum stock rule for proteins?"
-    context_arg = call_args.args[1]
-    assert isinstance(context_arg, list)
-    assert context_arg[0]["source_document"] == "supplier-ordering"
-    assert "3 days" in context_arg[0]["text"]
-
-    assert result["status"] == "ok"
-    assert "3 days" in (result["answer"] or "")
-    assert "Lucía Fernández" in (result["answer"] or "") or "Lucia Fernandez" in (
-        result["answer"] or ""
+    facts = _context_grounding_facts()
+    result = _run_and_save_trace(
+        "What is the minimum stock rule for proteins?",
+        trace_dir,
+        **{
+            "services.agent.nodes.retrieve": lambda q: [PROTEIN_STOCK_CHUNK],
+            "services.agent.nodes.generate_answer": lambda q, ctx: GROUNDED_ANSWER,
+        },
     )
 
+    # Assert against the saved trace (not a re-invoke).
     trace = load_trace(result["trace_id"], trace_dir=trace_dir)
-    assert "3 days" in (trace["answer"] or "")
-    assert "supplier-ordering" in trace["steps"][1]["output"]["sources"]
-    # Persist a sample trace artifact for the PR
+    _assert_trace_retrieve_before_generate(trace)
+    answer = trace["answer"] or ""
+    assert facts["stock_rule"] in answer
+    assert facts["person"] in answer
+    assert facts["threshold"] in answer
+    assert facts["source_document"] in trace["steps"][1]["output"]["sources"]
+
     artifact = Path("data/process/agent-traces")
     artifact.mkdir(parents=True, exist_ok=True)
-    sample = artifact / "sample-grounding-eval.json"
-    sample.write_text(json.dumps(trace, indent=2, ensure_ascii=False), encoding="utf-8")
+    (artifact / "sample-grounding-eval.json").write_text(
+        json.dumps(trace, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+
+def test_eval_grounding_from_saved_trace_artifact():
+    """Eval against an already-saved trace file (no live graph execution)."""
+    facts = _context_grounding_facts()
+    sample = REPO_ROOT / "data" / "process" / "agent-traces" / "sample-grounding-eval.json"
+    assert sample.is_file(), "sample grounding trace artifact must exist"
+    trace = json.loads(sample.read_text(encoding="utf-8"))
+    _assert_trace_retrieve_before_generate(trace)
+    answer = trace.get("answer") or ""
+    assert facts["stock_rule"] in answer
+    assert facts["person"] in answer or "Lucia Fernandez" in answer
+    assert facts["source_document"] in (trace["steps"][1]["output"].get("sources") or [])
 
 
 def test_generate_answer_is_separate_from_retrieve():

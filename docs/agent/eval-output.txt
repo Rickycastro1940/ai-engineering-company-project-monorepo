@@ -1,4 +1,29 @@
-............                                                             [100%]
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0 -- /workspace/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /workspace
+configfile: pyproject.toml
+plugins: anyio-4.14.2, langsmith-0.10.15
+collecting ... collected 17 items
+
+tests/pipelines/test_agent_graph.py::test_graph_compiles_successfully PASSED [  5%]
+tests/pipelines/test_agent_graph.py::test_compile_fails_clearly_on_missing_required_node PASSED [ 11%]
+tests/pipelines/test_agent_graph.py::test_agent_state_is_minimal_and_has_no_history_field PASSED [ 17%]
+tests/pipelines/test_agent_graph.py::test_eval_retrieve_runs_before_generate PASSED [ 23%]
+tests/pipelines/test_agent_graph.py::test_eval_empty_question_skips_retrieve PASSED [ 29%]
+tests/pipelines/test_agent_graph.py::test_eval_no_context_when_retrieve_empty PASSED [ 35%]
+tests/pipelines/test_agent_graph.py::test_eval_answer_grounded_in_context_knowledge_base PASSED [ 41%]
+tests/pipelines/test_agent_graph.py::test_eval_grounding_from_saved_trace_artifact PASSED [ 47%]
+tests/pipelines/test_agent_graph.py::test_generate_answer_is_separate_from_retrieve PASSED [ 52%]
+tests/pipelines/test_agent_graph.py::test_node_contract_graph_never_calls_monolithic_query PASSED [ 58%]
+tests/pipelines/test_agent_graph.py::test_query_skips_retrieve_when_chunks_provided PASSED [ 64%]
+tests/pipelines/test_agent_graph.py::test_checkpointing_persists_thread_state PASSED [ 70%]
+tests/pipelines/test_agent_graph.py::test_every_run_produces_queryable_trace PASSED [ 76%]
+tests/pipelines/test_rag.py::test_retrieve_filters_by_min_score PASSED   [ 82%]
+tests/pipelines/test_rag.py::test_query_orchestrates_retrieve_then_generate PASSED [ 88%]
+tests/pipelines/test_rag.py::test_query_returns_fallback_when_no_chunks PASSED [ 94%]
+tests/pipelines/test_rag.py::test_generate_answer_does_not_call_retrieve PASSED [100%]
+
 =============================== warnings summary ===============================
 .venv/lib/python3.12/site-packages/qdrant_client/qdrant_remote.py:290
 .venv/lib/python3.12/site-packages/qdrant_client/qdrant_remote.py:290
@@ -6,4 +31,4 @@
     show_warning(
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-12 passed, 2 warnings in 1.45s
+======================== 17 passed, 2 warnings in 1.47s ========================
