@@ -131,13 +131,19 @@ def generate_answer(question: str, context: list[dict[str, Any]] | str) -> str:
     return response.choices[0].message.content or NO_CONTEXT_ANSWER
 
 
-def query(question: str) -> str:
-    """Monolithic RAG entry: retrieve then generate.
+def query(
+    question: str,
+    *,
+    chunks: list[dict[str, Any]] | None = None,
+) -> str:
+    """Monolithic RAG entry for ``POST /knowledge/query``.
 
-    Prefer the LangGraph agent (``services.agent``) when you need a traceable
-    flow. Kept for the existing ``POST /knowledge/query`` endpoint.
+    Node contract: LangGraph nodes must **not** call this. They call ``retrieve``
+    and ``generate_answer`` separately. If something does reuse ``query()`` with
+    already-retrieved context, pass ``chunks=...`` so the internal ``retrieve()``
+    is skipped and retrieval is not re-run.
     """
-    retrieved_chunks = retrieve(question)
+    retrieved_chunks = chunks if chunks is not None else retrieve(question)
     if not retrieved_chunks:
         return NO_CONTEXT_ANSWER
     return generate_answer(question, retrieved_chunks)

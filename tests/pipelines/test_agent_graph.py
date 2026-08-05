@@ -237,6 +237,51 @@ def test_generate_answer_is_separate_from_retrieve():
     assert answer == "ok"
 
 
+def test_node_contract_graph_never_calls_monolithic_query():
+    """Node contract: retrieve node → retrieve(); generate node → generate_answer(q, ctx).
+
+    The monolithic ``query()`` (retrieve + generate) must not run inside any node.
+    """
+    import services.agent.nodes as nodes_mod
+
+    assert not hasattr(nodes_mod, "query"), "nodes must not import monolithic query()"
+
+    with patch("services.agent.nodes.retrieve", return_value=[PROTEIN_STOCK_CHUNK]) as mock_retrieve, patch(
+        "services.agent.nodes.generate_answer", return_value=GROUNDED_ANSWER
+    ) as mock_generate, patch("data.pipelines.rag.query") as mock_query, patch(
+        "services.agent.graph._COMPILED_GRAPH", compile_agent_graph()
+    ), patch("services.agent.graph.save_trace"):
+        result = run_agent("What is the minimum stock rule for proteins?")
+
+    mock_query.assert_not_called()
+    mock_retrieve.assert_called_once_with("What is the minimum stock rule for proteins?")
+    mock_generate.assert_called_once()
+    question_arg, context_arg = mock_generate.call_args.args[:2]
+    assert question_arg == "What is the minimum stock rule for proteins?"
+    assert context_arg == [PROTEIN_STOCK_CHUNK]
+    assert result["node_order"] == ["receive_question", "retrieve", "generate"]
+
+
+def test_query_skips_retrieve_when_chunks_provided():
+    """If query() is reused with already-retrieved chunks, it must not re-retrieve."""
+    from data.pipelines.rag import query
+
+    with patch("data.pipelines.rag.retrieve") as mock_retrieve, patch(
+        "data.pipelines.rag.generate_answer", return_value=GROUNDED_ANSWER
+    ) as mock_generate:
+        answer = query(
+            "What is the minimum stock rule for proteins?",
+            chunks=[PROTEIN_STOCK_CHUNK],
+        )
+
+    mock_retrieve.assert_not_called()
+    mock_generate.assert_called_once_with(
+        "What is the minimum stock rule for proteins?",
+        [PROTEIN_STOCK_CHUNK],
+    )
+    assert answer == GROUNDED_ANSWER
+
+
 def test_checkpointing_persists_thread_state():
     """Verifiable checkpointing: the same thread_id can be inspected after a run."""
     graph = compile_agent_graph()

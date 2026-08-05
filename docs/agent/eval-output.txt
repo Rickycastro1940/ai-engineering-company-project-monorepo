@@ -4,16 +4,18 @@ cachedir: .pytest_cache
 rootdir: /workspace
 configfile: pyproject.toml
 plugins: anyio-4.14.2, langsmith-0.10.15
-collecting ... collected 9 items
+collecting ... collected 11 items
 
-tests/pipelines/test_agent_graph.py::test_graph_compiles_successfully PASSED [ 11%]
-tests/pipelines/test_agent_graph.py::test_compile_fails_clearly_on_missing_required_node PASSED [ 22%]
-tests/pipelines/test_agent_graph.py::test_agent_state_is_minimal_and_has_no_history_field PASSED [ 33%]
-tests/pipelines/test_agent_graph.py::test_eval_retrieve_runs_before_generate PASSED [ 44%]
-tests/pipelines/test_agent_graph.py::test_eval_empty_question_skips_retrieve PASSED [ 55%]
-tests/pipelines/test_agent_graph.py::test_eval_no_context_when_retrieve_empty PASSED [ 66%]
-tests/pipelines/test_agent_graph.py::test_eval_answer_grounded_in_context_knowledge_base PASSED [ 77%]
-tests/pipelines/test_agent_graph.py::test_generate_answer_is_separate_from_retrieve PASSED [ 88%]
+tests/pipelines/test_agent_graph.py::test_graph_compiles_successfully PASSED [  9%]
+tests/pipelines/test_agent_graph.py::test_compile_fails_clearly_on_missing_required_node PASSED [ 18%]
+tests/pipelines/test_agent_graph.py::test_agent_state_is_minimal_and_has_no_history_field PASSED [ 27%]
+tests/pipelines/test_agent_graph.py::test_eval_retrieve_runs_before_generate PASSED [ 36%]
+tests/pipelines/test_agent_graph.py::test_eval_empty_question_skips_retrieve PASSED [ 45%]
+tests/pipelines/test_agent_graph.py::test_eval_no_context_when_retrieve_empty PASSED [ 54%]
+tests/pipelines/test_agent_graph.py::test_eval_answer_grounded_in_context_knowledge_base PASSED [ 63%]
+tests/pipelines/test_agent_graph.py::test_generate_answer_is_separate_from_retrieve PASSED [ 72%]
+tests/pipelines/test_agent_graph.py::test_node_contract_graph_never_calls_monolithic_query PASSED [ 81%]
+tests/pipelines/test_agent_graph.py::test_query_skips_retrieve_when_chunks_provided PASSED [ 90%]
 tests/pipelines/test_agent_graph.py::test_checkpointing_persists_thread_state PASSED [100%]
 
 =============================== warnings summary ===============================
@@ -23,4 +25,4 @@ tests/pipelines/test_agent_graph.py::test_checkpointing_persists_thread_state PA
     show_warning(
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-======================== 9 passed, 2 warnings in 1.46s =========================
+======================== 11 passed, 2 warnings in 1.44s ========================

@@ -19,6 +19,9 @@ from data.pipelines.rag import NO_CONTEXT_ANSWER, generate_answer, retrieve
 
 from services.agent.state import AgentState
 
+# Node contract: this module imports retrieve + generate_answer only — never query().
+_MONOLITHIC_QUERY_FORBIDDEN = True
+
 
 def _step(
     state: AgentState,

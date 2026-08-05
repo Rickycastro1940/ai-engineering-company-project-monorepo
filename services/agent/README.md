@@ -12,6 +12,7 @@ explicit, checkpointed, traceable graph.
   - `retrieve` — calls `data.pipelines.rag.retrieve` (reuse, not duplicate)
   - `generate` — calls `generate_answer(question, context)` with already-retrieved chunks
   - `no_context` / `empty_question` — honest / error terminals
+  - **Node contract:** never calls monolithic `query()` inside a node
 - [x] **Edges** (`graph.py`) — conditional, not a fixed sequence:
   - empty question → `empty_question` → END (skip retrieve)
   - retrieve with no chunks above threshold → `no_context` → END (skip generate)
