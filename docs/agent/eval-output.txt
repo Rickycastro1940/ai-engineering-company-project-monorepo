@@ -41,9 +41,9 @@ tests/pipelines/test_rag.py::test_generate_answer_does_not_call_retrieve PASSED 
     from starlette.testclient import TestClient as TestClient  # noqa
 
 .venv/lib/python3.12/site-packages/qdrant_client/qdrant_remote.py:290
-.venv/lib/python3.12/site-packages/qdrant_client/qdrant_remote.py:290
+tests/pipelines/test_agent_endpoint.py::test_agent_query_empty_question_returns_clear_400
   /workspace/.venv/lib/python3.12/site-packages/qdrant_client/qdrant_remote.py:290: UserWarning: Failed to obtain server version. Unable to check client-server compatibility. Set check_compatibility=False to skip version check.
     show_warning(
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-======================== 28 passed, 3 warnings in 1.39s ========================
+======================== 28 passed, 3 warnings in 1.42s ========================
