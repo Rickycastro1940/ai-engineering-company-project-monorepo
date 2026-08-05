@@ -318,6 +318,8 @@ def test_checkpointing_persists_thread_state():
 
 def test_every_run_produces_queryable_trace(trace_dir: Path):
     """Tracing: each run persists node order + outputs loadable after the fact."""
+    from services.agent.tracing import query_traces
+
     with patch("services.agent.nodes.retrieve", return_value=[PROTEIN_STOCK_CHUNK]), patch(
         "services.agent.nodes.generate_answer", return_value=GROUNDED_ANSWER
     ), patch("services.agent.tracing.DEFAULT_TRACE_DIR", trace_dir), patch(
@@ -338,3 +340,11 @@ def test_every_run_produces_queryable_trace(trace_dir: Path):
     assert trace["steps"][2]["notes"] == "grounded answer"
     # Trace file is queryable from disk (not just console print).
     assert (trace_dir / f"{result['trace_id']}.json").is_file()
+
+    # Structured query after the run (filter by node / question).
+    hits = query_traces(
+        node="retrieve",
+        question_contains="protein",
+        trace_dir=trace_dir,
+    )
+    assert any(t["trace_id"] == result["trace_id"] for t in hits)

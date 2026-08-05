@@ -1,8 +1,15 @@
 """Queryable run traces for the LangGraph support agent.
 
-Each invoke writes a JSON file under ``data/process/agent-traces/`` keyed by
-``trace_id``. Evals and operators can load traces after the run without
-re-executing the graph.
+Every ``run_agent`` invoke writes a structured JSON file under
+``data/process/agent-traces/<trace_id>.json``. The file records:
+
+- which nodes ran
+- in what order (``node_order`` / ``steps[].sequence``)
+- what each node produced (``steps[].output``)
+
+Traces are queryable after the run via ``load_trace`` / ``list_traces`` /
+``query_traces``, or HTTP ``GET /agent/traces`` and ``GET /agent/traces/{id}``
+— not just printed to the console.
 """
 
 from __future__ import annotations
@@ -62,9 +69,43 @@ def list_traces(*, trace_dir: Path | None = None, limit: int = 50) -> list[dict[
         return []
     files = sorted(directory.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
     traces: list[dict[str, Any]] = []
-    for path in files[:limit]:
+    for path in files:
+        if path.name.startswith("sample-"):
+            continue
         try:
             traces.append(json.loads(path.read_text(encoding="utf-8")))
         except (json.JSONDecodeError, OSError):
             continue
+        if len(traces) >= limit:
+            break
     return traces
+
+
+def query_traces(
+    *,
+    node: str | None = None,
+    status: str | None = None,
+    question_contains: str | None = None,
+    trace_dir: Path | None = None,
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    """Filter persisted traces — proves traces are queryable after the run.
+
+    Examples
+    --------
+    >>> query_traces(node="retrieve")           # runs where retrieve executed
+    >>> query_traces(status="ok")               # successful runs
+    >>> query_traces(question_contains="protein")
+    """
+    matches: list[dict[str, Any]] = []
+    for trace in list_traces(trace_dir=trace_dir, limit=max(limit * 5, 50)):
+        if status and trace.get("status") != status:
+            continue
+        if node and node not in (trace.get("node_order") or []):
+            continue
+        if question_contains and question_contains.casefold() not in (trace.get("question") or "").casefold():
+            continue
+        matches.append(trace)
+        if len(matches) >= limit:
+            break
+    return matches

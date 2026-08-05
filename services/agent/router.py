@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from services.agent.graph import run_agent
-from services.agent.tracing import list_traces, load_trace
+from services.agent.tracing import list_traces, load_trace, query_traces
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 
@@ -47,9 +47,26 @@ def agent_query(payload: AgentQueryRequest) -> AgentQueryResponse:
 
 
 @router.get("/traces")
-def get_traces(limit: int = 20) -> list[dict]:
-    """List recent queryable run traces (newest first)."""
-    return list_traces(limit=max(1, min(limit, 100)))
+def get_traces(
+    limit: int = 20,
+    node: str | None = None,
+    status: str | None = None,
+    question_contains: str | None = None,
+) -> list[dict]:
+    """List/query recent run traces (newest first).
+
+    Optional filters make the store queryable after the run — e.g.
+    ``?node=retrieve&status=ok``.
+    """
+    limit = max(1, min(limit, 100))
+    if node or status or question_contains:
+        return query_traces(
+            node=node,
+            status=status,
+            question_contains=question_contains,
+            limit=limit,
+        )
+    return list_traces(limit=limit)
 
 
 @router.get("/traces/{trace_id}")
