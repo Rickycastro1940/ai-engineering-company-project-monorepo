@@ -5,8 +5,8 @@ build/startup time rather than in production. Checkpointing uses
 ``MemorySaver`` so each meaningful transition can be inspected or resumed via
 ``thread_id``.
 
-Part 2 adds a read-only ticket tool node and conditional routing between RAG
-and the incident manager based on the question content.
+Part 2 adds read-only ticket + inventory tool nodes and conditional routing
+between RAG and those tools based on the question content.
 """
 
 from __future__ import annotations
@@ -20,10 +20,13 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
 from services.agent.nodes import (
+    answer_inventory_node,
     answer_ticket_node,
     decide_route_node,
     empty_question_node,
     generate_node,
+    inventory_fallback_node,
+    lookup_inventory_node,
     lookup_ticket_node,
     no_context_node,
     receive_question,
@@ -43,6 +46,9 @@ REQUIRED_NODES = (
     "lookup_ticket",
     "answer_ticket",
     "ticket_fallback",
+    "lookup_inventory",
+    "answer_inventory",
+    "inventory_fallback",
 )
 
 _CHECKPOINTER = MemorySaver()
@@ -59,21 +65,20 @@ def _after_receive(state: AgentState) -> str:
 
 
 def _after_decide_route(state: AgentState) -> str:
-    """Conditional edge: ticket tool, RAG, or both (tool first, then RAG).
-
-    ``decide_route`` sets ``route`` from the question content:
-    - ``ticket`` / ``both`` → ``lookup_ticket`` (tool node)
-    - ``retrieve`` → RAG ``retrieve`` node
-    """
+    """Conditional agent: ticket tool, inventory tool, or RAG."""
     route = state.get("route") or ""
-    if route in ("ticket", "both"):
+    if route in ("ticket", "both", "ticket_inventory", "all"):
         return "lookup_ticket"
+    if route in ("inventory", "inventory_rag"):
+        return "lookup_inventory"
     return "retrieve"
 
 
 def _after_lookup_ticket(state: AgentState) -> str:
-    """After the ticket tool: continue to RAG, answer, or honest fallback."""
+    """After the ticket tool: inventory, RAG, answer, or honest fallback."""
     route = state.get("route") or ""
+    if route == "lookup_inventory":
+        return "lookup_inventory"
     if route == "retrieve":
         return "retrieve"
     if route == "ticket_answer":
@@ -81,8 +86,18 @@ def _after_lookup_ticket(state: AgentState) -> str:
     return "ticket_fallback"
 
 
+def _after_lookup_inventory(state: AgentState) -> str:
+    """After the inventory tool: RAG, answer, or honest fallback."""
+    route = state.get("route") or ""
+    if route == "retrieve":
+        return "retrieve"
+    if route == "inventory_answer":
+        return "answer_inventory"
+    return "inventory_fallback"
+
+
 def _after_retrieve(state: AgentState) -> str:
-    """Conditional edge after retrieve (RAG and/or prior ticket result)."""
+    """Conditional edge after retrieve (RAG and/or prior tool results)."""
     route = state.get("route")
     if route == "error":
         return "end"
@@ -92,34 +107,24 @@ def _after_retrieve(state: AgentState) -> str:
         return "answer_ticket"
     if route == "ticket_fallback":
         return "ticket_fallback"
+    if route == "inventory_answer":
+        return "answer_inventory"
+    if route == "inventory_fallback":
+        return "inventory_fallback"
     return "generate"
 
 
 def build_agent_graph() -> StateGraph:
-    """Assemble nodes + conditional edges (not yet compiled).
-
-    Topology (Part 2)
-    -----------------
-    ::
-
-        START → receive_question
-                    │
-                    ├── empty ──────────────► empty_question → END
-                    └── decide_route  (conditional agent)
-                              │
-                              ├── ticket / both ─► lookup_ticket  (tool node)
-                              │                         │
-                              │                         ├── answer_ticket → END
-                              │                         ├── ticket_fallback → END
-                              │                         └── retrieve (when both)
-                              └── retrieve (RAG only) ─► generate | no_context | …
-    """
+    """Assemble nodes + conditional edges (not yet compiled)."""
     graph = StateGraph(AgentState)
     graph.add_node("receive_question", receive_question)
     graph.add_node("decide_route", decide_route_node)
     graph.add_node("lookup_ticket", lookup_ticket_node)
     graph.add_node("answer_ticket", answer_ticket_node)
     graph.add_node("ticket_fallback", ticket_fallback_node)
+    graph.add_node("lookup_inventory", lookup_inventory_node)
+    graph.add_node("answer_inventory", answer_inventory_node)
+    graph.add_node("inventory_fallback", inventory_fallback_node)
     graph.add_node("retrieve", retrieve_node)
     graph.add_node("generate", generate_node)
     graph.add_node("no_context", no_context_node)
@@ -134,12 +139,12 @@ def build_agent_graph() -> StateGraph:
             "decide_route": "decide_route",
         },
     )
-    # Conditional agent: ticket tool instead of / in addition to RAG.
     graph.add_conditional_edges(
         "decide_route",
         _after_decide_route,
         {
             "lookup_ticket": "lookup_ticket",
+            "lookup_inventory": "lookup_inventory",
             "retrieve": "retrieve",
         },
     )
@@ -147,9 +152,19 @@ def build_agent_graph() -> StateGraph:
         "lookup_ticket",
         _after_lookup_ticket,
         {
+            "lookup_inventory": "lookup_inventory",
             "retrieve": "retrieve",
             "answer_ticket": "answer_ticket",
             "ticket_fallback": "ticket_fallback",
+        },
+    )
+    graph.add_conditional_edges(
+        "lookup_inventory",
+        _after_lookup_inventory,
+        {
+            "retrieve": "retrieve",
+            "answer_inventory": "answer_inventory",
+            "inventory_fallback": "inventory_fallback",
         },
     )
     graph.add_conditional_edges(
@@ -160,6 +175,8 @@ def build_agent_graph() -> StateGraph:
             "no_context": "no_context",
             "answer_ticket": "answer_ticket",
             "ticket_fallback": "ticket_fallback",
+            "answer_inventory": "answer_inventory",
+            "inventory_fallback": "inventory_fallback",
             "end": END,
         },
     )
@@ -168,6 +185,8 @@ def build_agent_graph() -> StateGraph:
     graph.add_edge("empty_question", END)
     graph.add_edge("answer_ticket", END)
     graph.add_edge("ticket_fallback", END)
+    graph.add_edge("answer_inventory", END)
+    graph.add_edge("inventory_fallback", END)
     return graph
 
 
@@ -218,6 +237,7 @@ def inspect_checkpoints(thread_id: str, *, graph: Any | None = None) -> list[dic
                 "node_order": [s.get("node_name") for s in (values.get("steps") or [])],
                 "sources_used": list(values.get("sources_used") or []),
                 "needs_ticket": values.get("needs_ticket"),
+                "needs_inventory": values.get("needs_inventory"),
                 "needs_rag": values.get("needs_rag"),
             }
         )
@@ -241,9 +261,12 @@ def run_agent(question: str, *, thread_id: str | None = None) -> dict[str, Any]:
         "error": None,
         "route": "",
         "needs_ticket": False,
+        "needs_inventory": False,
         "needs_rag": False,
         "ticket_query": None,
         "ticket_result": None,
+        "inventory_query": None,
+        "inventory_result": None,
         "sources_used": [],
         "steps": [],
     }

@@ -115,3 +115,66 @@ class TicketLookupOutput(BaseModel):
         description="Human-readable detail for fallback answers / traces.",
     )
     duration_ms: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Inventory tool (stretch) — mirrors GET /inventory/products
+# ---------------------------------------------------------------------------
+
+
+class InventoryLookupInput(BaseModel):
+    """Input contract for the read-only inventory lookup tool.
+
+    Provide ``product_id`` and/or ``name_contains``. An empty input lists all
+    products via ``GET /inventory/products``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    product_id: str | None = Field(
+        default=None,
+        description="Exact product id (maps to GET /inventory/products/{id}).",
+    )
+    name_contains: str | None = Field(
+        default=None,
+        description="Case-insensitive name filter for GET /inventory/products?name=…",
+    )
+
+
+class InventoryProductRecord(BaseModel):
+    """One product as returned by the inventory API (tool output item)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    product_id: str
+    name: str
+    quantity: int
+    unit: str
+    source: str = Field(
+        default="inventory_manager",
+        description="Origin of the live record (inventory manager).",
+    )
+
+
+class InventoryLookupOutput(BaseModel):
+    """Output contract for the inventory lookup tool.
+
+    On failure never invent stock quantities — ``ok=False`` and empty products.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    ok: bool
+    products: list[InventoryProductRecord] = Field(default_factory=list)
+    error: (
+        Literal[
+            "not_found",
+            "timeout",
+            "service_error",
+            "invalid_input",
+            "auth_error",
+        ]
+        | None
+    ) = None
+    message: str | None = None
+    duration_ms: int = 0

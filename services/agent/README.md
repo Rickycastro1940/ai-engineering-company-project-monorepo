@@ -19,9 +19,14 @@ LangGraph orchestration around the existing Brasaland RAG flow, plus a
   the ticket does not exist. Answer always includes
   *"I couldn't confirm that ticket's status right now"* — never a made-up
   status (`ABIERTO` / `CERRADO` / …).
+- [x] **Stretch inventory tool** — typed `InventoryLookupInput` /
+  `InventoryLookupOutput`; `GET /inventory/products` against CSV-backed
+  inventory manager; same **5s** timeout + `inventory_fallback`; separate
+  node from tickets (single responsibility).
 - [x] **Routing** — explicit `decide_route` node + conditional edges choose RAG,
-  ticket tool, or both from the question text (no user hint required).
+  ticket tool, inventory tool, or combinations from the question text.
 - [x] **Ticket tool node** — `lookup_ticket` on the compiled graph (HTTP GET only).
+- [x] **Inventory tool node** — `lookup_inventory` on the compiled graph.
 - [x] **Traces** — `sources_used` + `node_order` show which source(s) ran
   and in what order (including `decide_route` → `lookup_ticket` / `retrieve`).
 - [x] **Evals** — `tests/pipelines/test_agent_tools.py` (tool-required,

@@ -22,8 +22,20 @@ from typing import Any
 from data.pipelines.rag import NO_CONTEXT_ANSWER, generate_answer, retrieve
 
 from services.agent.state import AgentState
-from services.agent.tools.contracts import TicketLookupInput, TicketLookupOutput
+from services.agent.tools.contracts import (
+    InventoryLookupInput,
+    InventoryLookupOutput,
+    TicketLookupInput,
+    TicketLookupOutput,
+)
 from services.agent.tools.routing import classify_sources
+from services.agent.tools.inventory_lookup import (
+    INVENTORY_FALLBACK_MESSAGE,
+    INVENTORY_LOOKUP_TIMEOUT_SECONDS,
+    format_inventory_answer,
+    honest_inventory_fallback_answer,
+    lookup_inventory,
+)
 from services.agent.tools.ticket_lookup import (
     TICKET_FALLBACK_MESSAGE,
     TICKET_LOOKUP_TIMEOUT_SECONDS,
@@ -67,9 +79,12 @@ def receive_question(state: AgentState) -> dict[str, Any]:
             "error": "empty_question",
             "answer": None,
             "needs_ticket": False,
+            "needs_inventory": False,
             "needs_rag": False,
             "ticket_query": None,
             "ticket_result": None,
+            "inventory_query": None,
+            "inventory_result": None,
             "sources_used": [],
             "steps": [
                 _step(
@@ -88,6 +103,7 @@ def receive_question(state: AgentState) -> dict[str, Any]:
         "route": "decide",
         "error": None,
         "ticket_result": None,
+        "inventory_result": None,
         "sources_used": [],
         "steps": [
             _step(
@@ -103,23 +119,30 @@ def receive_question(state: AgentState) -> dict[str, Any]:
 
 
 def decide_route_node(state: AgentState) -> dict[str, Any]:
-    """Conditional router — choose ticket tool, RAG, or both from the question.
+    """Conditional router — ticket tool, inventory tool, RAG, or a combination.
 
-    The user never specifies which source to use. This node inspects the
-    question text and sets ``route`` to:
-
-    - ``ticket`` — live incident lookup only (``lookup_ticket``)
-    - ``retrieve`` — RAG only
-    - ``both`` — ticket tool first, then RAG
+    The user never specifies which source to use. Inspects the question and sets
+    ``needs_ticket`` / ``needs_inventory`` / ``needs_rag`` plus ``route``.
     """
     started = time.perf_counter()
     question = state.get("question") or ""
     decision = classify_sources(question)
+    label = {
+        "ticket": "ticket_tool",
+        "inventory": "inventory_tool",
+        "retrieve": "rag",
+        "both": "ticket_tool_and_rag",
+        "inventory_rag": "inventory_tool_and_rag",
+        "ticket_inventory": "ticket_and_inventory",
+        "all": "ticket_inventory_and_rag",
+    }.get(decision["route"], decision["route"])
     return {
         "route": decision["route"],
         "needs_ticket": decision["needs_ticket"],
+        "needs_inventory": decision["needs_inventory"],
         "needs_rag": decision["needs_rag"],
         "ticket_query": decision["ticket_query"],
+        "inventory_query": decision["inventory_query"],
         "steps": [
             _step(
                 state,
@@ -129,24 +152,31 @@ def decide_route_node(state: AgentState) -> dict[str, Any]:
                 notes=(
                     f"route={decision['route']} "
                     f"needs_ticket={decision['needs_ticket']} "
+                    f"needs_inventory={decision['needs_inventory']} "
                     f"needs_rag={decision['needs_rag']}"
                 ),
                 output={
                     "route": decision["route"],
                     "needs_ticket": decision["needs_ticket"],
+                    "needs_inventory": decision["needs_inventory"],
                     "needs_rag": decision["needs_rag"],
                     "ticket_query": decision["ticket_query"],
-                    "decision": (
-                        "ticket_tool"
-                        if decision["route"] == "ticket"
-                        else "rag"
-                        if decision["route"] == "retrieve"
-                        else "ticket_tool_and_rag"
-                    ),
+                    "inventory_query": decision["inventory_query"],
+                    "decision": label,
                 },
             )
         ],
     }
+
+
+def _next_after_ticket(state: AgentState, result: TicketLookupOutput) -> str:
+    if state.get("needs_inventory"):
+        return "lookup_inventory"
+    if state.get("needs_rag"):
+        return "retrieve"
+    if result.ok and result.tickets:
+        return "ticket_answer"
+    return "ticket_fallback"
 
 
 def lookup_ticket_node(state: AgentState) -> dict[str, Any]:
@@ -168,7 +198,7 @@ def lookup_ticket_node(state: AgentState) -> dict[str, Any]:
         )
         return {
             "ticket_result": result.model_dump(),
-            "route": "ticket_fallback" if not state.get("needs_rag") else "retrieve",
+            "route": _next_after_ticket(state, result),
             "sources_used": ["ticket"],
             "steps": [
                 _step(
@@ -184,12 +214,7 @@ def lookup_ticket_node(state: AgentState) -> dict[str, Any]:
 
     # Explicit numeric timeout — never leave the HTTP call unbounded.
     result = lookup_ticket(query, timeout_seconds=TICKET_LOOKUP_TIMEOUT_SECONDS)
-    if state.get("needs_rag"):
-        next_route = "retrieve"
-    elif result.ok and result.tickets:
-        next_route = "ticket_answer"
-    else:
-        next_route = "ticket_fallback"
+    next_route = _next_after_ticket(state, result)
 
     status = "ok" if result.ok else "error"
     return {
@@ -299,6 +324,168 @@ def ticket_fallback_node(state: AgentState) -> dict[str, Any]:
     }
 
 
+def _next_after_inventory(state: AgentState, result: InventoryLookupOutput) -> str:
+    if state.get("needs_rag"):
+        return "retrieve"
+    if result.ok and result.products:
+        return "inventory_answer"
+    return "inventory_fallback"
+
+
+def lookup_inventory_node(state: AgentState) -> dict[str, Any]:
+    """Read-only inventory tool node — GET /inventory/products only.
+
+    Separate from the ticket tool (single responsibility). Explicit 5s timeout;
+    failures route to ``inventory_fallback`` — never invent stock quantities.
+    """
+    started = time.perf_counter()
+    raw_query = state.get("inventory_query") or {}
+    try:
+        query = InventoryLookupInput.model_validate(raw_query)
+    except Exception as exc:  # noqa: BLE001
+        result = InventoryLookupOutput(
+            ok=False,
+            products=[],
+            error="invalid_input",
+            message=f"Invalid inventory lookup input: {exc}",
+        )
+        next_route = _next_after_inventory(state, result)
+        return {
+            "inventory_result": result.model_dump(),
+            "route": next_route,
+            "sources_used": ["inventory"],
+            "steps": [
+                _step(
+                    state,
+                    "lookup_inventory",
+                    "error",
+                    started,
+                    notes="invalid inventory query",
+                    output={
+                        **result.model_dump(),
+                        "timeout_seconds": INVENTORY_LOOKUP_TIMEOUT_SECONDS,
+                    },
+                )
+            ],
+        }
+
+    result = lookup_inventory(query, timeout_seconds=INVENTORY_LOOKUP_TIMEOUT_SECONDS)
+    next_route = _next_after_inventory(state, result)
+    status = "ok" if result.ok else "error"
+    return {
+        "inventory_result": result.model_dump(),
+        "route": next_route,
+        "sources_used": ["inventory"],
+        "steps": [
+            _step(
+                state,
+                "lookup_inventory",
+                status,
+                started,
+                notes=(
+                    f"inventory tool ok={result.ok} error={result.error} "
+                    f"count={len(result.products)} next={next_route} "
+                    f"timeout_s={INVENTORY_LOOKUP_TIMEOUT_SECONDS}"
+                ),
+                output={
+                    "source": "inventory",
+                    "ok": result.ok,
+                    "error": result.error,
+                    "product_count": len(result.products),
+                    "product_ids": [p.product_id for p in result.products],
+                    "quantities": [p.quantity for p in result.products],
+                    "duration_ms": result.duration_ms,
+                    "timeout_seconds": INVENTORY_LOOKUP_TIMEOUT_SECONDS,
+                    "next_route": next_route,
+                },
+            )
+        ],
+    }
+
+
+def answer_inventory_node(state: AgentState) -> dict[str, Any]:
+    """Format inventory answer from a successful tool call (optionally + ticket)."""
+    started = time.perf_counter()
+    raw = state.get("inventory_result") or {}
+    result = InventoryLookupOutput.model_validate(raw)
+    answer = format_inventory_answer(result)
+    ticket_raw = state.get("ticket_result")
+    if ticket_raw:
+        try:
+            ticket_out = TicketLookupOutput.model_validate(ticket_raw)
+            ticket_text = format_ticket_answer(ticket_out)
+            answer = f"{ticket_text}\n\n{answer}"
+        except Exception:  # noqa: BLE001
+            pass
+    return {
+        "answer": answer,
+        "error": None,
+        "route": "done",
+        "steps": [
+            _step(
+                state,
+                "answer_inventory",
+                "ok",
+                started,
+                notes="answer from live inventory manager",
+                output={
+                    "source": "inventory",
+                    "answer": answer,
+                    "product_count": len(result.products),
+                    "used_ticket": bool(ticket_raw),
+                },
+            )
+        ],
+    }
+
+
+def inventory_fallback_node(state: AgentState) -> dict[str, Any]:
+    """Fallback when inventory tool fails — never invent a stock quantity."""
+    started = time.perf_counter()
+    raw = state.get("inventory_result") or {}
+    try:
+        result = InventoryLookupOutput.model_validate(raw)
+        answer = honest_inventory_fallback_answer(result)
+        error_code = result.error or "service_error"
+    except Exception:  # noqa: BLE001
+        answer = INVENTORY_FALLBACK_MESSAGE
+        error_code = "service_error"
+
+    if "quantity=" in answer.casefold() and "couldn't confirm" not in answer.casefold():
+        answer = INVENTORY_FALLBACK_MESSAGE
+
+    # If a prior ticket succeeded, still surface it honestly alongside fallback.
+    ticket_raw = state.get("ticket_result")
+    if ticket_raw and ticket_raw.get("ok") and ticket_raw.get("tickets"):
+        try:
+            ticket_out = TicketLookupOutput.model_validate(ticket_raw)
+            answer = f"{format_ticket_answer(ticket_out)}\n\n{answer}"
+        except Exception:  # noqa: BLE001
+            pass
+
+    return {
+        "answer": answer,
+        "error": None,
+        "route": "done",
+        "steps": [
+            _step(
+                state,
+                "inventory_fallback",
+                "ok",
+                started,
+                notes=f"inventory fallback reason={error_code} (no invented stock)",
+                output={
+                    "source": "inventory_fallback",
+                    "reason": error_code,
+                    "answer": answer,
+                    "invented_stock": False,
+                    "fallback_message": INVENTORY_FALLBACK_MESSAGE,
+                },
+            )
+        ],
+    }
+
+
 def retrieve_node(state: AgentState) -> dict[str, Any]:
     """Node — run ``retrieve`` against the knowledge base.
 
@@ -329,8 +516,13 @@ def retrieve_node(state: AgentState) -> dict[str, Any]:
         }
 
     ticket_raw = state.get("ticket_result")
+    inventory_raw = state.get("inventory_result")
     if chunks:
         route = "generate"
+    elif inventory_raw and (inventory_raw.get("ok") and inventory_raw.get("products")):
+        route = "inventory_answer"
+    elif inventory_raw and not inventory_raw.get("ok"):
+        route = "inventory_fallback"
     elif ticket_raw and (ticket_raw.get("ok") and ticket_raw.get("tickets")):
         route = "ticket_answer"
     elif ticket_raw and not ticket_raw.get("ok"):
@@ -410,6 +602,15 @@ def generate_node(state: AgentState) -> dict[str, Any]:
         except Exception:  # noqa: BLE001
             pass
 
+    inventory_raw = state.get("inventory_result")
+    if inventory_raw:
+        try:
+            inv_out = InventoryLookupOutput.model_validate(inventory_raw)
+            inv_text = format_inventory_answer(inv_out)
+            answer = f"{answer}\n\nLive inventory data:\n{inv_text}"
+        except Exception:  # noqa: BLE001
+            pass
+
     return {
         "answer": answer,
         "error": None,
@@ -426,6 +627,7 @@ def generate_node(state: AgentState) -> dict[str, Any]:
                     "grounded": True,
                     "source": "rag",
                     "used_ticket": bool(ticket_raw),
+                    "used_inventory": bool(inventory_raw),
                     "context_sources": [c.get("source_document") for c in chunks],
                 },
             )
