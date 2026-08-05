@@ -127,12 +127,20 @@ def test_incident_store_reads_real_company_csv():
 
 
 def test_lookup_ticket_http_get_by_id_uses_real_shape():
-    """HTTP tool returns typed TicketLookupOutput from GET /api/incidents/{id}."""
+    """Protocol check: tool issues GET /api/incidents/{id} (payload from handler).
+
+    Live CSV-backed coverage lives in ``test_ticket_tool_live.py`` and
+    ``test_agent_routing_evals.py`` — those call the real FastAPI app.
+    """
+    from services.api.incidents_store import get_incident
+
+    live = get_incident("BRS-000002")
+    assert live is not None
 
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.method == "GET"
         assert str(request.url).endswith("/api/incidents/BRS-000002")
-        return httpx.Response(200, json=SAMPLE_TICKET.model_dump())
+        return httpx.Response(200, json=live.model_dump())
 
     transport = httpx.MockTransport(handler)
     result = lookup_ticket(
@@ -142,9 +150,9 @@ def test_lookup_ticket_http_get_by_id_uses_real_shape():
     assert result.ok is True
     assert result.error is None
     assert len(result.tickets) == 1
-    assert result.tickets[0].status == "ABIERTO"
-    assert result.tickets[0].category == "ABASTECIMIENTO"
-    assert result.tickets[0].date == "2026-06-01"
+    assert result.tickets[0].status == live.status
+    assert result.tickets[0].category == live.category
+    assert result.tickets[0].date == live.date
     assert result.tickets[0].source == "incident_manager"
 
 
@@ -411,11 +419,15 @@ def test_graph_registers_lookup_ticket_and_decide_route_nodes():
 
 def test_tool_is_read_only_get_only():
     """Ticket tool must only issue GET (never POST/PUT/PATCH/DELETE)."""
+    from services.api.incidents_store import get_incident
+
+    live = get_incident("BRS-000002")
+    assert live is not None
     methods: list[str] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         methods.append(request.method)
-        return httpx.Response(200, json=SAMPLE_TICKET.model_dump())
+        return httpx.Response(200, json=live.model_dump())
 
     lookup_ticket(
         TicketLookupInput(ticket_id="BRS-000002"),

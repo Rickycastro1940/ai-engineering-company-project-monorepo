@@ -31,8 +31,9 @@ LangGraph orchestration around the existing Brasaland RAG flow, plus a
   `rag`) and `node_order` so reviewers can see which source(s) ran and in
   what order; queryable via `GET /agent/traces?node=lookup_ticket`.
 - [x] **Evals** — ≥2 routing evals (tool-required vs RAG-required) plus
-  optional fallback when the incident service is unavailable
-  (`tests/pipelines/test_agent_tools.py`).
+  optional fallback (`tests/pipelines/test_agent_routing_evals.py`). Tool
+  evals call the **real** incident/inventory FastAPI routes (company CSV),
+  not simulated payloads.
 
 ## Agent routing (Part 2)
 

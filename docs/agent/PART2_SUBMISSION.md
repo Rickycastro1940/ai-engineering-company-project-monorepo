@@ -16,9 +16,13 @@ Inventory GETs (`GET /inventory/products`) likewise require **no auth** today.
   - `sources_order` — e.g. `["ticket"]`, `["rag"]`, `["ticket", "rag"]`
   - `source_summary` — e.g. `ticket_only`, `rag_only`, `ticket_then_rag`
   - `node_order` / `steps[].sequence` — full node sequence
-- [x] **Eval — tool required (not RAG):** `test_eval_tool_required_question_uses_ticket_not_rag`
-- [x] **Eval — RAG required (not a tool):** `test_eval_rag_required_question_skips_ticket_tool`
-- [x] **Optional fallback eval:** `test_eval_ticket_fallback_when_service_unavailable`
+- [x] **Eval — tool required (not RAG):** `test_eval_tool_required_reads_real_incident_service_not_rag`
+  in `tests/pipelines/test_agent_routing_evals.py` — calls real
+  `GET /api/incidents/{id}` (company CSV), not a mocked ticket payload
+- [x] **Eval — RAG required (not a tool):** `test_eval_rag_required_skips_tools`
+- [x] **Optional fallback eval:** `test_eval_fallback_when_incident_service_unavailable`
+- [x] **No simulated tool data** — ticket/inventory tools only HTTP GET the
+  company backends (`incidents-COMPANY.csv`, `products.csv`)
 
 Query after a run: `GET /agent/traces?source=ticket` or `?source=rag`.
 

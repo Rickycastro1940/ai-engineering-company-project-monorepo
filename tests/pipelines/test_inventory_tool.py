@@ -119,18 +119,12 @@ def test_classify_keeps_stock_rule_on_rag_not_inventory():
 
 
 def test_eval_inventory_question_uses_inventory_tool(trace_dir: Path):
-    ok = InventoryLookupOutput(
-        ok=True,
-        products=[
-            {
-                "product_id": "1",
-                "name": "Tomatoes",
-                "quantity": 25,
-                "unit": "kg",
-                "source": "inventory_manager",
-            }
-        ],
-    )
+    """Routing shape — prefer real-backend coverage in test_agent_routing_evals."""
+    from services.api.inventory import get_product
+
+    live = get_product("1")
+    assert live is not None
+    ok = InventoryLookupOutput(ok=True, products=[live.model_dump()])
     with patch("services.agent.nodes.retrieve") as mock_retrieve, patch(
         "services.agent.nodes.lookup_inventory", return_value=ok
     ) as mock_inv:
@@ -148,8 +142,8 @@ def test_eval_inventory_question_uses_inventory_tool(trace_dir: Path):
     assert "retrieve" not in trace["node_order"]
     assert "answer_inventory" in trace["node_order"]
     assert trace["sources_used"] == ["inventory"]
-    assert "Tomatoes" in (trace["answer"] or "")
-    assert "quantity=25" in (trace["answer"] or "")
+    assert live.name in (trace["answer"] or "")
+    assert f"quantity={live.quantity}" in (trace["answer"] or "")
 
 
 def test_eval_inventory_fallback_never_invents_stock(trace_dir: Path):
