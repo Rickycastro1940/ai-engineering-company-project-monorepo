@@ -39,6 +39,9 @@ class TraceRecord:
     node_order: list[str] = field(default_factory=list)
     retrieved_count: int = 0
     route: str | None = None
+    sources_used: list[str] = field(default_factory=list)
+    needs_ticket: bool = False
+    needs_rag: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

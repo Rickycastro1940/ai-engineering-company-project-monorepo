@@ -124,6 +124,19 @@ curl "http://127.0.0.1:8000/inventory/alerts?threshold=20"
 
 Interactive docs: `http://127.0.0.1:8000/docs`
 
+## Incident ticket endpoints (read-only)
+
+Used by the LangGraph support agent ticket tool (Part 2). Backed by
+`scripts/incidents-COMPANY.csv` via `incidents_store.py` — **no authentication**
+is required on these GETs today.
+
+- `GET /api/incidents` — list/search (`status`, `category`, `location_id`, `date_from`, `date_to`)
+- `GET /api/incidents/{id}` — get one ticket by id (e.g. `BRS-000002`)
+
+Response fields: `incident_id`, `date`, `location_id`, `category`,
+`description`, `status`, `customer_id`, `satisfaction_score`, `reporter_id`,
+`source`.
+
 ## Incident analysis endpoints
 
 The FastAPI app also includes:

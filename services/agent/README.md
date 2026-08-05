@@ -1,61 +1,87 @@
-# `services/agent` — Brasaland Support Agent (LangGraph Part 1)
+# `services/agent` — Brasaland Support Agent (LangGraph Parts 1–2)
 
-LangGraph migration of the existing Brasaland RAG flow. Retrieval and generation
-stay in `data/pipelines/rag.py`; this service only orchestrates them as an
-explicit, checkpointed, traceable graph.
+LangGraph orchestration around the existing Brasaland RAG flow, plus a
+**read-only ticket tool** that queries the live incident manager.
 
-## Course checklist — Agent graph (`services/`)
+## Part 2 checklist — Tools outside the RAG
 
-- [x] **State** (`state.py`) — minimal: `question`, `retrieved`, `answer` (+ route/error/steps). No full conversation history.
-- [x] **Nodes** (`nodes.py`)
-  - `receive_question` — receives/normalizes the question
-  - `retrieve` — calls `data.pipelines.rag.retrieve` (reuse, not duplicate)
-  - `generate` — calls `generate_answer(question, context)` with already-retrieved chunks
-  - `no_context` / `empty_question` — honest / error terminals
-  - **Node contract:** never calls monolithic `query()` inside a node
-- [x] **Edges** (`graph.py`) — conditional, not a fixed sequence:
-  - empty question → `empty_question` → END (skip retrieve)
-  - retrieve with no chunks above threshold → `no_context` → END (skip generate)
-  - otherwise → `generate` → END
-- [x] **Compile before execution** — `compile_agent_graph()` / `get_compiled_graph()` at startup; `validate_graph_structure()` fails clearly on missing nodes
-- [x] **Checkpointing** — `MemorySaver` after every node; inspect via `inspect_checkpoints(thread_id)` / `get_state`
-- [x] **Queryable traces** — every run writes JSON with `node_order` + `steps[].output` under `data/process/agent-traces/`; query via `query_traces()` / `GET /agent/traces?node=retrieve` / `scripts/query_agent_trace.py`
-- [x] **Evals** — `tests/pipelines/test_agent_graph.py` (single command below); includes grounding
-- [x] **Endpoint** — `POST /agent/query` invokes the compiled graph only (coexists with `POST /knowledge/query`); failures return clear messages, never stack traces
-- [x] **Grounding** — same `retrieve` / `generate_answer` as RAG; CONTEXT-company.md acceptance gate in `tests/pipelines/test_agent_grounding.py`
+- [x] **Typed contract** (`tools/contracts.py`) — `TicketLookupInput` /
+  `TicketLookupOutput` / `TicketRecord` (same fields as
+  `GET /api/incidents` / `GET /api/incidents/{id}`).
+- [x] **Ticket tool** (`tools/ticket_lookup.py`) — HTTP GET to the incident
+  manager (real CSV-backed store). Read-only. Explicit **5s** timeout.
+- [x] **Auth** — incident GETs currently require **no auth**. Optional
+  `INCIDENT_API_TOKEN` / `INCIDENT_API_KEY` env vars are forwarded as Bearer
+  if set. Never hardcode tokens.
+- [x] **Fallback** — timeout / not-found / service error → honest message,
+  never an invented status (`ticket_fallback` node).
+- [x] **Routing** — `receive_question` classifies RAG vs ticket vs both from
+  the question text (no user hint required).
+- [x] **Traces** — `sources_used` + `node_order` show which source(s) ran
+  and in what order.
+- [x] **Evals** — `tests/pipelines/test_agent_tools.py` (tool-required,
+  RAG-required, fallback).
 
-## Graph
+## Graph (Part 2)
 
 ```text
-START → receive_question ──(empty?)──► empty_question → END
-                 │
-                 └──(ok)──► retrieve ──(no chunks)──► no_context → END
-                                 │
-                                 └──(chunks)──► generate → END
+START → receive_question
+            │
+            ├── empty ──────────────► empty_question → END
+            ├── ticket / both ──────► lookup_ticket
+            │                              │
+            │                              ├── ticket_answer → answer_ticket → END
+            │                              ├── ticket_fallback → END
+            │                              └── retrieve (when needs_rag / both)
+            └── retrieve (RAG only) ─► retrieve → generate | no_context | ticket_* → END
 ```
+
+## Ticket tool contract
+
+**Input** (`TicketLookupInput`): `ticket_id` **or** search filters
+(`status`, `category`, `location_id`, `date_from`, `date_to`).
+
+**Output** (`TicketRecord` items): `incident_id`, `date`, `location_id`,
+`category`, `description`, `status`, `customer_id`, `satisfaction_score`,
+`reporter_id`, `source` — the same fields the incident API exposes.
+
+## Environment
+
+| Variable | Purpose |
+|----------|---------|
+| `INCIDENT_API_BASE` | Base URL for incident GETs (default `http://127.0.0.1:8000`) |
+| `INCIDENT_API_TOKEN` / `INCIDENT_API_KEY` | Optional Bearer token (unused while the API has no auth) |
 
 ## API
 
 ```bash
-# Preferred — standalone agent service
-uv run uvicorn services.agent.app:app --reload --port 8000
+# Start the company API (incidents + agent)
+uv run uvicorn services.api.app:app --reload --port 8000
 
-# Or via the main company API (agent router is mounted there too)
-uv run uvicorn api.app:app --reload --port 8000
+# Live incident endpoints used by the tool
+curl -s http://127.0.0.1:8000/api/incidents/BRS-000002
+curl -s 'http://127.0.0.1:8000/api/incidents?status=ABIERTO'
 
-# Query the agent
+# Agent query (auto-routes)
 curl -s -X POST http://127.0.0.1:8000/agent/query \
   -H 'Content-Type: application/json' \
-  -d '{"question":"What is the minimum stock rule for proteins?"}'
-
-# Load a saved trace
-curl -s http://127.0.0.1:8000/agent/traces/<trace_id>
+  -d '{"question":"What is the status of ticket BRS-000002?"}'
 ```
-
-Traces are also written to `data/process/agent-traces/<trace_id>.json`.
 
 ## Evals
 
 ```bash
-uv run pytest tests/pipelines/test_agent_graph.py -q
+uv run pytest tests/pipelines/ -q
+# Part 2 only:
+uv run pytest tests/pipelines/test_agent_tools.py -q
 ```
+
+## Part 1 (still required)
+
+See checklist history below — state, retrieve/generate nodes, checkpointing,
+grounding, and `POST /agent/query` remain in place.
+
+- State (`state.py`) — minimal; no full conversation history
+- RAG nodes reuse `data.pipelines.rag.retrieve` / `generate_answer`
+- Compile-before-execute + `MemorySaver` checkpoints
+- Queryable JSON traces under `data/process/agent-traces/`

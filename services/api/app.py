@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Literal
 
 from analyzer import IncidentAnalyzer
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -20,6 +20,23 @@ try:
     from inventory import router as inventory_router
 except Exception:  # noqa: BLE001 — inventory module may be mid-migration
     inventory_router = None
+
+# Prefer package import when running under the monorepo; fall back for local cwd.
+try:
+    from services.api.incidents_store import (
+        IncidentRecord,
+        IncidentSearchFilters,
+        get_incident,
+        search_incidents,
+    )
+except Exception:  # noqa: BLE001
+    from incidents_store import (  # type: ignore
+        IncidentRecord,
+        IncidentSearchFilters,
+        get_incident,
+        search_incidents,
+    )
+
 UI_ROOT = REPO_ROOT / "uis" / "web"
 UPLOAD_DIR = REPO_ROOT / "data" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -99,7 +116,7 @@ if inventory_router is not None:
 _register_analyze_routes(app, "anylayze")
 _register_analyze_routes(app, "analyze")
 
-# LangGraph support agent (Part 1) — thin HTTP adapter over the compiled graph.
+# LangGraph support agent — thin HTTP adapter over the compiled graph.
 from services.agent.graph import get_compiled_graph  # noqa: E402
 from services.agent.router import router as agent_router  # noqa: E402
 from services.api.routers.knowledge import router as knowledge_router  # noqa: E402
@@ -108,12 +125,45 @@ get_compiled_graph()
 app.include_router(agent_router)
 app.include_router(knowledge_router)
 
+
+@app.get("/api/incidents", response_model=list[IncidentRecord])
+def list_incidents(
+    status: str | None = Query(default=None),
+    category: str | None = Query(default=None),
+    location_id: str | None = Query(default=None),
+    date_from: str | None = Query(default=None),
+    date_to: str | None = Query(default=None),
+) -> list[IncidentRecord]:
+    """Read-only list/search of live incident tickets (no auth required today)."""
+    filters = IncidentSearchFilters(
+        status=status,
+        category=category,
+        location_id=location_id,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    return search_incidents(filters)
+
+
 @app.get("/api/incidents/results/export")
 def export_results(output_file: str = "results.csv"):
     output_path = _resolve_repo_path(output_file)
     if not output_path.exists():
         raise HTTPException(status_code=404, detail=f"Results file not found: {output_file}")
     return FileResponse(path=output_path, filename=output_path.name, media_type="text/csv")
+
+
+@app.get("/api/incidents/{incident_id}", response_model=IncidentRecord)
+def get_incident_by_id(incident_id: str) -> IncidentRecord:
+    """Read-only get-by-id for a single incident ticket (no auth required today)."""
+    # Avoid colliding with analysis subpaths like /api/incidents/anylayze.
+    reserved = {"anylayze", "analyze", "results"}
+    if incident_id.casefold() in reserved:
+        raise HTTPException(status_code=404, detail=f"Incident not found: {incident_id}")
+    record = get_incident(incident_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"Incident not found: {incident_id}")
+    return record
 
 if UI_ROOT.exists():
     app.mount("/", StaticFiles(directory=UI_ROOT, html=True), name="web-ui")
