@@ -26,6 +26,7 @@ from services.agent.tools.contracts import TicketLookupInput, TicketLookupOutput
 from services.agent.tools.routing import classify_sources
 from services.agent.tools.ticket_lookup import (
     TICKET_FALLBACK_MESSAGE,
+    TICKET_LOOKUP_TIMEOUT_SECONDS,
     format_ticket_answer,
     lookup_ticket,
 )
@@ -148,7 +149,11 @@ def decide_route_node(state: AgentState) -> dict[str, Any]:
 
 
 def lookup_ticket_node(state: AgentState) -> dict[str, Any]:
-    """Read-only ticket tool node — GET against the incident manager only."""
+    """Read-only ticket tool node — GET against the incident manager only.
+
+    Always passes ``TICKET_LOOKUP_TIMEOUT_SECONDS`` (5s) so a non-responsive
+    incident service cannot hang the graph; timeouts route to ``ticket_fallback``.
+    """
     started = time.perf_counter()
     raw_query = state.get("ticket_query") or {}
     try:
@@ -171,12 +176,13 @@ def lookup_ticket_node(state: AgentState) -> dict[str, Any]:
                     "error",
                     started,
                     notes="invalid ticket query",
-                    output=result.model_dump(),
+                    output={**result.model_dump(), "timeout_seconds": TICKET_LOOKUP_TIMEOUT_SECONDS},
                 )
             ],
         }
 
-    result = lookup_ticket(query)
+    # Explicit numeric timeout — never leave the HTTP call unbounded.
+    result = lookup_ticket(query, timeout_seconds=TICKET_LOOKUP_TIMEOUT_SECONDS)
     if state.get("needs_rag"):
         next_route = "retrieve"
     elif result.ok and result.tickets:
@@ -197,7 +203,8 @@ def lookup_ticket_node(state: AgentState) -> dict[str, Any]:
                 started,
                 notes=(
                     f"ticket tool ok={result.ok} error={result.error} "
-                    f"count={len(result.tickets)} next={next_route}"
+                    f"count={len(result.tickets)} next={next_route} "
+                    f"timeout_s={TICKET_LOOKUP_TIMEOUT_SECONDS}"
                 ),
                 output={
                     "source": "ticket",
@@ -207,6 +214,7 @@ def lookup_ticket_node(state: AgentState) -> dict[str, Any]:
                     "ticket_ids": [t.incident_id for t in result.tickets],
                     "statuses": [t.status for t in result.tickets],
                     "duration_ms": result.duration_ms,
+                    "timeout_seconds": TICKET_LOOKUP_TIMEOUT_SECONDS,
                     "next_route": next_route,
                 },
             )

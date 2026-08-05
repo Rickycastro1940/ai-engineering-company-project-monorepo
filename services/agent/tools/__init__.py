@@ -10,6 +10,7 @@ from services.agent.tools.contracts import (
 )
 from services.agent.tools.ticket_lookup import (
     TICKET_LOOKUP_TIMEOUT_SECONDS,
+    build_ticket_http_timeout,
     lookup_ticket,
 )
 
@@ -18,5 +19,6 @@ __all__ = [
     "TicketLookupInput",
     "TicketLookupOutput",
     "TicketRecord",
+    "build_ticket_http_timeout",
     "lookup_ticket",
 ]

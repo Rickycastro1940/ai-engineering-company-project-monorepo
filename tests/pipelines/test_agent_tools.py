@@ -19,6 +19,7 @@ from services.agent.tools.routing import classify_sources
 from services.agent.tools.ticket_lookup import (
     TICKET_FALLBACK_MESSAGE,
     TICKET_LOOKUP_TIMEOUT_SECONDS,
+    build_ticket_http_timeout,
     lookup_ticket,
 )
 from services.agent.tracing import load_trace
@@ -298,7 +299,7 @@ def test_eval_decide_route_both_runs_ticket_then_rag(trace_dir: Path):
         "What is the status of ticket BRS-000002 and what is the minimum stock rule for proteins?",
         trace_dir,
         **{
-            "services.agent.nodes.lookup_ticket": lambda q: ok_result,
+            "services.agent.nodes.lookup_ticket": lambda q, **_: ok_result,
             "services.agent.nodes.retrieve": lambda q: [PROTEIN_STOCK_CHUNK],
             "services.agent.nodes.generate_answer": lambda q, ctx: GROUNDED_ANSWER,
         },
@@ -347,3 +348,87 @@ def test_tool_is_read_only_get_only():
 def test_timeout_constant_is_explicit_and_numeric():
     assert isinstance(TICKET_LOOKUP_TIMEOUT_SECONDS, (int, float))
     assert 3.0 <= float(TICKET_LOOKUP_TIMEOUT_SECONDS) <= 5.0
+    timeout = build_ticket_http_timeout()
+    assert timeout.connect == TICKET_LOOKUP_TIMEOUT_SECONDS
+    assert timeout.read == TICKET_LOOKUP_TIMEOUT_SECONDS
+
+
+def test_slow_incident_service_does_not_hang_call():
+    """A silent TCP acceptor must abort within the timeout — graph must not hang."""
+    import socket
+    import threading
+    import time
+
+    sock = socket.socket()
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    sock.listen(1)
+    stop = threading.Event()
+
+    def _accept_and_stall() -> None:
+        sock.settimeout(2.0)
+        try:
+            conn, _ = sock.accept()
+            while not stop.wait(0.05):
+                pass
+            conn.close()
+        except OSError:
+            pass
+
+    thread = threading.Thread(target=_accept_and_stall, daemon=True)
+    thread.start()
+    short_timeout = 0.4
+    started = time.perf_counter()
+    try:
+        result = lookup_ticket(
+            TicketLookupInput(ticket_id="BRS-000002"),
+            base_url=f"http://127.0.0.1:{port}",
+            timeout_seconds=short_timeout,
+        )
+    finally:
+        stop.set()
+        sock.close()
+        thread.join(timeout=2.0)
+
+    elapsed = time.perf_counter() - started
+    assert result.ok is False
+    assert result.error == "timeout"
+    assert result.tickets == []
+    # Must finish near the timeout, not hang for tens of seconds.
+    assert elapsed < short_timeout + 1.5
+
+
+def test_eval_graph_timeout_routes_to_fallback_without_hanging(trace_dir: Path):
+    """Graph-level: ticket timeout → ticket_fallback; run completes quickly."""
+    import time
+
+    timed_out = TicketLookupOutput(
+        ok=False,
+        tickets=[],
+        error="timeout",
+        message=TICKET_FALLBACK_MESSAGE,
+    )
+    started = time.perf_counter()
+    with patch(
+        "services.agent.nodes.lookup_ticket",
+        return_value=timed_out,
+    ) as mock_lookup, patch("services.agent.nodes.retrieve") as mock_retrieve:
+        result = _run_and_save_trace(
+            "Status of ticket BRS-000002?",
+            trace_dir,
+        )
+
+    elapsed = time.perf_counter() - started
+    mock_retrieve.assert_not_called()
+    mock_lookup.assert_called_once()
+    # Node must pass the explicit numeric timeout into the tool.
+    assert mock_lookup.call_args.kwargs.get("timeout_seconds") == TICKET_LOOKUP_TIMEOUT_SECONDS
+    trace = load_trace(result["trace_id"], trace_dir=trace_dir)
+    assert "lookup_ticket" in trace["node_order"]
+    assert "ticket_fallback" in trace["node_order"]
+    lookup_step = next(s for s in trace["steps"] if s["node_name"] == "lookup_ticket")
+    assert lookup_step["output"]["timeout_seconds"] == TICKET_LOOKUP_TIMEOUT_SECONDS
+    assert lookup_step["output"]["error"] == "timeout"
+    assert elapsed < 2.0
+    assert "couldn't confirm" in (trace["answer"] or "").casefold()

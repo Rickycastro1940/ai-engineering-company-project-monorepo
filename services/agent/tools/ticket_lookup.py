@@ -38,8 +38,22 @@ from services.agent.tools.contracts import (
     TicketRecord,
 )
 
-# Explicit numeric timeout required by Part 2 acceptance criteria.
+# Explicit numeric timeout (seconds) — Part 2 acceptance criterion.
+# If the incident manager does not respond in time, the call aborts and the
+# graph takes the ticket_fallback path instead of hanging.
 TICKET_LOOKUP_TIMEOUT_SECONDS: float = 5.0
+
+
+def build_ticket_http_timeout(seconds: float = TICKET_LOOKUP_TIMEOUT_SECONDS) -> httpx.Timeout:
+    """Build an explicit httpx Timeout for connect / read / write / pool.
+
+    A single float is not enough for reviewers to see the contract; this makes
+    every phase of the HTTP call bound to the same numeric limit.
+    """
+    limit = float(seconds)
+    if limit <= 0:
+        raise ValueError("ticket lookup timeout must be a positive number of seconds")
+    return httpx.Timeout(limit, connect=limit, read=limit, write=limit, pool=limit)
 
 # Live incident manager base URL (override with INCIDENT_API_BASE in deploy).
 DEFAULT_INCIDENT_API_BASE = "http://127.0.0.1:8000"
@@ -143,11 +157,13 @@ def lookup_ticket(
     base_url:
         Incident manager origin; defaults to ``INCIDENT_API_BASE`` / localhost:8000.
     timeout_seconds:
-        Explicit numeric HTTP timeout (default 5s).
+        Explicit numeric HTTP timeout in seconds (default
+        ``TICKET_LOOKUP_TIMEOUT_SECONDS`` = 5). Applied to connect/read/write/pool
+        so a silent incident service cannot hang the graph.
     transport:
-        Optional httpx transport for tests (``MockTransport`` / ``ASGITransport``
-        against the real FastAPI app). Leave unset in production so traffic hits
-        the running incident manager over the network.
+        Optional httpx transport for tests (``MockTransport`` against the real
+        FastAPI app). Leave unset in production so traffic hits the running
+        incident manager over the network.
     """
     started = time.perf_counter()
     try:
@@ -164,11 +180,12 @@ def lookup_ticket(
 
     root = (base_url or _incident_api_base()).rstrip("/")
     headers = _auth_headers()
+    http_timeout = build_ticket_http_timeout(timeout_seconds)
 
     try:
         with httpx.Client(
             base_url=root,
-            timeout=timeout_seconds,
+            timeout=http_timeout,
             transport=transport,
             headers=headers,
         ) as client:

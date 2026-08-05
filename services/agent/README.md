@@ -9,7 +9,9 @@ LangGraph orchestration around the existing Brasaland RAG flow, plus a
   `TicketLookupOutput` / `TicketRecord` (same fields as
   `GET /api/incidents` / `GET /api/incidents/{id}`).
 - [x] **Ticket tool** (`tools/ticket_lookup.py`) — HTTP GET to the incident
-  manager (real CSV-backed store). Read-only. Explicit **5s** timeout.
+  manager (real CSV-backed store). Read-only. Explicit **5s** timeout
+  (`TICKET_LOOKUP_TIMEOUT_SECONDS`) on connect/read/write/pool — a silent
+  service cannot hang the graph; timeouts go to `ticket_fallback`.
 - [x] **Auth** — incident GETs currently require **no auth**. Optional
   `INCIDENT_API_TOKEN` / `INCIDENT_API_KEY` env vars are forwarded as Bearer
   if set. Never hardcode tokens.
