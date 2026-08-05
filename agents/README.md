@@ -8,3 +8,9 @@ Each subfolder under `agents/` should represent **one concrete agent** (for exam
 - **Recommendation**: maintain a catalog of agents here as they are created and link to each agent’s README.
 
 > _Spanish version: [README.es.md](./README.es.md)._
+
+## Catalog
+
+| Agent | Location | Status |
+|-------|----------|--------|
+| Brasaland support agent (LangGraph Part 1) | [`services/agent/`](../services/agent/) | Migration + explicit RAG flow with traces |
