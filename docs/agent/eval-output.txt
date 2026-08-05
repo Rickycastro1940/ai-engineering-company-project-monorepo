@@ -1,0 +1,24 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0 -- /workspace/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /workspace
+configfile: pyproject.toml
+plugins: anyio-4.14.2, langsmith-0.10.15
+collecting ... collected 7 items
+
+tests/pipelines/test_agent_graph.py::test_graph_compiles_successfully PASSED [ 14%]
+tests/pipelines/test_agent_graph.py::test_eval_retrieve_runs_before_generate PASSED [ 28%]
+tests/pipelines/test_agent_graph.py::test_eval_empty_question_skips_retrieve PASSED [ 42%]
+tests/pipelines/test_agent_graph.py::test_eval_no_context_when_retrieve_empty PASSED [ 57%]
+tests/pipelines/test_agent_graph.py::test_eval_answer_grounded_in_context_knowledge_base PASSED [ 71%]
+tests/pipelines/test_agent_graph.py::test_generate_answer_is_separate_from_retrieve PASSED [ 85%]
+tests/pipelines/test_agent_graph.py::test_checkpointing_persists_thread_state PASSED [100%]
+
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/qdrant_client/qdrant_remote.py:290
+.venv/lib/python3.12/site-packages/qdrant_client/qdrant_remote.py:290
+  /workspace/.venv/lib/python3.12/site-packages/qdrant_client/qdrant_remote.py:290: UserWarning: Failed to obtain server version. Unable to check client-server compatibility. Set check_compatibility=False to skip version check.
+    show_warning(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 7 passed, 2 warnings in 1.63s =========================

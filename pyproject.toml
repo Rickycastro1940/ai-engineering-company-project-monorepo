@@ -1,0 +1,26 @@
+[project]
+name = "ai-engineering-company-project"
+version = "0.1.0"
+description = "Brasaland AI Engineering company monorepo"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.110.0",
+    "httpx>=0.27.0",
+    "langchain-core>=0.3.0",
+    "langgraph>=0.2.0",
+    "openai>=1.0.0",
+    "pandas>=2.2.0",
+    "python-dotenv>=1.0.0",
+    "python-multipart>=0.0.9",
+    "pytest>=8.0.0",
+    "qdrant-client>=1.9.0",
+    "uvicorn[standard]>=0.27.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.uv]
+package = false
