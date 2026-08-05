@@ -16,7 +16,13 @@ from unittest.mock import patch
 import pytest
 
 from data.pipelines.rag import NO_CONTEXT_ANSWER
-from services.agent.graph import compile_agent_graph, run_agent
+from services.agent.graph import (
+    GraphStructureError,
+    build_agent_graph,
+    compile_agent_graph,
+    run_agent,
+    validate_graph_structure,
+)
 from services.agent.tracing import load_trace
 
 # Known fact from docs/company-knowledge-base/brasaland-supplier-ordering.en.md
@@ -75,6 +81,29 @@ def test_graph_compiles_successfully(compiled_graph):
     """Compilation must succeed for a valid topology (fails loudly otherwise)."""
     assert compiled_graph is not None
     assert hasattr(compiled_graph, "invoke")
+
+
+def test_compile_fails_clearly_on_missing_required_node():
+    """Structural errors are caught before invoke — missing node → GraphStructureError."""
+    graph = build_agent_graph()
+    # Simulate a mistyped / incomplete topology
+    del graph.nodes["retrieve"]
+    with pytest.raises(GraphStructureError, match="missing required node"):
+        validate_graph_structure(graph)
+
+
+def test_agent_state_is_minimal_and_has_no_history_field():
+    """State carries question / retrieved / answer — not full conversation history."""
+    from services.agent.state import AgentState
+
+    annotations = AgentState.__annotations__
+    assert "question" in annotations
+    assert "retrieved" in annotations
+    assert "answer" in annotations
+    # Full chat history must not sneak into Part 1 state
+    assert "messages" not in annotations
+    assert "history" not in annotations
+    assert "conversation" not in annotations
 
 
 def test_eval_retrieve_runs_before_generate(trace_dir: Path):

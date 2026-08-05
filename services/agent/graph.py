@@ -1,8 +1,9 @@
 """Compile and run the Brasaland support-agent LangGraph.
 
-The graph is compiled once at import/startup so structural errors fail before
-any request is served. Checkpointing uses an in-memory saver so each run can
-be inspected or resumed via ``thread_id``.
+The graph is **compiled before any execution** so structural errors fail at
+build/startup time rather than in production. Checkpointing uses
+``MemorySaver`` so each meaningful transition can be inspected or resumed via
+``thread_id``.
 """
 
 from __future__ import annotations
@@ -25,15 +26,29 @@ from services.agent.nodes import (
 from services.agent.state import AgentState
 from services.agent.tracing import TraceRecord, save_trace
 
+REQUIRED_NODES = (
+    "receive_question",
+    "retrieve",
+    "generate",
+    "no_context",
+    "empty_question",
+)
+
 _CHECKPOINTER = MemorySaver()
 _COMPILED_GRAPH = None
 
 
+class GraphStructureError(ValueError):
+    """Raised when the agent graph topology is invalid before compile/invoke."""
+
+
 def _after_receive(state: AgentState) -> str:
+    """Conditional edge: empty question → error path; else → retrieve."""
     return "empty_question" if state.get("route") == "empty" else "retrieve"
 
 
 def _after_retrieve(state: AgentState) -> str:
+    """Conditional edge: no chunks above threshold → no_context; else → generate."""
     route = state.get("route")
     if route == "error":
         return "end"
@@ -42,12 +57,8 @@ def _after_retrieve(state: AgentState) -> str:
     return "generate"
 
 
-def compile_agent_graph(*, checkpointer: Any | None = None):
-    """Build and compile the agent graph.
-
-    Compilation validates topology (missing edges, bad node names, etc.) and
-    raises before any invoke. Pass a custom checkpointer in tests if needed.
-    """
+def build_agent_graph() -> StateGraph:
+    """Assemble nodes + conditional edges (not yet compiled)."""
     graph = StateGraph(AgentState)
     graph.add_node("receive_question", receive_question)
     graph.add_node("retrieve", retrieve_node)
@@ -56,6 +67,7 @@ def compile_agent_graph(*, checkpointer: Any | None = None):
     graph.add_node("empty_question", empty_question_node)
 
     graph.add_edge(START, "receive_question")
+    # Real conditions — not a hardcoded fixed sequence.
     graph.add_conditional_edges(
         "receive_question",
         _after_receive,
@@ -69,7 +81,33 @@ def compile_agent_graph(*, checkpointer: Any | None = None):
     graph.add_edge("generate", END)
     graph.add_edge("no_context", END)
     graph.add_edge("empty_question", END)
+    return graph
 
+
+def validate_graph_structure(graph: StateGraph) -> None:
+    """Fail clearly on structural problems before ``compile()`` / invoke.
+
+    Checks that the required single-responsibility nodes are registered. This
+    catches mistyped node names and incomplete graphs at build time.
+    """
+    registered = set(graph.nodes.keys()) - {"__start__", "__end__"}
+    missing = [name for name in REQUIRED_NODES if name not in registered]
+    if missing:
+        raise GraphStructureError(
+            f"Agent graph is missing required node(s): {', '.join(missing)}. "
+            "Fix the topology before compile/invoke."
+        )
+
+
+def compile_agent_graph(*, checkpointer: Any | None = None):
+    """Build, validate, and compile the agent graph.
+
+    Compilation (plus ``validate_graph_structure``) must succeed before any
+    ``invoke``. Structural problems raise ``GraphStructureError`` / LangGraph
+    errors at this stage — not during a live request.
+    """
+    graph = build_agent_graph()
+    validate_graph_structure(graph)
     return graph.compile(checkpointer=checkpointer or _CHECKPOINTER)
 
 
@@ -82,7 +120,7 @@ def get_compiled_graph():
 
 
 def run_agent(question: str, *, thread_id: str | None = None) -> dict[str, Any]:
-    """Invoke the compiled graph once and persist a queryable trace.
+    """Invoke the **already-compiled** graph once and persist a queryable trace.
 
     Returns a dict with ``answer``, ``trace_id``, ``status``, ``steps``, and
     ``error`` — never a raw exception traceback.

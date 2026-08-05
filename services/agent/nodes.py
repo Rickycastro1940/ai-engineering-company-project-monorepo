@@ -1,4 +1,14 @@
-"""Single-responsibility LangGraph nodes for the Brasaland support agent."""
+"""Single-responsibility LangGraph nodes for the Brasaland support agent.
+
+Required nodes (Part 1 checklist)
+---------------------------------
+1. ``receive_question`` — accepts/normalizes the user question.
+2. ``retrieve`` — calls ``data.pipelines.rag.retrieve`` (reuse, do not duplicate).
+3. ``generate`` — calls ``data.pipelines.rag.generate_answer(question, context)``
+   with the chunks the retrieve node already produced.
+
+Never call the monolithic ``query()`` (retrieve + generate) inside a node.
+"""
 
 from __future__ import annotations
 
@@ -31,7 +41,11 @@ def _step(
 
 
 def receive_question(state: AgentState) -> dict[str, Any]:
-    """Validate and normalize the incoming question."""
+    """Node 1 — receive the question.
+
+    Normalizes whitespace and sets ``route`` so conditional edges can skip
+    retrieval when the question is empty.
+    """
     started = time.perf_counter()
     question = (state.get("question") or "").strip()
     if not question:
@@ -69,7 +83,12 @@ def receive_question(state: AgentState) -> dict[str, Any]:
 
 
 def retrieve_node(state: AgentState) -> dict[str, Any]:
-    """Run ``data.pipelines.rag.retrieve`` — never the monolithic ``query()``."""
+    """Node 2 — run ``retrieve`` against the knowledge base.
+
+    Reuses ``data.pipelines.rag.retrieve``; does not embed generation here.
+    Sets ``route`` to ``generate`` or ``no_context`` based on whether any chunk
+    cleared the score threshold.
+    """
     started = time.perf_counter()
     try:
         chunks = retrieve(state["question"])
@@ -113,7 +132,11 @@ def retrieve_node(state: AgentState) -> dict[str, Any]:
 
 
 def generate_node(state: AgentState) -> dict[str, Any]:
-    """Call ``generate_answer`` with already-retrieved context."""
+    """Node 3 — generate the final answer from already-retrieved context.
+
+    Calls ``generate_answer(question, context)`` only. Does not call ``retrieve``
+    or the monolithic ``query()``.
+    """
     started = time.perf_counter()
     try:
         answer = generate_answer(state["question"], state.get("retrieved") or [])

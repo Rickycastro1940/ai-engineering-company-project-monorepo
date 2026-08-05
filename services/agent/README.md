@@ -4,6 +4,21 @@ LangGraph migration of the existing Brasaland RAG flow. Retrieval and generation
 stay in `data/pipelines/rag.py`; this service only orchestrates them as an
 explicit, checkpointed, traceable graph.
 
+## Course checklist — Agent graph (`services/`)
+
+- [x] **State** (`state.py`) — minimal: `question`, `retrieved`, `answer` (+ route/error/steps). No full conversation history.
+- [x] **Nodes** (`nodes.py`)
+  - `receive_question` — receives/normalizes the question
+  - `retrieve` — calls `data.pipelines.rag.retrieve` (reuse, not duplicate)
+  - `generate` — calls `generate_answer(question, context)` with already-retrieved chunks
+  - `no_context` / `empty_question` — honest / error terminals
+- [x] **Edges** (`graph.py`) — conditional, not a fixed sequence:
+  - empty question → `empty_question` → END (skip retrieve)
+  - retrieve with no chunks above threshold → `no_context` → END (skip generate)
+  - otherwise → `generate` → END
+- [x] **Compile before execution** — `compile_agent_graph()` / `get_compiled_graph()` at startup; `validate_graph_structure()` fails clearly on missing nodes
+- [x] **Checkpointing** — `MemorySaver` on every compiled graph; inspect via `graph.get_state(thread_id)`
+
 ## Graph
 
 ```text
@@ -13,17 +28,6 @@ START → receive_question ──(empty?)──► empty_question → END
                                  │
                                  └──(chunks)──► generate → END
 ```
-
-| Node | Responsibility |
-|------|----------------|
-| `receive_question` | Normalize/validate the question |
-| `retrieve` | Calls `data.pipelines.rag.retrieve` |
-| `generate` | Calls `data.pipelines.rag.generate_answer(question, context)` |
-| `no_context` | Honest "not enough information" when nothing clears the score threshold |
-| `empty_question` | Clear error path for blank input |
-
-Edges are **conditional** (empty question → error; no retrieval hits → no_context).
-The graph is **compiled once** at startup with a `MemorySaver` checkpointer.
 
 ## API
 
