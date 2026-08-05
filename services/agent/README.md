@@ -55,8 +55,12 @@ START → receive_question
 ## API
 
 ```bash
-# Start the company API (incidents + agent)
-uv run uvicorn services.api.app:app --reload --port 8000
+# Start the company API (incidents + agent) from services/api so local imports resolve
+cd services/api && PYTHONPATH=/workspace:/workspace/services/api \
+  uv run uvicorn app:app --reload --host 127.0.0.1 --port 8000
+
+# Or from repo root via the api/ shim:
+# uv run uvicorn api.app:app --reload --port 8000
 
 # Live incident endpoints used by the tool
 curl -s http://127.0.0.1:8000/api/incidents/BRS-000002
