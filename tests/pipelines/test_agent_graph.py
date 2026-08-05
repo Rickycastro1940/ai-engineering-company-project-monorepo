@@ -284,6 +284,8 @@ def test_query_skips_retrieve_when_chunks_provided():
 
 def test_checkpointing_persists_thread_state():
     """Verifiable checkpointing: the same thread_id can be inspected after a run."""
+    from services.agent.graph import inspect_checkpoints
+
     graph = compile_agent_graph()
     thread_id = "checkpoint-eval-thread"
     with patch("services.agent.nodes.retrieve", return_value=[PROTEIN_STOCK_CHUNK]), patch(
@@ -305,3 +307,34 @@ def test_checkpointing_persists_thread_state():
     assert snapshot is not None
     assert snapshot.values.get("answer") == GROUNDED_ANSWER
     assert len(snapshot.values.get("retrieved") or []) == 1
+
+    # Checkpointing at every meaningful transition → multiple history entries.
+    history = inspect_checkpoints(thread_id, graph=graph)
+    assert len(history) >= 3  # receive → retrieve → generate (at least)
+    assert history[-1]["answer"] == GROUNDED_ANSWER
+    assert "retrieve" in history[-1]["node_order"]
+    assert "generate" in history[-1]["node_order"]
+
+
+def test_every_run_produces_queryable_trace(trace_dir: Path):
+    """Tracing: each run persists node order + outputs loadable after the fact."""
+    with patch("services.agent.nodes.retrieve", return_value=[PROTEIN_STOCK_CHUNK]), patch(
+        "services.agent.nodes.generate_answer", return_value=GROUNDED_ANSWER
+    ), patch("services.agent.tracing.DEFAULT_TRACE_DIR", trace_dir), patch(
+        "services.agent.graph.save_trace"
+    ) as mock_save:
+        from services.agent.tracing import save_trace as real_save
+
+        mock_save.side_effect = lambda record, **_: real_save(record, trace_dir=trace_dir)
+        with patch("services.agent.graph._COMPILED_GRAPH", compile_agent_graph()):
+            result = run_agent("What is the minimum stock rule for proteins?")
+
+    trace = load_trace(result["trace_id"], trace_dir=trace_dir)
+    assert trace["trace_id"] == result["trace_id"]
+    assert trace["node_order"] == ["receive_question", "retrieve", "generate"]
+    assert len(trace["steps"]) == 3
+    assert trace["steps"][0]["node_name"] == "receive_question"
+    assert trace["steps"][1]["output"]["chunk_count"] == 1
+    assert trace["steps"][2]["notes"] == "grounded answer"
+    # Trace file is queryable from disk (not just console print).
+    assert (trace_dir / f"{result['trace_id']}.json").is_file()

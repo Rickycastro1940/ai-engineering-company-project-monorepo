@@ -18,7 +18,9 @@ explicit, checkpointed, traceable graph.
   - retrieve with no chunks above threshold → `no_context` → END (skip generate)
   - otherwise → `generate` → END
 - [x] **Compile before execution** — `compile_agent_graph()` / `get_compiled_graph()` at startup; `validate_graph_structure()` fails clearly on missing nodes
-- [x] **Checkpointing** — `MemorySaver` on every compiled graph; inspect via `graph.get_state(thread_id)`
+- [x] **Checkpointing** — `MemorySaver` after every node; inspect via `inspect_checkpoints(thread_id)` / `get_state`
+- [x] **Queryable traces** — JSON under `data/process/agent-traces/`; `GET /agent/traces` + `GET /agent/traces/{id}`
+- [x] **Evals** — `tests/pipelines/test_agent_graph.py` (single command below); includes grounding
 
 ## Graph
 

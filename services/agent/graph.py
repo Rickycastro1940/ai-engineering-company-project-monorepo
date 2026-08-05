@@ -119,6 +119,39 @@ def get_compiled_graph():
     return _COMPILED_GRAPH
 
 
+def inspect_checkpoints(thread_id: str, *, graph: Any | None = None) -> list[dict[str, Any]]:
+    """Return checkpoint snapshots for a run (one per meaningful transition).
+
+    LangGraph's ``MemorySaver`` persists state after each node. This helper
+    makes those checkpoints queryable for evals and operators without re-running
+    the graph.
+    """
+    compiled = graph or get_compiled_graph()
+    config = {"configurable": {"thread_id": thread_id}}
+    history: list[dict[str, Any]] = []
+    for i, snapshot in enumerate(compiled.get_state_history(config)):
+        values = dict(snapshot.values or {})
+        history.append(
+            {
+                "index": i,
+                "next": list(snapshot.next or []),
+                "created_at": getattr(snapshot, "created_at", None),
+                "question": values.get("question"),
+                "route": values.get("route"),
+                "answer": values.get("answer"),
+                "error": values.get("error"),
+                "retrieved_count": len(values.get("retrieved") or []),
+                "step_count": len(values.get("steps") or []),
+                "node_order": [s.get("node_name") for s in (values.get("steps") or [])],
+            }
+        )
+    # get_state_history returns newest-first; reverse for chronological order.
+    history.reverse()
+    for i, item in enumerate(history):
+        item["index"] = i
+    return history
+
+
 def run_agent(question: str, *, thread_id: str | None = None) -> dict[str, Any]:
     """Invoke the **already-compiled** graph once and persist a queryable trace.
 
