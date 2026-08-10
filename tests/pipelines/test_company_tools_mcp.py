@@ -582,3 +582,79 @@ def test_least_privilege_update_rejects_non_status_fields(api_base: str) -> None
     )
     assert rejected["ok"] is False
     assert rejected["error_code"] == ErrorCode.VALIDATION_ERROR
+
+
+def test_error_catalog_defines_distinct_auth_authz_validation_codes() -> None:
+    """Failures must use named codes — never a generic 'error' string."""
+    from mcps.company_tools.errors import (
+        ALL_ERROR_CODES,
+        ERROR_CATALOG,
+        ExitCode,
+        FORBIDDEN_GENERIC_CODES,
+        map_transport_oauth_error,
+        error_payload,
+    )
+
+    codes = {spec.code for spec in ERROR_CATALOG}
+    assert codes == ALL_ERROR_CODES
+    assert ErrorCode.AUTH_MISSING_TOKEN in codes
+    assert ErrorCode.AUTH_INVALID_TOKEN in codes
+    assert ErrorCode.AUTH_INVALID_AUDIENCE in codes
+    assert ErrorCode.AUTH_INSUFFICIENT_SCOPE in codes
+    assert ErrorCode.VALIDATION_ERROR in codes
+    assert ErrorCode.LIFECYCLE_ERROR in codes
+    assert "error" not in codes
+    assert codes.isdisjoint(FORBIDDEN_GENERIC_CODES)
+
+    by_category = {spec.category for spec in ERROR_CATALOG}
+    assert {"authentication", "authorization", "validation"} <= by_category
+
+    assert map_transport_oauth_error("missing_auth_header") == ErrorCode.AUTH_MISSING_TOKEN
+    assert map_transport_oauth_error("invalid_token") == ErrorCode.AUTH_INVALID_TOKEN
+    assert map_transport_oauth_error("insufficient_scope") == ErrorCode.AUTH_INSUFFICIENT_SCOPE
+
+    payload = error_payload(ErrorCode.VALIDATION_ERROR, "bad input", tool="t")
+    assert payload["ok"] is False
+    assert payload["error_code"] == ErrorCode.VALIDATION_ERROR
+    assert payload["error_code"] != "error"
+
+    try:
+        error_payload("error", "nope")
+        raise AssertionError("generic error_code must be rejected")
+    except ValueError:
+        pass
+
+    assert int(ExitCode.SUCCESS) == 0
+    assert int(ExitCode.CONFIG_ERROR) == 2
+    assert int(ExitCode.AUTH_SETUP_ERROR) == 3
+    assert int(ExitCode.VALIDATION_ERROR) == 4
+
+
+def test_transport_auth_failures_map_to_catalog_codes(mcp_base: str) -> None:
+    from mcps.company_tools.errors import map_transport_oauth_error
+
+    missing = httpx.post(
+        f"{mcp_base}/mcp",
+        headers={"Accept": "application/json, text/event-stream", "Content-Type": "application/json"},
+        json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
+        timeout=5.0,
+    )
+    assert missing.status_code == 401
+    body = missing.json()
+    assert body.get("error") != "error"
+    assert map_transport_oauth_error(body.get("error")) == ErrorCode.AUTH_MISSING_TOKEN
+
+    invalid = httpx.post(
+        f"{mcp_base}/mcp",
+        headers={
+            "Authorization": "Bearer not-a-jwt",
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+        },
+        json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
+        timeout=5.0,
+    )
+    assert invalid.status_code == 401
+    inv_body = invalid.json()
+    assert inv_body.get("error") == "invalid_token"
+    assert map_transport_oauth_error(inv_body.get("error")) == ErrorCode.AUTH_INVALID_TOKEN
