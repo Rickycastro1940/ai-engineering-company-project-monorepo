@@ -130,10 +130,24 @@ def test_inventory_query_and_write_rejection(api_base: str) -> None:
     assert ok["ok"] is True
     assert ok["products"][0]["product_id"] == "1"
 
+    # Playground often sends blank optional strings — those must still read.
+    blank_ok = query_inventory(
+        action="",
+        product_id="1",
+        unit="",
+        name="",
+        name_contains="",
+    )
+    assert blank_ok["ok"] is True
+    assert blank_ok["products"][0]["product_id"] == "1"
+
     forbidden = query_inventory(action="update", product_id="1", quantity=99)
     assert forbidden["ok"] is False
     assert forbidden["error_code"] == ErrorCode.INVENTORY_WRITE_FORBIDDEN
     assert forbidden["tool"] == "query_inventory"
+
+    forbidden_fields = query_inventory(action="query", product_id="1", name="Tomatoes", unit="kg")
+    assert forbidden_fields["error_code"] == ErrorCode.INVENTORY_WRITE_FORBIDDEN
 
 
 def test_mcp_rejects_unauthenticated_client(mcp_base: str) -> None:

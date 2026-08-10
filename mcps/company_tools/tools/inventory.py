@@ -2,16 +2,24 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from mcps.company_tools import http_clients
 from mcps.company_tools.errors import ErrorCode, error_payload
 
 TOOL_NAME = "query_inventory"
-WriteAction = Literal["update", "create", "delete", "write", "patch", "put"]
-READ_ACTIONS = frozenset({"query", "get", "list", "read", None, ""})
+READ_ACTIONS = frozenset({"query", "get", "list", "read"})
+WRITE_ACTIONS = frozenset({"update", "create", "delete", "write", "patch", "put"})
+
+
+def _blank_to_none(value: str | None) -> str | None:
+    """MCP clients often send '' for unused optional string fields."""
+    if value is None:
+        return None
+    stripped = value.strip()
+    return stripped or None
 
 
 class QueryInventoryInput(BaseModel):
@@ -35,7 +43,7 @@ class QueryInventoryInput(BaseModel):
         default=None,
         description="Optional case-insensitive name substring filter.",
     )
-    # Explicit write-oriented fields — presence alone triggers rejection.
+    # Explicit write-oriented fields — a non-empty value triggers rejection.
     quantity: int | None = Field(
         default=None,
         description="WRITE FIELD — not permitted. Setting this triggers INVENTORY_WRITE_FORBIDDEN.",
@@ -53,15 +61,22 @@ class QueryInventoryInput(BaseModel):
         description="WRITE FIELD for create/rename — not permitted on this read-only tool.",
     )
 
+    @field_validator("action", "product_id", "name_contains", "unit", "name", mode="before")
+    @classmethod
+    def _normalize_blank_strings(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return _blank_to_none(value)
+        return value
+
 
 def _is_write_attempt(inp: QueryInventoryInput) -> bool:
     action = (inp.action or "query").strip().casefold()
-    if action not in {"query", "get", "list", "read"}:
+    if action in WRITE_ACTIONS or action not in READ_ACTIONS:
         return True
-    if inp.quantity is not None or inp.delta is not None or inp.unit is not None:
+    # Only non-None write fields count — blank strings are normalized away above.
+    if inp.quantity is not None or inp.delta is not None:
         return True
-    # `name` is treated as a write field; use name_contains for filters.
-    if inp.name is not None:
+    if inp.unit is not None or inp.name is not None:
         return True
     return False
 
@@ -110,7 +125,7 @@ def query_inventory(
             "Inventory tool is read-only. Write operations are not permitted on this MCP server.",
             tool=TOOL_NAME,
             details={
-                "action": inp.action,
+                "action": inp.action or "query",
                 "rejected_fields": {
                     k: v
                     for k, v in {
