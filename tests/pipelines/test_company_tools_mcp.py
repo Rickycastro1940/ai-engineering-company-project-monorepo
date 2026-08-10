@@ -75,6 +75,77 @@ def test_mcp_standard_discovery_exposes_tools(mcp_base: str) -> None:
         assert entry.get("inputSchema")
 
 
+def test_mcp_discovery_descriptions_and_schemas_self_explanatory(mcp_base: str) -> None:
+    """Rubric: each tool's description + schema are verifiable from discovery alone.
+
+    Assertions use only the ``tools/list`` payload (no source reads).
+    """
+    token = mint_access_token(
+        audience="http://127.0.0.1:13001/mcp",
+        scopes="incidents:read inventory:read",
+        client_id="discovery-schema-eval",
+    )
+    response, body = _mcp_rpc(mcp_base, token, "tools/list", {})
+    assert response.status_code == 200
+    discovered = {t["name"]: t for t in body["result"]["tools"]}
+    assert set(discovered) == set(EXPECTED_MCP_TOOLS)
+
+    for name, entry in discovered.items():
+        desc = (entry.get("description") or "").strip()
+        assert len(desc) >= 40, f"{name} description too short for external clients"
+        assert entry.get("title"), f"{name} missing discovery title"
+
+        schema = entry.get("inputSchema")
+        assert isinstance(schema, dict), f"{name} missing inputSchema"
+        assert schema.get("type") == "object", f"{name} inputSchema.type"
+        props = schema.get("properties") or {}
+        assert props, f"{name} inputSchema has no properties"
+        for prop, spec in props.items():
+            assert isinstance(spec, dict), f"{name}.{prop}"
+            assert (spec.get("description") or "").strip(), (
+                f"{name}.{prop} missing property description in discovery"
+            )
+
+        output = entry.get("outputSchema")
+        assert isinstance(output, dict) and output, f"{name} missing outputSchema"
+
+    incidents = discovered["manage_incident_ticket"]
+    incidents_blob = (
+        incidents["description"] + " " + __import__("json").dumps(incidents["inputSchema"])
+    ).casefold()
+    for needle in (
+        "create",
+        "update",
+        "get_status",
+        "ticket_id",
+        "abierto",
+        "cerrado",
+        "descartado",
+        "incidents:manage",
+        "incidents:read",
+    ):
+        assert needle in incidents_blob, f"manage_incident_ticket discovery missing {needle!r}"
+    action = incidents["inputSchema"]["properties"]["action"]
+    assert set(action.get("enum") or []) == {"create", "update", "get_status"}
+
+    inventory = discovered["query_inventory"]
+    inventory_blob = (
+        inventory["description"] + " " + __import__("json").dumps(inventory["inputSchema"])
+    ).casefold()
+    for needle in (
+        "inventory",
+        "read-only",
+        "product_id",
+        "inventory_write_forbidden",
+        "inventory:read",
+    ):
+        assert needle in inventory_blob, f"query_inventory discovery missing {needle!r}"
+    assert "quantity" in inventory["inputSchema"]["properties"]
+    assert "WRITE FIELD" in (
+        inventory["inputSchema"]["properties"]["quantity"].get("description") or ""
+    )
+
+
 @pytest.fixture(scope="module")
 def api_base() -> Iterator[str]:
     """Start the company FastAPI app on an ephemeral port."""

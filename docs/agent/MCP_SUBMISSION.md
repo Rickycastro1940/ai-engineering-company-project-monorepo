@@ -10,6 +10,13 @@
    `query_inventory` with descriptions + `inputSchema`. Confirmed by
    `test_mcp_server_lives_under_mcps_and_starts` and
    `test_mcp_standard_discovery_exposes_tools`.
+0b. **Self-explanatory discovery (no source required)** — Each tool's
+   `tools/list` entry includes a clear `description`, `title`, full
+   `inputSchema` (every property described), and `outputSchema`. External
+   clients can learn actions, required fields, statuses/categories, OAuth
+   scopes, and inventory write rejection (`INVENTORY_WRITE_FORBIDDEN`) from
+   discovery alone. Snapshot: [`docs/agent/mcp-tools-discovery.json`](./mcp-tools-discovery.json).
+   Confirmed by `test_mcp_discovery_descriptions_and_schemas_self_explanatory`.
 1. **Domain parity with existing APIs** — MCP ticket/product fields match
    `IncidentRecord` / `InventoryProduct` from `services/api` (`incident_id`,
    `location_id`, `category`, `ABIERTO|CERRADO|DESCARTADO`, `BRS-######`,
