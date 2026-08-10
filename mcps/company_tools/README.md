@@ -91,10 +91,12 @@ curl -s 'http://127.0.0.1:3002/token?client_id=mcp-playground'
 
 ## MCP Playground
 
-1. Forward port `3001` with **public** visibility (Codespaces) or expose the host.
-2. Paste the public base URL into [MCP Playground](https://www.mcpplayground.tech/playground).
-3. Connect with a Bearer access token from the issuer.
-4. Exercise each tool once; try `query_inventory` with `action=update` and confirm `INVENTORY_WRITE_FORBIDDEN`.
+1. Forward port `3001` with **public** visibility (Codespaces / Cloudflare Tunnel).
+2. Paste the public MCP URL (`https://…/mcp`) into [MCP Playground Connect](https://www.mcpplayground.tech/connect).
+3. Add auth header `Authorization: Bearer <token>` from `GET /token?client_id=mcp-playground`.
+4. Confirm tools `manage_incident_ticket` and `query_inventory`, then exercise each once; try `query_inventory` with `action=update` and confirm `INVENTORY_WRITE_FORBIDDEN`.
+
+Verified screenshots: [`docs/agent/playground/`](../../docs/agent/playground/).
 
 ## Agent migration
 
