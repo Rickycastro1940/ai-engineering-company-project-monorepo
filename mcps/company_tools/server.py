@@ -17,6 +17,7 @@ import os
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from mcpauth.exceptions import BearerAuthExceptionCode, MCPAuthBearerAuthException
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
@@ -35,7 +36,62 @@ from mcps.company_tools.tools.inventory import query_inventory
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-mcp = FastMCP(name="Brasaland Company Tools", stateless_http=True)
+
+def _build_transport_security() -> TransportSecuritySettings:
+    """Allow localhost + optional public Host values (Codespaces / Cloudflare).
+
+    The MCP SDK only supports exact Host matches or ``host:*`` port wildcards —
+    not ``*.domain`` patterns — so public tunnel hosts must be listed explicitly
+    via ``MCP_RESOURCE_ID`` / ``MCP_ALLOWED_HOSTS``.
+    """
+    if os.getenv("MCP_DISABLE_DNS_REBINDING", "").strip().lower() in {"1", "true", "yes"}:
+        return TransportSecuritySettings(enable_dns_rebinding_protection=False)
+
+    hosts = [
+        "127.0.0.1",
+        "127.0.0.1:*",
+        "localhost",
+        "localhost:*",
+        "[::1]",
+        "[::1]:*",
+    ]
+    origins = [
+        "http://127.0.0.1",
+        "http://127.0.0.1:*",
+        "http://localhost",
+        "http://localhost:*",
+        "https://www.mcpplayground.tech",
+        "https://mcpplayground.tech",
+    ]
+
+    resource = os.getenv("MCP_RESOURCE_ID") or ""
+    if "://" in resource:
+        # https://host[:port]/path → host[:port]
+        hostport = resource.split("://", 1)[1].split("/", 1)[0]
+        if hostport and hostport not in hosts:
+            hosts.append(hostport)
+        if resource.startswith("https://"):
+            origins.append(f"https://{hostport}")
+        elif resource.startswith("http://"):
+            origins.append(f"http://{hostport}")
+
+    for raw in (os.getenv("MCP_ALLOWED_HOSTS") or "").split(","):
+        host = raw.strip()
+        if host and host not in hosts:
+            hosts.append(host)
+
+    return TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=hosts,
+        allowed_origins=origins,
+    )
+
+
+mcp = FastMCP(
+    name="Brasaland Company Tools",
+    stateless_http=True,
+    transport_security=_build_transport_security(),
+)
 mcp_auth = None  # set in create_app() so issuer can start first
 
 
