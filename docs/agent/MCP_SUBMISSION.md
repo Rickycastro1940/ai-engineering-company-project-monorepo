@@ -57,6 +57,10 @@ generic `"error"`). See [`mcps/company_tools/ERRORS.md`](../mcps/company_tools/E
 - Validation → `VALIDATION_ERROR` / `LIFECYCLE_ERROR` / `NOT_FOUND`
 - Process exits → `ExitCode` 0/1/2/3/4
 
+The three categories are **pairwise distinct** in both `error_code` and
+`message` (sampled live in
+`test_auth_authz_validation_errors_have_distinct_codes_and_messages`).
+
 ## Agent migration (LangGraph → MCP)
 
 - [x] Graph `lookup_ticket` node uses `lookup_ticket_via_mcp` +

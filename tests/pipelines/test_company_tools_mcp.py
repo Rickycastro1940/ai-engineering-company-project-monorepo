@@ -846,6 +846,14 @@ def test_error_catalog_defines_distinct_auth_authz_validation_codes() -> None:
     by_category = {spec.category for spec in ERROR_CATALOG}
     assert {"authentication", "authorization", "validation"} <= by_category
 
+    # Pairwise-disjoint code sets across the three rubric categories.
+    grouped: dict[str, set[str]] = {}
+    for spec in ERROR_CATALOG:
+        grouped.setdefault(spec.category, set()).add(spec.code)
+    assert grouped["authentication"].isdisjoint(grouped["authorization"])
+    assert grouped["authentication"].isdisjoint(grouped["validation"])
+    assert grouped["authorization"].isdisjoint(grouped["validation"])
+
     assert map_transport_oauth_error("missing_auth_header") == ErrorCode.AUTH_MISSING_TOKEN
     assert map_transport_oauth_error("invalid_token") == ErrorCode.AUTH_INVALID_TOKEN
     assert map_transport_oauth_error("insufficient_scope") == ErrorCode.AUTH_INSUFFICIENT_SCOPE
@@ -865,6 +873,131 @@ def test_error_catalog_defines_distinct_auth_authz_validation_codes() -> None:
     assert int(ExitCode.CONFIG_ERROR) == 2
     assert int(ExitCode.AUTH_SETUP_ERROR) == 3
     assert int(ExitCode.VALIDATION_ERROR) == 4
+
+
+def test_auth_authz_validation_errors_have_distinct_codes_and_messages(
+    mcp_base: str, api_base: str
+) -> None:
+    """Rubric: authentication, authorization, and validation failures are distinguishable."""
+    from mcps.company_tools.errors import FORBIDDEN_GENERIC_CODES, map_transport_oauth_error
+
+    samples: list[tuple[str, str, str]] = []  # category, code, message
+
+    # --- Authentication (transport) ---
+    missing = httpx.post(
+        f"{mcp_base}/mcp",
+        headers={"Accept": "application/json, text/event-stream", "Content-Type": "application/json"},
+        json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
+        timeout=5.0,
+    )
+    assert missing.status_code == 401
+    missing_body = missing.json()
+    auth_code = map_transport_oauth_error(missing_body.get("error"))
+    auth_msg = str(
+        missing_body.get("error_description") or missing_body.get("error") or ""
+    ).strip()
+    assert auth_code == ErrorCode.AUTH_MISSING_TOKEN
+    assert auth_msg
+    samples.append(("authentication", auth_code, auth_msg))
+
+    invalid = httpx.post(
+        f"{mcp_base}/mcp",
+        headers={
+            "Authorization": "Bearer not-a-jwt",
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+        },
+        json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
+        timeout=5.0,
+    )
+    assert invalid.status_code == 401
+    invalid_body = invalid.json()
+    auth_code_2 = map_transport_oauth_error(invalid_body.get("error"))
+    auth_msg_2 = str(
+        invalid_body.get("error_description") or invalid_body.get("error") or ""
+    ).strip()
+    assert auth_code_2 == ErrorCode.AUTH_INVALID_TOKEN
+    assert auth_msg_2
+    samples.append(("authentication", auth_code_2, auth_msg_2))
+
+    # --- Authorization (valid token, wrong privilege) ---
+    inv_only = mint_access_token(
+        audience="http://127.0.0.1:13001/mcp",
+        scopes="inventory:read",
+        client_id="err-distinct-inv",
+    )
+    denied_resp, denied_body = _mcp_rpc(
+        mcp_base,
+        inv_only,
+        "tools/call",
+        {
+            "name": "manage_incident_ticket",
+            "arguments": {"action": "get_status", "ticket_id": "BRS-000001"},
+        },
+        request_id=2,
+    )
+    assert denied_resp.status_code == 200
+    denied = __import__("json").loads(denied_body["result"]["content"][0]["text"])
+    assert denied["ok"] is False
+    assert denied["error_code"] == ErrorCode.AUTH_INSUFFICIENT_SCOPE
+    assert denied["error_code"] not in FORBIDDEN_GENERIC_CODES
+    assert (denied.get("message") or "").strip()
+    samples.append(("authorization", denied["error_code"], denied["message"]))
+
+    write = query_inventory(action="update", product_id="1", quantity=99)
+    assert write["error_code"] == ErrorCode.INVENTORY_WRITE_FORBIDDEN
+    assert (write.get("message") or "").strip()
+    samples.append(("authorization", write["error_code"], write["message"]))
+
+    # --- Validation (authenticated, wrong/missing input) ---
+    full = mint_access_token(
+        audience="http://127.0.0.1:13001/mcp",
+        scopes="incidents:manage inventory:read",
+        client_id="err-distinct-full",
+    )
+    val_resp, val_body = _mcp_rpc(
+        mcp_base,
+        full,
+        "tools/call",
+        {
+            "name": "manage_incident_ticket",
+            "arguments": {"action": "update", "ticket_id": "BRS-000001"},
+        },
+        request_id=3,
+    )
+    assert val_resp.status_code == 200
+    validated = __import__("json").loads(val_body["result"]["content"][0]["text"])
+    assert validated["ok"] is False
+    assert validated["error_code"] == ErrorCode.VALIDATION_ERROR
+    assert validated["error_code"] not in FORBIDDEN_GENERIC_CODES
+    assert (validated.get("message") or "").strip()
+    samples.append(("validation", validated["error_code"], validated["message"]))
+
+    smuggled = manage_incident_ticket(
+        action="update",
+        ticket_id="BRS-000001",
+        status="CERRADO",
+        description="not allowed on update",
+    )
+    assert smuggled["error_code"] == ErrorCode.VALIDATION_ERROR
+    samples.append(("validation", smuggled["error_code"], smuggled["message"]))
+
+    # Pairwise: different categories ⇒ different codes AND different messages.
+    by_cat: dict[str, list[tuple[str, str]]] = {}
+    for category, code, message in samples:
+        by_cat.setdefault(category, []).append((code, message))
+    assert set(by_cat) == {"authentication", "authorization", "validation"}
+
+    pairs = [
+        ("authentication", "authorization"),
+        ("authentication", "validation"),
+        ("authorization", "validation"),
+    ]
+    for left, right in pairs:
+        for l_code, l_msg in by_cat[left]:
+            for r_code, r_msg in by_cat[right]:
+                assert l_code != r_code, (left, l_code, right, r_code)
+                assert l_msg != r_msg, (left, l_msg, right, r_msg)
 
 
 def test_transport_auth_failures_map_to_catalog_codes(mcp_base: str) -> None:
