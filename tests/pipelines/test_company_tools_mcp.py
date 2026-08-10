@@ -141,6 +141,8 @@ def test_mcp_http_clients_only_call_company_api_paths(api_base: str) -> None:
     assert one.status_code == 200
     assert one.json()["source"] == "inventory_manager"
 
+
+def test_incident_create_and_status_lifecycle(api_base: str) -> None:
     created = manage_incident_ticket(
         action="create",
         category="EQUIPAMIENTO",
