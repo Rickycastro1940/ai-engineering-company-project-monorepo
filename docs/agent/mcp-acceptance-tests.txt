@@ -4,23 +4,25 @@ cachedir: .pytest_cache
 rootdir: /workspace
 configfile: pyproject.toml
 plugins: langsmith-0.10.15, anyio-4.14.2
-collecting ... collected 15 items
+collecting ... collected 17 items
 
-tests/pipelines/test_company_tools_mcp.py::test_mcp_http_clients_only_call_company_api_paths PASSED [  6%]
-tests/pipelines/test_company_tools_mcp.py::test_incident_create_and_status_lifecycle PASSED [ 13%]
-tests/pipelines/test_company_tools_mcp.py::test_inventory_query_and_write_rejection PASSED [ 20%]
-tests/pipelines/test_company_tools_mcp.py::test_mcp_rejects_unauthenticated_client PASSED [ 26%]
-tests/pipelines/test_company_tools_mcp.py::test_mcp_discovery_with_token PASSED [ 33%]
-tests/pipelines/test_company_tools_mcp.py::test_incident_api_status_endpoint PASSED [ 40%]
-tests/pipelines/test_company_tools_mcp.py::test_acceptance_domain_fields_match_company_apis PASSED [ 46%]
-tests/pipelines/test_company_tools_mcp.py::test_acceptance_status_update_uses_lifecycle_endpoint_only PASSED [ 53%]
-tests/pipelines/test_company_tools_mcp.py::test_acceptance_oauth_via_mcpauth_not_fastmcp_auth PASSED [ 60%]
-tests/pipelines/test_company_tools_mcp.py::test_mandatory_oauth_blocks_unauthenticated_list_and_invoke PASSED [ 66%]
-tests/pipelines/test_company_tools_mcp.py::test_mandatory_oauth_rejects_invalid_and_wrong_audience_tokens PASSED [ 73%]
-tests/pipelines/test_company_tools_mcp.py::test_mandatory_oauth_scope_enforcement_on_invoke PASSED [ 80%]
-tests/pipelines/test_company_tools_mcp.py::test_least_privilege_incident_read_scope_cannot_write PASSED [ 86%]
-tests/pipelines/test_company_tools_mcp.py::test_least_privilege_clients_are_domain_isolated PASSED [ 93%]
-tests/pipelines/test_company_tools_mcp.py::test_least_privilege_update_rejects_non_status_fields PASSED [100%]
+tests/pipelines/test_company_tools_mcp.py::test_mcp_http_clients_only_call_company_api_paths PASSED [  5%]
+tests/pipelines/test_company_tools_mcp.py::test_incident_create_and_status_lifecycle PASSED [ 11%]
+tests/pipelines/test_company_tools_mcp.py::test_inventory_query_and_write_rejection PASSED [ 17%]
+tests/pipelines/test_company_tools_mcp.py::test_mcp_rejects_unauthenticated_client PASSED [ 23%]
+tests/pipelines/test_company_tools_mcp.py::test_mcp_discovery_with_token PASSED [ 29%]
+tests/pipelines/test_company_tools_mcp.py::test_incident_api_status_endpoint PASSED [ 35%]
+tests/pipelines/test_company_tools_mcp.py::test_acceptance_domain_fields_match_company_apis PASSED [ 41%]
+tests/pipelines/test_company_tools_mcp.py::test_acceptance_status_update_uses_lifecycle_endpoint_only PASSED [ 47%]
+tests/pipelines/test_company_tools_mcp.py::test_acceptance_oauth_via_mcpauth_not_fastmcp_auth PASSED [ 52%]
+tests/pipelines/test_company_tools_mcp.py::test_mandatory_oauth_blocks_unauthenticated_list_and_invoke PASSED [ 58%]
+tests/pipelines/test_company_tools_mcp.py::test_mandatory_oauth_rejects_invalid_and_wrong_audience_tokens PASSED [ 64%]
+tests/pipelines/test_company_tools_mcp.py::test_mandatory_oauth_scope_enforcement_on_invoke PASSED [ 70%]
+tests/pipelines/test_company_tools_mcp.py::test_least_privilege_incident_read_scope_cannot_write PASSED [ 76%]
+tests/pipelines/test_company_tools_mcp.py::test_least_privilege_clients_are_domain_isolated PASSED [ 82%]
+tests/pipelines/test_company_tools_mcp.py::test_least_privilege_update_rejects_non_status_fields PASSED [ 88%]
+tests/pipelines/test_company_tools_mcp.py::test_error_catalog_defines_distinct_auth_authz_validation_codes PASSED [ 94%]
+tests/pipelines/test_company_tools_mcp.py::test_transport_auth_failures_map_to_catalog_codes PASSED [100%]
 
 =============================== warnings summary ===============================
 tests/pipelines/test_company_tools_mcp.py::test_mcp_http_clients_only_call_company_api_paths
@@ -33,4 +35,4 @@ tests/pipelines/test_company_tools_mcp.py::test_mcp_rejects_unauthenticated_clie
     warnings.warn(
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-======================== 15 passed, 3 warnings in 2.63s ========================
+======================== 17 passed, 3 warnings in 2.66s ========================

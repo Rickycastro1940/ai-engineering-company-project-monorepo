@@ -34,7 +34,7 @@ from mcps.company_tools.auth import (
     has_required_scopes,
     resource_indicator,
 )
-from mcps.company_tools.errors import ErrorCode, error_payload
+from mcps.company_tools.errors import ErrorCode, ExitCode, error_payload
 from mcps.company_tools.logging_util import timed_call
 from mcps.company_tools.schemas import ManageIncidentTicketOutput, QueryInventoryOutput
 from mcps.company_tools.tools.incidents import manage_incident_ticket
@@ -165,8 +165,8 @@ def _auth_gate(
         "Statuses: ABIERTO | CERRADO | DESCARTADO. "
         "On success returns {ok:true, action, ticket:{incident_id,status,…}}. "
         "On failure returns {ok:false, error_code, message} with distinct codes "
-        "(VALIDATION_ERROR, NOT_FOUND, LIFECYCLE_ERROR, UPSTREAM_ERROR, "
-        "AUTH_INSUFFICIENT_SCOPE). "
+        "(never a generic 'error'): AUTH_INSUFFICIENT_SCOPE, VALIDATION_ERROR, "
+        "NOT_FOUND, LIFECYCLE_ERROR, UPSTREAM_ERROR — see ERRORS.md. "
         "Requires OAuth Bearer token with required_scopes incidents:manage "
         "(create/update) or incidents:read (get_status; manage also allowed)."
     ),
@@ -379,23 +379,36 @@ def create_app() -> Starlette:
     1. ``resource_metadata_router`` — public OAuth Protected Resource Metadata
        (RFC 9728) so clients discover the OIDC issuer + scopes.
     2. ``bearer_auth_middleware("jwt", ...)`` wraps **all** ``/mcp`` traffic.
-       Missing / invalid / wrong-audience tokens → HTTP 401. No anonymous
+       Missing / invalid / wrong-audience tokens → HTTP 401
+       (``AUTH_MISSING_TOKEN`` / ``AUTH_INVALID_TOKEN``). No anonymous
        ``tools/list`` or ``tools/call``.
     3. Per-tool ``required_scopes`` (least privilege):
-       ``incidents:read`` / ``incidents:manage`` / ``inventory:read``.
+       ``incidents:read`` / ``incidents:manage`` / ``inventory:read``
+       → ``AUTH_INSUFFICIENT_SCOPE`` when missing.
 
     FastMCP built-in auth is intentionally unused (``settings.auth is None``).
     Middleware ``required_scopes`` stays unset at the transport layer so a
     read-only inventory token can still open an MCP session; tool gates apply
     the precise ``required_scopes`` for each operation.
+
+    See ``ERRORS.md`` for the full error / exit code catalog.
     """
-    auth = build_mcp_auth()
+    try:
+        auth = build_mcp_auth()
+    except Exception as exc:  # noqa: BLE001 — surface as auth setup failure
+        logger.error("AUTH_SETUP_ERROR: failed to init MCP Auth from OIDC issuer: %s", exc)
+        raise SystemExit(int(ExitCode.AUTH_SETUP_ERROR)) from exc
+
     resource = resource_indicator()
+    if "://" not in resource:
+        logger.error("CONFIG_ERROR: MCP_RESOURCE_ID must be an absolute URL, got %r", resource)
+        raise SystemExit(int(ExitCode.CONFIG_ERROR))
+
     if mcp.settings.auth is not None:
-        raise RuntimeError(
-            "Refusing to start: FastMCP built-in auth is set. "
-            "Use mcpauth resource-server mode only."
+        logger.error(
+            "CONFIG_ERROR: FastMCP built-in auth is set; use mcpauth resource-server mode only."
         )
+        raise SystemExit(int(ExitCode.CONFIG_ERROR))
 
     bearer_auth = Middleware(
         auth.bearer_auth_middleware(
@@ -435,8 +448,14 @@ def get_app() -> Starlette:
 def main() -> None:
     import uvicorn
 
-    # Build app after issuer is expected to be reachable.
-    asgi = create_app()
+    try:
+        asgi = create_app()
+    except SystemExit:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("UNEXPECTED startup failure: %s", exc)
+        raise SystemExit(int(ExitCode.UNEXPECTED)) from exc
+
     host = os.getenv("MCP_HOST", "0.0.0.0")
     port = int(os.getenv("MCP_PORT", "3001"))
     uvicorn.run(asgi, host=host, port=port)

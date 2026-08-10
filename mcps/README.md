@@ -14,3 +14,5 @@ Each subfolder inside `mcps/` must correspond to **one specific MCP server** (fo
 | [`company_tools/`](./company_tools/) | OAuth-protected FastMCP server for Incidents Manager tickets + read-only inventory (Streamable HTTP + MCP Auth) |
 
 > _Spanish version: [README.es.md](./README.es.md)._
+
+Company tools error catalog: [`company_tools/ERRORS.md`](./company_tools/ERRORS.md).

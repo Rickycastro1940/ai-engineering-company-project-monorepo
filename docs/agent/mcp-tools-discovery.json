@@ -2,7 +2,7 @@
   {
     "name": "manage_incident_ticket",
     "title": "Manage Brasaland incident tickets",
-    "description": "Create, update status, or query an incident ticket in the Brasaland Incidents Manager (live HTTP API — not a mock). Actions: create | update | get_status. create requires category+description; update requires ticket_id+status and always calls PATCH /api/incidents/{id}/status (lifecycle only); get_status requires ticket_id. Statuses: ABIERTO | CERRADO | DESCARTADO. On success returns {ok:true, action, ticket:{incident_id,status,…}}. On failure returns {ok:false, error_code, message} with distinct codes (VALIDATION_ERROR, NOT_FOUND, LIFECYCLE_ERROR, UPSTREAM_ERROR, AUTH_INSUFFICIENT_SCOPE). Requires OAuth Bearer token with required_scopes incidents:manage (create/update) or incidents:read (get_status; manage also allowed).",
+    "description": "Create, update status, or query an incident ticket in the Brasaland Incidents Manager (live HTTP API — not a mock). Actions: create | update | get_status. create requires category+description; update requires ticket_id+status and always calls PATCH /api/incidents/{id}/status (lifecycle only); get_status requires ticket_id. Statuses: ABIERTO | CERRADO | DESCARTADO. On success returns {ok:true, action, ticket:{incident_id,status,…}}. On failure returns {ok:false, error_code, message} with distinct codes (never a generic 'error'): AUTH_INSUFFICIENT_SCOPE, VALIDATION_ERROR, NOT_FOUND, LIFECYCLE_ERROR, UPSTREAM_ERROR — see ERRORS.md. Requires OAuth Bearer token with required_scopes incidents:manage (create/update) or incidents:read (get_status; manage also allowed).",
     "inputSchema": {
       "properties": {
         "action": {
@@ -318,7 +318,7 @@
             }
           ],
           "default": null,
-          "description": "Machine-readable error when ok is false: VALIDATION_ERROR, NOT_FOUND, LIFECYCLE_ERROR, UPSTREAM_ERROR, AUTH_INSUFFICIENT_SCOPE, …",
+          "description": "Machine-readable failure code when ok is false — never the generic string 'error'. Auth: AUTH_MISSING_TOKEN | AUTH_INVALID_TOKEN | AUTH_INVALID_AUDIENCE | AUTH_INSUFFICIENT_SCOPE. Validation: VALIDATION_ERROR | LIFECYCLE_ERROR | NOT_FOUND. Other: INVENTORY_WRITE_FORBIDDEN | UPSTREAM_ERROR | UNHANDLED_ERROR. See mcps/company_tools/ERRORS.md.",
           "title": "Error Code"
         },
         "message": {
@@ -605,7 +605,7 @@
             }
           ],
           "default": null,
-          "description": "Machine-readable error when ok is false. Write attempts always return INVENTORY_WRITE_FORBIDDEN. Other codes: VALIDATION_ERROR, NOT_FOUND, UPSTREAM_ERROR, AUTH_INSUFFICIENT_SCOPE.",
+          "description": "Machine-readable failure code when ok is false — never the generic string 'error'. Write attempts → INVENTORY_WRITE_FORBIDDEN. Auth: AUTH_MISSING_TOKEN | AUTH_INVALID_TOKEN | AUTH_INSUFFICIENT_SCOPE. Validation: VALIDATION_ERROR | NOT_FOUND. Other: UPSTREAM_ERROR | UNHANDLED_ERROR. See ERRORS.md.",
           "title": "Error Code"
         },
         "tool": {

@@ -10,6 +10,8 @@ from typing import Any, Callable
 
 from mcpauth import MCPAuth
 
+from mcps.company_tools.errors import ErrorCode
+
 logger = logging.getLogger("mcps.company_tools")
 
 
@@ -62,12 +64,12 @@ def timed_call(
             input_summary=input_summary,
             result="error",
             duration_ms=duration_ms,
-            error_code="UNHANDLED_ERROR",
+            error_code=ErrorCode.UNHANDLED_ERROR,
         )
         raise exc
 
     duration_ms = max(0, int((time.perf_counter() - started) * 1000))
-    ok = bool(payload.get("ok", True)) and "error_code" not in payload
+    ok = bool(payload.get("ok", True)) and payload.get("error_code") is None
     log_invocation(
         tool=tool,
         client_id=client_id,

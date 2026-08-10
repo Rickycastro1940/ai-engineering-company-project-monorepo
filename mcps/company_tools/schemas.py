@@ -60,8 +60,12 @@ class ManageIncidentTicketOutput(BaseModel):
     error_code: str | None = Field(
         default=None,
         description=(
-            "Machine-readable error when ok is false: VALIDATION_ERROR, NOT_FOUND, "
-            "LIFECYCLE_ERROR, UPSTREAM_ERROR, AUTH_INSUFFICIENT_SCOPE, …"
+            "Machine-readable failure code when ok is false — never the generic "
+            "string 'error'. Auth: AUTH_MISSING_TOKEN | AUTH_INVALID_TOKEN | "
+            "AUTH_INVALID_AUDIENCE | AUTH_INSUFFICIENT_SCOPE. "
+            "Validation: VALIDATION_ERROR | LIFECYCLE_ERROR | NOT_FOUND. "
+            "Other: INVENTORY_WRITE_FORBIDDEN | UPSTREAM_ERROR | UNHANDLED_ERROR. "
+            "See mcps/company_tools/ERRORS.md."
         ),
     )
     message: str | None = Field(default=None, description="Human-readable error detail.")
@@ -102,9 +106,11 @@ class QueryInventoryOutput(BaseModel):
     error_code: str | None = Field(
         default=None,
         description=(
-            "Machine-readable error when ok is false. Write attempts always return "
-            "INVENTORY_WRITE_FORBIDDEN. Other codes: VALIDATION_ERROR, NOT_FOUND, "
-            "UPSTREAM_ERROR, AUTH_INSUFFICIENT_SCOPE."
+            "Machine-readable failure code when ok is false — never the generic "
+            "string 'error'. Write attempts → INVENTORY_WRITE_FORBIDDEN. "
+            "Auth: AUTH_MISSING_TOKEN | AUTH_INVALID_TOKEN | AUTH_INSUFFICIENT_SCOPE. "
+            "Validation: VALIDATION_ERROR | NOT_FOUND. "
+            "Other: UPSTREAM_ERROR | UNHANDLED_ERROR. See ERRORS.md."
         ),
     )
     tool: str | None = Field(default=None, description="Tool name on error payloads.")

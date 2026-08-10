@@ -18,6 +18,16 @@
    inventory cannot call incident routes and vice versa (inventory is GET-only).
    FastMCP built-in auth is not used (`settings.auth is None`).
 
+## Distinct error / exit codes
+
+Auth, authorization, and validation failures use **named** codes (never a
+generic `"error"`). See [`mcps/company_tools/ERRORS.md`](../mcps/company_tools/ERRORS.md):
+
+- Authentication → `AUTH_MISSING_TOKEN` / `AUTH_INVALID_TOKEN` / `AUTH_INVALID_AUDIENCE` (HTTP 401)
+- Authorization → `AUTH_INSUFFICIENT_SCOPE` / `INVENTORY_WRITE_FORBIDDEN`
+- Validation → `VALIDATION_ERROR` / `LIFECYCLE_ERROR` / `NOT_FOUND`
+- Process exits → `ExitCode` 0/1/2/3/4
+
 Regression coverage: `tests/pipelines/test_company_tools_mcp.py`
 (`test_acceptance_*`).
 

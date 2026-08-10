@@ -78,18 +78,27 @@ export MCP_AUTH_ISSUER=https://your-tenant.logto.app/oidc
 export MCP_RESOURCE_ID=https://mcp.brasaland.example/mcp
 ```
 
-## Error codes
+## Error and exit codes
 
-| Code | Meaning |
-| ---- | ------- |
-| `AUTH_MISSING_TOKEN` | No Bearer token (HTTP 401 from MCP Auth middleware) |
-| `AUTH_INVALID_TOKEN` | Invalid / expired JWT (HTTP 401) |
-| `AUTH_INSUFFICIENT_SCOPE` | Token lacks the tool's required scope |
-| `INVENTORY_WRITE_FORBIDDEN` | Write attempt on read-only inventory tool |
-| `VALIDATION_ERROR` | Bad tool input |
-| `LIFECYCLE_ERROR` | Invalid incident status transition |
-| `NOT_FOUND` | Ticket / product missing upstream |
-| `UPSTREAM_ERROR` | Incidents / inventory API failure |
+Failures use **distinct** machine-readable codes — never a generic `"error"`.
+
+Full catalog (authentication / authorization / validation / process exits):
+[`ERRORS.md`](./ERRORS.md) and [`errors.py`](./errors.py).
+
+| `error_code` | Category | Meaning |
+| ------------ | -------- | ------- |
+| `AUTH_MISSING_TOKEN` | authentication | No Bearer token (HTTP **401**) |
+| `AUTH_INVALID_TOKEN` | authentication | Bad / expired / wrong-issuer JWT (HTTP **401**) |
+| `AUTH_INVALID_AUDIENCE` | authentication | JWT `aud` ≠ resource (HTTP **401**) |
+| `AUTH_INSUFFICIENT_SCOPE` | authorization | Missing `required_scopes` for the tool/action |
+| `INVENTORY_WRITE_FORBIDDEN` | authorization | Write attempt on read-only inventory tool |
+| `VALIDATION_ERROR` | validation | Bad tool input / least-privilege field rules |
+| `LIFECYCLE_ERROR` | validation | Illegal incident status transition |
+| `NOT_FOUND` | validation | Ticket / product missing upstream |
+| `UPSTREAM_ERROR` | upstream | Incidents / inventory API failure |
+| `UNHANDLED_ERROR` | internal | Unexpected tool exception |
+
+Process exit codes: `0` success, `2` config, `3` auth setup (OIDC), `4` validation, `1` unexpected.
 
 ## Run locally
 

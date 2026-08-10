@@ -52,7 +52,16 @@ tool signatures in `server.py`.
 }
 ```
 
-Error shape: `{ "ok": false, "error_code": "NOT_FOUND|VALIDATION_ERROR|LIFECYCLE_ERROR|…", "message": "…", "tool": "manage_incident_ticket" }`
+Error shape (never a generic `"error"` code — see [`ERRORS.md`](./ERRORS.md)):
+
+```json
+{
+  "ok": false,
+  "error_code": "NOT_FOUND|VALIDATION_ERROR|LIFECYCLE_ERROR|AUTH_INSUFFICIENT_SCOPE|…",
+  "message": "…",
+  "tool": "manage_incident_ticket"
+}
+```
 
 ---
 
