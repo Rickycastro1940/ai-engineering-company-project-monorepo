@@ -1,217 +1,114 @@
-from .auth import get_current_user
-from fastapi import APIRouter, Depends
-from sqlmodel import Session, select, func
-from typing import List
-from .database import get_db
-from .models import Product, InboundOrder, OutboundOrder
-from .schemas import ProductResponse, OrderType, ProductCreate
+"""Brasaland inventory manager — CSV-backed, read-first HTTP API.
+
+Data lives in the company ``products.csv`` at the repo root (same file the
+earlier inventory project used). This is **not** a parallel fake dataset.
+
+Stretch routes used by the LangGraph inventory tool:
+
+- ``GET /inventory/products`` — list / filter products (read-only)
+- ``GET /inventory/products/{id}`` — get one product by id (read-only)
+
+Compatibility aliases for the plain-Python inventory agent:
+
+- ``GET /inventory`` — same list as ``/inventory/products``
+"""
+
+from __future__ import annotations
+
+import csv
+from pathlib import Path
+
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, ConfigDict, Field
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+PRODUCTS_CSV = REPO_ROOT / "products.csv"
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 
-@router.get("/products", response_model=List[ProductResponse])
-def get_products(db: Session = Depends(get_db)):
-    products = db.exec(select(Product)).all()
-    response = []
-    for product in products:
-        # Sum inbound quantities
-        inbound = db.exec(
-            select(func.sum(InboundOrder, OutboundOrder.quantity))
-            .where(InboundOrder, OutboundOrder.product_id == product.id)
-            .where(InboundOrder, OutboundOrder.order_type == OrderType.INBOUND)
-        ).one() or 0
-        
-        # Sum outbound quantities
-        outbound = db.exec(
-            select(func.sum(InboundOrder, OutboundOrder.quantity))
-            .where(InboundOrder, OutboundOrder.product_id == product.id)
-            .where(InboundOrder, OutboundOrder.order_type == OrderType.OUTBOUND)
-        ).one() or 0
-        
-        current_stock = inbound - outbound
-        
-        # Build the response object. Note: Product model fields are mapped, 
-        # and defaults are provided for fields in ProductResponse not present in Product.
-        response.append(ProductResponse(
-            product_id=str(product.id),
-            name=product.name,
-            sku=product.sku,
-            current_stock=current_stock,
-            description=getattr(product, 'description', None),
-            price=getattr(product, 'price', 0.0)
-        ))
-    return response
 
-@router.post("/products", response_model=ProductResponse, status_code=201)
-def create_product(
-    product_in: ProductCreate,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
-    # Map ProductCreate to Product model. 
-    # Note: Product model expects "unit", but ProductCreate might not have it.
-    # Defaulting unit to "unit" if not present to avoid validation errors.
-    product_data = product_in.model_dump()
-    if "unit" not in product_data:
-        product_data["unit"] = "unit"
-    
-    db_product = Product(**product_data)
-    db.add(db_product)
-    db.commit()
-    db.refresh(db_product)
-    
-    return ProductResponse(
-        product_id=str(db_product.id),
-        name=db_product.name,
-        sku=db_product.sku,
-        current_stock=0,
-        description=db_product.description,
-        price=db_product.price
-    )
+class InventoryProduct(BaseModel):
+    """One product row as exposed by the inventory manager."""
 
-@inventory_router.get("/products/{id}", response_model=ProductResponse)
-def get_product(id: int, db: Session = Depends(get_session)):
-    product = db.get(Product, id)
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    
-    inbound_stock = db.exec(
-        select(func.sum(InboundOrder, OutboundOrder.quantity))
-        .where(InboundOrder, OutboundOrder.product_id == id)
-    ).one() or 0
-    
-    outbound_stock = db.exec(
-        select(func.sum(OutboundOrder.quantity))
-        .where(OutboundOrder.product_id == id)
-    ).one() or 0
-    
-    current_stock = inbound_stock - outbound_stock
-    
-    return ProductResponse(
-        product_id=str(product.id),
-        sku=product.sku,
-        name=product.name,
-        description=product.description,
-        price=product.price,
-        current_stock=current_stock
-    )
+    model_config = ConfigDict(extra="forbid")
 
-@inventory_router.post("/orders/inbound", response_model=OrderResponse)
-def create_inbound_order(
+    product_id: str
+    name: str
+    quantity: int
+    unit: str
+    source: str = Field(default="inventory_manager")
+
+
+def _load_products(*, csv_path: Path | None = None) -> list[InventoryProduct]:
+    path = csv_path or PRODUCTS_CSV
+    if not path.exists():
+        return []
+    products: list[InventoryProduct] = []
+    with path.open(newline="", encoding="utf-8") as handle:
+        for row in csv.DictReader(handle):
+            pid = (row.get("product_id") or "").strip()
+            if not pid:
+                continue
+            try:
+                qty = int(float((row.get("quantity") or "0").strip() or "0"))
+            except ValueError:
+                qty = 0
+            products.append(
+                InventoryProduct(
+                    product_id=pid,
+                    name=(row.get("name") or "").strip(),
+                    quantity=qty,
+                    unit=(row.get("unit") or "").strip() or "unit",
+                    source="inventory_manager",
+                )
+            )
+    return products
+
+
+def get_product(product_id: str, *, csv_path: Path | None = None) -> InventoryProduct | None:
+    needle = product_id.strip().casefold()
+    for product in _load_products(csv_path=csv_path):
+        if product.product_id.casefold() == needle:
+            return product
+    return None
+
+
+def search_products(
     *,
-    db: Session = Depends(get_session),
-    order_in: InboundOrder, OutboundOrderCreate,
-    current_user: dict = Depends(get_current_user)
-):
-    db_order = InboundOrder, OutboundOrder(
-        product_id=order_in.product_id,
-        quantity=order_in.quantity,
-        user_uuid=current_user["uuid"]
-    )
-    db.add(db_order)
-    db.commit()
-    db.refresh(db_order)
-    return db_order
+    product_id: str | None = None,
+    name_contains: str | None = None,
+    csv_path: Path | None = None,
+) -> list[InventoryProduct]:
+    products = _load_products(csv_path=csv_path)
+    if product_id:
+        found = get_product(product_id, csv_path=csv_path)
+        return [found] if found else []
+    if name_contains:
+        needle = name_contains.casefold()
+        return [p for p in products if needle in p.name.casefold()]
+    return products
 
-@inventory_router.post("/orders/inbound", response_model=OrderResponse)
-def create_inbound_order(
-    *,
-    db: Session = Depends(get_session),
-    order_in: InboundOrder, OutboundOrderCreate,
-    current_user: dict = Depends(get_current_user)
-):
-    db_order = InboundOrder, OutboundOrder(
-        product_id=order_in.product_id,
-        quantity=order_in.quantity,
-        user_uuid=current_user["uuid"]
-    )
-    db.add(db_order)
-    db.commit()
-    db.refresh(db_order)
-    return db_order
 
-@router.post("/orders/outbound", response_model=OrderResponse)
-def create_outbound_order(
-    order_in: OutboundOrderCreate,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
-    # Calculate current stock (SUM(inbound) - SUM(outbound))
-    inbound_qty = db.exec(
-        select(func.sum(InboundOrder.quantity))
-        .where(InboundOrder.product_id == order_in.product_id)
-    ).first() or 0
-    
-    outbound_qty = db.exec(
-        select(func.sum(OutboundOrder.quantity))
-        .where(OutboundOrder.product_id == order_in.product_id)
-    ).first() or 0
-    
-    current_stock = inbound_qty - outbound_qty
-    
-    if order_in.quantity > current_stock:
-        raise HTTPException(
-            status_code=400, 
-            detail="Insufficient stock available"
-        )
-    
-    db_order = OutboundOrder(
-        product_id=order_in.product_id,
-        quantity=order_in.quantity,
-        user_uuid=current_user["uuid"]
-    )
-    db.add(db_order)
-    db.commit()
-    db.refresh(db_order)
-    return db_order
+@router.get("/products", response_model=list[InventoryProduct])
+def list_products(
+    product_id: str | None = Query(default=None),
+    name: str | None = Query(default=None, description="Case-insensitive name substring"),
+) -> list[InventoryProduct]:
+    """Read-only list/search — used by the LangGraph inventory tool."""
+    return search_products(product_id=product_id, name_contains=name)
 
-@inventory_router.get("/orders", response_model=List[OrderResponse])
-def get_orders(db: Session = Depends(get_db)):
-    # Query inbound orders with product data
-    inbound_orders = db.query(InboundOrder, Product).join(
-        Product, InboundOrder.product_id == Product.id
-    ).all()
-    
-    # Query outbound orders with product data
-    outbound_orders = db.query(OutboundOrder, Product).join(
-        Product, OutboundOrder.product_id == Product.id
-    ).all()
-    
-    all_orders = []
-    
-    # Process inbound
-    for order, product in inbound_orders:
-        all_orders.append(OrderResponse(
-            id=order.id,
-            type=OrderType.INBOUND,
-            created_by=order.user_uuid,
-            created_at=order.created_at,
-            items=[OrderItemResponse(
-                product_id=product.id,
-                sku=product.sku,
-                name=product.name,
-                unit=product.unit,
-                quantity=order.quantity,
-                price=product.price
-            )]
-        ))
-        
-    # Process outbound
-    for order, product in outbound_orders:
-        all_orders.append(OrderResponse(
-            id=order.id,
-            type=OrderType.OUTBOUND,
-            created_by=order.user_uuid,
-            created_at=order.created_at,
-            items=[OrderItemResponse(
-                product_id=product.id,
-                sku=product.sku,
-                name=product.name,
-                unit=product.unit,
-                quantity=order.quantity,
-                price=product.price
-            )]
-        ))
-    
-    # Sort by creation date descending
-    all_orders.sort(key=lambda x: x.created_at, reverse=True)
-    return all_orders
+
+@router.get("/products/{product_id}", response_model=InventoryProduct)
+def get_product_by_id(product_id: str) -> InventoryProduct:
+    """Read-only get-by-id for a single inventory product."""
+    record = get_product(product_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"Product not found: {product_id}")
+    return record
+
+
+@router.get("", response_model=list[InventoryProduct])
+@router.get("/", response_model=list[InventoryProduct], include_in_schema=False)
+def list_inventory_compat() -> list[InventoryProduct]:
+    """Alias of ``GET /inventory/products`` for the legacy inventory agent."""
+    return search_products()

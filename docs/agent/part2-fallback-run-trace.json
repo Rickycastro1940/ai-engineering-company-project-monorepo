@@ -1,0 +1,96 @@
+{
+  "trace_id": "e53d763c1e3745a79fe27f5d9616c478",
+  "status": "ok",
+  "question": "Status of ticket BRS-000002?",
+  "answer": "I couldn't confirm that ticket's status right now. Please try again shortly or check the incident manager directly.",
+  "error": null,
+  "steps": [
+    {
+      "node_name": "receive_question",
+      "sequence": 1,
+      "status": "ok",
+      "duration_ms": 0,
+      "notes": "question accepted; next=decide_route",
+      "output": {
+        "accepted": true,
+        "question_len": 28
+      }
+    },
+    {
+      "node_name": "decide_route",
+      "sequence": 2,
+      "status": "ok",
+      "duration_ms": 0,
+      "notes": "route=ticket needs_ticket=True needs_inventory=False needs_rag=False",
+      "output": {
+        "route": "ticket",
+        "needs_ticket": true,
+        "needs_inventory": false,
+        "needs_rag": false,
+        "ticket_query": {
+          "ticket_id": "BRS-000002",
+          "status": null,
+          "category": null,
+          "location_id": null,
+          "date_from": null,
+          "date_to": null
+        },
+        "inventory_query": null,
+        "decision": "ticket_tool"
+      }
+    },
+    {
+      "node_name": "lookup_ticket",
+      "sequence": 3,
+      "status": "error",
+      "duration_ms": 0,
+      "notes": "ticket tool ok=False error=timeout count=0 next=ticket_fallback timeout_s=5.0",
+      "output": {
+        "source": "ticket",
+        "ok": false,
+        "error": "timeout",
+        "ticket_count": 0,
+        "ticket_ids": [],
+        "statuses": [],
+        "duration_ms": 0,
+        "timeout_seconds": 5.0,
+        "next_route": "ticket_fallback"
+      }
+    },
+    {
+      "node_name": "ticket_fallback",
+      "sequence": 4,
+      "status": "ok",
+      "duration_ms": 0,
+      "notes": "ticket fallback reason=timeout (no invented status)",
+      "output": {
+        "source": "ticket_fallback",
+        "reason": "timeout",
+        "answer": "I couldn't confirm that ticket's status right now. Please try again shortly or check the incident manager directly.",
+        "invented_status": false,
+        "fallback_message": "I couldn't confirm that ticket's status right now. Please try again shortly or check the incident manager directly."
+      }
+    }
+  ],
+  "started_at": "2026-08-05T22:24:45.234718+00:00",
+  "ended_at": "2026-08-05T22:24:45.237926+00:00",
+  "duration_ms": 3,
+  "node_order": [
+    "receive_question",
+    "decide_route",
+    "lookup_ticket",
+    "ticket_fallback"
+  ],
+  "retrieved_count": 0,
+  "route": "done",
+  "sources_used": [
+    "ticket"
+  ],
+  "sources_order": [
+    "ticket"
+  ],
+  "source_summary": "ticket_only",
+  "needs_ticket": true,
+  "needs_inventory": false,
+  "needs_rag": false
+}
