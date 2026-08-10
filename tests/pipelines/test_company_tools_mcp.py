@@ -443,21 +443,51 @@ def _mcp_rpc(mcp_base: str, token: str | None, method: str, params: dict, reques
 
 
 def test_mandatory_oauth_blocks_unauthenticated_list_and_invoke(mcp_base: str) -> None:
-    """No client without a valid access token can list or invoke tools."""
+    """Rubric: no client without a valid access token can list or invoke any tool."""
     list_resp, list_body = _mcp_rpc(mcp_base, None, "tools/list", {})
     assert list_resp.status_code == 401
     assert "error" in list_body
     assert "www-authenticate" in {k.lower() for k in list_resp.headers.keys()}
 
-    call_resp, call_body = _mcp_rpc(
-        mcp_base,
-        None,
-        "tools/call",
-        {"name": "query_inventory", "arguments": {"action": "list"}},
-        request_id=2,
-    )
-    assert call_resp.status_code == 401
-    assert "error" in call_body
+    # Both exposed tools must be unreachable without a Bearer access token.
+    for rid, tool_name, arguments in (
+        (2, "query_inventory", {"action": "list"}),
+        (
+            3,
+            "manage_incident_ticket",
+            {"action": "get_status", "ticket_id": "BRS-000001"},
+        ),
+    ):
+        call_resp, call_body = _mcp_rpc(
+            mcp_base,
+            None,
+            "tools/call",
+            {"name": tool_name, "arguments": arguments},
+            request_id=rid,
+        )
+        assert call_resp.status_code == 401, (tool_name, call_resp.status_code, call_body)
+        assert "error" in call_body
+
+    # Invalid Bearer also cannot list or invoke either tool.
+    for rid, method, params in (
+        (10, "tools/list", {}),
+        (
+            11,
+            "tools/call",
+            {"name": "query_inventory", "arguments": {"action": "list"}},
+        ),
+        (
+            12,
+            "tools/call",
+            {
+                "name": "manage_incident_ticket",
+                "arguments": {"action": "get_status", "ticket_id": "BRS-000001"},
+            },
+        ),
+    ):
+        bad_resp, bad_body = _mcp_rpc(mcp_base, "not-a-jwt", method, params, request_id=rid)
+        assert bad_resp.status_code == 401, (method, params, bad_resp.status_code, bad_body)
+        assert "error" in bad_body
 
     init_resp, _ = _mcp_rpc(
         mcp_base,
@@ -468,7 +498,7 @@ def test_mandatory_oauth_blocks_unauthenticated_list_and_invoke(mcp_base: str) -
             "capabilities": {},
             "clientInfo": {"name": "unauth", "version": "0"},
         },
-        request_id=3,
+        request_id=4,
     )
     assert init_resp.status_code == 401
 

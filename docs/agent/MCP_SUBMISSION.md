@@ -20,11 +20,16 @@
    There is no generic `PATCH /api/incidents/{id}` helper.
 3. **OAuth via MCP Auth** — `mcpauth.MCPAuth` in **resource-server** mode with
    OIDC (`AuthServerType.OIDC`), provider-agnostic via `MCP_AUTH_ISSUER`.
-   Bearer JWT middleware blocks anonymous `tools/list` / `tools/call` (HTTP 401).
-   Least-privilege **`required_scopes`**: `incidents:read` / `incidents:manage` /
-   `inventory:read` enforced per tool/action. Domain HTTP clients are split so
-   inventory cannot call incident routes and vice versa (inventory is GET-only).
-   FastMCP built-in auth is not used (`settings.auth is None`).
+   **Clients without a valid OAuth access token cannot list or execute any
+   tool**: missing / garbage / wrong-audience Bearer → HTTP **401** on
+   `tools/list`, `tools/call` (both `manage_incident_ticket` and
+   `query_inventory`), and even `initialize`. Confirmed by
+   `test_mandatory_oauth_blocks_unauthenticated_list_and_invoke` (+ invalid/
+   wrong-audience cases). Least-privilege **`required_scopes`**:
+   `incidents:read` / `incidents:manage` / `inventory:read` enforced per
+   tool/action. Domain HTTP clients are split so inventory cannot call
+   incident routes and vice versa (inventory is GET-only). FastMCP built-in
+   auth is not used (`settings.auth is None`).
 
 ## Distinct error / exit codes
 
