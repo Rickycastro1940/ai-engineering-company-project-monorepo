@@ -145,7 +145,19 @@ Tunnel), mint a token (`GET /token?client_id=mcp-playground`), paste the
 ### Verified public connection + complete flows per tool
 
 Connected Brasaland Company Tools via **public** Streamable HTTP URL + Bearer JWT
-(not localhost). Ran one complete flow per exposed tool:
+(**not** `localhost` / `127.0.0.1`).
+
+Public URL used in MCP Playground Connect:
+
+`https://metres-grams-heroes-mistress.trycloudflare.com/mcp`
+
+(Cursor cloud agent port forward via Cloudflare quick tunnel — same role as a
+Codespaces **public** forwarded HTTPS URL. Screenshots show this URL in the
+Playground connect field, with Brasaland Company Tools connected over
+Streamable HTTP; the featured “Local Test Server” `http://localhost:3001/mcp`
+card was **not** used.)
+
+Ran one complete flow per exposed tool:
 
 **`manage_incident_ticket`**
 1. `create` → `BRS-000013` (`EQUIPAMIENTO`, `ABIERTO`, `COL-01`)
@@ -157,3 +169,10 @@ Connected Brasaland Company Tools via **public** Streamable HTTP URL + Bearer JW
 2. `action=update` → `INVENTORY_WRITE_FORBIDDEN`
 
 Evidence (screenshots + JSON): [`docs/agent/playground/`](./playground/)
+
+| File | What it proves |
+| ---- | -------------- |
+| `playground-public-url.png` | Connect form has the public `*.trycloudflare.com/mcp` URL (not localhost) |
+| `playground-public-connected.png` / `playground-server-details.png` | Brasaland Company Tools connected (2 tools, Streamable HTTP, Bearer auth) |
+| `create_ticket.json` / `get_status.json` / `update_ticket.json` | Incidents complete flow |
+| `inventory_list.json` / `inventory_update_forbidden.json` | Inventory query + write rejection |
