@@ -39,6 +39,17 @@ See `mcps/company_tools/README.md`.
 
 ## Playground
 
-Forward port `3001` with **public** visibility (Codespaces), mint a token from
-the issuer (`GET /token`), paste the public URL + Bearer token into
-[MCP Playground](https://www.mcpplayground.tech/playground).
+Forward port `3001` with **public** visibility (Codespaces / Cloudflare Tunnel),
+mint a token from the issuer (`GET /token?client_id=mcp-playground`), paste the
+public URL + Bearer token into
+[MCP Playground](https://www.mcpplayground.tech/connect).
+
+### Verified connection
+
+Connected Brasaland Company Tools (`v1.29.0`) via Streamable HTTP + Bearer JWT:
+
+1. Discovered tools: `manage_incident_ticket`, `query_inventory`
+2. `query_inventory` read path succeeds against live inventory API
+3. `query_inventory` with `action=update` returns `INVENTORY_WRITE_FORBIDDEN`
+
+Screenshots: [`docs/agent/playground/`](./playground/)
