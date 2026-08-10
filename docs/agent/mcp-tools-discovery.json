@@ -1,0 +1,655 @@
+[
+  {
+    "name": "manage_incident_ticket",
+    "title": "Manage Brasaland incident tickets",
+    "description": "Create, update status, or query an incident ticket in the Brasaland Incidents Manager (live HTTP API \u2014 not a mock). Actions: create | update | get_status. create requires category+description; update requires ticket_id+status and always calls PATCH /api/incidents/{id}/status (lifecycle only); get_status requires ticket_id. Statuses: ABIERTO | CERRADO | DESCARTADO. On success returns {ok:true, action, ticket:{incident_id,status,\u2026}}. On failure returns {ok:false, error_code, message} with distinct codes (never a generic 'error'): AUTH_INSUFFICIENT_SCOPE, VALIDATION_ERROR, NOT_FOUND, LIFECYCLE_ERROR, UPSTREAM_ERROR \u2014 see ERRORS.md. Requires OAuth Bearer token with required_scopes incidents:manage (create/update) or incidents:read (get_status; manage also allowed).",
+    "inputSchema": {
+      "properties": {
+        "action": {
+          "description": "create: open a new ticket (needs category+description). update: change status via PATCH /api/incidents/{id}/status (needs ticket_id+status). get_status: look up one ticket (needs ticket_id).",
+          "enum": [
+            "create",
+            "update",
+            "get_status"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "ticket_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Required for update and get_status. Example: BRS-000002.",
+          "title": "Ticket Id"
+        },
+        "category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Required for create. Categories from Incidents Manager: EQUIPAMIENTO | ABASTECIMIENTO | QUEJA_CLIENTE | CALIDAD_ALIMENTO | PERSONAL.",
+          "title": "Category"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Required for create. Short description of the incident.",
+          "title": "Description"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "For create: initial status (default ABIERTO). For update: target status only \u2014 ABIERTO | CERRADO | DESCARTADO. update always calls PATCH /api/incidents/{id}/status.",
+          "title": "Status"
+        },
+        "date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional ISO date for create (YYYY-MM-DD).",
+          "title": "Date"
+        },
+        "location_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional location id for create (e.g. COL-01, FLA-02).",
+          "title": "Location Id"
+        },
+        "customer_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional customer id for create.",
+          "title": "Customer Id"
+        },
+        "satisfaction_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional satisfaction score for create (IncidentCreateInput field).",
+          "title": "Satisfaction Score"
+        },
+        "reporter_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional reporter id for create.",
+          "title": "Reporter Id"
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "title": "tool_manage_incident_ticketArguments",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "IncidentTicket": {
+          "additionalProperties": true,
+          "description": "One Brasaland incident ticket as returned by the Incidents Manager.",
+          "properties": {
+            "incident_id": {
+              "description": "Ticket id, e.g. BRS-000002.",
+              "title": "Incident Id",
+              "type": "string"
+            },
+            "date": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Incident date YYYY-MM-DD.",
+              "title": "Date"
+            },
+            "location_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Location id, e.g. COL-01.",
+              "title": "Location Id"
+            },
+            "category": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Category from Incidents Manager: EQUIPAMIENTO | ABASTECIMIENTO | QUEJA_CLIENTE | CALIDAD_ALIMENTO | PERSONAL.",
+              "title": "Category"
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Incident description.",
+              "title": "Description"
+            },
+            "status": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Lifecycle status: ABIERTO | CERRADO | DESCARTADO.",
+              "title": "Status"
+            },
+            "customer_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Optional customer id.",
+              "title": "Customer Id"
+            },
+            "satisfaction_score": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Optional score.",
+              "title": "Satisfaction Score"
+            },
+            "reporter_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Optional reporter id.",
+              "title": "Reporter Id"
+            },
+            "source": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "incident_manager",
+              "description": "Always incident_manager for live backend data.",
+              "title": "Source"
+            }
+          },
+          "required": [
+            "incident_id"
+          ],
+          "title": "IncidentTicket",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Structured result of ``manage_incident_ticket``.",
+      "properties": {
+        "ok": {
+          "description": "True when the Incidents Manager call succeeded.",
+          "title": "Ok",
+          "type": "boolean"
+        },
+        "action": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Echo of the requested action: create | update | get_status.",
+          "title": "Action"
+        },
+        "ticket": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IncidentTicket"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Ticket payload from the live Incidents Manager on success."
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Machine-readable failure code when ok is false \u2014 never the generic string 'error'. Auth: AUTH_MISSING_TOKEN | AUTH_INVALID_TOKEN | AUTH_INVALID_AUDIENCE | AUTH_INSUFFICIENT_SCOPE. Validation: VALIDATION_ERROR | LIFECYCLE_ERROR | NOT_FOUND. Other: INVENTORY_WRITE_FORBIDDEN | UPSTREAM_ERROR | UNHANDLED_ERROR. See mcps/company_tools/ERRORS.md.",
+          "title": "Error Code"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Human-readable error detail.",
+          "title": "Message"
+        },
+        "tool": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Tool name on error payloads.",
+          "title": "Tool"
+        },
+        "details": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional error details.",
+          "title": "Details"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Tool latency in milliseconds.",
+          "title": "Duration Ms"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "title": "ManageIncidentTicketOutput",
+      "type": "object"
+    }
+  },
+  {
+    "name": "query_inventory",
+    "title": "Query Brasaland inventory (read-only)",
+    "description": "Read-only lookup of Brasaland inventory products/stock from the live inventory manager (GET /inventory/products \u2014 products.csv-backed). Use product_id for one product or name_contains to filter by name. Allowed actions: query | get | list | read. Write operations are NOT supported: any action of update/create/delete/write/patch/put OR any non-empty quantity/delta/unit/name field is explicitly rejected with error_code INVENTORY_WRITE_FORBIDDEN (the write tool is not omitted \u2014 it fails with a clear code). On success returns {ok:true, products:[{product_id,name,quantity,unit,source}]}. Requires OAuth Bearer token with required_scopes=[inventory:read].",
+    "inputSchema": {
+      "properties": {
+        "action": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "query",
+          "description": "Read-only action. Allowed: query | get | list | read (default query). Write-oriented values (update, create, delete, write, patch, put) are rejected with INVENTORY_WRITE_FORBIDDEN.",
+          "title": "Action"
+        },
+        "product_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional product id from products.csv (e.g. '1').",
+          "title": "Product Id"
+        },
+        "name_contains": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional case-insensitive name substring filter.",
+          "title": "Name Contains"
+        },
+        "quantity": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "WRITE FIELD \u2014 not permitted. Any value triggers INVENTORY_WRITE_FORBIDDEN.",
+          "title": "Quantity"
+        },
+        "delta": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "WRITE FIELD \u2014 not permitted. Any value triggers INVENTORY_WRITE_FORBIDDEN.",
+          "title": "Delta"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "WRITE FIELD \u2014 not permitted. Non-empty value triggers INVENTORY_WRITE_FORBIDDEN.",
+          "title": "Unit"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "WRITE FIELD for create/rename \u2014 not permitted. Use name_contains to filter reads instead.",
+          "title": "Name"
+        }
+      },
+      "title": "tool_query_inventoryArguments",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "InventoryProduct": {
+          "additionalProperties": true,
+          "description": "One product row from the inventory manager (products.csv-backed).",
+          "properties": {
+            "product_id": {
+              "description": "Product id, e.g. '1'.",
+              "title": "Product Id",
+              "type": "string"
+            },
+            "name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Product display name.",
+              "title": "Name"
+            },
+            "quantity": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "On-hand quantity.",
+              "title": "Quantity"
+            },
+            "unit": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Unit of measure, e.g. kg.",
+              "title": "Unit"
+            },
+            "source": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "inventory_manager",
+              "description": "Always inventory_manager for live backend data.",
+              "title": "Source"
+            }
+          },
+          "required": [
+            "product_id"
+          ],
+          "title": "InventoryProduct",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Structured result of ``query_inventory`` (read-only).",
+      "properties": {
+        "ok": {
+          "description": "True when the inventory query succeeded.",
+          "title": "Ok",
+          "type": "boolean"
+        },
+        "products": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/InventoryProduct"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Matching products from GET /inventory/products.",
+          "title": "Products"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional note (e.g. no matches) or error text.",
+          "title": "Message"
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Machine-readable failure code when ok is false \u2014 never the generic string 'error'. Write attempts \u2192 INVENTORY_WRITE_FORBIDDEN. Auth: AUTH_MISSING_TOKEN | AUTH_INVALID_TOKEN | AUTH_INSUFFICIENT_SCOPE. Validation: VALIDATION_ERROR | NOT_FOUND. Other: UPSTREAM_ERROR | UNHANDLED_ERROR. See ERRORS.md.",
+          "title": "Error Code"
+        },
+        "tool": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Tool name on error payloads.",
+          "title": "Tool"
+        },
+        "details": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional details (e.g. rejected write fields).",
+          "title": "Details"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Tool latency in milliseconds.",
+          "title": "Duration Ms"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "title": "QueryInventoryOutput",
+      "type": "object"
+    }
+  }
+]
