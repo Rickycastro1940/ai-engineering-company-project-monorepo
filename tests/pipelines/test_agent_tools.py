@@ -201,7 +201,7 @@ def test_eval_ticket_not_found_uses_fallback_never_invents_status(trace_dir: Pat
             "Ticket BRS-999999 was not found in the incident manager."
         ),
     )
-    with patch("services.agent.nodes.lookup_ticket", return_value=missing), patch(
+    with patch("services.agent.nodes.lookup_ticket_via_mcp", return_value=missing), patch(
         "services.agent.nodes.retrieve"
     ) as mock_retrieve:
         result = _run_and_save_trace(
@@ -281,7 +281,7 @@ def test_eval_tool_required_question_uses_ticket_not_rag(trace_dir: Path):
     ok_result = TicketLookupOutput(ok=True, tickets=[SAMPLE_TICKET], error=None)
 
     with patch("services.agent.nodes.retrieve") as mock_retrieve, patch(
-        "services.agent.nodes.lookup_ticket", return_value=ok_result
+        "services.agent.nodes.lookup_ticket_via_mcp", return_value=ok_result
     ) as mock_lookup:
         result = _run_and_save_trace(
             "What is the status of ticket BRS-000002?",
@@ -320,7 +320,7 @@ def test_eval_tool_required_question_uses_ticket_not_rag(trace_dir: Path):
 
 def test_eval_rag_required_question_skips_ticket_tool(trace_dir: Path):
     """Eval — policy question must resolve via RAG, not the ticket tool."""
-    with patch("services.agent.nodes.lookup_ticket") as mock_lookup:
+    with patch("services.agent.nodes.lookup_ticket_via_mcp") as mock_lookup:
         result = _run_and_save_trace(
             "What is the minimum stock rule for proteins?",
             trace_dir,
@@ -357,7 +357,7 @@ def test_eval_ticket_fallback_when_service_unavailable(trace_dir: Path):
         error="timeout",
         message=TICKET_FALLBACK_MESSAGE,
     )
-    with patch("services.agent.nodes.lookup_ticket", return_value=failed), patch(
+    with patch("services.agent.nodes.lookup_ticket_via_mcp", return_value=failed), patch(
         "services.agent.nodes.retrieve"
     ) as mock_retrieve:
         result = _run_and_save_trace(
@@ -384,7 +384,7 @@ def test_eval_decide_route_both_runs_ticket_then_rag(trace_dir: Path):
         "What is the status of ticket BRS-000002 and what is the minimum stock rule for proteins?",
         trace_dir,
         **{
-            "services.agent.nodes.lookup_ticket": lambda q, **_: ok_result,
+            "services.agent.nodes.lookup_ticket_via_mcp": lambda q, **_: ok_result,
             "services.agent.nodes.retrieve": lambda q: [PROTEIN_STOCK_CHUNK],
             "services.agent.nodes.generate_answer": lambda q, ctx: GROUNDED_ANSWER,
         },
@@ -474,7 +474,7 @@ def test_every_run_trace_exposes_sources_order_and_summary(trace_dir: Path):
     result = _run_and_save_trace(
         "What is the status of ticket BRS-000002?",
         trace_dir,
-        **{"services.agent.nodes.lookup_ticket": lambda q, **_: ok_result},
+        **{"services.agent.nodes.lookup_ticket_via_mcp": lambda q, **_: ok_result},
     )
     trace = load_trace(result["trace_id"], trace_dir=trace_dir)
     for key in ("sources_order", "sources_used", "source_summary", "node_order"):
@@ -553,7 +553,7 @@ def test_eval_graph_timeout_routes_to_fallback_without_hanging(trace_dir: Path):
     )
     started = time.perf_counter()
     with patch(
-        "services.agent.nodes.lookup_ticket",
+        "services.agent.nodes.lookup_ticket_via_mcp",
         return_value=timed_out,
     ) as mock_lookup, patch("services.agent.nodes.retrieve") as mock_retrieve:
         result = _run_and_save_trace(

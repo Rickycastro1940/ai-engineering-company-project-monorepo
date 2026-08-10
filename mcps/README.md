@@ -7,4 +7,10 @@ Each subfolder inside `mcps/` must correspond to **one specific MCP server** (fo
 - **Main purpose**: to centralize the servers that bridge the gap between AI models and the company's internal systems or data sources.
 - **Recommendation**: document the tools and resources exposed by each MCP server.
 
+## Servers in this monorepo
+
+| Folder | Purpose |
+| ------ | ------- |
+| [`company_tools/`](./company_tools/) | OAuth-protected FastMCP server for Incidents Manager tickets + read-only inventory (Streamable HTTP + MCP Auth) |
+
 > _Spanish version: [README.es.md](./README.es.md)._

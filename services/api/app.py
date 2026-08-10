@@ -24,17 +24,27 @@ except Exception:  # noqa: BLE001 — inventory module may be mid-migration
 # Prefer package import when running under the monorepo; fall back for local cwd.
 try:
     from services.api.incidents_store import (
+        IncidentCreateInput,
+        IncidentLifecycleError,
         IncidentRecord,
         IncidentSearchFilters,
+        IncidentStatusUpdate,
+        create_incident,
         get_incident,
         search_incidents,
+        update_incident_status,
     )
 except Exception:  # noqa: BLE001
     from incidents_store import (  # type: ignore
+        IncidentCreateInput,
+        IncidentLifecycleError,
         IncidentRecord,
         IncidentSearchFilters,
+        IncidentStatusUpdate,
+        create_incident,
         get_incident,
         search_incidents,
+        update_incident_status,
     )
 
 UI_ROOT = REPO_ROOT / "uis" / "web"
@@ -134,7 +144,7 @@ def list_incidents(
     date_from: str | None = Query(default=None),
     date_to: str | None = Query(default=None),
 ) -> list[IncidentRecord]:
-    """Read-only list/search of live incident tickets (no auth required today)."""
+    """List/search live incident tickets (no auth required today)."""
     filters = IncidentSearchFilters(
         status=status,
         category=category,
@@ -145,6 +155,15 @@ def list_incidents(
     return search_incidents(filters)
 
 
+@app.post("/api/incidents", response_model=IncidentRecord, status_code=201)
+def create_incident_ticket(payload: IncidentCreateInput) -> IncidentRecord:
+    """Create a new incident ticket in the Incidents Manager."""
+    try:
+        return create_incident(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @app.get("/api/incidents/results/export")
 def export_results(output_file: str = "results.csv"):
     output_path = _resolve_repo_path(output_file)
@@ -153,9 +172,25 @@ def export_results(output_file: str = "results.csv"):
     return FileResponse(path=output_path, filename=output_path.name, media_type="text/csv")
 
 
+@app.patch("/api/incidents/{incident_id}/status", response_model=IncidentRecord)
+def patch_incident_status(incident_id: str, payload: IncidentStatusUpdate) -> IncidentRecord:
+    """Update ticket status via the lifecycle endpoint (status field only)."""
+    reserved = {"anylayze", "analyze", "results"}
+    if incident_id.casefold() in reserved:
+        raise HTTPException(status_code=404, detail=f"Incident not found: {incident_id}")
+    try:
+        return update_incident_status(incident_id, payload.status)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Incident not found: {incident_id}") from exc
+    except IncidentLifecycleError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @app.get("/api/incidents/{incident_id}", response_model=IncidentRecord)
 def get_incident_by_id(incident_id: str) -> IncidentRecord:
-    """Read-only get-by-id for a single incident ticket (no auth required today)."""
+    """Get-by-id for a single incident ticket (no auth required today)."""
     # Avoid colliding with analysis subpaths like /api/incidents/anylayze.
     reserved = {"anylayze", "analyze", "results"}
     if incident_id.casefold() in reserved:

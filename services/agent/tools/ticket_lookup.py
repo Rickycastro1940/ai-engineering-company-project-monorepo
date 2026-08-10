@@ -1,27 +1,13 @@
-"""Read-only ticket lookup tool — HTTP only against the live incident manager.
+"""DEPRECATED for LangGraph graph use — prefer MCP client path.
 
-Data source (non-negotiable)
----------------------------
-This tool **only** issues:
+.. deprecated::
+    The support agent must call Incidents Manager through the company-tools
+    MCP server (``services.agent.tools.mcp_incidents``) via
+    ``langchain-mcp-adapters``. This module remains only for formatting helpers
+    and historical direct-HTTP reference; ``lookup_ticket`` must not be wired
+    into the compiled graph.
 
-- ``GET {base}/api/incidents``
-- ``GET {base}/api/incidents/{id}``
-
-against the company's existing incident manager service. Ticket fields come
-from that response — never from a parallel fake dataset, hardcoded ticket
-table, or invented status/category/date values.
-
-Auth
-----
-The Brasaland incident manager currently has **no authentication** on those
-GETs. If auth is added later, pass credentials via env
-(``INCIDENT_API_TOKEN`` / ``INCIDENT_API_KEY``) — never hardcode a token.
-
-Timeout
--------
-Every call uses an explicit numeric timeout of ``TICKET_LOOKUP_TIMEOUT_SECONDS``
-(5 seconds). On timeout / error / not-found the tool returns a structured
-``TicketLookupOutput`` with ``ok=False`` — the graph must never invent a status.
+Read-only ticket lookup tool — HTTP only against the live incident manager.
 """
 
 from __future__ import annotations

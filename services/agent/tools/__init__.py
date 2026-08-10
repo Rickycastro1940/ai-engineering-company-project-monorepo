@@ -1,6 +1,7 @@
-"""External tools for the Brasaland support agent (Part 2).
+"""External tools for the Brasaland support agent.
 
-Each tool has a single responsibility and a typed input/output contract.
+Ticket status for the LangGraph graph goes through the MCP client
+(``mcp_incidents``). Direct ``lookup_ticket`` HTTP is deprecated for graph use.
 """
 
 from services.agent.tools.contracts import (
@@ -15,6 +16,7 @@ from services.agent.tools.inventory_lookup import (
     INVENTORY_LOOKUP_TIMEOUT_SECONDS,
     lookup_inventory,
 )
+from services.agent.tools.mcp_incidents import lookup_ticket_via_mcp
 from services.agent.tools.ticket_lookup import (
     TICKET_LOOKUP_TIMEOUT_SECONDS,
     build_ticket_http_timeout,
@@ -35,4 +37,5 @@ __all__ = [
     "honest_ticket_fallback_answer",
     "lookup_inventory",
     "lookup_ticket",
+    "lookup_ticket_via_mcp",
 ]

@@ -150,7 +150,7 @@ def test_eval_tool_required_reads_real_incident_service_not_rag(
     expected = _csv_incident("BRS-000002")
 
     with patch("services.agent.nodes.retrieve") as mock_retrieve, patch(
-        "services.agent.nodes.lookup_ticket",
+        "services.agent.nodes.lookup_ticket_via_mcp",
         side_effect=_ticket_via_real_backend(real_backend_transport),
     ), patch("services.agent.nodes.lookup_inventory") as mock_inv:
         result = _run_and_save_trace(
@@ -177,7 +177,7 @@ def test_eval_tool_required_reads_real_incident_service_not_rag(
 
 def test_eval_rag_required_skips_tools(trace_dir: Path):
     """Eval 2 — policy question: RAG only; incident/inventory tools must not run."""
-    with patch("services.agent.nodes.lookup_ticket") as mock_ticket, patch(
+    with patch("services.agent.nodes.lookup_ticket_via_mcp") as mock_ticket, patch(
         "services.agent.nodes.lookup_inventory"
     ) as mock_inv:
         result = _run_and_save_trace(
@@ -220,7 +220,7 @@ def test_eval_fallback_when_incident_service_unavailable(trace_dir: Path):
             message=TICKET_FALLBACK_MESSAGE,
         )
 
-    with patch("services.agent.nodes.lookup_ticket", side_effect=_timeout_tool), patch(
+    with patch("services.agent.nodes.lookup_ticket_via_mcp", side_effect=_timeout_tool), patch(
         "services.agent.nodes.retrieve"
     ) as mock_retrieve:
         result = _run_and_save_trace(
@@ -246,7 +246,7 @@ def test_eval_inventory_tool_reads_real_products_csv(
     with patch("services.agent.nodes.retrieve") as mock_retrieve, patch(
         "services.agent.nodes.lookup_inventory",
         side_effect=_inventory_via_real_backend(real_backend_transport),
-    ), patch("services.agent.nodes.lookup_ticket") as mock_ticket:
+    ), patch("services.agent.nodes.lookup_ticket_via_mcp") as mock_ticket:
         result = _run_and_save_trace(
             "Do we have stock of tomatoes?",
             trace_dir,

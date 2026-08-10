@@ -8,7 +8,7 @@ Required nodes (Part 1 + Part 2)
 3. ``retrieve`` — calls ``data.pipelines.rag.retrieve`` (reuse, do not duplicate).
 4. ``generate`` — calls ``data.pipelines.rag.generate_answer(question, context)``
    with the chunks the retrieve node already produced.
-5. ``lookup_ticket`` — read-only ticket tool against the incident manager.
+5. ``lookup_ticket`` — ticket status via company-tools MCP (not direct HTTP).
 6. ``answer_ticket`` / ``ticket_fallback`` — honest ticket answers / recovery.
 
 Never call the monolithic ``query()`` (retrieve + generate) inside a node.
@@ -36,12 +36,12 @@ from services.agent.tools.inventory_lookup import (
     honest_inventory_fallback_answer,
     lookup_inventory,
 )
+from services.agent.tools.mcp_incidents import lookup_ticket_via_mcp
 from services.agent.tools.ticket_lookup import (
     TICKET_FALLBACK_MESSAGE,
     TICKET_LOOKUP_TIMEOUT_SECONDS,
     format_ticket_answer,
     honest_ticket_fallback_answer,
-    lookup_ticket,
 )
 
 # Node contract: this module imports retrieve + generate_answer only — never query().
@@ -180,10 +180,10 @@ def _next_after_ticket(state: AgentState, result: TicketLookupOutput) -> str:
 
 
 def lookup_ticket_node(state: AgentState) -> dict[str, Any]:
-    """Read-only ticket tool node — GET against the incident manager only.
+    """Ticket tool node — Incidents Manager via MCP (langchain-mcp-adapters).
 
-    Always passes ``TICKET_LOOKUP_TIMEOUT_SECONDS`` (5s) so a non-responsive
-    incident service cannot hang the graph; timeouts route to ``ticket_fallback``.
+    Direct HTTP ``ticket_lookup.lookup_ticket`` is deprecated for graph use.
+    This node always goes through the company-tools MCP server.
     """
     started = time.perf_counter()
     raw_query = state.get("ticket_query") or {}
@@ -212,8 +212,8 @@ def lookup_ticket_node(state: AgentState) -> dict[str, Any]:
             ],
         }
 
-    # Explicit numeric timeout — never leave the HTTP call unbounded.
-    result = lookup_ticket(query, timeout_seconds=TICKET_LOOKUP_TIMEOUT_SECONDS)
+    # MCP client path — never call the Incidents Manager HTTP API directly.
+    result = lookup_ticket_via_mcp(query, timeout_seconds=TICKET_LOOKUP_TIMEOUT_SECONDS)
     next_route = _next_after_ticket(state, result)
 
     status = "ok" if result.ok else "error"
@@ -228,12 +228,13 @@ def lookup_ticket_node(state: AgentState) -> dict[str, Any]:
                 status,
                 started,
                 notes=(
-                    f"ticket tool ok={result.ok} error={result.error} "
+                    f"mcp ticket tool ok={result.ok} error={result.error} "
                     f"count={len(result.tickets)} next={next_route} "
                     f"timeout_s={TICKET_LOOKUP_TIMEOUT_SECONDS}"
                 ),
                 output={
                     "source": "ticket",
+                    "via": "mcp",
                     "ok": result.ok,
                     "error": result.error,
                     "ticket_count": len(result.tickets),

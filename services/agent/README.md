@@ -1,20 +1,27 @@
-# `services/agent` — Brasaland Support Agent (LangGraph Parts 1–2)
+# `services/agent` — Brasaland Support Agent (LangGraph + MCP)
 
-LangGraph orchestration around the existing Brasaland RAG flow, plus a
-**read-only ticket tool** that queries the live incident manager.
+LangGraph orchestration around the existing Brasaland RAG flow. Ticket status
+goes through the **company-tools MCP server** (`langchain-mcp-adapters`);
+inventory remains a read-only HTTP tool against the inventory manager.
+
+## MCP migration (company tools)
+
+- [x] **MCP client** (`tools/mcp_incidents.py`) — `lookup_ticket` node calls
+  `manage_incident_ticket` on `mcps/company_tools` via Streamable HTTP + OAuth.
+- [x] **Direct HTTP deprecated** — `tools/ticket_lookup.py` is no longer wired
+  into the graph (formatting helpers only).
+- [x] **Routing unchanged** — RAG vs tools decision is the same; only the
+  ticket transport changed.
 
 ## Part 2 checklist — Tools outside the RAG
 
 - [x] **Typed contract** (`tools/contracts.py`) — `TicketLookupInput` /
   `TicketLookupOutput` / `TicketRecord` (same fields as
   `GET /api/incidents` / `GET /api/incidents/{id}`).
-- [x] **Ticket tool** (`tools/ticket_lookup.py`) — HTTP GET to the incident
-  manager (real CSV-backed store). Read-only. Explicit **5s** timeout
-  (`TICKET_LOOKUP_TIMEOUT_SECONDS`) on connect/read/write/pool — a silent
-  service cannot hang the graph; timeouts go to `ticket_fallback`.
-- [x] **Auth** — incident GETs currently require **no auth**. Optional
-  `INCIDENT_API_TOKEN` / `INCIDENT_API_KEY` env vars are forwarded as Bearer
-  if set. Never hardcode tokens.
+- [x] **Ticket tool (legacy HTTP)** (`tools/ticket_lookup.py`) — deprecated for
+  graph use; kept for helpers / reference.
+- [x] **Auth** — MCP path uses OAuth via MCP Auth; optional
+  `INCIDENT_API_TOKEN` still forwarded by the MCP server to upstream GETs.
 - [x] **Fallback** — `ticket_fallback` node when the tool times out, errors, or
   the ticket does not exist. Answer always includes
   *"I couldn't confirm that ticket's status right now"* — never a made-up
@@ -25,7 +32,7 @@ LangGraph orchestration around the existing Brasaland RAG flow, plus a
   node from tickets (single responsibility).
 - [x] **Routing** — explicit `decide_route` node + conditional edges choose RAG,
   ticket tool, inventory tool, or combinations from the question text.
-- [x] **Ticket tool node** — `lookup_ticket` on the compiled graph (HTTP GET only).
+- [x] **Ticket tool node** — `lookup_ticket` on the compiled graph (via MCP).
 - [x] **Inventory tool node** — `lookup_inventory` on the compiled graph.
 - [x] **Traces** — each run records `sources_used` (`ticket` / `inventory` /
   `rag`) and `node_order` so reviewers can see which source(s) ran and in
@@ -39,7 +46,7 @@ LangGraph orchestration around the existing Brasaland RAG flow, plus a
 
 - [x] **Auto-decide** — `decide_route` inspects the question and chooses RAG,
   a tool, or both. The user never names the source.
-- [x] **One job per tool** — `lookup_ticket` only hits incidents;
+- [x] **One job per tool** — `lookup_ticket` only hits incidents (via MCP);
   `lookup_inventory` only hits inventory. Never a combined “look up tickets
   or inventory” tool.
 
@@ -51,7 +58,7 @@ START → receive_question
             ├── empty ──────────────► empty_question → END
             └── decide_route  (auto: ticket | inventory | rag | combinations)
                       │
-                      ├── ticket / both / … ──► lookup_ticket  ← incidents only
+                      ├── ticket / both / … ──► lookup_ticket  ← MCP → incidents
                       │                              │
                       │                              ├── (+ inventory) → lookup_inventory
                       │                              ├── answer_ticket / ticket_fallback
