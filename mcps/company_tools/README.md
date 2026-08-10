@@ -4,6 +4,16 @@ Exposes Incidents Manager ticket management and **read-only** inventory queries
 over the Model Context Protocol, protected by **OAuth via [MCP Auth](https://mcp-auth.dev/)**
 (`mcpauth`) — not FastMCP's built-in auth.
 
+## Dependencies (`uv add` only)
+
+Installed in the monorepo with **`uv add`** (never `pip install`):
+
+```bash
+uv add fastmcp "mcpauth>=0.2.0b1" "langchain-mcp-adapters>=0.1.0"
+```
+
+Also present: `mcp[cli]` (provides `mcp.server.fastmcp` used by the server), `pyjwt[crypto]`.
+
 ## Depends on existing backends (does not replace them)
 
 The MCP server is a **thin OAuth-protected facade**. It never owns incident or
