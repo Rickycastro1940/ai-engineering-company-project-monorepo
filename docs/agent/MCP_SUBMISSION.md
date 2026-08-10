@@ -75,6 +75,13 @@ Confirmed by `test_every_tool_invocation_is_logged_with_tool_client_and_result`
   `langchain-mcp-adapters` (`MultiServerMCPClient` / Streamable HTTP).
 - [x] Direct HTTP `lookup_ticket` deprecated and not re-exported from
   `services.agent.tools` — single path to Incidents Manager.
+- [x] **No direct Incidents Manager calls from the agent** — the graph never
+  imports/calls `ticket_lookup.lookup_ticket`; `mcp_incidents` has no
+  `/api/incidents` URL; live lookups from the agent process do not hit the
+  Incidents HTTP API (MCP server does that). Confirmed by
+  `test_agent_nodes_do_not_import_direct_lookup_ticket`,
+  `test_lookup_ticket_node_never_hits_incidents_http_directly`, and the live
+  guard in `test_live_lookup_ticket_via_mcp_against_running_server`.
 - [x] RAG vs tools routing (`decide_route`) unchanged; confirmed by
   `tests/pipelines/test_agent_mcp_migration.py`.
 
