@@ -29,7 +29,9 @@ tool signatures in `server.py`.
 
 - `action` — `create` \| `update` \| `get_status`
 - `ticket_id` — e.g. `BRS-000002`
-- `category`, `description`, `status`, `date`, `location_id`, `customer_id`, `reporter_id`
+- `category`, `description`, `status`, `date`, `location_id`, `customer_id`, `satisfaction_score`, `reporter_id`
+- Categories must match Incidents Manager: `EQUIPAMIENTO | ABASTECIMIENTO | QUEJA_CLIENTE | CALIDAD_ALIMENTO | PERSONAL`
+- Statuses: `ABIERTO | CERRADO | DESCARTADO` (updates only via lifecycle `PATCH .../status`)
 
 ### Output (summary)
 

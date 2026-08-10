@@ -24,7 +24,10 @@ class IncidentTicket(BaseModel):
     location_id: str | None = Field(default=None, description="Location id, e.g. COL-01.")
     category: str | None = Field(
         default=None,
-        description="Category, e.g. EQUIPAMIENTO, ABASTECIMIENTO.",
+        description=(
+            "Category from Incidents Manager: EQUIPAMIENTO | ABASTECIMIENTO | "
+            "QUEJA_CLIENTE | CALIDAD_ALIMENTO | PERSONAL."
+        ),
     )
     description: str | None = Field(default=None, description="Incident description.")
     status: str | None = Field(

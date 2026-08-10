@@ -1,5 +1,22 @@
 # MCP Server — Company Tools (submission notes)
 
+## Acceptance criteria (verified)
+
+1. **Domain parity with existing APIs** — MCP ticket/product fields match
+   `IncidentRecord` / `InventoryProduct` from `services/api` (`incident_id`,
+   `location_id`, `category`, `ABIERTO|CERRADO|DESCARTADO`, `BRS-######`,
+   `product_id`/`quantity`/`unit`, `source=incident_manager|inventory_manager`).
+   Tools call `COMPANY_API_BASE` over HTTP; they do not replace the backends.
+2. **Lifecycle status only** — `action=update` always calls
+   `PATCH /api/incidents/{id}/status` via `http_clients.update_incident_status`.
+   There is no generic `PATCH /api/incidents/{id}` helper.
+3. **OAuth via MCP Auth** — `mcpauth.MCPAuth` bearer middleware + Protected
+   Resource Metadata; scopes `incidents:manage` and `inventory:read`. FastMCP
+   built-in auth is not used.
+
+Regression coverage: `tests/pipelines/test_company_tools_mcp.py`
+(`test_acceptance_*`).
+
 ## Depends on existing backends
 
 The MCP server **does not replace** the Incidents Manager or inventory module.
@@ -32,6 +49,17 @@ middleware and Protected Resource Metadata are mounted on the HTTP app.
 - Dev issuer: `mcps/company_tools/dev_issuer.py` (local OIDC + JWKS)
 - Production: set `MCP_AUTH_ISSUER` to Logto / any OIDC provider
 - Scopes: `incidents:manage`, `inventory:read`
+
+## Domain contract (must match Company APIs)
+
+| Area | Values / fields |
+| ---- | --------------- |
+| Incident id | `incident_id` (`BRS-######`) |
+| Statuses | `ABIERTO`, `CERRADO`, `DESCARTADO` |
+| Categories | `EQUIPAMIENTO`, `ABASTECIMIENTO`, `QUEJA_CLIENTE`, `CALIDAD_ALIMENTO`, `PERSONAL` |
+| Ticket fields | same as `IncidentRecord` (`date`, `location_id`, `category`, `description`, `status`, `customer_id`, `satisfaction_score`, `reporter_id`, `source`) |
+| Inventory fields | same as API `InventoryProduct` (`product_id`, `name`, `quantity`, `unit`, `source`) |
+| Status update | **only** `PATCH /api/incidents/{id}/status` |
 
 ## How to run
 

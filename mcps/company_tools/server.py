@@ -143,7 +143,10 @@ def tool_manage_incident_ticket(
     category: Annotated[
         str | None,
         Field(
-            description="Required for create. Brasaland categories e.g. EQUIPAMIENTO, ABASTECIMIENTO."
+            description=(
+                "Required for create. Categories from Incidents Manager: "
+                "EQUIPAMIENTO | ABASTECIMIENTO | QUEJA_CLIENTE | CALIDAD_ALIMENTO | PERSONAL."
+            )
         ),
     ] = None,
     description: Annotated[
@@ -155,7 +158,8 @@ def tool_manage_incident_ticket(
         Field(
             description=(
                 "For create: initial status (default ABIERTO). "
-                "For update: target status only — ABIERTO | CERRADO | DESCARTADO."
+                "For update: target status only — ABIERTO | CERRADO | DESCARTADO. "
+                "update always calls PATCH /api/incidents/{id}/status."
             )
         ),
     ] = None,
@@ -170,6 +174,10 @@ def tool_manage_incident_ticket(
     customer_id: Annotated[
         str | None,
         Field(description="Optional customer id for create."),
+    ] = None,
+    satisfaction_score: Annotated[
+        float | None,
+        Field(description="Optional satisfaction score for create (IncidentCreateInput field)."),
     ] = None,
     reporter_id: Annotated[
         str | None,
@@ -197,6 +205,7 @@ def tool_manage_incident_ticket(
             date=date,
             location_id=location_id,
             customer_id=customer_id,
+            satisfaction_score=satisfaction_score,
             reporter_id=reporter_id,
         )
 

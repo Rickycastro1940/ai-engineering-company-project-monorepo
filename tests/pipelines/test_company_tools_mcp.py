@@ -243,3 +243,113 @@ def test_incident_api_status_endpoint(api_base: str) -> None:
         timeout=5.0,
     )
     assert bad.status_code == 400
+
+
+def test_acceptance_domain_fields_match_company_apis(api_base: str) -> None:
+    """Rubric: MCP field names/IDs/domain values must match existing company APIs."""
+    from services.api.constants import VALID_CATEGORIES, VALID_STATUSES
+    from services.api.incidents_store import IncidentCreateInput, IncidentRecord
+    from services.api.inventory import InventoryProduct as ApiInventoryProduct
+
+    from mcps.company_tools.schemas import IncidentTicket, InventoryProduct as McpInventoryProduct
+
+    assert set(IncidentTicket.model_fields) == set(IncidentRecord.model_fields)
+    assert set(McpInventoryProduct.model_fields) == set(ApiInventoryProduct.model_fields)
+    assert VALID_STATUSES == {"ABIERTO", "CERRADO", "DESCARTADO"}
+    assert "QUEJA_CLIENTE" in VALID_CATEGORIES
+
+    created = manage_incident_ticket(
+        action="create",
+        category="CALIDAD_ALIMENTO",
+        description="Acceptance: MCP create uses IncidentCreateInput fields",
+        location_id="FLA-02",
+        customer_id="CUST-9",
+        reporter_id="REP-1",
+        satisfaction_score=4.5,
+        status="ABIERTO",
+    )
+    assert created["ok"] is True, created
+    ticket = created["ticket"]
+    assert set(ticket) >= set(IncidentRecord.model_fields)
+    assert ticket["incident_id"].startswith("BRS-")
+    assert ticket["category"] == "CALIDAD_ALIMENTO"
+    assert ticket["location_id"] == "FLA-02"
+    assert ticket["customer_id"] == "CUST-9"
+    assert ticket["reporter_id"] == "REP-1"
+    assert ticket["satisfaction_score"] == 4.5
+    assert ticket["source"] == "incident_manager"
+    assert set(IncidentCreateInput.model_fields) <= {
+        "category",
+        "description",
+        "status",
+        "date",
+        "location_id",
+        "customer_id",
+        "satisfaction_score",
+        "reporter_id",
+    }
+
+    products = query_inventory(action="list")
+    assert products["ok"] is True
+    assert products["products"]
+    product = products["products"][0]
+    assert set(product) >= set(ApiInventoryProduct.model_fields)
+    assert product["source"] == "inventory_manager"
+
+
+def test_acceptance_status_update_uses_lifecycle_endpoint_only(api_base: str, monkeypatch) -> None:
+    """Rubric: status changes MUST use PATCH /api/incidents/{id}/status."""
+    import mcps.company_tools.http_clients as clients
+
+    assert clients.INCIDENT_STATUS_PATH == "/api/incidents/{incident_id}/status"
+    assert not hasattr(clients, "update_incident")
+    assert not hasattr(clients, "patch_incident")
+
+    created = manage_incident_ticket(
+        action="create",
+        category="PERSONAL",
+        description="Acceptance: lifecycle endpoint only for status changes",
+        status="ABIERTO",
+    )
+    assert created["ok"] is True
+    ticket_id = created["ticket"]["incident_id"]
+
+    seen: list[str] = []
+    real_patch = httpx.Client.patch
+
+    def tracking_patch(self, url, *args, **kwargs):  # noqa: ANN001
+        seen.append(str(url))
+        return real_patch(self, url, *args, **kwargs)
+
+    monkeypatch.setattr(httpx.Client, "patch", tracking_patch)
+    updated = manage_incident_ticket(action="update", ticket_id=ticket_id, status="CERRADO")
+    assert updated["ok"] is True, updated
+    assert updated["ticket"]["status"] == "CERRADO"
+    assert seen, "expected at least one PATCH"
+    assert all(url.endswith(f"/api/incidents/{ticket_id}/status") for url in seen), seen
+    assert not any(
+        url.rstrip("/").endswith(f"/api/incidents/{ticket_id}") and not url.endswith("/status")
+        for url in seen
+    )
+
+
+def test_acceptance_oauth_via_mcpauth_not_fastmcp_auth(mcp_base: str) -> None:
+    """Rubric: MCP Server must use OAuth via MCP Auth (mcpauth)."""
+    import mcps.company_tools.auth as auth_mod
+    import mcps.company_tools.server as server_mod
+
+    assert auth_mod.MCPAuth.__module__.startswith("mcpauth")
+    assert auth_mod.SCOPE_INCIDENTS_MANAGE == "incidents:manage"
+    assert auth_mod.SCOPE_INVENTORY_READ == "inventory:read"
+    # FastMCP is the tool host only — no FastMCP AuthSettings / built-in auth wiring.
+    assert not hasattr(server_mod.mcp, "auth") or server_mod.mcp.auth is None
+    source = Path(server_mod.__file__).read_text(encoding="utf-8")
+    assert "from mcpauth" in Path(auth_mod.__file__).read_text(encoding="utf-8")
+    assert "AuthSettings" not in source
+    assert "mcp.server.auth" not in source
+
+    meta = httpx.get(f"{mcp_base}/.well-known/oauth-protected-resource/mcp", timeout=5.0)
+    assert meta.status_code == 200
+    payload = meta.json()
+    assert "incidents:manage" in (payload.get("scopes_supported") or [])
+    assert "inventory:read" in (payload.get("scopes_supported") or [])

@@ -2,7 +2,7 @@
   {
     "name": "manage_incident_ticket",
     "title": "Manage Brasaland incident tickets",
-    "description": "Create, update status, or query an incident ticket in the Brasaland Incidents Manager (live HTTP API \u2014 not a mock). Actions: create | update | get_status. create requires category+description; update requires ticket_id+status and always calls PATCH /api/incidents/{id}/status (lifecycle only); get_status requires ticket_id. Statuses: ABIERTO | CERRADO | DESCARTADO. On success returns {ok:true, action, ticket:{incident_id,status,\u2026}}. On failure returns {ok:false, error_code, message} with distinct codes (VALIDATION_ERROR, NOT_FOUND, LIFECYCLE_ERROR, UPSTREAM_ERROR, AUTH_INSUFFICIENT_SCOPE). Requires OAuth Bearer token with scope incidents:manage.",
+    "description": "Create, update status, or query an incident ticket in the Brasaland Incidents Manager (live HTTP API — not a mock). Actions: create | update | get_status. create requires category+description; update requires ticket_id+status and always calls PATCH /api/incidents/{id}/status (lifecycle only); get_status requires ticket_id. Statuses: ABIERTO | CERRADO | DESCARTADO. On success returns {ok:true, action, ticket:{incident_id,status,…}}. On failure returns {ok:false, error_code, message} with distinct codes (VALIDATION_ERROR, NOT_FOUND, LIFECYCLE_ERROR, UPSTREAM_ERROR, AUTH_INSUFFICIENT_SCOPE). Requires OAuth Bearer token with scope incidents:manage.",
     "inputSchema": {
       "properties": {
         "action": {
@@ -38,7 +38,7 @@
             }
           ],
           "default": null,
-          "description": "Required for create. Brasaland categories e.g. EQUIPAMIENTO, ABASTECIMIENTO.",
+          "description": "Required for create. Categories from Incidents Manager: EQUIPAMIENTO | ABASTECIMIENTO | QUEJA_CLIENTE | CALIDAD_ALIMENTO | PERSONAL.",
           "title": "Category"
         },
         "description": {
@@ -64,7 +64,7 @@
             }
           ],
           "default": null,
-          "description": "For create: initial status (default ABIERTO). For update: target status only \u2014 ABIERTO | CERRADO | DESCARTADO.",
+          "description": "For create: initial status (default ABIERTO). For update: target status only — ABIERTO | CERRADO | DESCARTADO. update always calls PATCH /api/incidents/{id}/status.",
           "title": "Status"
         },
         "date": {
@@ -105,6 +105,19 @@
           "default": null,
           "description": "Optional customer id for create.",
           "title": "Customer Id"
+        },
+        "satisfaction_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional satisfaction score for create (IncidentCreateInput field).",
+          "title": "Satisfaction Score"
         },
         "reporter_id": {
           "anyOf": [
@@ -173,7 +186,7 @@
                 }
               ],
               "default": null,
-              "description": "Category, e.g. EQUIPAMIENTO, ABASTECIMIENTO.",
+              "description": "Category from Incidents Manager: EQUIPAMIENTO | ABASTECIMIENTO | QUEJA_CLIENTE | CALIDAD_ALIMENTO | PERSONAL.",
               "title": "Category"
             },
             "description": {
@@ -305,7 +318,7 @@
             }
           ],
           "default": null,
-          "description": "Machine-readable error when ok is false: VALIDATION_ERROR, NOT_FOUND, LIFECYCLE_ERROR, UPSTREAM_ERROR, AUTH_INSUFFICIENT_SCOPE, \u2026",
+          "description": "Machine-readable error when ok is false: VALIDATION_ERROR, NOT_FOUND, LIFECYCLE_ERROR, UPSTREAM_ERROR, AUTH_INSUFFICIENT_SCOPE, …",
           "title": "Error Code"
         },
         "message": {
@@ -376,7 +389,7 @@
   {
     "name": "query_inventory",
     "title": "Query Brasaland inventory (read-only)",
-    "description": "Read-only lookup of Brasaland inventory products/stock from the live inventory manager (GET /inventory/products \u2014 products.csv-backed). Use product_id for one product or name_contains to filter by name. Allowed actions: query | get | list | read. Write operations are NOT supported: any action of update/create/delete/write/patch/put OR any non-empty quantity/delta/unit/name field is explicitly rejected with error_code INVENTORY_WRITE_FORBIDDEN (the write tool is not omitted \u2014 it fails with a clear code). On success returns {ok:true, products:[{product_id,name,quantity,unit,source}]}. Requires OAuth Bearer token with scope inventory:read.",
+    "description": "Read-only lookup of Brasaland inventory products/stock from the live inventory manager (GET /inventory/products — products.csv-backed). Use product_id for one product or name_contains to filter by name. Allowed actions: query | get | list | read. Write operations are NOT supported: any action of update/create/delete/write/patch/put OR any non-empty quantity/delta/unit/name field is explicitly rejected with error_code INVENTORY_WRITE_FORBIDDEN (the write tool is not omitted — it fails with a clear code). On success returns {ok:true, products:[{product_id,name,quantity,unit,source}]}. Requires OAuth Bearer token with scope inventory:read.",
     "inputSchema": {
       "properties": {
         "action": {
@@ -428,7 +441,7 @@
             }
           ],
           "default": null,
-          "description": "WRITE FIELD \u2014 not permitted. Any value triggers INVENTORY_WRITE_FORBIDDEN.",
+          "description": "WRITE FIELD — not permitted. Any value triggers INVENTORY_WRITE_FORBIDDEN.",
           "title": "Quantity"
         },
         "delta": {
@@ -441,7 +454,7 @@
             }
           ],
           "default": null,
-          "description": "WRITE FIELD \u2014 not permitted. Any value triggers INVENTORY_WRITE_FORBIDDEN.",
+          "description": "WRITE FIELD — not permitted. Any value triggers INVENTORY_WRITE_FORBIDDEN.",
           "title": "Delta"
         },
         "unit": {
@@ -454,7 +467,7 @@
             }
           ],
           "default": null,
-          "description": "WRITE FIELD \u2014 not permitted. Non-empty value triggers INVENTORY_WRITE_FORBIDDEN.",
+          "description": "WRITE FIELD — not permitted. Non-empty value triggers INVENTORY_WRITE_FORBIDDEN.",
           "title": "Unit"
         },
         "name": {
@@ -467,7 +480,7 @@
             }
           ],
           "default": null,
-          "description": "WRITE FIELD for create/rename \u2014 not permitted. Use name_contains to filter reads instead.",
+          "description": "WRITE FIELD for create/rename — not permitted. Use name_contains to filter reads instead.",
           "title": "Name"
         }
       },

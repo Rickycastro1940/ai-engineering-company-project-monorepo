@@ -1,0 +1,30 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0 -- /workspace/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /workspace
+configfile: pyproject.toml
+plugins: langsmith-0.10.15, anyio-4.14.2
+collecting ... collected 9 items
+
+tests/pipelines/test_company_tools_mcp.py::test_mcp_http_clients_only_call_company_api_paths PASSED [ 11%]
+tests/pipelines/test_company_tools_mcp.py::test_incident_create_and_status_lifecycle PASSED [ 22%]
+tests/pipelines/test_company_tools_mcp.py::test_inventory_query_and_write_rejection PASSED [ 33%]
+tests/pipelines/test_company_tools_mcp.py::test_mcp_rejects_unauthenticated_client PASSED [ 44%]
+tests/pipelines/test_company_tools_mcp.py::test_mcp_discovery_with_token PASSED [ 55%]
+tests/pipelines/test_company_tools_mcp.py::test_incident_api_status_endpoint PASSED [ 66%]
+tests/pipelines/test_company_tools_mcp.py::test_acceptance_domain_fields_match_company_apis PASSED [ 77%]
+tests/pipelines/test_company_tools_mcp.py::test_acceptance_status_update_uses_lifecycle_endpoint_only PASSED [ 88%]
+tests/pipelines/test_company_tools_mcp.py::test_acceptance_oauth_via_mcpauth_not_fastmcp_auth PASSED [100%]
+
+=============================== warnings summary ===============================
+tests/pipelines/test_company_tools_mcp.py::test_mcp_http_clients_only_call_company_api_paths
+tests/pipelines/test_company_tools_mcp.py::test_mcp_http_clients_only_call_company_api_paths
+  /workspace/.venv/lib/python3.12/site-packages/qdrant_client/qdrant_remote.py:290: UserWarning: Failed to obtain server version. Unable to check client-server compatibility. Set check_compatibility=False to skip version check.
+    show_warning(
+
+tests/pipelines/test_company_tools_mcp.py::test_mcp_rejects_unauthenticated_client
+  /workspace/.venv/lib/python3.12/site-packages/pydantic_settings/sources/utils.py:47: IncompleteFieldDefinitionWarning: Field 'lifespan' has an incomplete definition: its annotation contains an unresolved forward reference, so settings sources may fail to correctly resolve its value. Call `model_rebuild()` on the model where the field is defined, once all the referenced types are defined.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 9 passed, 3 warnings in 2.46s =========================

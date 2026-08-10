@@ -30,7 +30,10 @@ class ManageIncidentInput(BaseModel):
     )
     category: str | None = Field(
         default=None,
-        description="Required for create. Brasaland categories e.g. EQUIPAMIENTO, ABASTECIMIENTO.",
+        description=(
+            "Required for create. Must match Incidents Manager categories: "
+            "EQUIPAMIENTO | ABASTECIMIENTO | QUEJA_CLIENTE | CALIDAD_ALIMENTO | PERSONAL."
+        ),
     )
     description: str | None = Field(
         default=None,
@@ -46,6 +49,10 @@ class ManageIncidentInput(BaseModel):
     date: str | None = Field(default=None, description="Optional ISO date for create (YYYY-MM-DD).")
     location_id: str | None = Field(default=None, description="Optional location id (e.g. COL-01).")
     customer_id: str | None = Field(default=None, description="Optional customer id.")
+    satisfaction_score: float | None = Field(
+        default=None,
+        description="Optional satisfaction score forwarded to POST /api/incidents.",
+    )
     reporter_id: str | None = Field(default=None, description="Optional reporter id.")
 
 
@@ -74,6 +81,7 @@ def manage_incident_ticket(
     date: str | None = None,
     location_id: str | None = None,
     customer_id: str | None = None,
+    satisfaction_score: float | None = None,
     reporter_id: str | None = None,
 ) -> dict[str, Any]:
     """Execute create / update / get_status against the live Incidents Manager."""
@@ -87,6 +95,7 @@ def manage_incident_ticket(
             date=date,
             location_id=location_id,
             customer_id=customer_id,
+            satisfaction_score=satisfaction_score,
             reporter_id=reporter_id,
         )
     except Exception as exc:  # noqa: BLE001
@@ -125,6 +134,7 @@ def manage_incident_ticket(
                 "category and description are required for action=create",
                 tool=TOOL_NAME,
             )
+        # Body keys must match IncidentCreateInput in services/api/incidents_store.py.
         body: dict[str, Any] = {
             "category": inp.category,
             "description": inp.description,
@@ -136,6 +146,8 @@ def manage_incident_ticket(
             body["location_id"] = inp.location_id
         if inp.customer_id:
             body["customer_id"] = inp.customer_id
+        if inp.satisfaction_score is not None:
+            body["satisfaction_score"] = inp.satisfaction_score
         if inp.reporter_id:
             body["reporter_id"] = inp.reporter_id
         response = http_clients.create_incident(body)
