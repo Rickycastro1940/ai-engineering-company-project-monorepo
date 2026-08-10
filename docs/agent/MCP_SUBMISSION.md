@@ -18,6 +18,15 @@
 2. **Lifecycle status only** — `action=update` always calls
    `PATCH /api/incidents/{id}/status` via `http_clients.update_incident_status`.
    There is no generic `PATCH /api/incidents/{id}` helper.
+2b. **Inventory queries + write rejection** — `query_inventory` correctly serves
+   read actions (`list` / `get` / `query` / `read`) against the live inventory
+   API (`product_id`, `name`, `quantity`, `unit`, `source=inventory_manager`).
+   Any write action (`update|create|delete|write|patch|put`) or write field
+   (`quantity` / `delta` / `unit` / `name`) returns
+   **`INVENTORY_WRITE_FORBIDDEN`** (explicit reject, not a missing tool). The
+   inventory HTTP client is GET-only. Confirmed by
+   `test_inventory_query_and_write_rejection` and
+   `test_inventory_mcp_query_and_write_rejection_over_tools_call`.
 3. **OAuth via MCP Auth** — `mcpauth.MCPAuth` in **resource-server** mode with
    OIDC (`AuthServerType.OIDC`), provider-agnostic via `MCP_AUTH_ISSUER`.
    **Clients without a valid OAuth access token cannot list or execute any

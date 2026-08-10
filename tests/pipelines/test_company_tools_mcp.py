@@ -213,9 +213,28 @@ def test_incident_create_and_status_lifecycle(api_base: str) -> None:
 
 
 def test_inventory_query_and_write_rejection(api_base: str) -> None:
+    """Rubric: inventory queries succeed; every write attempt is explicitly rejected."""
+    from mcps.company_tools.clients import inventory as inventory_client
+    from mcps.company_tools.tools.inventory import WRITE_ACTIONS
+
     ok = query_inventory(action="query", product_id="1")
     assert ok["ok"] is True
-    assert ok["products"][0]["product_id"] == "1"
+    product = ok["products"][0]
+    assert product["product_id"] == "1"
+    assert product["source"] == "inventory_manager"
+    assert set(product) >= {"product_id", "name", "quantity", "unit", "source"}
+
+    listed = query_inventory(action="list")
+    assert listed["ok"] is True
+    assert len(listed["products"]) >= 1
+
+    filtered = query_inventory(action="query", name_contains="Tom")
+    assert filtered["ok"] is True
+    assert any("Tomato" in (p.get("name") or "") for p in filtered["products"])
+
+    missing = query_inventory(action="get", product_id="99999")
+    assert missing["ok"] is False
+    assert missing["error_code"] == ErrorCode.NOT_FOUND
 
     # Playground often sends blank optional strings — those must still read.
     blank_ok = query_inventory(
@@ -228,13 +247,81 @@ def test_inventory_query_and_write_rejection(api_base: str) -> None:
     assert blank_ok["ok"] is True
     assert blank_ok["products"][0]["product_id"] == "1"
 
-    forbidden = query_inventory(action="update", product_id="1", quantity=99)
-    assert forbidden["ok"] is False
-    assert forbidden["error_code"] == ErrorCode.INVENTORY_WRITE_FORBIDDEN
-    assert forbidden["tool"] == "query_inventory"
+    # Explicit rejection for every write-oriented action (not a silent omit).
+    for action in sorted(WRITE_ACTIONS):
+        forbidden = query_inventory(action=action, product_id="1", quantity=99)
+        assert forbidden["ok"] is False, action
+        assert forbidden["error_code"] == ErrorCode.INVENTORY_WRITE_FORBIDDEN, action
+        assert forbidden["tool"] == "query_inventory"
 
-    forbidden_fields = query_inventory(action="query", product_id="1", name="Tomatoes", unit="kg")
-    assert forbidden_fields["error_code"] == ErrorCode.INVENTORY_WRITE_FORBIDDEN
+    # Write fields on a read action are also rejected.
+    for kwargs in (
+        {"action": "query", "product_id": "1", "quantity": 99},
+        {"action": "query", "product_id": "1", "delta": -1},
+        {"action": "query", "product_id": "1", "unit": "kg"},
+        {"action": "query", "product_id": "1", "name": "Hacked"},
+    ):
+        forbidden_fields = query_inventory(**kwargs)
+        assert forbidden_fields["error_code"] == ErrorCode.INVENTORY_WRITE_FORBIDDEN, kwargs
+
+    # Least privilege at the HTTP client: GET-only (no write helpers).
+    assert hasattr(inventory_client, "list_products")
+    assert hasattr(inventory_client, "get_product")
+    assert not hasattr(inventory_client, "create_product")
+    assert not hasattr(inventory_client, "update_product")
+    assert not hasattr(inventory_client, "delete_product")
+
+
+def test_inventory_mcp_query_and_write_rejection_over_tools_call(mcp_base: str, api_base: str) -> None:
+    """Same rubric over the MCP transport (authenticated tools/call)."""
+    token = mint_access_token(
+        audience="http://127.0.0.1:13001/mcp",
+        scopes="inventory:read",
+        client_id="inventory-eval",
+    )
+
+    list_resp, list_body = _mcp_rpc(
+        mcp_base,
+        token,
+        "tools/call",
+        {"name": "query_inventory", "arguments": {"action": "list"}},
+        request_id=1,
+    )
+    assert list_resp.status_code == 200
+    listed = __import__("json").loads(list_body["result"]["content"][0]["text"])
+    assert listed["ok"] is True
+    assert listed["products"]
+
+    get_resp, get_body = _mcp_rpc(
+        mcp_base,
+        token,
+        "tools/call",
+        {"name": "query_inventory", "arguments": {"action": "get", "product_id": "1"}},
+        request_id=2,
+    )
+    assert get_resp.status_code == 200
+    got = __import__("json").loads(get_body["result"]["content"][0]["text"])
+    assert got["ok"] is True
+    assert got["products"][0]["product_id"] == "1"
+
+    for rid, arguments in (
+        (3, {"action": "update", "product_id": "1", "quantity": 99}),
+        (4, {"action": "create", "name": "X", "quantity": 1}),
+        (5, {"action": "delete", "product_id": "1"}),
+        (6, {"action": "query", "product_id": "1", "delta": 5}),
+    ):
+        write_resp, write_body = _mcp_rpc(
+            mcp_base,
+            token,
+            "tools/call",
+            {"name": "query_inventory", "arguments": arguments},
+            request_id=rid,
+        )
+        assert write_resp.status_code == 200, arguments
+        rejected = __import__("json").loads(write_body["result"]["content"][0]["text"])
+        assert rejected["ok"] is False, arguments
+        assert rejected["error_code"] == ErrorCode.INVENTORY_WRITE_FORBIDDEN, arguments
+        assert rejected["tool"] == "query_inventory"
 
 
 def test_mcp_rejects_unauthenticated_client(mcp_base: str) -> None:
