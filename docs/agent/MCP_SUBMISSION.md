@@ -68,7 +68,7 @@ middleware and Protected Resource Metadata are mounted on the HTTP app.
 - Library: **MCP Auth** (`mcpauth`) — not FastMCP built-in auth
 - Dev issuer: `mcps/company_tools/dev_issuer.py` (local OIDC + JWKS)
 - Production: set `MCP_AUTH_ISSUER` to Logto / any OIDC provider
-- Scopes: `incidents:manage`, `inventory:read`
+- Scopes: `incidents:read`, `incidents:manage`, `inventory:read`
 
 ## Domain contract (must match Company APIs)
 
@@ -88,17 +88,24 @@ See `mcps/company_tools/README.md`.
 
 ## Playground
 
-Forward port `3001` with **public** visibility (Codespaces / Cloudflare Tunnel),
-mint a token from the issuer (`GET /token?client_id=mcp-playground`), paste the
-public URL + Bearer token into
-[MCP Playground](https://www.mcpplayground.tech/connect).
+**Localhost alone will not work** from MCP Playground. Expose/forward port
+`3001` with **public** visibility (Codespaces forwarded URL or Cloudflare
+Tunnel), mint a token (`GET /token?client_id=mcp-playground`), paste the
+**public** `https://…/mcp` URL + `Authorization: Bearer …` into
+[MCP Playground Connect](https://www.mcpplayground.tech/connect).
 
-### Verified connection
+### Verified public connection + complete flows per tool
 
-Connected Brasaland Company Tools (`v1.29.0`) via Streamable HTTP + Bearer JWT:
+Connected Brasaland Company Tools via **public** Streamable HTTP URL + Bearer JWT
+(not localhost). Ran one complete flow per exposed tool:
 
-1. Discovered tools: `manage_incident_ticket`, `query_inventory`
-2. `query_inventory` read path succeeds against live inventory API
-3. `query_inventory` with `action=update` returns `INVENTORY_WRITE_FORBIDDEN`
+**`manage_incident_ticket`**
+1. `create` → `BRS-000013` (`EQUIPAMIENTO`, `ABIERTO`, `COL-01`)
+2. `get_status` → `ABIERTO`
+3. `update` → `CERRADO` via lifecycle `PATCH /api/incidents/{id}/status`
 
-Screenshots: [`docs/agent/playground/`](./playground/)
+**`query_inventory`**
+1. `list` → products from live inventory (`Tomatoes`, `Mozzarella`, `Napkins`)
+2. `action=update` → `INVENTORY_WRITE_FORBIDDEN`
+
+Evidence (screenshots + JSON): [`docs/agent/playground/`](./playground/)
