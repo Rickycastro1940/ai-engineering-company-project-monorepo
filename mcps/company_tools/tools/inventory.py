@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from mcps.company_tools import http_clients
+from mcps.company_tools.clients import inventory as inventory_client
 from mcps.company_tools.errors import ErrorCode, error_payload
 
 TOOL_NAME = "query_inventory"
@@ -140,7 +140,7 @@ def query_inventory(
         )
 
     if inp.product_id and not inp.name_contains:
-        response = http_clients.get_product(inp.product_id)
+        response = inventory_client.get_product(inp.product_id)
         if response.status_code == 404:
             return error_payload(
                 ErrorCode.NOT_FOUND,
@@ -158,7 +158,7 @@ def query_inventory(
             "products": [_product_from_payload(response.json())],
         }
 
-    response = http_clients.list_products(
+    response = inventory_client.list_products(
         product_id=inp.product_id,
         name_contains=inp.name_contains,
     )

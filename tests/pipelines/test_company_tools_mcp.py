@@ -213,6 +213,7 @@ def test_mcp_discovery_with_token(mcp_base: str, issuer_base: str) -> None:
     assert meta.status_code == 200, meta.text
     payload = meta.json()
     assert payload.get("resource") == "http://127.0.0.1:13001/mcp"
+    assert "incidents:read" in (payload.get("scopes_supported") or [])
     assert "incidents:manage" in (payload.get("scopes_supported") or [])
     assert "inventory:read" in (payload.get("scopes_supported") or [])
     assert token
@@ -339,8 +340,13 @@ def test_acceptance_oauth_via_mcpauth_not_fastmcp_auth(mcp_base: str) -> None:
     import mcps.company_tools.server as server_mod
 
     assert auth_mod.MCPAuth.__module__.startswith("mcpauth")
+    assert auth_mod.SCOPE_INCIDENTS_READ == "incidents:read"
     assert auth_mod.SCOPE_INCIDENTS_MANAGE == "incidents:manage"
     assert auth_mod.SCOPE_INVENTORY_READ == "inventory:read"
+    assert auth_mod.TOOL_REQUIRED_SCOPES["query_inventory"] == ["inventory:read"]
+    assert "incidents:read" in auth_mod.TOOL_SCOPE_ANY_OF["manage_incident_ticket:get_status"]
+    assert auth_mod.TOOL_SCOPE_ANY_OF["manage_incident_ticket:create"] == ["incidents:manage"]
+    assert auth_mod.TOOL_SCOPE_ANY_OF["manage_incident_ticket:update"] == ["incidents:manage"]
     # FastMCP is the tool host only — no FastMCP AuthSettings / built-in auth wiring.
     assert server_mod.mcp.settings.auth is None
     source = Path(server_mod.__file__).read_text(encoding="utf-8")
@@ -356,6 +362,7 @@ def test_acceptance_oauth_via_mcpauth_not_fastmcp_auth(mcp_base: str) -> None:
     meta = httpx.get(f"{mcp_base}/.well-known/oauth-protected-resource/mcp", timeout=5.0)
     assert meta.status_code == 200
     payload = meta.json()
+    assert "incidents:read" in (payload.get("scopes_supported") or [])
     assert "incidents:manage" in (payload.get("scopes_supported") or [])
     assert "inventory:read" in (payload.get("scopes_supported") or [])
 
@@ -432,7 +439,7 @@ def test_mandatory_oauth_rejects_invalid_and_wrong_audience_tokens(mcp_base: str
 
 
 def test_mandatory_oauth_scope_enforcement_on_invoke(mcp_base: str) -> None:
-    """Valid JWT can list tools; invoke still requires the tool's OAuth scope."""
+    """Valid JWT can list tools; invoke still requires the tool's required_scopes."""
     inv_only = mint_access_token(
         audience="http://127.0.0.1:13001/mcp",
         scopes="inventory:read",
@@ -470,3 +477,108 @@ def test_mandatory_oauth_scope_enforcement_on_invoke(mcp_base: str) -> None:
     ok_tool = __import__("json").loads(ok_body["result"]["content"][0]["text"])
     assert ok_tool["ok"] is True
     assert ok_tool["products"]
+
+
+def test_least_privilege_incident_read_scope_cannot_write(mcp_base: str, api_base: str) -> None:
+    """incidents:read may get_status but must not create/update (required_scopes)."""
+    read_only = mint_access_token(
+        audience="http://127.0.0.1:13001/mcp",
+        scopes="incidents:read",
+        client_id="inc-read",
+    )
+    created = manage_incident_ticket(
+        action="create",
+        category="EQUIPAMIENTO",
+        description="Seed ticket for read-scope least-privilege check",
+        status="ABIERTO",
+    )
+    assert created["ok"] is True
+    ticket_id = created["ticket"]["incident_id"]
+
+    get_resp, get_body = _mcp_rpc(
+        mcp_base,
+        read_only,
+        "tools/call",
+        {"name": "manage_incident_ticket", "arguments": {"action": "get_status", "ticket_id": ticket_id}},
+        request_id=1,
+    )
+    assert get_resp.status_code == 200
+    get_tool = __import__("json").loads(get_body["result"]["content"][0]["text"])
+    assert get_tool["ok"] is True
+    assert get_tool["ticket"]["incident_id"] == ticket_id
+
+    create_resp, create_body = _mcp_rpc(
+        mcp_base,
+        read_only,
+        "tools/call",
+        {
+            "name": "manage_incident_ticket",
+            "arguments": {
+                "action": "create",
+                "category": "EQUIPAMIENTO",
+                "description": "Should be denied by required_scopes",
+            },
+        },
+        request_id=2,
+    )
+    create_tool = __import__("json").loads(create_body["result"]["content"][0]["text"])
+    assert create_tool["ok"] is False
+    assert create_tool["error_code"] == ErrorCode.AUTH_INSUFFICIENT_SCOPE
+
+    update_resp, update_body = _mcp_rpc(
+        mcp_base,
+        read_only,
+        "tools/call",
+        {
+            "name": "manage_incident_ticket",
+            "arguments": {"action": "update", "ticket_id": ticket_id, "status": "CERRADO"},
+        },
+        request_id=3,
+    )
+    update_tool = __import__("json").loads(update_body["result"]["content"][0]["text"])
+    assert update_tool["ok"] is False
+    assert update_tool["error_code"] == ErrorCode.AUTH_INSUFFICIENT_SCOPE
+
+
+def test_least_privilege_clients_are_domain_isolated() -> None:
+    """Incident tool client must not expose inventory ops and vice versa."""
+    from mcps.company_tools.clients import incidents as inc
+    from mcps.company_tools.clients import inventory as inv
+
+    assert hasattr(inc, "get_incident")
+    assert hasattr(inc, "create_incident")
+    assert hasattr(inc, "update_incident_status")
+    assert not hasattr(inc, "list_products")
+    assert not hasattr(inc, "get_product")
+    assert inc.INCIDENT_STATUS_PATH.endswith("/status")
+
+    assert hasattr(inv, "list_products")
+    assert hasattr(inv, "get_product")
+    assert not hasattr(inv, "create_incident")
+    assert not hasattr(inv, "update_incident_status")
+    # Inventory client is GET-only — no write helpers.
+    src = Path(inv.__file__).read_text(encoding="utf-8")
+    assert "client.post" not in src
+    assert "client.patch" not in src
+    assert "client.put" not in src
+    assert "client.delete" not in src
+
+
+def test_least_privilege_update_rejects_non_status_fields(api_base: str) -> None:
+    created = manage_incident_ticket(
+        action="create",
+        category="PERSONAL",
+        description="Update must not accept unrelated fields",
+        status="ABIERTO",
+    )
+    assert created["ok"] is True
+    ticket_id = created["ticket"]["incident_id"]
+    rejected = manage_incident_ticket(
+        action="update",
+        ticket_id=ticket_id,
+        status="CERRADO",
+        category="EQUIPAMIENTO",
+        description="smuggled",
+    )
+    assert rejected["ok"] is False
+    assert rejected["error_code"] == ErrorCode.VALIDATION_ERROR

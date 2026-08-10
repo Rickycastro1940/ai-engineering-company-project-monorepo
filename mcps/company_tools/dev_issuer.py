@@ -21,7 +21,7 @@ from starlette.routing import Route
 
 ISSUER_DEFAULT = "http://127.0.0.1:3002"
 DEFAULT_AUDIENCE = "http://127.0.0.1:3001/mcp"
-DEFAULT_SCOPES = "incidents:manage inventory:read"
+DEFAULT_SCOPES = "incidents:read incidents:manage inventory:read"
 
 
 def _issuer() -> str:
@@ -92,6 +92,7 @@ async def openid_configuration(_: Request) -> JSONResponse:
             "grant_types_supported": ["client_credentials", "authorization_code"],
             "token_endpoint_auth_methods_supported": ["client_secret_post", "none"],
             "scopes_supported": [
+                "incidents:read",
                 "incidents:manage",
                 "inventory:read",
                 "openid",

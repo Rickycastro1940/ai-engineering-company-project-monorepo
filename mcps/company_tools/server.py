@@ -25,8 +25,13 @@ from starlette.routing import Mount
 
 from mcps.company_tools.auth import (
     SCOPE_INCIDENTS_MANAGE,
+    SCOPE_INCIDENTS_READ,
     SCOPE_INVENTORY_READ,
+    TOOL_REQUIRED_SCOPES,
+    TOOL_SCOPE_ANY_OF,
     build_mcp_auth,
+    has_any_scope,
+    has_required_scopes,
     resource_indicator,
 )
 from mcps.company_tools.errors import ErrorCode, error_payload
@@ -100,12 +105,17 @@ assert getattr(mcp, "settings", None) is None or mcp.settings.auth is None, (
 )
 
 
-def _auth_gate(required: list[str], *, tool: str) -> dict[str, Any] | None:
-    """Fail closed: missing token context or missing scopes → structured error.
+def _auth_gate(
+    *,
+    tool: str,
+    required_scopes: list[str] | None = None,
+    any_of_scopes: list[str] | None = None,
+) -> dict[str, Any] | None:
+    """Enforce least-privilege ``required_scopes`` (MCP Auth semantics).
 
     Transport-level MCP Auth middleware already rejects missing/invalid JWTs
-    with HTTP 401 before tools run. This gate enforces per-tool OAuth scopes
-    and treats a missing auth context as AUTH_MISSING_TOKEN (never as success).
+    with HTTP 401. This gate applies per-tool ``required_scopes`` so each tool
+    only runs when the token carries the scopes it needs.
     """
     auth = build_mcp_auth().auth_info
     if auth is None:
@@ -114,15 +124,31 @@ def _auth_gate(required: list[str], *, tool: str) -> dict[str, Any] | None:
             "Missing authenticated Bearer context. Present a valid OAuth access token.",
             tool=tool,
         )
-    have = set(auth.scopes or [])
-    missing = [scope for scope in required if scope not in have]
-    if missing:
-        return error_payload(
-            ErrorCode.AUTH_INSUFFICIENT_SCOPE,
-            f"Missing required scope: {', '.join(missing)}",
-            tool=tool,
-            details={"required": required, "present": sorted(have), "missing": missing},
-        )
+    present = list(auth.scopes or [])
+    if required_scopes:
+        if not has_required_scopes(present, required_scopes):
+            missing = [s for s in required_scopes if s not in set(present)]
+            return error_payload(
+                ErrorCode.AUTH_INSUFFICIENT_SCOPE,
+                f"Missing required_scopes: {', '.join(missing)}",
+                tool=tool,
+                details={
+                    "required_scopes": required_scopes,
+                    "present": sorted(set(present)),
+                    "missing": missing,
+                },
+            )
+    if any_of_scopes:
+        if not has_any_scope(present, any_of_scopes):
+            return error_payload(
+                ErrorCode.AUTH_INSUFFICIENT_SCOPE,
+                f"Token needs one of required_scopes: {', '.join(any_of_scopes)}",
+                tool=tool,
+                details={
+                    "required_scopes_any_of": any_of_scopes,
+                    "present": sorted(set(present)),
+                },
+            )
     return None
 
 
@@ -141,7 +167,8 @@ def _auth_gate(required: list[str], *, tool: str) -> dict[str, Any] | None:
         "On failure returns {ok:false, error_code, message} with distinct codes "
         "(VALIDATION_ERROR, NOT_FOUND, LIFECYCLE_ERROR, UPSTREAM_ERROR, "
         "AUTH_INSUFFICIENT_SCOPE). "
-        "Requires OAuth Bearer token with scope incidents:manage."
+        "Requires OAuth Bearer token with required_scopes incidents:manage "
+        "(create/update) or incidents:read (get_status; manage also allowed)."
     ),
     structured_output=True,
 )
@@ -208,7 +235,14 @@ def tool_manage_incident_ticket(
     auth = build_mcp_auth()
 
     def _run() -> dict[str, Any]:
-        denied = _auth_gate([SCOPE_INCIDENTS_MANAGE], tool="manage_incident_ticket")
+        # Least privilege: get_status needs read (or manage); writes need manage.
+        key = f"manage_incident_ticket:{action}"
+        any_of = TOOL_SCOPE_ANY_OF.get(key)
+        denied = _auth_gate(
+            tool="manage_incident_ticket",
+            required_scopes=None if any_of else [SCOPE_INCIDENTS_MANAGE],
+            any_of_scopes=any_of,
+        )
         if denied is not None:
             return denied
         return manage_incident_ticket(
@@ -246,7 +280,7 @@ def tool_manage_incident_ticket(
         "explicitly rejected with error_code INVENTORY_WRITE_FORBIDDEN "
         "(the write tool is not omitted — it fails with a clear code). "
         "On success returns {ok:true, products:[{product_id,name,quantity,unit,source}]}. "
-        "Requires OAuth Bearer token with scope inventory:read."
+        "Requires OAuth Bearer token with required_scopes=[inventory:read]."
     ),
     structured_output=True,
 )
@@ -301,7 +335,10 @@ def tool_query_inventory(
     auth = build_mcp_auth()
 
     def _run() -> dict[str, Any]:
-        denied = _auth_gate([SCOPE_INVENTORY_READ], tool="query_inventory")
+        denied = _auth_gate(
+            tool="query_inventory",
+            required_scopes=TOOL_REQUIRED_SCOPES["query_inventory"],
+        )
         if denied is not None:
             return denied
         return query_inventory(
@@ -344,10 +381,13 @@ def create_app() -> Starlette:
     2. ``bearer_auth_middleware("jwt", ...)`` wraps **all** ``/mcp`` traffic.
        Missing / invalid / wrong-audience tokens → HTTP 401. No anonymous
        ``tools/list`` or ``tools/call``.
-    3. Per-tool ``_auth_gate`` enforces ``incidents:manage`` /
-       ``inventory:read`` after JWT validation.
+    3. Per-tool ``required_scopes`` (least privilege):
+       ``incidents:read`` / ``incidents:manage`` / ``inventory:read``.
 
     FastMCP built-in auth is intentionally unused (``settings.auth is None``).
+    Middleware ``required_scopes`` stays unset at the transport layer so a
+    read-only inventory token can still open an MCP session; tool gates apply
+    the precise ``required_scopes`` for each operation.
     """
     auth = build_mcp_auth()
     resource = resource_indicator()
@@ -362,15 +402,15 @@ def create_app() -> Starlette:
             "jwt",
             resource=resource,
             audience=resource,  # aud must equal resource indicator
-            # Transport gate = valid JWT. Tool scopes enforced in _auth_gate.
+            # Transport gate = valid JWT. Per-tool required_scopes in _auth_gate.
             required_scopes=None,
             show_error_details=True,
         )
     )
     logger.info(
-        "MCP Auth resource-server enabled resource=%s scopes=%s issuer_via=MCP_AUTH_ISSUER",
+        "MCP Auth resource-server enabled resource=%s scopes=%s",
         resource,
-        [SCOPE_INCIDENTS_MANAGE, SCOPE_INVENTORY_READ],
+        [SCOPE_INCIDENTS_READ, SCOPE_INCIDENTS_MANAGE, SCOPE_INVENTORY_READ],
     )
     return Starlette(
         routes=[

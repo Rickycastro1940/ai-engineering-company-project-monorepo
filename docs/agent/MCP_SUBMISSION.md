@@ -13,7 +13,9 @@
 3. **OAuth via MCP Auth** — `mcpauth.MCPAuth` in **resource-server** mode with
    OIDC (`AuthServerType.OIDC`), provider-agnostic via `MCP_AUTH_ISSUER`.
    Bearer JWT middleware blocks anonymous `tools/list` / `tools/call` (HTTP 401).
-   Scopes `incidents:manage` / `inventory:read` are enforced per tool.
+   Least-privilege **`required_scopes`**: `incidents:read` / `incidents:manage` /
+   `inventory:read` enforced per tool/action. Domain HTTP clients are split so
+   inventory cannot call incident routes and vice versa (inventory is GET-only).
    FastMCP built-in auth is not used (`settings.auth is None`).
 
 Regression coverage: `tests/pipelines/test_company_tools_mcp.py`
@@ -62,6 +64,7 @@ middleware and Protected Resource Metadata are mounted on the HTTP app.
 | Ticket fields | same as `IncidentRecord` (`date`, `location_id`, `category`, `description`, `status`, `customer_id`, `satisfaction_score`, `reporter_id`, `source`) |
 | Inventory fields | same as API `InventoryProduct` (`product_id`, `name`, `quantity`, `unit`, `source`) |
 | Status update | **only** `PATCH /api/incidents/{id}/status` |
+| Scopes | `incidents:read`, `incidents:manage`, `inventory:read` (`required_scopes` per tool) |
 
 ## How to run
 

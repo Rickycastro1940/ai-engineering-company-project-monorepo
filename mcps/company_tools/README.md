@@ -25,7 +25,8 @@ built in previous milestones:
 | `manage_incident_ticket` | Incidents Manager (`services/api`) | `POST /api/incidents`, `PATCH /api/incidents/{id}/status`, `GET /api/incidents/{id}` |
 | `query_inventory` | Inventory module (`services/api/inventory.py` → `products.csv`) | `GET /inventory/products`, `GET /inventory/products/{id}` |
 
-Implementation: `http_clients.py` → `httpx` → `COMPANY_API_BASE` (default
+Implementation: least-privilege clients under `mcps/company_tools/clients/`
+(`incidents.py` / `inventory.py`) → `httpx` → `COMPANY_API_BASE` (default
 `http://127.0.0.1:8000`). No CSV reads, no parallel fake stores, no in-process
 incident/inventory logic inside `mcps/`.
 
@@ -45,9 +46,9 @@ multiple authenticated clients share one OAuth-protected resource server.
 
 ## Tools
 
-| Tool | Scopes | Operations |
-| ---- | ------ | ---------- |
-| `manage_incident_ticket` | `incidents:manage` | `create`, `update` (via `PATCH /api/incidents/{id}/status`), `get_status` |
+| Tool | Scopes (`required_scopes`) | Operations |
+| ---- | -------------------------- | ---------- |
+| `manage_incident_ticket` | `incidents:read` (get_status) or `incidents:manage` (create/update) | create; update via `PATCH .../status` only; get_status |
 | `query_inventory` | `inventory:read` | read-only query; writes → `INVENTORY_WRITE_FORBIDDEN` |
 
 Domain values match the live Company APIs: statuses `ABIERTO|CERRADO|DESCARTADO`,
@@ -67,7 +68,8 @@ over FastMCP built-in auth so the flow matches the MCP Authorization spec.
 | Mode | OAuth 2.1 **resource server** (`protected_resources` + PRM) |
 | Protocol | **OIDC** metadata / JWKS via `MCP_AUTH_ISSUER` (provider-agnostic) |
 | Transport gate | `bearer_auth_middleware("jwt", audience=resource)` on `/mcp` → HTTP 401 without a valid access token |
-| Scopes | `incidents:manage`, `inventory:read` (advertised + enforced per tool) |
+| Least privilege | Per-tool **`required_scopes`**: `incidents:read` (get_status), `incidents:manage` (create/update), `inventory:read` (query only) |
+| Data plane | Split clients: `clients/incidents.py` vs `clients/inventory.py` (inventory is GET-only) |
 | Not used | FastMCP `AuthSettings` / built-in auth |
 
 ```bash

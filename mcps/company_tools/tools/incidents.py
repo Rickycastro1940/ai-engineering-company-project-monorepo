@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from mcps.company_tools import http_clients
+from mcps.company_tools.clients import incidents as incident_client
 from mcps.company_tools.errors import ErrorCode, error_payload
 
 TOOL_NAME = "manage_incident_ticket"
@@ -112,7 +112,7 @@ def manage_incident_ticket(
                 "ticket_id is required for action=get_status",
                 tool=TOOL_NAME,
             )
-        response = http_clients.get_incident(inp.ticket_id)
+        response = incident_client.get_incident(inp.ticket_id)
         if response.status_code == 404:
             return error_payload(
                 ErrorCode.NOT_FOUND,
@@ -150,7 +150,7 @@ def manage_incident_ticket(
             body["satisfaction_score"] = inp.satisfaction_score
         if inp.reporter_id:
             body["reporter_id"] = inp.reporter_id
-        response = http_clients.create_incident(body)
+        response = incident_client.create_incident(body)
         if response.status_code >= 400:
             return error_payload(
                 ErrorCode.UPSTREAM_ERROR if response.status_code >= 500 else ErrorCode.VALIDATION_ERROR,
@@ -159,7 +159,7 @@ def manage_incident_ticket(
             )
         return {"ok": True, "action": "create", "ticket": _ticket_from_response(response.json())}
 
-    # update — status lifecycle only
+    # update — status lifecycle only (ignore unrelated fields; least privilege)
     if not inp.ticket_id:
         return error_payload(
             ErrorCode.VALIDATION_ERROR,
@@ -172,7 +172,29 @@ def manage_incident_ticket(
             "status is required for action=update (sent to PATCH /api/incidents/{id}/status)",
             tool=TOOL_NAME,
         )
-    response = http_clients.update_incident_status(inp.ticket_id, inp.status)
+    # Reject attempts to smuggle non-status mutations through update.
+    extras = {
+        k: v
+        for k, v in {
+            "category": inp.category,
+            "description": inp.description,
+            "date": inp.date,
+            "location_id": inp.location_id,
+            "customer_id": inp.customer_id,
+            "satisfaction_score": inp.satisfaction_score,
+            "reporter_id": inp.reporter_id,
+        }.items()
+        if v is not None
+    }
+    if extras:
+        return error_payload(
+            ErrorCode.VALIDATION_ERROR,
+            "action=update only accepts ticket_id+status (lifecycle). "
+            "Other fields are not allowed — least privilege.",
+            tool=TOOL_NAME,
+            details={"rejected_fields": extras},
+        )
+    response = incident_client.update_incident_status(inp.ticket_id, inp.status)
     if response.status_code == 404:
         return error_payload(
             ErrorCode.NOT_FOUND,

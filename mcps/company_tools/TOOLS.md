@@ -14,7 +14,7 @@ tool signatures in `server.py`.
 | | |
 | --- | --- |
 | **Title** | Manage Brasaland incident tickets |
-| **OAuth scope** | `incidents:manage` |
+| **OAuth scope** | `required_scopes`: `incidents:read` (get_status) or `incidents:manage` (create/update) |
 | **Upstream** | Incidents Manager HTTP API |
 
 ### Actions
@@ -61,7 +61,7 @@ Error shape: `{ "ok": false, "error_code": "NOT_FOUND|VALIDATION_ERROR|LIFECYCLE
 | | |
 | --- | --- |
 | **Title** | Query Brasaland inventory (read-only) |
-| **OAuth scope** | `inventory:read` |
+| **OAuth scope** | `required_scopes`: `inventory:read` |
 | **Upstream** | `GET /inventory/products` (products.csv-backed) |
 
 ### Read inputs
