@@ -7,8 +7,9 @@ Acceptance
 - Optional: fallback when the incident service is unavailable
 
 Tools under test call ``GET /api/incidents`` / ``GET /inventory/products`` on
-the real FastAPI app (CSV-backed). No hardcoded ticket/product payloads are
-injected into the tool return value.
+the real FastAPI app (CSV-backed). Ticket routing patches
+``lookup_ticket_via_mcp`` (the graph's only Incidents path). No hardcoded
+ticket/product payloads are injected into the tool return value.
 """
 
 from __future__ import annotations
@@ -26,10 +27,14 @@ from services.agent.tools.inventory_lookup import (
     INVENTORY_LOOKUP_TIMEOUT_SECONDS,
     lookup_inventory,
 )
+from services.agent.tools.contracts import (
+    TicketLookupInput,
+    TicketLookupOutput,
+    TicketRecord,
+)
 from services.agent.tools.ticket_lookup import (
     TICKET_FALLBACK_MESSAGE,
     TICKET_LOOKUP_TIMEOUT_SECONDS,
-    lookup_ticket,
 )
 from services.agent.tracing import load_trace
 
@@ -120,13 +125,48 @@ def _run_and_save_trace(question: str, trace_dir: Path, **node_patches) -> dict:
 
 
 def _ticket_via_real_backend(transport: httpx.BaseTransport):
+    """Stand-in for MCP get_status: read the real incident API (no deprecated HTTP tool)."""
+
     def _call(query, **kwargs):
-        return lookup_ticket(
-            query,
+        if isinstance(query, dict):
+            inp = TicketLookupInput.model_validate(query)
+        else:
+            inp = query
+        ticket_id = (inp.ticket_id or "").strip()
+        with httpx.Client(
             base_url="http://company-backend",
             transport=transport,
-            timeout_seconds=TICKET_LOOKUP_TIMEOUT_SECONDS,
+            timeout=TICKET_LOOKUP_TIMEOUT_SECONDS,
+        ) as client:
+            response = client.get(f"/api/incidents/{ticket_id}")
+        if response.status_code == 404:
+            return TicketLookupOutput(
+                ok=False,
+                tickets=[],
+                error="not_found",
+                message=TICKET_FALLBACK_MESSAGE,
+            )
+        if response.status_code >= 400:
+            return TicketLookupOutput(
+                ok=False,
+                tickets=[],
+                error="service_error",
+                message=TICKET_FALLBACK_MESSAGE,
+            )
+        payload = response.json()
+        ticket = TicketRecord(
+            incident_id=str(payload.get("incident_id") or ""),
+            date=str(payload.get("date") or ""),
+            location_id=payload.get("location_id"),
+            category=str(payload.get("category") or ""),
+            description=str(payload.get("description") or ""),
+            status=str(payload.get("status") or ""),
+            customer_id=payload.get("customer_id"),
+            satisfaction_score=payload.get("satisfaction_score"),
+            reporter_id=payload.get("reporter_id"),
+            source=str(payload.get("source") or "incident_manager"),
         )
+        return TicketLookupOutput(ok=True, tickets=[ticket])
 
     return _call
 

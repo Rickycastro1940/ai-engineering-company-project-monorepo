@@ -6,12 +6,14 @@ inventory remains a read-only HTTP tool against the inventory manager.
 
 ## MCP migration (company tools)
 
-- [x] **MCP client** (`tools/mcp_incidents.py`) — `lookup_ticket` node calls
-  `manage_incident_ticket` on `mcps/company_tools` via Streamable HTTP + OAuth.
-- [x] **Direct HTTP deprecated** — `tools/ticket_lookup.py` is no longer wired
-  into the graph (formatting helpers only).
-- [x] **Routing unchanged** — RAG vs tools decision is the same; only the
-  ticket transport changed.
+- [x] **Connect via `langchain-mcp-adapters`** — `tools/mcp_incidents.py` loads
+  `manage_incident_ticket` from the company-tools MCP server (Streamable HTTP +
+  OAuth) and the graph `lookup_ticket` node calls `lookup_ticket_via_mcp` only.
+- [x] **Single path to Incidents Manager** — direct HTTP `lookup_ticket` is
+  deprecated (`DeprecationWarning`), not re-exported from `tools/__init__.py`,
+  and not wired into the compiled graph.
+- [x] **RAG vs tools routing unchanged** — `decide_route` + conditional edges
+  still choose RAG / ticket / inventory; only the ticket transport is MCP.
 
 ## Part 2 checklist — Tools outside the RAG
 
@@ -83,8 +85,11 @@ START → receive_question
 
 | Variable | Purpose |
 |----------|---------|
-| `INCIDENT_API_BASE` | Base URL for incident GETs (default `http://127.0.0.1:8000`) |
-| `INCIDENT_API_TOKEN` / `INCIDENT_API_KEY` | Optional Bearer token (unused while the API has no auth) |
+| `MCP_SERVER_URL` | Company-tools MCP endpoint (default `http://127.0.0.1:3001/mcp`) |
+| `MCP_ACCESS_TOKEN` | Bearer access token for MCP Auth (optional; agent can mint from issuer) |
+| `MCP_AUTH_ISSUER` | OIDC issuer for minting tokens (default `http://127.0.0.1:3002`) |
+| `MCP_CLIENT_ID` | OAuth client id when minting (default `agent-support-prod`) |
+| `COMPANY_API_BASE` / `INCIDENT_API_BASE` | Upstream used by the MCP server (not by the graph ticket node) |
 
 ## API
 

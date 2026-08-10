@@ -168,27 +168,20 @@ def lookup_ticket(
     timeout_seconds: float = TICKET_LOOKUP_TIMEOUT_SECONDS,
     transport: httpx.BaseTransport | None = None,
 ) -> TicketLookupOutput:
-    """Call the incident manager via GET only. Never creates/updates/deletes.
+    """DEPRECATED — do not use from the LangGraph agent.
 
-    Always reads responses from ``GET /api/incidents`` or
-    ``GET /api/incidents/{id}`` on the incident manager. This module does not
-    contain ticket rows — if the service is down, the tool fails honestly.
-
-    Parameters
-    ----------
-    query:
-        Typed ``TicketLookupInput`` (or dict matching that schema).
-    base_url:
-        Incident manager origin; defaults to ``INCIDENT_API_BASE`` / localhost:8000.
-    timeout_seconds:
-        Explicit numeric HTTP timeout in seconds (default
-        ``TICKET_LOOKUP_TIMEOUT_SECONDS`` = 5). Applied to connect/read/write/pool
-        so a silent incident service cannot hang the graph.
-    transport:
-        Optional httpx transport for tests (``MockTransport`` against the real
-        FastAPI app). Leave unset in production so traffic hits the running
-        incident manager over the network.
+    The compiled graph must call ``lookup_ticket_via_mcp`` only. This function
+    remains for historical reference / offline HTTP contract tests.
     """
+    import warnings
+
+    warnings.warn(
+        "lookup_ticket() is deprecated for agent use. "
+        "The LangGraph graph must use lookup_ticket_via_mcp (langchain-mcp-adapters). "
+        "Direct Incidents Manager HTTP is not a second agent path.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     started = time.perf_counter()
     try:
         if isinstance(query, dict):

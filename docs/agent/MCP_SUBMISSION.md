@@ -28,14 +28,14 @@ generic `"error"`). See [`mcps/company_tools/ERRORS.md`](../mcps/company_tools/E
 - Validation → `VALIDATION_ERROR` / `LIFECYCLE_ERROR` / `NOT_FOUND`
 - Process exits → `ExitCode` 0/1/2/3/4
 
-## Invocation logging
+## Agent migration (LangGraph → MCP)
 
-Every tool invocation is logged (`tool`, `client_id`, `result` / `error_code`)
-via `mcps.company_tools.invocations` — see
-[`mcps/company_tools/LOGGING.md`](../mcps/company_tools/LOGGING.md).
-
-Regression coverage: `tests/pipelines/test_company_tools_mcp.py`
-(`test_acceptance_*`).
+- [x] Graph `lookup_ticket` node uses `lookup_ticket_via_mcp` +
+  `langchain-mcp-adapters` (`MultiServerMCPClient` / Streamable HTTP).
+- [x] Direct HTTP `lookup_ticket` deprecated and not re-exported from
+  `services.agent.tools` — single path to Incidents Manager.
+- [x] RAG vs tools routing (`decide_route`) unchanged; confirmed by
+  `tests/pipelines/test_agent_mcp_migration.py`.
 
 ## Depends on existing backends
 
