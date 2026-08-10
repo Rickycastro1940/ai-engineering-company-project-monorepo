@@ -124,18 +124,34 @@ curl "http://127.0.0.1:8000/inventory/alerts?threshold=20"
 
 Interactive docs: `http://127.0.0.1:8000/docs`
 
-## Incident ticket endpoints (read-only)
+## Incident ticket endpoints (Incidents Manager)
 
-Used by the LangGraph support agent ticket tool (Part 2). Backed by
-`scripts/incidents-COMPANY.csv` via `incidents_store.py` — **no authentication**
-is required on these GETs today.
+Backed by `scripts/incidents-COMPANY.csv` via `incidents_store.py`. The
+**company-tools MCP server** and the LangGraph agent call these live HTTP
+routes — they do not replace this service.
 
-- `GET /api/incidents` — list/search (`status`, `category`, `location_id`, `date_from`, `date_to`)
-- `GET /api/incidents/{id}` — get one ticket by id (e.g. `BRS-000002`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/incidents` | List/search (`status`, `category`, `location_id`, `date_from`, `date_to`) |
+| `GET` | `/api/incidents/{id}` | Get one ticket (e.g. `BRS-000002`) |
+| `POST` | `/api/incidents` | Create ticket (`category`, `description`, optional `status`/`location_id`/…) |
+| `PATCH` | `/api/incidents/{id}/status` | Lifecycle status change — body is `{ "status": "CERRADO" }` only |
 
 Response fields: `incident_id`, `date`, `location_id`, `category`,
 `description`, `status`, `customer_id`, `satisfaction_score`, `reporter_id`,
 `source`.
+
+Valid statuses: `ABIERTO`, `CERRADO`, `DESCARTADO`. Invalid transitions return
+`400`.
+
+### Inventory products (stretch / MCP read path)
+
+CSV-backed read routes used by the inventory tool and MCP `query_inventory`:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/inventory/products` | List/filter (`product_id`, `name`) |
+| `GET` | `/inventory/products/{id}` | Get one product |
 
 ## Incident analysis endpoints
 

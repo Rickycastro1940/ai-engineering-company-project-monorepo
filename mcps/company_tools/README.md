@@ -4,6 +4,27 @@ Exposes Incidents Manager ticket management and **read-only** inventory queries
 over the Model Context Protocol, protected by **OAuth via [MCP Auth](https://mcp-auth.dev/)**
 (`mcpauth`) — not FastMCP's built-in auth.
 
+## Depends on existing backends (does not replace them)
+
+The MCP server is a **thin OAuth-protected facade**. It never owns incident or
+inventory data. Every tool call is an HTTP request to the company API already
+built in previous milestones:
+
+| MCP tool | Upstream service | Live routes |
+| -------- | ---------------- | ----------- |
+| `manage_incident_ticket` | Incidents Manager (`services/api`) | `POST /api/incidents`, `PATCH /api/incidents/{id}/status`, `GET /api/incidents/{id}` |
+| `query_inventory` | Inventory module (`services/api/inventory.py` → `products.csv`) | `GET /inventory/products`, `GET /inventory/products/{id}` |
+
+Implementation: `http_clients.py` → `httpx` → `COMPANY_API_BASE` (default
+`http://127.0.0.1:8000`). No CSV reads, no parallel fake stores, no in-process
+incident/inventory logic inside `mcps/`.
+
+```text
+MCP client ──OAuth──► mcps/company_tools ──HTTP──► services/api (Incidents + Inventory)
+```
+
+The company API **must be running** before the MCP server is useful.
+
 ## Transport
 
 **Streamable HTTP** on port `3001` (path `/mcp`).

@@ -104,7 +104,43 @@ def mcp_base(issuer_base: str, api_base: str) -> Iterator[str]:
     thread.join(timeout=5)
 
 
-def test_incident_create_and_status_lifecycle(api_base: str) -> None:
+def test_mcp_http_clients_only_call_company_api_paths(api_base: str) -> None:
+    """MCP tools must rely on the live Incidents/Inventory HTTP API — not replace it."""
+    import mcps.company_tools.http_clients as clients
+
+    assert clients.INCIDENTS_COLLECTION_PATH == "/api/incidents"
+    assert clients.INCIDENT_STATUS_PATH == "/api/incidents/{incident_id}/status"
+    assert clients.PRODUCTS_COLLECTION_PATH == "/inventory/products"
+
+    # Live round-trip against the running company API (same process as other fixtures).
+    created = clients.create_incident(
+        {
+            "category": "EQUIPAMIENTO",
+            "description": "MCP relies on Incidents Manager HTTP",
+            "status": "ABIERTO",
+        },
+        base_url=api_base,
+    )
+    assert created.status_code == 201, created.text
+    ticket_id = created.json()["incident_id"]
+
+    got = clients.get_incident(ticket_id, base_url=api_base)
+    assert got.status_code == 200
+    assert got.json()["incident_id"] == ticket_id
+
+    patched = clients.update_incident_status(ticket_id, "CERRADO", base_url=api_base)
+    assert patched.status_code == 200
+    assert patched.json()["status"] == "CERRADO"
+
+    products = clients.list_products(base_url=api_base)
+    assert products.status_code == 200
+    assert isinstance(products.json(), list)
+    assert len(products.json()) >= 1
+
+    one = clients.get_product(products.json()[0]["product_id"], base_url=api_base)
+    assert one.status_code == 200
+    assert one.json()["source"] == "inventory_manager"
+
     created = manage_incident_ticket(
         action="create",
         category="EQUIPAMIENTO",

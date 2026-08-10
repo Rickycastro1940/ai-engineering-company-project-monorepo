@@ -1,5 +1,15 @@
 # MCP Server — Company Tools (submission notes)
 
+## Depends on existing backends
+
+The MCP server **does not replace** the Incidents Manager or inventory module.
+`mcps/company_tools/http_clients.py` issues HTTP calls to:
+
+- `POST /api/incidents`, `PATCH /api/incidents/{id}/status`, `GET /api/incidents/{id}`
+- `GET /inventory/products`, `GET /inventory/products/{id}`
+
+Those routes live in `services/api/` (CSV-backed stores from earlier milestones).
+
 ## Transport choice
 
 **Streamable HTTP** (port `3001`, path `/mcp`).
