@@ -342,14 +342,131 @@ def test_acceptance_oauth_via_mcpauth_not_fastmcp_auth(mcp_base: str) -> None:
     assert auth_mod.SCOPE_INCIDENTS_MANAGE == "incidents:manage"
     assert auth_mod.SCOPE_INVENTORY_READ == "inventory:read"
     # FastMCP is the tool host only — no FastMCP AuthSettings / built-in auth wiring.
-    assert not hasattr(server_mod.mcp, "auth") or server_mod.mcp.auth is None
+    assert server_mod.mcp.settings.auth is None
     source = Path(server_mod.__file__).read_text(encoding="utf-8")
-    assert "from mcpauth" in Path(auth_mod.__file__).read_text(encoding="utf-8")
-    assert "AuthSettings" not in source
-    assert "mcp.server.auth" not in source
+    auth_source = Path(auth_mod.__file__).read_text(encoding="utf-8")
+    assert "from mcpauth" in auth_source
+    assert "AuthServerType.OIDC" in auth_source
+    assert "protected_resources" in auth_source
+    assert "from mcp.server.auth" not in source
+    assert "import mcp.server.auth" not in source
+    # No FastMCP auth wiring — only documented as intentionally unused.
+    assert "settings.auth is None" in source or "settings.auth is not None" in source
 
     meta = httpx.get(f"{mcp_base}/.well-known/oauth-protected-resource/mcp", timeout=5.0)
     assert meta.status_code == 200
     payload = meta.json()
     assert "incidents:manage" in (payload.get("scopes_supported") or [])
     assert "inventory:read" in (payload.get("scopes_supported") or [])
+
+
+def _mcp_rpc(mcp_base: str, token: str | None, method: str, params: dict, request_id: int = 1):
+    headers = {
+        "Accept": "application/json, text/event-stream",
+        "Content-Type": "application/json",
+    }
+    if token is not None:
+        headers["Authorization"] = f"Bearer {token}"
+    response = httpx.post(
+        f"{mcp_base}/mcp",
+        headers=headers,
+        json={"jsonrpc": "2.0", "id": request_id, "method": method, "params": params},
+        timeout=10.0,
+    )
+    body = response.text
+    if "data: " in body:
+        for line in body.splitlines():
+            if line.startswith("data: "):
+                body = line[6:]
+                break
+    try:
+        payload = __import__("json").loads(body)
+    except Exception:  # noqa: BLE001
+        payload = {"_raw": body}
+    return response, payload
+
+
+def test_mandatory_oauth_blocks_unauthenticated_list_and_invoke(mcp_base: str) -> None:
+    """No client without a valid access token can list or invoke tools."""
+    list_resp, list_body = _mcp_rpc(mcp_base, None, "tools/list", {})
+    assert list_resp.status_code == 401
+    assert "error" in list_body
+    assert "www-authenticate" in {k.lower() for k in list_resp.headers.keys()}
+
+    call_resp, call_body = _mcp_rpc(
+        mcp_base,
+        None,
+        "tools/call",
+        {"name": "query_inventory", "arguments": {"action": "list"}},
+        request_id=2,
+    )
+    assert call_resp.status_code == 401
+    assert "error" in call_body
+
+    init_resp, _ = _mcp_rpc(
+        mcp_base,
+        None,
+        "initialize",
+        {
+            "protocolVersion": "2025-03-26",
+            "capabilities": {},
+            "clientInfo": {"name": "unauth", "version": "0"},
+        },
+        request_id=3,
+    )
+    assert init_resp.status_code == 401
+
+
+def test_mandatory_oauth_rejects_invalid_and_wrong_audience_tokens(mcp_base: str) -> None:
+    bad_resp, bad_body = _mcp_rpc(mcp_base, "not-a-jwt", "tools/list", {})
+    assert bad_resp.status_code == 401
+    assert bad_body.get("error") in {"invalid_token", "invalid_request", "unauthorized"}
+
+    wrong_aud = mint_access_token(
+        audience="https://evil.example/mcp",
+        scopes="incidents:manage inventory:read",
+    )
+    aud_resp, aud_body = _mcp_rpc(mcp_base, wrong_aud, "tools/list", {})
+    assert aud_resp.status_code == 401
+    assert "error" in aud_body
+
+
+def test_mandatory_oauth_scope_enforcement_on_invoke(mcp_base: str) -> None:
+    """Valid JWT can list tools; invoke still requires the tool's OAuth scope."""
+    inv_only = mint_access_token(
+        audience="http://127.0.0.1:13001/mcp",
+        scopes="inventory:read",
+        client_id="inv-only",
+    )
+    list_resp, list_body = _mcp_rpc(mcp_base, inv_only, "tools/list", {})
+    assert list_resp.status_code == 200
+    tools = [t["name"] for t in list_body["result"]["tools"]]
+    assert "manage_incident_ticket" in tools
+    assert "query_inventory" in tools
+
+    denied_resp, denied_body = _mcp_rpc(
+        mcp_base,
+        inv_only,
+        "tools/call",
+        {
+            "name": "manage_incident_ticket",
+            "arguments": {"action": "get_status", "ticket_id": "BRS-000001"},
+        },
+        request_id=2,
+    )
+    assert denied_resp.status_code == 200
+    denied_tool = __import__("json").loads(denied_body["result"]["content"][0]["text"])
+    assert denied_tool["ok"] is False
+    assert denied_tool["error_code"] == ErrorCode.AUTH_INSUFFICIENT_SCOPE
+
+    ok_resp, ok_body = _mcp_rpc(
+        mcp_base,
+        inv_only,
+        "tools/call",
+        {"name": "query_inventory", "arguments": {"action": "list"}},
+        request_id=3,
+    )
+    assert ok_resp.status_code == 200
+    ok_tool = __import__("json").loads(ok_body["result"]["content"][0]["text"])
+    assert ok_tool["ok"] is True
+    assert ok_tool["products"]

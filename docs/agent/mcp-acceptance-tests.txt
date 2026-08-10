@@ -4,17 +4,20 @@ cachedir: .pytest_cache
 rootdir: /workspace
 configfile: pyproject.toml
 plugins: langsmith-0.10.15, anyio-4.14.2
-collecting ... collected 9 items
+collecting ... collected 12 items
 
-tests/pipelines/test_company_tools_mcp.py::test_mcp_http_clients_only_call_company_api_paths PASSED [ 11%]
-tests/pipelines/test_company_tools_mcp.py::test_incident_create_and_status_lifecycle PASSED [ 22%]
-tests/pipelines/test_company_tools_mcp.py::test_inventory_query_and_write_rejection PASSED [ 33%]
-tests/pipelines/test_company_tools_mcp.py::test_mcp_rejects_unauthenticated_client PASSED [ 44%]
-tests/pipelines/test_company_tools_mcp.py::test_mcp_discovery_with_token PASSED [ 55%]
-tests/pipelines/test_company_tools_mcp.py::test_incident_api_status_endpoint PASSED [ 66%]
-tests/pipelines/test_company_tools_mcp.py::test_acceptance_domain_fields_match_company_apis PASSED [ 77%]
-tests/pipelines/test_company_tools_mcp.py::test_acceptance_status_update_uses_lifecycle_endpoint_only PASSED [ 88%]
-tests/pipelines/test_company_tools_mcp.py::test_acceptance_oauth_via_mcpauth_not_fastmcp_auth PASSED [100%]
+tests/pipelines/test_company_tools_mcp.py::test_mcp_http_clients_only_call_company_api_paths PASSED [  8%]
+tests/pipelines/test_company_tools_mcp.py::test_incident_create_and_status_lifecycle PASSED [ 16%]
+tests/pipelines/test_company_tools_mcp.py::test_inventory_query_and_write_rejection PASSED [ 25%]
+tests/pipelines/test_company_tools_mcp.py::test_mcp_rejects_unauthenticated_client PASSED [ 33%]
+tests/pipelines/test_company_tools_mcp.py::test_mcp_discovery_with_token PASSED [ 41%]
+tests/pipelines/test_company_tools_mcp.py::test_incident_api_status_endpoint PASSED [ 50%]
+tests/pipelines/test_company_tools_mcp.py::test_acceptance_domain_fields_match_company_apis PASSED [ 58%]
+tests/pipelines/test_company_tools_mcp.py::test_acceptance_status_update_uses_lifecycle_endpoint_only PASSED [ 66%]
+tests/pipelines/test_company_tools_mcp.py::test_acceptance_oauth_via_mcpauth_not_fastmcp_auth PASSED [ 75%]
+tests/pipelines/test_company_tools_mcp.py::test_mandatory_oauth_blocks_unauthenticated_list_and_invoke PASSED [ 83%]
+tests/pipelines/test_company_tools_mcp.py::test_mandatory_oauth_rejects_invalid_and_wrong_audience_tokens PASSED [ 91%]
+tests/pipelines/test_company_tools_mcp.py::test_mandatory_oauth_scope_enforcement_on_invoke PASSED [100%]
 
 =============================== warnings summary ===============================
 tests/pipelines/test_company_tools_mcp.py::test_mcp_http_clients_only_call_company_api_paths
@@ -27,4 +30,4 @@ tests/pipelines/test_company_tools_mcp.py::test_mcp_rejects_unauthenticated_clie
     warnings.warn(
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-======================== 9 passed, 3 warnings in 2.46s =========================
+======================== 12 passed, 3 warnings in 2.69s ========================

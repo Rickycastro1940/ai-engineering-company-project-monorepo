@@ -57,6 +57,25 @@ ticket ids `BRS-######`, inventory `product_id`/`quantity`/`unit`.
 Full discovery docs (name / description / input / output — MCP `--help`):
 [`TOOLS.md`](./TOOLS.md) and [`docs/agent/mcp-tools-discovery.json`](../../docs/agent/mcp-tools-discovery.json).
 
+## Auth (mandatory — MCP Auth resource-server mode)
+
+Company tools are **not** exposed without OAuth. Prefer **MCP Auth** (`mcpauth`)
+over FastMCP built-in auth so the flow matches the MCP Authorization spec.
+
+| Concern | Implementation |
+| ------- | -------------- |
+| Mode | OAuth 2.1 **resource server** (`protected_resources` + PRM) |
+| Protocol | **OIDC** metadata / JWKS via `MCP_AUTH_ISSUER` (provider-agnostic) |
+| Transport gate | `bearer_auth_middleware("jwt", audience=resource)` on `/mcp` → HTTP 401 without a valid access token |
+| Scopes | `incidents:manage`, `inventory:read` (advertised + enforced per tool) |
+| Not used | FastMCP `AuthSettings` / built-in auth |
+
+```bash
+# Production / staging — point at Logto (or any OIDC provider)
+export MCP_AUTH_ISSUER=https://your-tenant.logto.app/oidc
+export MCP_RESOURCE_ID=https://mcp.brasaland.example/mcp
+```
+
 ## Error codes
 
 | Code | Meaning |

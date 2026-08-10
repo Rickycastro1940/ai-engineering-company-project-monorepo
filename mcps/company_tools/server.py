@@ -18,7 +18,6 @@ from typing import Annotated, Any, Literal
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
-from mcpauth.exceptions import BearerAuthExceptionCode, MCPAuthBearerAuthException
 from pydantic import Field
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
@@ -37,6 +36,7 @@ from mcps.company_tools.tools.incidents import manage_incident_ticket
 from mcps.company_tools.tools.inventory import query_inventory
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
+logger = logging.getLogger("mcps.company_tools.server")
 
 
 def _build_transport_security() -> TransportSecuritySettings:
@@ -93,17 +93,37 @@ mcp = FastMCP(
     name="Brasaland Company Tools",
     stateless_http=True,
     transport_security=_build_transport_security(),
+    # Intentionally NO FastMCP AuthSettings — OAuth is MCP Auth (mcpauth) only.
 )
-mcp_auth = None  # set in create_app() so issuer can start first
+assert getattr(mcp, "settings", None) is None or mcp.settings.auth is None, (
+    "FastMCP built-in auth must stay disabled; use mcpauth resource-server mode."
+)
 
 
-def _require_scopes(required: list[str]) -> None:
+def _auth_gate(required: list[str], *, tool: str) -> dict[str, Any] | None:
+    """Fail closed: missing token context or missing scopes → structured error.
+
+    Transport-level MCP Auth middleware already rejects missing/invalid JWTs
+    with HTTP 401 before tools run. This gate enforces per-tool OAuth scopes
+    and treats a missing auth context as AUTH_MISSING_TOKEN (never as success).
+    """
     auth = build_mcp_auth().auth_info
     if auth is None:
-        raise MCPAuthBearerAuthException(BearerAuthExceptionCode.MISSING_AUTH_HEADER)
-    missing = [scope for scope in required if scope not in (auth.scopes or [])]
+        return error_payload(
+            ErrorCode.AUTH_MISSING_TOKEN,
+            "Missing authenticated Bearer context. Present a valid OAuth access token.",
+            tool=tool,
+        )
+    have = set(auth.scopes or [])
+    missing = [scope for scope in required if scope not in have]
     if missing:
-        raise MCPAuthBearerAuthException(BearerAuthExceptionCode.MISSING_REQUIRED_SCOPES)
+        return error_payload(
+            ErrorCode.AUTH_INSUFFICIENT_SCOPE,
+            f"Missing required scope: {', '.join(missing)}",
+            tool=tool,
+            details={"required": required, "present": sorted(have), "missing": missing},
+        )
+    return None
 
 
 @mcp.tool(
@@ -188,14 +208,9 @@ def tool_manage_incident_ticket(
     auth = build_mcp_auth()
 
     def _run() -> dict[str, Any]:
-        try:
-            _require_scopes([SCOPE_INCIDENTS_MANAGE])
-        except MCPAuthBearerAuthException:
-            return error_payload(
-                ErrorCode.AUTH_INSUFFICIENT_SCOPE,
-                f"Missing required scope: {SCOPE_INCIDENTS_MANAGE}",
-                tool="manage_incident_ticket",
-            )
+        denied = _auth_gate([SCOPE_INCIDENTS_MANAGE], tool="manage_incident_ticket")
+        if denied is not None:
+            return denied
         return manage_incident_ticket(
             action=action,
             ticket_id=ticket_id,
@@ -286,14 +301,9 @@ def tool_query_inventory(
     auth = build_mcp_auth()
 
     def _run() -> dict[str, Any]:
-        try:
-            _require_scopes([SCOPE_INVENTORY_READ])
-        except MCPAuthBearerAuthException:
-            return error_payload(
-                ErrorCode.AUTH_INSUFFICIENT_SCOPE,
-                f"Missing required scope: {SCOPE_INVENTORY_READ}",
-                tool="query_inventory",
-            )
+        denied = _auth_gate([SCOPE_INVENTORY_READ], tool="query_inventory")
+        if denied is not None:
+            return denied
         return query_inventory(
             action=action,
             product_id=product_id,
@@ -325,17 +335,42 @@ async def lifespan(app: Starlette):
 
 
 def create_app() -> Starlette:
-    """Build the Streamable HTTP Starlette app with MCP Auth middleware."""
+    """Build Streamable HTTP app with mandatory MCP Auth (resource-server mode).
+
+    Protection model
+    ----------------
+    1. ``resource_metadata_router`` — public OAuth Protected Resource Metadata
+       (RFC 9728) so clients discover the OIDC issuer + scopes.
+    2. ``bearer_auth_middleware("jwt", ...)`` wraps **all** ``/mcp`` traffic.
+       Missing / invalid / wrong-audience tokens → HTTP 401. No anonymous
+       ``tools/list`` or ``tools/call``.
+    3. Per-tool ``_auth_gate`` enforces ``incidents:manage`` /
+       ``inventory:read`` after JWT validation.
+
+    FastMCP built-in auth is intentionally unused (``settings.auth is None``).
+    """
     auth = build_mcp_auth()
     resource = resource_indicator()
+    if mcp.settings.auth is not None:
+        raise RuntimeError(
+            "Refusing to start: FastMCP built-in auth is set. "
+            "Use mcpauth resource-server mode only."
+        )
+
     bearer_auth = Middleware(
         auth.bearer_auth_middleware(
             "jwt",
             resource=resource,
-            audience=resource,
-            required_scopes=None,  # per-tool scopes enforced inside tools
+            audience=resource,  # aud must equal resource indicator
+            # Transport gate = valid JWT. Tool scopes enforced in _auth_gate.
+            required_scopes=None,
             show_error_details=True,
         )
+    )
+    logger.info(
+        "MCP Auth resource-server enabled resource=%s scopes=%s issuer_via=MCP_AUTH_ISSUER",
+        resource,
+        [SCOPE_INCIDENTS_MANAGE, SCOPE_INVENTORY_READ],
     )
     return Starlette(
         routes=[

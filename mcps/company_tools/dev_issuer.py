@@ -110,10 +110,17 @@ async def token(request: Request) -> JSONResponse:
     """Minimal token endpoint — issues a JWT for local MCP clients / tests."""
     if request.method == "POST":
         form = await request.form()
-        scopes = str(form.get("scope") or DEFAULT_SCOPES)
+        # Respect an explicitly provided scope (including "") for auth tests.
+        if "scope" in form:
+            scopes = str(form.get("scope") or "")
+        else:
+            scopes = DEFAULT_SCOPES
         client_id = str(form.get("client_id") or "mcp-playground")
     else:
-        scopes = request.query_params.get("scope") or DEFAULT_SCOPES
+        if "scope" in request.query_params:
+            scopes = request.query_params.get("scope") or ""
+        else:
+            scopes = DEFAULT_SCOPES
         client_id = request.query_params.get("client_id") or "mcp-playground"
 
     access_token = mint_access_token(

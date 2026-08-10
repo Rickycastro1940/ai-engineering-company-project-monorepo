@@ -10,9 +10,11 @@
 2. **Lifecycle status only** — `action=update` always calls
    `PATCH /api/incidents/{id}/status` via `http_clients.update_incident_status`.
    There is no generic `PATCH /api/incidents/{id}` helper.
-3. **OAuth via MCP Auth** — `mcpauth.MCPAuth` bearer middleware + Protected
-   Resource Metadata; scopes `incidents:manage` and `inventory:read`. FastMCP
-   built-in auth is not used.
+3. **OAuth via MCP Auth** — `mcpauth.MCPAuth` in **resource-server** mode with
+   OIDC (`AuthServerType.OIDC`), provider-agnostic via `MCP_AUTH_ISSUER`.
+   Bearer JWT middleware blocks anonymous `tools/list` / `tools/call` (HTTP 401).
+   Scopes `incidents:manage` / `inventory:read` are enforced per tool.
+   FastMCP built-in auth is not used (`settings.auth is None`).
 
 Regression coverage: `tests/pipelines/test_company_tools_mcp.py`
 (`test_acceptance_*`).
