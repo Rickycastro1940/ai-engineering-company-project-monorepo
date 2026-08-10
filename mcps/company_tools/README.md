@@ -50,6 +50,9 @@ multiple authenticated clients share one OAuth-protected resource server.
 | `manage_incident_ticket` | `incidents:manage` | `create`, `update` (via `PATCH /api/incidents/{id}/status`), `get_status` |
 | `query_inventory` | `inventory:read` | read-only query; writes → `INVENTORY_WRITE_FORBIDDEN` |
 
+Full discovery docs (name / description / input / output — MCP `--help`):
+[`TOOLS.md`](./TOOLS.md) and [`docs/agent/mcp-tools-discovery.json`](../../docs/agent/mcp-tools-discovery.json).
+
 ## Error codes
 
 | Code | Meaning |
