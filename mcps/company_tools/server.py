@@ -261,7 +261,12 @@ def tool_manage_incident_ticket(
     payload = timed_call(
         tool="manage_incident_ticket",
         mcp_auth=auth,
-        input_summary={"action": action, "ticket_id": ticket_id},
+        input_summary={
+            "action": action,
+            "ticket_id": ticket_id,
+            "category": category,
+            "status": status,
+        },
         fn=_run,
     )
     return ManageIncidentTicketOutput.model_validate(payload)

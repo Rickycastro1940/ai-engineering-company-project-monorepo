@@ -658,3 +658,110 @@ def test_transport_auth_failures_map_to_catalog_codes(mcp_base: str) -> None:
     inv_body = invalid.json()
     assert inv_body.get("error") == "invalid_token"
     assert map_transport_oauth_error(inv_body.get("error")) == ErrorCode.AUTH_INVALID_TOKEN
+
+
+def test_every_tool_invocation_is_logged_with_tool_client_and_result(caplog, mcp_base: str) -> None:
+    """Traceability: each tools/call emits tool + client_id + result."""
+    import json
+    import logging
+
+    from mcps.company_tools.logging_util import INVOCATION_LOGGER_NAME
+
+    token = mint_access_token(
+        audience="http://127.0.0.1:13001/mcp",
+        scopes="incidents:manage inventory:read",
+        client_id="trace-client",
+    )
+    with caplog.at_level(logging.INFO, logger=INVOCATION_LOGGER_NAME):
+        ok_resp, ok_body = _mcp_rpc(
+            mcp_base,
+            token,
+            "tools/call",
+            {
+                "name": "manage_incident_ticket",
+                "arguments": {
+                    "action": "create",
+                    "category": "EQUIPAMIENTO",
+                    "description": "Logged invocation for traceability",
+                },
+            },
+            request_id=1,
+        )
+        assert ok_resp.status_code == 200
+        create_tool = json.loads(ok_body["result"]["content"][0]["text"])
+        assert create_tool["ok"] is True
+
+        denied_resp, denied_body = _mcp_rpc(
+            mcp_base,
+            mint_access_token(
+                audience="http://127.0.0.1:13001/mcp",
+                scopes="inventory:read",
+                client_id="inv-logger",
+            ),
+            "tools/call",
+            {
+                "name": "manage_incident_ticket",
+                "arguments": {"action": "get_status", "ticket_id": "BRS-000001"},
+            },
+            request_id=2,
+        )
+        assert denied_resp.status_code == 200
+        denied_tool = json.loads(denied_body["result"]["content"][0]["text"])
+        assert denied_tool["error_code"] == ErrorCode.AUTH_INSUFFICIENT_SCOPE
+
+    entries = []
+    for record in caplog.records:
+        if record.name != INVOCATION_LOGGER_NAME:
+            continue
+        try:
+            entries.append(json.loads(record.getMessage()))
+        except json.JSONDecodeError:
+            continue
+
+    assert entries, "expected at least one tool_invocation log line"
+    for entry in entries:
+        assert entry.get("event") == "tool_invocation"
+        assert entry.get("tool") in {"manage_incident_ticket", "query_inventory"}
+        assert entry.get("client_id")
+        assert entry.get("result") in {"success", "error"}
+        if entry["result"] == "error":
+            assert entry.get("error_code")
+            assert entry["error_code"] != "error"
+
+    success = [e for e in entries if e["tool"] == "manage_incident_ticket" and e["result"] == "success"]
+    assert success
+    assert success[0]["client_id"] == "trace-client"
+
+    authz = [
+        e
+        for e in entries
+        if e.get("error_code") == ErrorCode.AUTH_INSUFFICIENT_SCOPE and e["client_id"] == "inv-logger"
+    ]
+    assert authz
+
+
+def test_timed_call_always_logs_tool_client_result(caplog) -> None:
+    import json
+    import logging
+    from types import SimpleNamespace
+
+    from mcps.company_tools.logging_util import INVOCATION_LOGGER_NAME, timed_call
+
+    class _Auth:
+        auth_info = SimpleNamespace(client_id="unit-client", subject="sub-1", scopes=["inventory:read"])
+
+    with caplog.at_level(logging.INFO, logger=INVOCATION_LOGGER_NAME):
+        out = timed_call(
+            tool="query_inventory",
+            mcp_auth=_Auth(),  # type: ignore[arg-type]
+            input_summary={"action": "list"},
+            fn=lambda: {"ok": True, "products": [{"product_id": "1"}]},
+        )
+    assert out["ok"] is True
+    logged = [json.loads(r.getMessage()) for r in caplog.records if r.name == INVOCATION_LOGGER_NAME]
+    assert len(logged) == 1
+    entry = logged[0]
+    assert entry["tool"] == "query_inventory"
+    assert entry["client_id"] == "unit-client"
+    assert entry["result"] == "success"
+    assert entry["result_summary"]["product_count"] == 1

@@ -100,6 +100,12 @@ Full catalog (authentication / authorization / validation / process exits):
 
 Process exit codes: `0` success, `2` config, `3` auth setup (OIDC), `4` validation, `1` unexpected.
 
+## Invocation logging (traceability)
+
+Every tool call is logged as one JSON line (`event=tool_invocation`) with
+**tool**, **client_id**, and **result** (`success` / `error` + `error_code`).
+See [`LOGGING.md`](./LOGGING.md).
+
 ## Run locally
 
 Prerequisites: company API on `:8000` (incidents + inventory).
