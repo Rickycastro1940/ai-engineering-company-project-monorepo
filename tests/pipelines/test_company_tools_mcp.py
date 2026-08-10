@@ -1031,7 +1031,7 @@ def test_transport_auth_failures_map_to_catalog_codes(mcp_base: str) -> None:
 
 
 def test_every_tool_invocation_is_logged_with_tool_client_and_result(caplog, mcp_base: str) -> None:
-    """Traceability: each tools/call emits tool + client_id + result."""
+    """Rubric: ≥1 log entry per tools/call with tool, client_id, and result."""
     import json
     import logging
 
@@ -1042,6 +1042,8 @@ def test_every_tool_invocation_is_logged_with_tool_client_and_result(caplog, mcp
         scopes="incidents:manage inventory:read",
         client_id="trace-client",
     )
+    expected_calls: list[tuple[str, str, str]] = []  # tool, client_id, result_kind
+
     with caplog.at_level(logging.INFO, logger=INVOCATION_LOGGER_NAME):
         ok_resp, ok_body = _mcp_rpc(
             mcp_base,
@@ -1060,6 +1062,34 @@ def test_every_tool_invocation_is_logged_with_tool_client_and_result(caplog, mcp
         assert ok_resp.status_code == 200
         create_tool = json.loads(ok_body["result"]["content"][0]["text"])
         assert create_tool["ok"] is True
+        expected_calls.append(("manage_incident_ticket", "trace-client", "success"))
+
+        inv_resp, inv_body = _mcp_rpc(
+            mcp_base,
+            token,
+            "tools/call",
+            {"name": "query_inventory", "arguments": {"action": "list"}},
+            request_id=2,
+        )
+        assert inv_resp.status_code == 200
+        inv_tool = json.loads(inv_body["result"]["content"][0]["text"])
+        assert inv_tool["ok"] is True
+        expected_calls.append(("query_inventory", "trace-client", "success"))
+
+        write_resp, write_body = _mcp_rpc(
+            mcp_base,
+            token,
+            "tools/call",
+            {
+                "name": "query_inventory",
+                "arguments": {"action": "update", "product_id": "1", "quantity": 99},
+            },
+            request_id=3,
+        )
+        assert write_resp.status_code == 200
+        write_tool = json.loads(write_body["result"]["content"][0]["text"])
+        assert write_tool["error_code"] == ErrorCode.INVENTORY_WRITE_FORBIDDEN
+        expected_calls.append(("query_inventory", "trace-client", "error"))
 
         denied_resp, denied_body = _mcp_rpc(
             mcp_base,
@@ -1073,11 +1103,12 @@ def test_every_tool_invocation_is_logged_with_tool_client_and_result(caplog, mcp
                 "name": "manage_incident_ticket",
                 "arguments": {"action": "get_status", "ticket_id": "BRS-000001"},
             },
-            request_id=2,
+            request_id=4,
         )
         assert denied_resp.status_code == 200
         denied_tool = json.loads(denied_body["result"]["content"][0]["text"])
         assert denied_tool["error_code"] == ErrorCode.AUTH_INSUFFICIENT_SCOPE
+        expected_calls.append(("manage_incident_ticket", "inv-logger", "error"))
 
     entries = []
     for record in caplog.records:
@@ -1088,19 +1119,33 @@ def test_every_tool_invocation_is_logged_with_tool_client_and_result(caplog, mcp
         except json.JSONDecodeError:
             continue
 
-    assert entries, "expected at least one tool_invocation log line"
+    assert len(entries) >= len(expected_calls), (
+        f"expected ≥{len(expected_calls)} tool_invocation logs, got {len(entries)}"
+    )
     for entry in entries:
         assert entry.get("event") == "tool_invocation"
         assert entry.get("tool") in {"manage_incident_ticket", "query_inventory"}
-        assert entry.get("client_id")
-        assert entry.get("result") in {"success", "error"}
+        assert entry.get("client_id"), entry
+        assert entry.get("result") in {"success", "error"}, entry
         if entry["result"] == "error":
             assert entry.get("error_code")
             assert entry["error_code"] != "error"
 
-    success = [e for e in entries if e["tool"] == "manage_incident_ticket" and e["result"] == "success"]
-    assert success
-    assert success[0]["client_id"] == "trace-client"
+    # Match each tools/call to at least one log with the same tool + client + result.
+    remaining = list(entries)
+    for tool, client_id, result in expected_calls:
+        match_idx = next(
+            (
+                i
+                for i, e in enumerate(remaining)
+                if e.get("tool") == tool
+                and e.get("client_id") == client_id
+                and e.get("result") == result
+            ),
+            None,
+        )
+        assert match_idx is not None, (tool, client_id, result, remaining)
+        remaining.pop(match_idx)
 
     authz = [
         e
@@ -1108,6 +1153,12 @@ def test_every_tool_invocation_is_logged_with_tool_client_and_result(caplog, mcp
         if e.get("error_code") == ErrorCode.AUTH_INSUFFICIENT_SCOPE and e["client_id"] == "inv-logger"
     ]
     assert authz
+    write_logs = [
+        e
+        for e in entries
+        if e.get("error_code") == ErrorCode.INVENTORY_WRITE_FORBIDDEN and e["tool"] == "query_inventory"
+    ]
+    assert write_logs
 
 
 def test_timed_call_always_logs_tool_client_result(caplog) -> None:

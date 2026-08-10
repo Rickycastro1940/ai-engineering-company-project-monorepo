@@ -61,6 +61,14 @@ The three categories are **pairwise distinct** in both `error_code` and
 `message` (sampled live in
 `test_auth_authz_validation_errors_have_distinct_codes_and_messages`).
 
+## Invocation logging (tool + client + result)
+
+Every MCP tool call is wrapped in `timed_call` and emits **≥1** JSON log line
+(`event=tool_invocation`) with required fields `tool`, `client_id`, and
+`result` (`success`|`error`). See [`mcps/company_tools/LOGGING.md`](../mcps/company_tools/LOGGING.md).
+Confirmed by `test_every_tool_invocation_is_logged_with_tool_client_and_result`
+(covers both tools, success and error paths).
+
 ## Agent migration (LangGraph → MCP)
 
 - [x] Graph `lookup_ticket` node uses `lookup_ticket_via_mcp` +
