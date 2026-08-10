@@ -14,11 +14,12 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
-from typing import Any
+from typing import Annotated, Any, Literal
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from mcpauth.exceptions import BearerAuthExceptionCode, MCPAuthBearerAuthException
+from pydantic import Field
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.routing import Mount
@@ -31,6 +32,7 @@ from mcps.company_tools.auth import (
 )
 from mcps.company_tools.errors import ErrorCode, error_payload
 from mcps.company_tools.logging_util import timed_call
+from mcps.company_tools.schemas import ManageIncidentTicketOutput, QueryInventoryOutput
 from mcps.company_tools.tools.incidents import manage_incident_ticket
 from mcps.company_tools.tools.inventory import query_inventory
 
@@ -106,27 +108,75 @@ def _require_scopes(required: list[str]) -> None:
 
 @mcp.tool(
     name="manage_incident_ticket",
+    title="Manage Brasaland incident tickets",
     description=(
         "Create, update status, or query an incident ticket in the Brasaland "
-        "Incidents Manager. "
+        "Incidents Manager (live HTTP API — not a mock). "
         "Actions: create | update | get_status. "
-        "Status updates always call PATCH /api/incidents/{id}/status (lifecycle). "
-        "Requires OAuth scope incidents:manage. "
-        "Fields match the live API (incident_id, category, description, status, …)."
+        "create requires category+description; update requires ticket_id+status and "
+        "always calls PATCH /api/incidents/{id}/status (lifecycle only); "
+        "get_status requires ticket_id. "
+        "Statuses: ABIERTO | CERRADO | DESCARTADO. "
+        "On success returns {ok:true, action, ticket:{incident_id,status,…}}. "
+        "On failure returns {ok:false, error_code, message} with distinct codes "
+        "(VALIDATION_ERROR, NOT_FOUND, LIFECYCLE_ERROR, UPSTREAM_ERROR, "
+        "AUTH_INSUFFICIENT_SCOPE). "
+        "Requires OAuth Bearer token with scope incidents:manage."
     ),
+    structured_output=True,
 )
 def tool_manage_incident_ticket(
-    action: str,
-    ticket_id: str | None = None,
-    category: str | None = None,
-    description: str | None = None,
-    status: str | None = None,
-    date: str | None = None,
-    location_id: str | None = None,
-    customer_id: str | None = None,
-    reporter_id: str | None = None,
-) -> dict[str, Any]:
-    """MCP tool: manage Incidents Manager tickets."""
+    action: Annotated[
+        Literal["create", "update", "get_status"],
+        Field(
+            description=(
+                "create: open a new ticket (needs category+description). "
+                "update: change status via PATCH /api/incidents/{id}/status (needs ticket_id+status). "
+                "get_status: look up one ticket (needs ticket_id)."
+            )
+        ),
+    ],
+    ticket_id: Annotated[
+        str | None,
+        Field(description="Required for update and get_status. Example: BRS-000002."),
+    ] = None,
+    category: Annotated[
+        str | None,
+        Field(
+            description="Required for create. Brasaland categories e.g. EQUIPAMIENTO, ABASTECIMIENTO."
+        ),
+    ] = None,
+    description: Annotated[
+        str | None,
+        Field(description="Required for create. Short description of the incident."),
+    ] = None,
+    status: Annotated[
+        str | None,
+        Field(
+            description=(
+                "For create: initial status (default ABIERTO). "
+                "For update: target status only — ABIERTO | CERRADO | DESCARTADO."
+            )
+        ),
+    ] = None,
+    date: Annotated[
+        str | None,
+        Field(description="Optional ISO date for create (YYYY-MM-DD)."),
+    ] = None,
+    location_id: Annotated[
+        str | None,
+        Field(description="Optional location id for create (e.g. COL-01, FLA-02)."),
+    ] = None,
+    customer_id: Annotated[
+        str | None,
+        Field(description="Optional customer id for create."),
+    ] = None,
+    reporter_id: Annotated[
+        str | None,
+        Field(description="Optional reporter id for create."),
+    ] = None,
+) -> ManageIncidentTicketOutput:
+    """MCP discovery entry for Incidents Manager ticket management."""
     auth = build_mcp_auth()
 
     def _run() -> dict[str, Any]:
@@ -138,14 +188,8 @@ def tool_manage_incident_ticket(
                 f"Missing required scope: {SCOPE_INCIDENTS_MANAGE}",
                 tool="manage_incident_ticket",
             )
-        if action not in {"create", "update", "get_status"}:
-            return error_payload(
-                ErrorCode.VALIDATION_ERROR,
-                "action must be one of: create, update, get_status",
-                tool="manage_incident_ticket",
-            )
         return manage_incident_ticket(
-            action=action,  # type: ignore[arg-type]
+            action=action,
             ticket_id=ticket_id,
             category=category,
             description=description,
@@ -156,34 +200,80 @@ def tool_manage_incident_ticket(
             reporter_id=reporter_id,
         )
 
-    return timed_call(
+    payload = timed_call(
         tool="manage_incident_ticket",
         mcp_auth=auth,
         input_summary={"action": action, "ticket_id": ticket_id},
         fn=_run,
     )
+    return ManageIncidentTicketOutput.model_validate(payload)
 
 
 @mcp.tool(
     name="query_inventory",
+    title="Query Brasaland inventory (read-only)",
     description=(
         "Read-only lookup of Brasaland inventory products/stock from the live "
-        "inventory manager (products.csv-backed GET /inventory/products). "
-        "Write operations are not supported and are rejected with "
-        "INVENTORY_WRITE_FORBIDDEN. Requires OAuth scope inventory:read. "
-        "Filter with product_id or name_contains."
+        "inventory manager (GET /inventory/products — products.csv-backed). "
+        "Use product_id for one product or name_contains to filter by name. "
+        "Allowed actions: query | get | list | read. "
+        "Write operations are NOT supported: any action of update/create/delete/"
+        "write/patch/put OR any non-empty quantity/delta/unit/name field is "
+        "explicitly rejected with error_code INVENTORY_WRITE_FORBIDDEN "
+        "(the write tool is not omitted — it fails with a clear code). "
+        "On success returns {ok:true, products:[{product_id,name,quantity,unit,source}]}. "
+        "Requires OAuth Bearer token with scope inventory:read."
     ),
+    structured_output=True,
 )
 def tool_query_inventory(
-    action: str | None = "query",
-    product_id: str | None = None,
-    name_contains: str | None = None,
-    quantity: int | None = None,
-    delta: int | None = None,
-    unit: str | None = None,
-    name: str | None = None,
-) -> dict[str, Any]:
-    """MCP tool: read-only inventory queries."""
+    action: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Read-only action. Allowed: query | get | list | read (default query). "
+                "Write-oriented values (update, create, delete, write, patch, put) "
+                "are rejected with INVENTORY_WRITE_FORBIDDEN."
+            )
+        ),
+    ] = "query",
+    product_id: Annotated[
+        str | None,
+        Field(description="Optional product id from products.csv (e.g. '1')."),
+    ] = None,
+    name_contains: Annotated[
+        str | None,
+        Field(description="Optional case-insensitive name substring filter."),
+    ] = None,
+    quantity: Annotated[
+        int | None,
+        Field(
+            description="WRITE FIELD — not permitted. Any value triggers INVENTORY_WRITE_FORBIDDEN."
+        ),
+    ] = None,
+    delta: Annotated[
+        int | None,
+        Field(
+            description="WRITE FIELD — not permitted. Any value triggers INVENTORY_WRITE_FORBIDDEN."
+        ),
+    ] = None,
+    unit: Annotated[
+        str | None,
+        Field(
+            description="WRITE FIELD — not permitted. Non-empty value triggers INVENTORY_WRITE_FORBIDDEN."
+        ),
+    ] = None,
+    name: Annotated[
+        str | None,
+        Field(
+            description=(
+                "WRITE FIELD for create/rename — not permitted. "
+                "Use name_contains to filter reads instead."
+            )
+        ),
+    ] = None,
+) -> QueryInventoryOutput:
+    """MCP discovery entry for read-only inventory queries."""
     auth = build_mcp_auth()
 
     def _run() -> dict[str, Any]:
@@ -205,7 +295,7 @@ def tool_query_inventory(
             name=name,
         )
 
-    return timed_call(
+    payload = timed_call(
         tool="query_inventory",
         mcp_auth=auth,
         input_summary={
@@ -215,6 +305,7 @@ def tool_query_inventory(
         },
         fn=_run,
     )
+    return QueryInventoryOutput.model_validate(payload)
 
 
 @contextlib.asynccontextmanager
