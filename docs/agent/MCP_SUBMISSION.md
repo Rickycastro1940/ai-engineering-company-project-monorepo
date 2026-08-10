@@ -2,6 +2,14 @@
 
 ## Acceptance criteria (verified)
 
+0. **Location + start + discovery** — Server package lives under
+   `mcps/company_tools/` (`server.py` / `__main__.py`). `create_app()` boots a
+   Starlette ASGI app (Streamable HTTP on `/mcp`). Tools are exposed through
+   standard MCP discovery: in-process `mcp.list_tools()` and authenticated
+   JSON-RPC `tools/list` both return `manage_incident_ticket` and
+   `query_inventory` with descriptions + `inputSchema`. Confirmed by
+   `test_mcp_server_lives_under_mcps_and_starts` and
+   `test_mcp_standard_discovery_exposes_tools`.
 1. **Domain parity with existing APIs** — MCP ticket/product fields match
    `IncidentRecord` / `InventoryProduct` from `services/api` (`incident_id`,
    `location_id`, `category`, `ABIERTO|CERRADO|DESCARTADO`, `BRS-######`,

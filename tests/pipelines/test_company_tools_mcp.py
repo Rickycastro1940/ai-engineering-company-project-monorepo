@@ -25,6 +25,55 @@ API_DIR = REPO_ROOT / "services" / "api"
 if str(API_DIR) not in sys.path:
     sys.path.insert(0, str(API_DIR))
 
+EXPECTED_MCP_TOOLS = ("manage_incident_ticket", "query_inventory")
+
+
+def test_mcp_server_lives_under_mcps_and_starts() -> None:
+    """Rubric: MCP server lives under ``mcps/`` and ``create_app`` starts cleanly."""
+    package_root = REPO_ROOT / "mcps" / "company_tools"
+    assert package_root.is_dir()
+    assert (package_root / "server.py").is_file()
+    assert (package_root / "__main__.py").is_file()
+
+    # Import path must be the monorepo ``mcps`` package (not a stray copy).
+    import mcps.company_tools.server as server_mod
+
+    assert Path(server_mod.__file__).resolve().is_relative_to(package_root.resolve())
+
+    os.environ.setdefault("MCP_AUTH_ISSUER", "http://127.0.0.1:3002")
+    os.environ.setdefault("MCP_RESOURCE_ID", "http://127.0.0.1:13001/mcp")
+    app = server_mod.create_app()
+    assert app is not None
+    assert server_mod.mcp.name == "Brasaland Company Tools"
+    assert getattr(server_mod.mcp.settings, "auth", None) is None
+
+
+def test_mcp_standard_discovery_exposes_tools(mcp_base: str) -> None:
+    """Rubric: tools are exposed via standard MCP ``tools/list`` discovery."""
+    import asyncio
+
+    from mcps.company_tools.server import mcp
+
+    in_process = asyncio.run(mcp.list_tools())
+    assert sorted(t.name for t in in_process) == sorted(EXPECTED_MCP_TOOLS)
+    for tool in in_process:
+        assert tool.description
+        assert tool.inputSchema
+
+    token = mint_access_token(
+        audience="http://127.0.0.1:13001/mcp",
+        scopes="incidents:read inventory:read",
+        client_id="discovery-eval",
+    )
+    response, body = _mcp_rpc(mcp_base, token, "tools/list", {})
+    assert response.status_code == 200
+    discovered = body["result"]["tools"]
+    names = sorted(t["name"] for t in discovered)
+    assert names == sorted(EXPECTED_MCP_TOOLS)
+    for entry in discovered:
+        assert entry.get("description")
+        assert entry.get("inputSchema")
+
 
 @pytest.fixture(scope="module")
 def api_base() -> Iterator[str]:
