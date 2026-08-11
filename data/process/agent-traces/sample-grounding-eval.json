@@ -1,5 +1,5 @@
 {
-  "trace_id": "df73f92b85a442eb9a5c363ea38b132a",
+  "trace_id": "69f983b02a17462e88d4225ef6e7469e",
   "status": "ok",
   "question": "What is the minimum stock rule for proteins?",
   "answer": "Every Brasaland location must keep at least 3 days of main protein inventory. Emergency orders over 500 USD need approval from Lucía Fernández.",
@@ -10,52 +10,19 @@
       "sequence": 1,
       "status": "ok",
       "duration_ms": 0,
-      "notes": "question accepted; next=decide_route",
+      "notes": "question accepted",
       "output": {
         "accepted": true,
         "question_len": 44
       }
     },
     {
-      "node_name": "decide_route",
-      "sequence": 2,
-      "status": "ok",
-      "duration_ms": 0,
-      "notes": "route=retrieve needs_ticket=False needs_inventory=False needs_rag=True",
-      "output": {
-        "route": "retrieve",
-        "needs_ticket": false,
-        "needs_inventory": false,
-        "needs_rag": true,
-        "ticket_query": null,
-        "inventory_query": null,
-        "decision": "rag"
-      }
-    },
-    {
-      "node_name": "recall_memory",
-      "sequence": 3,
-      "status": "ok",
-      "duration_ms": 0,
-      "notes": "memory.read hits=0 limit=5 (explicit R/W interface)",
-      "output": {
-        "source": "memory",
-        "api": "MemoryInterface.read",
-        "hit_count": 0,
-        "limit": 5,
-        "kinds": [],
-        "ids": [],
-        "dumped_full_store": false
-      }
-    },
-    {
       "node_name": "retrieve",
-      "sequence": 4,
+      "sequence": 2,
       "status": "ok",
       "duration_ms": 0,
       "notes": "chunks=1 route=generate",
       "output": {
-        "source": "rag",
         "chunk_count": 1,
         "sources": [
           "supplier-ordering"
@@ -67,101 +34,27 @@
     },
     {
       "node_name": "generate",
-      "sequence": 5,
+      "sequence": 3,
       "status": "ok",
       "duration_ms": 0,
-      "notes": "structured turn: answer + memory_proposal question to user (one model call; no durable write on this step)",
+      "notes": "grounded answer from retrieved KB context",
       "output": {
         "answer_len": 143,
         "grounded": true,
-        "source": "rag",
-        "used_ticket": false,
-        "used_inventory": false,
-        "used_memory": false,
-        "memory_hit_count": 0,
-        "memory_via": "MemoryInterface.read→prompt",
-        "memory_proposal": {
-          "applicable": false,
-          "action": null,
-          "fact": null,
-          "previous_fact": null,
-          "why": "test_fixture_nothing_to_remember"
-        },
-        "proposed_to_user": false,
-        "wrote_to_memory": false,
-        "second_model_call": false,
-        "separate_memory_agent": false,
-        "system_prompt_mutated": false,
-        "full_memory_store_in_prompt": false,
         "context_sources": [
           "supplier-ordering"
         ]
       }
-    },
-    {
-      "node_name": "write_memory",
-      "sequence": 6,
-      "status": "ok",
-      "duration_ms": 0,
-      "notes": "propose-only verdict=skip_not_applicable; wrote=0 (never writes on this step; user must confirm later)",
-      "output": {
-        "source": "memory",
-        "api": "memory_proposal_to_user",
-        "always_write": false,
-        "wrote_to_memory": false,
-        "proposed_to_user": false,
-        "second_model_call": false,
-        "written_count": 0,
-        "written_ids": [],
-        "self_evaluations": [
-          {
-            "remember": false,
-            "verdict": "skip_not_applicable",
-            "reason": "test_fixture_nothing_to_remember",
-            "fact": null,
-            "kind": null,
-            "replace_id": null,
-            "proposal": {
-              "applicable": false,
-              "action": null,
-              "fact": null,
-              "previous_fact": null,
-              "why": "test_fixture_nothing_to_remember"
-            }
-          }
-        ],
-        "memory_proposal": {
-          "applicable": false,
-          "action": null,
-          "fact": null,
-          "previous_fact": null,
-          "why": "test_fixture_nothing_to_remember"
-        },
-        "pending_proposal": null
-      }
     }
   ],
-  "started_at": "2026-08-11T16:31:12.337596+00:00",
-  "ended_at": "2026-08-11T16:31:12.343525+00:00",
+  "started_at": "2026-08-05T15:28:39.044766+00:00",
+  "ended_at": "2026-08-05T15:28:39.050039+00:00",
   "duration_ms": 5,
   "node_order": [
     "receive_question",
-    "decide_route",
-    "recall_memory",
     "retrieve",
-    "generate",
-    "write_memory"
+    "generate"
   ],
   "retrieved_count": 1,
-  "route": "done",
-  "sources_used": [
-    "rag"
-  ],
-  "sources_order": [
-    "rag"
-  ],
-  "source_summary": "rag_only",
-  "needs_ticket": false,
-  "needs_inventory": false,
-  "needs_rag": true
+  "route": "done"
 }
