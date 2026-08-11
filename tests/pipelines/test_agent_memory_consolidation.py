@@ -119,3 +119,9 @@ def test_consolidation_docs_exist() -> None:
     assert "summar" in text.casefold()
     assert "low-relevance" in text.casefold() or "discard" in text.casefold()
     assert str(MAX_SEMANTIC_FACTS) in text or "MAX_FACTS" in text
+    # Expiration / clean-up policy must be documented with rationale.
+    assert "Expiration / clean-up policy" in text
+    lowered = text.casefold()
+    assert "not calendar ttl" in lowered or "time-to-live" in lowered
+    assert "Why this policy" in text
+    assert "capacity" in lowered and "relevance" in lowered

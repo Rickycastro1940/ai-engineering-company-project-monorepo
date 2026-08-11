@@ -88,7 +88,10 @@ Explicit R/W API (no system-prompt accumulation):
 
 After durable writes the store is consolidated: near-dedupe, extractive
 same-kind summaries, and low-relevance discard under the max-facts cap.
-Details: [`MEMORY_CONSOLIDATION.md`](./MEMORY_CONSOLIDATION.md).
+
+**Clean-up / “expiration” policy:** capacity + relevance (not calendar TTL).
+CONTEXT ops facts stay until superseded, collapsed, or evicted when over the
+cap — see the rationale in [`MEMORY_CONSOLIDATION.md`](./MEMORY_CONSOLIDATION.md).
 
 ## Dependencies
 
