@@ -4,6 +4,16 @@ LangGraph orchestration around the existing Brasaland RAG flow. Ticket status
 goes through the **company-tools MCP server** (`langchain-mcp-adapters`);
 inventory remains a read-only HTTP tool against the inventory manager.
 
+## Milestone — Agent Memory (Part 1 of 2)
+
+- [x] **Read `CONTEXT-company.md`** — memory allow/deny derived in
+  [`docs/agent/MEMORY_POLICY.md`](../../docs/agent/MEMORY_POLICY.md).
+- [x] **Branch from MCP / LangGraph progress** —
+  `cursor/agent-memory-part1-2e12` (from `cursor/mcp-playground-connection-2e12`).
+- [ ] Wire durable memory into the graph (Part 1 implementation — next).
+- [ ] Enforce “must never enter memory” filters on every write.
+- [ ] Persist only facts worth remembering for Brasaland ops/commercial use.
+
 ## MCP migration (company tools)
 
 - [x] **Connect via `langchain-mcp-adapters`** — `tools/mcp_incidents.py` loads
