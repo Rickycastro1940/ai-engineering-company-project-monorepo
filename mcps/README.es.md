@@ -6,3 +6,9 @@ Cada subcarpeta dentro de `mcps/` debe corresponder a **un servidor MCP concreto
 
 - **Propósito principal**: centralizar los servidores que actúan como puente entre los modelos de IA y los sistemas internos o fuentes de datos de la compañía.
 - **Recomendación**: documenta las herramientas y recursos que expone cada servidor MCP.
+
+## Servidores en este monorepo
+
+| Carpeta | Propósito |
+| ------- | --------- |
+| [`company_tools/`](./company_tools/) | Servidor FastMCP con OAuth para tickets del Incidents Manager e inventario de solo lectura (Streamable HTTP + MCP Auth) |

@@ -1,0 +1,40 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0 -- /workspace/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /workspace
+configfile: pyproject.toml
+plugins: langsmith-0.10.15, anyio-4.14.2
+collecting ... collected 19 items
+
+tests/pipelines/test_company_tools_mcp.py::test_mcp_http_clients_only_call_company_api_paths PASSED [  5%]
+tests/pipelines/test_company_tools_mcp.py::test_incident_create_and_status_lifecycle PASSED [ 10%]
+tests/pipelines/test_company_tools_mcp.py::test_inventory_query_and_write_rejection PASSED [ 15%]
+tests/pipelines/test_company_tools_mcp.py::test_mcp_rejects_unauthenticated_client PASSED [ 21%]
+tests/pipelines/test_company_tools_mcp.py::test_mcp_discovery_with_token PASSED [ 26%]
+tests/pipelines/test_company_tools_mcp.py::test_incident_api_status_endpoint PASSED [ 31%]
+tests/pipelines/test_company_tools_mcp.py::test_acceptance_domain_fields_match_company_apis PASSED [ 36%]
+tests/pipelines/test_company_tools_mcp.py::test_acceptance_status_update_uses_lifecycle_endpoint_only PASSED [ 42%]
+tests/pipelines/test_company_tools_mcp.py::test_acceptance_oauth_via_mcpauth_not_fastmcp_auth PASSED [ 47%]
+tests/pipelines/test_company_tools_mcp.py::test_mandatory_oauth_blocks_unauthenticated_list_and_invoke PASSED [ 52%]
+tests/pipelines/test_company_tools_mcp.py::test_mandatory_oauth_rejects_invalid_and_wrong_audience_tokens PASSED [ 57%]
+tests/pipelines/test_company_tools_mcp.py::test_mandatory_oauth_scope_enforcement_on_invoke PASSED [ 63%]
+tests/pipelines/test_company_tools_mcp.py::test_least_privilege_incident_read_scope_cannot_write PASSED [ 68%]
+tests/pipelines/test_company_tools_mcp.py::test_least_privilege_clients_are_domain_isolated PASSED [ 73%]
+tests/pipelines/test_company_tools_mcp.py::test_least_privilege_update_rejects_non_status_fields PASSED [ 78%]
+tests/pipelines/test_company_tools_mcp.py::test_error_catalog_defines_distinct_auth_authz_validation_codes PASSED [ 84%]
+tests/pipelines/test_company_tools_mcp.py::test_transport_auth_failures_map_to_catalog_codes PASSED [ 89%]
+tests/pipelines/test_company_tools_mcp.py::test_every_tool_invocation_is_logged_with_tool_client_and_result PASSED [ 94%]
+tests/pipelines/test_company_tools_mcp.py::test_timed_call_always_logs_tool_client_result PASSED [100%]
+
+=============================== warnings summary ===============================
+tests/pipelines/test_company_tools_mcp.py::test_mcp_http_clients_only_call_company_api_paths
+tests/pipelines/test_company_tools_mcp.py::test_mcp_http_clients_only_call_company_api_paths
+  /workspace/.venv/lib/python3.12/site-packages/qdrant_client/qdrant_remote.py:290: UserWarning: Failed to obtain server version. Unable to check client-server compatibility. Set check_compatibility=False to skip version check.
+    show_warning(
+
+tests/pipelines/test_company_tools_mcp.py::test_mcp_rejects_unauthenticated_client
+  /workspace/.venv/lib/python3.12/site-packages/pydantic_settings/sources/utils.py:47: IncompleteFieldDefinitionWarning: Field 'lifespan' has an incomplete definition: its annotation contains an unresolved forward reference, so settings sources may fail to correctly resolve its value. Call `model_rebuild()` on the model where the field is defined, once all the referenced types are defined.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 19 passed, 3 warnings in 2.76s ========================
