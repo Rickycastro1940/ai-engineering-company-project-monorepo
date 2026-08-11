@@ -1,6 +1,8 @@
 """At-most-one pending memory proposal (durable).
 
 A new proposal must not be opened while one is already unresolved.
+Silence ≠ consent: unconfirmed proposals expire after a TTL and are abandoned
+without writing to durable memory.
 """
 
 from __future__ import annotations
@@ -8,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+import time
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -22,6 +25,31 @@ DEFAULT_PENDING_PATH = Path(
         str(Path(DEFAULT_MEMORY_PATH).with_name("pending_proposal.json")),
     )
 )
+
+
+def pending_ttl_seconds() -> float:
+    """Abandon unconfirmed proposals after this many seconds (default 24h)."""
+    raw = os.environ.get("AGENT_MEMORY_PENDING_TTL_SECONDS", "86400").strip()
+    try:
+        return max(60.0, float(raw))
+    except ValueError:
+        return 86400.0
+
+
+def _parse_created_at(created_at: str) -> float | None:
+    """Parse ISO created_at to epoch seconds; None if unparseable."""
+    text = (created_at or "").strip()
+    if not text:
+        return None
+    try:
+        if text.endswith("Z"):
+            text = text[:-1] + "+00:00"
+        return datetime.fromisoformat(text).timestamp()
+    except ValueError:
+        try:
+            return float(text)
+        except ValueError:
+            return None
 
 
 @dataclass
@@ -78,8 +106,34 @@ class PendingProposalStore:
                 return None
             return PendingProposal.from_dict(data)
 
+    def is_expired(self, pending: PendingProposal, *, now: float | None = None) -> bool:
+        created = _parse_created_at(pending.created_at)
+        if created is None:
+            return False
+        ts = now if now is not None else time.time()
+        return (ts - created) > pending_ttl_seconds()
+
+    def get_active(self, *, now: float | None = None) -> PendingProposal | None:
+        """Return pending only if still within TTL."""
+        pending = self.get()
+        if pending is None:
+            return None
+        if self.is_expired(pending, now=now):
+            return None
+        return pending
+
+    def take_expired(self, *, now: float | None = None) -> PendingProposal | None:
+        """If pending exists and is past TTL, clear it and return the abandoned proposal."""
+        pending = self.get()
+        if pending is None:
+            return None
+        if not self.is_expired(pending, now=now):
+            return None
+        self.clear()
+        return pending
+
     def has_pending(self) -> bool:
-        return self.get() is not None
+        return self.get_active() is not None
 
     def set(self, pending: PendingProposal) -> PendingProposal:
         """Replace the single pending slot (enforces one-at-a-time)."""
@@ -139,5 +193,5 @@ def new_pending_from_proposal(
         originating_message=originating_message,
         created_at=now,
         thread_id=thread_id,
-        metadata={},
+        metadata={"opened_by": "agent_grounded_proposal"},
     )

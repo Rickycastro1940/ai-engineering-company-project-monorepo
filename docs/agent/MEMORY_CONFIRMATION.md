@@ -15,10 +15,17 @@ LangGraph turn resolves the pending proposal, then resumes normally.
    second one.
 3. **Default discard** — `topic_change` and `ambiguous` **discard** the pending
    proposal. Approval is never assumed from silence or unclear wording.
-4. **Auditable log** — every decision appends a JSONL row with `proposal`,
+4. **Pending TTL abandonment** — if the user never responds, the pending
+   proposal expires after `AGENT_MEMORY_PENDING_TTL_SECONDS` (default **86400**
+   = 24h). Outcome `discarded_pending_ttl`; **no** durable write (silence ≠
+   consent). See [`MEMORY_DESIGN_DECISIONS.md`](./MEMORY_DESIGN_DECISIONS.md).
+5. **Poisoning guards** — approve/edit re-check CONTEXT policy; edits must stay
+   related to the agent-proposed fact (Jaccard ≥ 0.45) or the write is blocked
+   (`blocked_poisoning`).
+6. **Auditable log** — every decision appends a JSONL row with `proposal`,
    `outcome`, `originating_message`, and `timestamp` (plus intent metadata) to
    `data/process/agent-memory/memory_decisions.jsonl`.
-5. **Resume conversation** — after resolve, residual questions in the same
+7. **Resume conversation** — after resolve, residual questions in the same
    message continue through `decide_route` → tools/RAG as usual.
 
 ## Graph
@@ -100,4 +107,5 @@ These two cycles are covered by
 | `memory/confirmation.py` | `resolve_memory_confirmation` node |
 
 See also [`MEMORY_SELF_EVAL.md`](./MEMORY_SELF_EVAL.md),
-[`MEMORY_CONSOLIDATION.md`](./MEMORY_CONSOLIDATION.md).
+[`MEMORY_CONSOLIDATION.md`](./MEMORY_CONSOLIDATION.md),
+[`MEMORY_DESIGN_DECISIONS.md`](./MEMORY_DESIGN_DECISIONS.md).

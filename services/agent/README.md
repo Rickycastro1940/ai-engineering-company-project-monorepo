@@ -36,6 +36,9 @@ inventory remains a read-only HTTP tool against the inventory manager.
 - [x] **Consolidation** — near-dedupe, extractive summarize, discard
   low-relevance under a max-facts cap
   ([`docs/agent/MEMORY_CONSOLIDATION.md`](../../docs/agent/MEMORY_CONSOLIDATION.md)).
+- [x] **Design decisions** — memory types, CONTEXT-restricted info, forgetting /
+  pending TTL, poisoning prevention, single-call self-eval (no multi-agent)
+  ([`docs/agent/MEMORY_DESIGN_DECISIONS.md`](../../docs/agent/MEMORY_DESIGN_DECISIONS.md)).
 
 ```text
 receive → resolve_memory_confirmation → decide_route → recall_memory

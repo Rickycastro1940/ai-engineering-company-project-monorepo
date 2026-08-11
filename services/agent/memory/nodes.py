@@ -122,8 +122,19 @@ def write_memory_node(state: AgentState) -> dict[str, Any]:
     else:
         proposal = None
 
-    # Hard rule: only one pending proposal at a time.
-    existing_pending = pending_store.get()
+    # Abandon TTL-expired pending before considering a new proposal.
+    abandoned = pending_store.take_expired()
+    if abandoned is not None:
+        log_memory_decision(
+            outcome="discarded_pending_ttl",
+            originating_message=str(state.get("question") or ""),
+            proposal=abandoned.as_dict(),
+            intent=None,
+            intent_reason="pending_ttl_expired_before_new_proposal",
+        )
+
+    # Hard rule: only one *active* pending proposal at a time.
+    existing_pending = pending_store.get_active()
     if existing_pending is not None:
         evaluations.append(
             {
@@ -282,7 +293,17 @@ def surface_memory_proposal_in_answer(
     Suppresses the question when a pending proposal is already open.
     Returns ``(answer_for_user, proposal_dict)``. Never writes to the store.
     """
-    if get_pending_store().has_pending():
+    pending_store = get_pending_store()
+    abandoned = pending_store.take_expired()
+    if abandoned is not None:
+        log_memory_decision(
+            outcome="discarded_pending_ttl",
+            originating_message="",
+            proposal=abandoned.as_dict(),
+            intent=None,
+            intent_reason="pending_ttl_expired_before_surface_proposal",
+        )
+    if pending_store.has_pending():
         dismissed = MemoryProposal.nothing_to_remember("one_pending_proposal_limit")
         return answer, dismissed.as_dict()
 

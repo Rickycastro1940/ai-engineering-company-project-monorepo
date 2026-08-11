@@ -1,4 +1,4 @@
-"""Resolve a pending memory proposal via explicit confirmation intent."""
+"""Resolve a pending memory proposal via explicit user confirmation intent."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from services.agent.memory.audit import log_memory_decision
 from services.agent.memory.intent import ConfirmationIntent, classify_confirmation_intent
 from services.agent.memory.interface import get_agent_memory
 from services.agent.memory.pending import PendingProposal, get_pending_store
+from services.agent.memory.poisoning import check_approve_write, check_edit_write
 from services.agent.state import AgentState
 
 
@@ -47,16 +48,53 @@ def _proposal_payload(pending: PendingProposal) -> dict[str, Any]:
 def resolve_memory_confirmation_node(state: AgentState) -> dict[str, Any]:
     """Classify the user message against the single pending proposal (if any).
 
-    - APPROVE / EDIT → durable write, clear pending, audit
+    - APPROVE / EDIT → durable write (after poisoning guards), clear pending, audit
     - REJECT / TOPIC_CHANGE / AMBIGUOUS → discard pending (never assume yes), audit
+    - Expired pending → abandon without write (silence ≠ consent), audit
     - Residual question (same message) → continue the graph with that question
     - Confirmation-only → short ack and ``confirmation_done``
     """
     started = time.perf_counter()
     store = get_pending_store()
-    pending = store.get()
     message = (state.get("question") or "").strip()
 
+    # Abandon TTL-expired proposals before intent classification.
+    expired = store.take_expired()
+    if expired is not None:
+        proposal_payload = _proposal_payload(expired)
+        log_memory_decision(
+            outcome="discarded_pending_ttl",
+            originating_message=message,
+            proposal=proposal_payload,
+            intent=None,
+            intent_reason="pending_ttl_expired_silence_is_not_consent",
+        )
+        return {
+            "memory_confirmation": {
+                "had_pending": True,
+                "intent": None,
+                "outcome": "discarded_pending_ttl",
+                "proposal": proposal_payload,
+            },
+            "memory_pending_proposal": None,
+            "route": "decide",
+            "steps": [
+                _step(
+                    state,
+                    "resolve_memory_confirmation",
+                    "ok",
+                    started,
+                    notes="discarded_pending_ttl; continue as normal turn",
+                    output={
+                        "had_pending": True,
+                        "outcome": "discarded_pending_ttl",
+                        "proposal": proposal_payload,
+                    },
+                )
+            ],
+        }
+
+    pending = store.get_active()
     if pending is None:
         return {
             "memory_confirmation": {
@@ -86,57 +124,84 @@ def resolve_memory_confirmation_node(state: AgentState) -> dict[str, Any]:
     memory = get_agent_memory()
 
     if intent == ConfirmationIntent.APPROVE:
-        result = memory.write(
-            pending.fact,
-            kind=pending.kind,
-            source="user_confirmed",
-            metadata={
-                "pending_id": pending.id,
-                "why": pending.why,
-                "confirmation_intent": intent.value,
-            },
-            replace_id=pending.replace_id if pending.action == "change" else None,
-        )
-        store.clear()
-        outcome = "approved"
-        ack = f'Saved to memory: "{pending.fact}"'
-        if result.ok and result.record is not None:
-            written.append(result.record.as_dict())
-        log_memory_decision(
-            outcome=outcome,
-            originating_message=message,
-            proposal=proposal_payload,
-            intent=intent.value,
-            intent_reason=classification.reason,
-            residual_question=classification.residual_question,
-        )
+        poison = check_approve_write(pending)
+        if not poison.allowed:
+            store.clear()
+            outcome = "blocked_poisoning"
+            ack = "I can't save that to memory — it didn't pass our safety checks."
+            log_memory_decision(
+                outcome=outcome,
+                originating_message=message,
+                proposal=proposal_payload,
+                intent=intent.value,
+                intent_reason=f"{classification.reason}; {poison.reason}",
+            )
+        else:
+            result = memory.write(
+                pending.fact,
+                kind=pending.kind,
+                source="user_confirmed",
+                metadata={
+                    "pending_id": pending.id,
+                    "why": pending.why,
+                    "confirmation_intent": intent.value,
+                },
+                replace_id=pending.replace_id if pending.action == "change" else None,
+            )
+            store.clear()
+            outcome = "approved"
+            ack = f'Saved to memory: "{pending.fact}"'
+            if result.ok and result.record is not None:
+                written.append(result.record.as_dict())
+            log_memory_decision(
+                outcome=outcome,
+                originating_message=message,
+                proposal=proposal_payload,
+                intent=intent.value,
+                intent_reason=classification.reason,
+                residual_question=classification.residual_question,
+            )
 
     elif intent == ConfirmationIntent.EDIT:
         fact = (classification.edited_fact or "").strip()
-        result = memory.write(
-            fact,
-            kind=pending.kind,
-            source="user_edited_confirmation",
-            metadata={
-                "pending_id": pending.id,
-                "original_fact": pending.fact,
-                "confirmation_intent": intent.value,
-            },
-            replace_id=pending.replace_id if pending.action == "change" else None,
-        )
-        store.clear()
-        outcome = "edited"
-        ack = f'Updated memory proposal and saved: "{fact}"'
-        if result.ok and result.record is not None:
-            written.append(result.record.as_dict())
-        log_memory_decision(
-            outcome=outcome,
-            originating_message=message,
-            proposal=proposal_payload,
-            intent=intent.value,
-            intent_reason=classification.reason,
-            edited_fact=fact,
-        )
+        poison = check_edit_write(pending, fact)
+        if not poison.allowed:
+            store.clear()
+            outcome = "blocked_poisoning"
+            ack = "I can't save that edit — it didn't pass our safety checks."
+            log_memory_decision(
+                outcome=outcome,
+                originating_message=message,
+                proposal=proposal_payload,
+                intent=intent.value,
+                intent_reason=f"{classification.reason}; {poison.reason}",
+                edited_fact=fact,
+            )
+        else:
+            result = memory.write(
+                fact,
+                kind=pending.kind,
+                source="user_edited_confirmation",
+                metadata={
+                    "pending_id": pending.id,
+                    "original_fact": pending.fact,
+                    "confirmation_intent": intent.value,
+                },
+                replace_id=pending.replace_id if pending.action == "change" else None,
+            )
+            store.clear()
+            outcome = "edited"
+            ack = f'Updated memory proposal and saved: "{fact}"'
+            if result.ok and result.record is not None:
+                written.append(result.record.as_dict())
+            log_memory_decision(
+                outcome=outcome,
+                originating_message=message,
+                proposal=proposal_payload,
+                intent=intent.value,
+                intent_reason=classification.reason,
+                edited_fact=fact,
+            )
 
     elif intent == ConfirmationIntent.REJECT:
         store.clear()
@@ -189,7 +254,7 @@ def resolve_memory_confirmation_node(state: AgentState) -> dict[str, Any]:
     }
 
     # Resume normal conversation when there is a residual / topic-change question.
-    if residual:
+    if residual and outcome != "blocked_poisoning":
         return {
             "question": residual,
             "answer": None,
