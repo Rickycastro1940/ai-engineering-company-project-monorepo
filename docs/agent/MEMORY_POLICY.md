@@ -63,6 +63,9 @@ parallel invented store.
 - Collection / company slug for RAG remain `brasaland_kb` / `brasaland`
 - **Backend choice:** SQLite semantic store + existing agent traces (episodic).
   Rationale: [`MEMORY_BACKEND.md`](./MEMORY_BACKEND.md).
+- **Access pattern:** explicit [`MemoryInterface`](./MEMORY_INTERFACE.md)
+  `read` / `write` only — never accumulate by appending the store to the
+  system prompt.
 - Store path: `data/process/agent-memory/semantic.sqlite` (override with
   `AGENT_MEMORY_PATH`)
 - **Dependencies:** Part 1 memory uses the existing stack only (stdlib

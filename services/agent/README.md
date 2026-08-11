@@ -17,6 +17,9 @@ inventory remains a read-only HTTP tool against the inventory manager.
 - [x] Persist only facts worth remembering (`data/process/agent-memory/semantic.sqlite`).
 - [x] **Backend documented** — SQLite semantic + traces episodic
   ([`docs/agent/MEMORY_BACKEND.md`](../../docs/agent/MEMORY_BACKEND.md)).
+- [x] **Explicit read/write interface** — `MemoryInterface.read` /
+  `MemoryInterface.write` ([`docs/agent/MEMORY_INTERFACE.md`](../../docs/agent/MEMORY_INTERFACE.md));
+  does **not** accumulate state by appending the store to the system prompt.
 
 ```text
 … → decide_route → recall_memory → lookup_ticket (MCP) | lookup_inventory | retrieve

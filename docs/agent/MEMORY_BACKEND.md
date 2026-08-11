@@ -65,13 +65,16 @@ Failed tool paths and `no_context` answers do **not** write semantic memory
 ## How it extends the MCP agent (does not replace it)
 
 ```text
-decide_route → recall_memory (SQLite semantic search)
+decide_route → recall_memory (MemoryInterface.read → SQLite)
             → lookup_ticket via MCP | inventory | RAG
-            → answer/generate → write_memory (SQLite upsert if policy allows)
+            → answer/generate → write_memory (MemoryInterface.write)
 ```
 
 Incidents Manager access remains **MCP-only**. SQLite only stores *approved
 summaries* of confirmed outcomes and ops facts — never a parallel incidents API.
+
+Explicit R/W API (no system-prompt accumulation):
+[`MEMORY_INTERFACE.md`](./MEMORY_INTERFACE.md).
 
 ## Configuration
 

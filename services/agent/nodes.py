@@ -578,13 +578,14 @@ def generate_node(state: AgentState) -> dict[str, Any]:
                 )
             ],
         }
-    from services.agent.memory.nodes import memory_context_chunks
+    # KB grounding uses retrieve chunks only. Recalled memory is applied via the
+    # explicit MemoryInterface.read results already in state — never by mutating
+    # the RAG system prompt or dumping the full SQLite store into the prompt.
+    from services.agent.memory.interface import get_agent_memory
+    from services.agent.memory.nodes import recalled_records_from_state
 
-    # Memory supplements RAG context; MCP/tool results stay authoritative separately.
-    memory_chunks = memory_context_chunks(state)
-    generation_context = list(memory_chunks) + list(chunks)
     try:
-        answer = generate_answer(state["question"], generation_context)
+        answer = generate_answer(state["question"], chunks)
     except Exception as exc:  # noqa: BLE001
         return {
             "answer": None,
@@ -600,6 +601,13 @@ def generate_node(state: AgentState) -> dict[str, Any]:
                 )
             ],
         }
+
+    memory = get_agent_memory()
+    recalled = recalled_records_from_state(state)
+    memory_notes = memory.format_turn_notes(recalled)
+    if memory_notes:
+        # Separate turn notes from system prompt / full-store accumulation.
+        answer = f"{answer}\n\n{memory_notes}"
 
     ticket_raw = state.get("ticket_result")
     if ticket_raw:
@@ -629,15 +637,18 @@ def generate_node(state: AgentState) -> dict[str, Any]:
                 "generate",
                 "ok",
                 started,
-                notes="grounded answer from retrieved KB context (+ recalled memory)",
+                notes="grounded answer from retrieved KB context (+ MemoryInterface.read notes)",
                 output={
                     "answer_len": len(answer or ""),
                     "grounded": True,
                     "source": "rag",
                     "used_ticket": bool(ticket_raw),
                     "used_inventory": bool(inventory_raw),
-                    "used_memory": bool(memory_chunks),
-                    "memory_hit_count": len(memory_chunks),
+                    "used_memory": bool(recalled),
+                    "memory_hit_count": len(recalled),
+                    "memory_via": "MemoryInterface.read",
+                    "system_prompt_mutated": False,
+                    "full_memory_store_in_prompt": False,
                     "context_sources": [c.get("source_document") for c in chunks],
                 },
             )
