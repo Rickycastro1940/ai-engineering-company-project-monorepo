@@ -45,6 +45,51 @@ not call `MemoryInterface.write`. Writes happen only inside
 | `What is the status of ticket BRS-000002?` | `topic_change` | discard, continue |
 | `maybe later?` / unclear | `ambiguous` | discard |
 
+## Complete cycles (documented end-to-end)
+
+At least two full flows are required: one **approved** update that appears in a
+later turn, and one **rejected** update that leaves durable memory unchanged.
+
+### Cycle A — approve, then recall in a future interaction
+
+**Fact under proposal:**  
+`Emergency orders over 500 USD require Procurement Manager approval.`
+
+| Turn | User | Agent / system | Durable store |
+| ---- | ---- | -------------- | ------------- |
+| **A1 — ask** | “When do emergency orders need approval?” | RAG `generate` returns grounded answer + closing question: *Would you like me to remember this for later: "Emergency orders over 500 USD require Procurement Manager approval."?* · `write_memory` opens **one** pending proposal · `MemoryInterface.write` is **not** called | unchanged (empty or prior facts only) |
+| **A2 — approve** | `yes` | `resolve_memory_confirmation` → intent=`approve` · durable `write` + consolidation · audit outcome=`approved` · short ack · pending cleared | **contains** the 500 USD approval fact |
+| **A3 — future ask** | “Remind me of the emergency order approval rule.” | `recall_memory` → `MemoryInterface.read` returns the stored fact into `memory_hits` · generate may use it in-prompt | still contains the fact |
+
+```text
+A1  question → … → generate (answer + proposal Q) → write_memory (pending only)
+A2  "yes" → resolve_memory_confirmation (approve → SQLite write) → END
+A3  later question → resolve (no pending) → recall_memory (hit) → … → answer
+```
+
+Audit (A2) includes `proposal`, `outcome=approved`, `originating_message`, `timestamp`.
+
+### Cycle B — reject, memory stays unchanged
+
+**Same proposal text as Cycle A** (opened the same way in B1).
+
+| Turn | User | Agent / system | Durable store |
+| ---- | ---- | -------------- | ------------- |
+| **B1 — ask** | “When do emergency orders need approval?” | Same as A1: answer + remember question · pending opened · no durable write | unchanged |
+| **B2 — reject** | `no` | `resolve_memory_confirmation` → intent=`reject` · pending **discarded** · audit outcome=`rejected` · ack *Okay — I won't remember that.* · **no** `MemoryInterface.write` | **unchanged** (fact never inserted) |
+| **B3 — future ask** | “Remind me of the emergency order approval rule.” | `recall_memory` does **not** return that proposed fact from semantic memory (it was never stored) · answer relies on RAG/tools only for that content | still unchanged |
+
+```text
+B1  question → … → generate (answer + proposal Q) → write_memory (pending only)
+B2  "no"  → resolve_memory_confirmation (reject → clear pending, no write) → END
+B3  later question → recall_memory (no hit for rejected fact) → … → answer
+```
+
+Audit (B2) includes `proposal`, `outcome=rejected`, `originating_message`, `timestamp`.
+
+These two cycles are covered by
+`tests/pipelines/test_agent_memory_confirmation_cycles.py`.
+
 ## Implementation
 
 | Module | Role |
@@ -54,4 +99,5 @@ not call `MemoryInterface.write`. Writes happen only inside
 | `memory/audit.py` | Append-only decision log |
 | `memory/confirmation.py` | `resolve_memory_confirmation` node |
 
-See also [`MEMORY_SELF_EVAL.md`](./MEMORY_SELF_EVAL.md).
+See also [`MEMORY_SELF_EVAL.md`](./MEMORY_SELF_EVAL.md),
+[`MEMORY_CONSOLIDATION.md`](./MEMORY_CONSOLIDATION.md).
