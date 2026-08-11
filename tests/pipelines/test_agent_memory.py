@@ -53,7 +53,7 @@ def test_policy_blocks_forbidden_memory_and_allows_ops_facts() -> None:
 
 
 def test_memory_store_upsert_and_search(tmp_path: Path) -> None:
-    store = MemoryStore(tmp_path / "semantic.json")
+    store = MemoryStore(tmp_path / "semantic.sqlite")
     store.upsert(
         text="Minimum protein stock is 3 days of inventory.",
         kind="procurement",
@@ -62,6 +62,24 @@ def test_memory_store_upsert_and_search(tmp_path: Path) -> None:
     hits = store.search("protein stock rule", limit=3)
     assert hits
     assert "3 days" in hits[0].text
+    # Upsert dedupes by kind + normalized text.
+    again = store.upsert(
+        text="Minimum protein stock is 3 days of inventory.",
+        kind="procurement",
+        source="test-2",
+    )
+    assert again.id == hits[0].id
+    assert len(store.list_records()) == 1
+
+
+def test_memory_backend_docs_explain_sqlite_choice() -> None:
+    doc = (
+        Path(__file__).resolve().parents[2] / "docs" / "agent" / "MEMORY_BACKEND.md"
+    ).read_text(encoding="utf-8")
+    assert "SQLite" in doc
+    assert "brasaland_kb" in doc
+    assert "Redis" in doc  # alternatives considered
+    assert "agent-traces" in doc or "traces" in doc
 
 
 def test_compiled_graph_routes_ticket_through_recall_then_mcp() -> None:

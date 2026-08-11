@@ -14,7 +14,9 @@ inventory remains a read-only HTTP tool against the inventory manager.
   nodes sit on the existing MCP + RAG graph; `lookup_ticket` still uses
   `lookup_ticket_via_mcp` only (does not replace MCP/tools/RAG).
 - [x] Enforce “must never enter memory” filters on every write (`memory/policy.py`).
-- [x] Persist only facts worth remembering (`data/process/agent-memory/semantic.json`).
+- [x] Persist only facts worth remembering (`data/process/agent-memory/semantic.sqlite`).
+- [x] **Backend documented** — SQLite semantic + traces episodic
+  ([`docs/agent/MEMORY_BACKEND.md`](../../docs/agent/MEMORY_BACKEND.md)).
 
 ```text
 … → decide_route → recall_memory → lookup_ticket (MCP) | lookup_inventory | retrieve

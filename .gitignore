@@ -16,3 +16,5 @@ data/process/agent-traces/*
 
 data/process/agent-memory/*
 !data/process/agent-memory/.gitkeep
+*.sqlite
+*.sqlite-journal

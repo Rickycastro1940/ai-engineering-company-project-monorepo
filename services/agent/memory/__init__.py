@@ -1,7 +1,8 @@
 """Durable semantic memory for the Brasaland LangGraph agent.
 
 Extends the existing MCP + RAG agent — does not replace tools or retrieval.
-All writes are gated by ``CONTEXT-company.md`` policy (see ``policy.py``).
+Backend: SQLite semantic store (+ agent traces for episodic) — see
+``docs/agent/MEMORY_BACKEND.md``. Writes are gated by ``policy.py``.
 """
 
 from services.agent.memory.policy import MemoryDecision, evaluate_memory_candidate

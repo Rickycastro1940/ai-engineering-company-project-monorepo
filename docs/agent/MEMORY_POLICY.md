@@ -61,8 +61,10 @@ parallel invented store.
 - Keep memory writes behind an explicit allowlist derived from this policy
 - Reject memory candidates that violate the “must never” table before persist
 - Collection / company slug for RAG remain `brasaland_kb` / `brasaland`
-- Store path: `data/process/agent-memory/semantic.json` (override with
+- **Backend choice:** SQLite semantic store + existing agent traces (episodic).
+  Rationale: [`MEMORY_BACKEND.md`](./MEMORY_BACKEND.md).
+- Store path: `data/process/agent-memory/semantic.sqlite` (override with
   `AGENT_MEMORY_PATH`)
-- **Dependencies:** Part 1 memory uses the existing stack only (stdlib +
-  LangGraph already in the project). Any *new* package must be added with
-  ``uv add`` — never ``pip install`` / ``pipenv``.
+- **Dependencies:** Part 1 memory uses the existing stack only (stdlib
+  `sqlite3` + LangGraph already in the project). Any *new* package must be
+  added with ``uv add`` — never ``pip install`` / ``pipenv``.
