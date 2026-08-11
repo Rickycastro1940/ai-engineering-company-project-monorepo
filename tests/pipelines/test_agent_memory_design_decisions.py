@@ -165,3 +165,8 @@ def test_design_decisions_doc_answers_all_five() -> None:
     assert "CONTEXT-company.md" in doc
     assert "SQLite" in doc
     assert "Knowledge graph" in doc or "knowledge graph" in doc.casefold()
+    # Backend doc must not contradict CONTEXT policy (tickets/inventory out of semantic).
+    backend = Path("docs/agent/MEMORY_BACKEND.md").read_text(encoding="utf-8")
+    assert "supplier_ordering" in backend
+    assert "Raw incident-ticket" in backend or "incident-ticket rows" in backend
+    assert "secrets/tokens" not in backend  # do not invent extra CONTEXT forbids

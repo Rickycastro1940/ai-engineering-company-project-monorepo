@@ -4,8 +4,8 @@ Not a second model call or a separate agent — one additional output field
 alongside the user-facing ``answer``.
 
 Most interactions must be dismissible as nothing to remember
-(``applicable=false``). See ``NOTHING_TO_REMEMBER_EXAMPLES`` and
-``docs/agent/MEMORY_SELF_EVAL.md``.
+(``applicable=false``). See ``MEMORABLE_INTERACTION_EXAMPLES``,
+``NOTHING_TO_REMEMBER_EXAMPLES``, and ``docs/agent/MEMORY_SELF_EVAL.md``.
 """
 
 from __future__ import annotations
@@ -20,6 +20,56 @@ class NothingToRememberExample(TypedDict):
     user: str
     why_dismiss: str
     why_code: str
+
+
+class MemorableInteractionExample(TypedDict):
+    id: str
+    user: str
+    why_remember: str
+    expected_fact: str
+    kind: str
+
+# At least three documented interactions that SHOULD generate a proposal.
+# Keep in sync with docs/agent/MEMORY_SELF_EVAL.md.
+MEMORABLE_INTERACTION_EXAMPLES: Final[tuple[MemorableInteractionExample, ...]] = (
+    {
+        "id": "protein_stock_days",
+        "user": (
+            "How many days of main protein inventory should each location keep?"
+        ),
+        "why_remember": (
+            "Durable supplier-ordering procedure from CONTEXT KB."
+        ),
+        "expected_fact": "Locations must keep 3 days of main protein inventory.",
+        "kind": "supplier_ordering",
+    },
+    {
+        "id": "waste_escalation_owner",
+        "user": (
+            "Who handles waste escalation when we exceed the daily threshold?"
+        ),
+        "why_remember": (
+            "Durable waste + key-person fact (Felipe Guerrero) from CONTEXT."
+        ),
+        "expected_fact": (
+            "Waste over the daily escalation threshold is handled by "
+            "Felipe Guerrero (Operations Director)."
+        ),
+        "kind": "people",
+    },
+    {
+        "id": "emergency_order_approval",
+        "user": "When do emergency orders need approval?",
+        "why_remember": (
+            "Durable procurement rule; currency kept as written (never convert)."
+        ),
+        "expected_fact": (
+            "Emergency orders over 500 USD require Procurement Manager "
+            "(Lucía Fernández) approval."
+        ),
+        "kind": "supplier_ordering",
+    },
+)
 
 
 # At least three documented interactions that must NOT generate a proposal.

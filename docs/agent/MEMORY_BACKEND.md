@@ -15,25 +15,33 @@ LangGraph’s in-process `MemorySaver` remains **working/short-term** checkpoint
 
 From [`CONTEXT-company.md`](../../CONTEXT-company.md) and
 [`MEMORY_POLICY.md`](./MEMORY_POLICY.md), the agent should remember **small,
-reusable semantic facts** for commercial/ops teams — not full chat dumps and
-not RAG internals:
+reusable semantic facts** for commercial/ops teams — not full chat dumps,
+not live tool rows, and not RAG internals:
 
-- Procurement rules (e.g. 3-day protein stock, **> 500 USD** emergency approval
-  by Lucía Fernández — currencies kept as written)
+- Supplier-ordering rules (e.g. 3-day protein stock, **> 500 USD** emergency
+  approval by Lucía Fernández — currencies kept as written)
 - Waste escalation (Felipe Guerrero)
 - Loyalty / allergen disclosures **as written** (never “zero risk”)
-- Key people/roles
-- Confirmed MCP ticket / inventory outcomes (`BRS-…`, product quantities)
+- Key people/roles (`people` kind)
+
+Allowed semantic `kind` values match CONTEXT only:
+`supplier_ordering` | `waste` | `loyalty` | `allergen` | `people`.
+
+**Not** stored in SQLite semantic memory (stay in live MCP/inventory tools +
+episodic traces):
+
+- Raw incident-ticket rows (`BRS-…` status lookups)
+- Raw inventory product quantities
 
 Those records are:
 
-1. **Structured** — each fact has a `kind` (`procurement`, `allergen`, …) so
-   policy can allow/deny before write.
+1. **Structured** — each fact has a CONTEXT `kind` so policy can allow/deny
+   before write.
 2. **Deduplicated** — the same stock rule should upsert, not multiply.
-3. **Exact** — ticket `BRS-000002 status=CERRADO` is an identity lookup, not a
-   “similar chunk” problem.
-4. **Low volume** — company ops facts and confirmed tool results, not millions
-   of embeddings.
+3. **Exact** — “Lucía approves emergency orders over 500 USD” is an identity
+   / wording fact, not a “similar chunk” problem.
+4. **Low volume** — company ops/commercial facts only, not millions of
+   embeddings and not every tool response.
 
 **SQLite** matches that profile: durable file on disk, SQL filters by `kind` /
 text, ACID upserts, **stdlib only** (no new `uv add` service dependency), easy
@@ -41,23 +49,31 @@ to inspect and delete forbidden content.
 
 **Existing traces** already capture episodic “what the agent did” (including
 MCP `lookup_ticket`). Reusing them avoids a second transcript store and keeps
-memory writes focused on semantic distillation.
+memory writes focused on semantic distillation of CONTEXT domains.
 
 ## Why not the other options (alone)
 
 | Option | Why it is not the primary Brasaland memory store |
 | ------ | ------------------------------------------------ |
 | **Redis alone** | Excellent cache/session KV, but needs a running Redis + `uv add redis`. Our durable needs are durable *facts*, not hot session state. Redis alone also lacks rich querying by `kind` without extra conventions. |
-| **Qdrant / vector DB alone** | Already used for **RAG** collection `brasaland_kb`. Agent memory must **not** mix into that collection: CONTEXT forbids storing raw chunks/scores/payloads, and approximate nearest-neighbor is the wrong primary API for “remember confirmed ticket status” or “Lucía approves > 500 USD”. A separate memory collection would still fight structured policy filters and exact IDs. |
+| **Qdrant / vector DB alone** | Already used for **RAG** collection `brasaland_kb`. Agent memory must **not** mix into that collection: CONTEXT forbids storing raw chunks/scores/payloads, and approximate nearest-neighbor is the wrong primary API for exact ops rules (“Lucía approves > 500 USD”). A separate memory collection would still fight structured policy filters. |
+| **Knowledge graph** | CONTEXT domains are procedure/policy text + a few named people — not a dense entity–relation graph worth graph ETL/traversal cost. |
 | **JSON file alone** | Fine for prototypes; SQLite keeps the same “local KV/document” idea with safer concurrent upserts and indexed lookups as the store grows. |
 | **One store for everything** | Would blur RAG knowledge, episodic traces, and semantic memory — harder to enforce “must never enter memory” and easier to re-learn invented answers. |
 
+See also [`MEMORY_DESIGN_DECISIONS.md`](./MEMORY_DESIGN_DECISIONS.md).
+
 ## What we deliberately keep out of the backend
 
-Per policy, the SQLite semantic store **rejects** before persist:
+Per [`MEMORY_POLICY.md`](./MEMORY_POLICY.md) / CONTEXT, the SQLite semantic
+store **rejects** before persist:
 
-- Currency conversions, absolute allergen safety claims, unknown-answer
-  placeholders, secrets/tokens, payment/PII, speculative roles, RAG internals
+- Currency conversions (USD/COP kept as written)
+- Absolute allergen safety claims (`zero risk`, `100% safe`)
+- Unknown-answer placeholders
+- RAG internals (chunks, scores, Qdrant payloads)
+- Anything outside the five CONTEXT memorable kinds (including raw tickets /
+  inventory rows)
 
 Failed tool paths and `no_context` answers do **not** propose semantic memory
 (`applicable=false`). The propose step never calls `MemoryInterface.write`.

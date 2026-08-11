@@ -71,12 +71,51 @@ write_memory (name kept for graph continuity)
 
 Durable writes wait for an explicit user confirmation in a later turn (Part 2+).
 
-## Examples that must NOT generate a proposal
+## Memorable vs non-memorable interactions (≥3 each)
+
+The agent must classify interactions correctly. Below: **≥3 examples that
+should propose** and **≥3 that must not**. Canonical lists live in
+`services/agent/memory/proposal.py` (`MEMORABLE_INTERACTION_EXAMPLES` /
+`NOTHING_TO_REMEMBER_EXAMPLES`).
+
+### Memorable — must generate a proposal (`applicable=true`)
+
+These are grounded KB / CONTEXT domain facts worth proposing (still
+**propose-only** — no durable write until confirmation).
+
+#### M1. Supplier ordering — protein stock rule
+
+- **User:** “How many days of main protein inventory should each location keep?”
+- **Why remember:** Durable supplier-ordering procedure from CONTEXT KB
+  (`brasaland-supplier-ordering.en.md`).
+- **Expected proposal:** `applicable=true`, `action=add`,
+  `fact` ≈ `Locations must keep 3 days of main protein inventory.`,
+  `kind` → `supplier_ordering`.
+
+#### M2. Waste protocol — escalation owner
+
+- **User:** “Who handles waste escalation when we exceed the daily threshold?”
+- **Why remember:** Durable waste + key-person fact (Felipe Guerrero /
+  Operations Director) from CONTEXT.
+- **Expected proposal:** `applicable=true`, `action=add`,
+  `fact` ≈ `Waste over the daily escalation threshold is handled by Felipe Guerrero (Operations Director).`,
+  `kind` → `people` or `waste`.
+
+#### M3. Emergency orders — 500 USD approval
+
+- **User:** “When do emergency orders need approval?”
+- **Why remember:** Durable procurement rule; currency kept as written
+  (never convert USD↔COP).
+- **Expected proposal:** `applicable=true`, `action=add`,
+  `fact` ≈ `Emergency orders over 500 USD require Procurement Manager (Lucía Fernández) approval.`,
+  `kind` → `supplier_ordering` / `people`.
+
+### Non-memorable — must NOT generate a proposal (`applicable=false`)
 
 These interactions are answered normally, but `memory_proposal.applicable`
 must stay **false** (nothing durable / in-scope to store):
 
-### 1. Live ticket status lookup
+#### N1. Live ticket status lookup
 
 - **User:** “What is the status of ticket BRS-000002?”
 - **Why dismiss:** Incident rows are live MCP/tool state, not a CONTEXT
@@ -84,7 +123,7 @@ must stay **false** (nothing durable / in-scope to store):
 - **Expected proposal:** `applicable=false`,
   `why` ≈ `ticket_path_not_in_context_memorable_domains` (or equivalent).
 
-### 2. Live inventory quantity lookup
+#### N2. Live inventory quantity lookup
 
 - **User:** “How many kg of tomatoes are in stock?”
 - **Why dismiss:** Inventory quantities change constantly; raw product rows are
@@ -92,7 +131,7 @@ must stay **false** (nothing durable / in-scope to store):
 - **Expected proposal:** `applicable=false`,
   `why` ≈ `inventory_path_not_in_context_memorable_domains`.
 
-### 3. Unknown / no-context answer
+#### N3. Unknown / no-context answer
 
 - **User:** “What is Brasaland’s secret sauce recipe?”
 - **Agent answer:** *There is not enough information available.*
@@ -101,7 +140,7 @@ must stay **false** (nothing durable / in-scope to store):
 - **Expected proposal:** `applicable=false`,
   `why` ≈ `unknown_answer_must_not_be_learned`.
 
-### 4. Duplicate of something already in memory (bonus)
+#### N4. Duplicate of something already in memory (bonus)
 
 - **User:** repeats a question whose durable fact is already in semantic memory
   (e.g. “3 days of protein stock” already stored).
@@ -111,8 +150,8 @@ must stay **false** (nothing durable / in-scope to store):
 
 Implementation: `services/agent/generation.py` → `generate_agent_turn`  
 Schema / question helper: `services/agent/memory/proposal.py`  
-Canonical dismissals: `NOTHING_TO_REMEMBER_EXAMPLES` in
-`services/agent/memory/proposal.py` (kept in sync with this section).
+Canonical lists: `MEMORABLE_INTERACTION_EXAMPLES` /
+`NOTHING_TO_REMEMBER_EXAMPLES` in `proposal.py` (kept in sync with this section).
 
 ## Related docs
 

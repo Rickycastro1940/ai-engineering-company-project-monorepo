@@ -385,7 +385,7 @@ def test_documented_nothing_to_remember_examples() -> None:
     doc = (
         Path(__file__).resolve().parents[2] / "docs" / "agent" / "MEMORY_SELF_EVAL.md"
     ).read_text(encoding="utf-8")
-    assert "Examples that must NOT generate a proposal" in doc
+    assert "Non-memorable" in doc or "must NOT generate a proposal" in doc
 
     required_ids = {"ticket_status", "inventory_quantity", "unknown_answer"}
     assert required_ids <= {ex["id"] for ex in NOTHING_TO_REMEMBER_EXAMPLES}
@@ -414,3 +414,35 @@ def test_documented_nothing_to_remember_examples() -> None:
     assert "default" in lowered
     assert "would you like me to remember" in lowered
     assert "never write" in lowered or "proposing to the user" in lowered
+
+
+def test_documented_memorable_interaction_examples() -> None:
+    """At least three interactions must be documented as worth proposing."""
+    from pathlib import Path
+
+    from services.agent.memory.policy import evaluate_memory_candidate
+    from services.agent.memory.proposal import MEMORABLE_INTERACTION_EXAMPLES
+
+    assert len(MEMORABLE_INTERACTION_EXAMPLES) >= 3
+
+    doc = (
+        Path(__file__).resolve().parents[2] / "docs" / "agent" / "MEMORY_SELF_EVAL.md"
+    ).read_text(encoding="utf-8")
+    assert "Memorable" in doc
+    assert "≥3" in doc or "at least 3" in doc.casefold() or "≥3 each" in doc
+
+    required_ids = {
+        "protein_stock_days",
+        "waste_escalation_owner",
+        "emergency_order_approval",
+    }
+    assert required_ids <= {ex["id"] for ex in MEMORABLE_INTERACTION_EXAMPLES}
+
+    for ex in MEMORABLE_INTERACTION_EXAMPLES:
+        assert ex["user"].strip()
+        assert ex["why_remember"].strip()
+        assert ex["expected_fact"].strip()
+        assert ex["kind"].strip()
+        assert ex["user"] in doc or ex["user"].replace("'", "’") in doc
+        decision = evaluate_memory_candidate(ex["expected_fact"], kind=ex["kind"])
+        assert decision.allowed is True, (ex["id"], decision.reason)
