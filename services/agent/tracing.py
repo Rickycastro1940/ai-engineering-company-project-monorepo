@@ -31,6 +31,7 @@ _SOURCE_BY_NODE: dict[str, str] = {
     "lookup_ticket": "ticket",
     "lookup_inventory": "inventory",
     "retrieve": "rag",
+    # recall_memory / write_memory extend the agent but are not primary answer sources
 }
 
 

@@ -236,8 +236,10 @@ def test_eval_rag_required_skips_tools(trace_dir: Path):
     assert trace["node_order"] == [
         "receive_question",
         "decide_route",
+        "recall_memory",
         "retrieve",
         "generate",
+        "write_memory",
     ]
     assert "lookup_ticket" not in trace["node_order"]
     assert "lookup_inventory" not in trace["node_order"]

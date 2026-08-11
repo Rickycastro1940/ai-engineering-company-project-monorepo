@@ -26,5 +26,8 @@ class AgentState(TypedDict, total=False):
     ticket_result: dict[str, Any] | None
     inventory_query: dict[str, Any] | None
     inventory_result: dict[str, Any] | None
+    # Durable semantic memory (extends MCP + RAG — does not replace them).
+    memory_hits: list[dict[str, Any]]
+    memory_writes: list[dict[str, Any]]
     sources_used: Annotated[list[str], operator.add]
     steps: Annotated[list[dict[str, Any]], operator.add]

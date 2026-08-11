@@ -13,3 +13,6 @@ data/process/agent-traces/*
 !data/process/agent-traces/sample-grounding-eval.json
 !data/process/agent-traces/sample-checkpoint-history.json
 **/__pycache__/
+
+data/process/agent-memory/*
+!data/process/agent-memory/.gitkeep

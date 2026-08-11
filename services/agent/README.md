@@ -10,9 +10,17 @@ inventory remains a read-only HTTP tool against the inventory manager.
   [`docs/agent/MEMORY_POLICY.md`](../../docs/agent/MEMORY_POLICY.md).
 - [x] **Branch from MCP / LangGraph progress** —
   `cursor/agent-memory-part1-2e12` (from `cursor/mcp-playground-connection-2e12`).
-- [ ] Wire durable memory into the graph (Part 1 implementation — next).
-- [ ] Enforce “must never enter memory” filters on every write.
-- [ ] Persist only facts worth remembering for Brasaland ops/commercial use.
+- [x] **Extend the same LangGraph agent** — `recall_memory` / `write_memory`
+  nodes sit on the existing MCP + RAG graph; `lookup_ticket` still uses
+  `lookup_ticket_via_mcp` only (does not replace MCP/tools/RAG).
+- [x] Enforce “must never enter memory” filters on every write (`memory/policy.py`).
+- [x] Persist only facts worth remembering (`data/process/agent-memory/semantic.json`).
+
+```text
+… → decide_route → recall_memory → lookup_ticket (MCP) | lookup_inventory | retrieve
+                                         ↓
+                              answer_* / generate → write_memory → END
+```
 
 ## MCP migration (company tools)
 

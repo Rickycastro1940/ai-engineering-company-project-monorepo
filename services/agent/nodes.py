@@ -10,6 +10,8 @@ Required nodes (Part 1 + Part 2)
    with the chunks the retrieve node already produced.
 5. ``lookup_ticket`` — ticket status via company-tools MCP (not direct HTTP).
 6. ``answer_ticket`` / ``ticket_fallback`` — honest ticket answers / recovery.
+7. ``recall_memory`` / ``write_memory`` — durable semantic memory that **extends**
+   the MCP + RAG agent (never replaces tools or retrieval).
 
 Never call the monolithic ``query()`` (retrieve + generate) inside a node.
 """
@@ -576,8 +578,13 @@ def generate_node(state: AgentState) -> dict[str, Any]:
                 )
             ],
         }
+    from services.agent.memory.nodes import memory_context_chunks
+
+    # Memory supplements RAG context; MCP/tool results stay authoritative separately.
+    memory_chunks = memory_context_chunks(state)
+    generation_context = list(memory_chunks) + list(chunks)
     try:
-        answer = generate_answer(state["question"], chunks)
+        answer = generate_answer(state["question"], generation_context)
     except Exception as exc:  # noqa: BLE001
         return {
             "answer": None,
@@ -622,13 +629,15 @@ def generate_node(state: AgentState) -> dict[str, Any]:
                 "generate",
                 "ok",
                 started,
-                notes="grounded answer from retrieved KB context",
+                notes="grounded answer from retrieved KB context (+ recalled memory)",
                 output={
                     "answer_len": len(answer or ""),
                     "grounded": True,
                     "source": "rag",
                     "used_ticket": bool(ticket_raw),
                     "used_inventory": bool(inventory_raw),
+                    "used_memory": bool(memory_chunks),
+                    "memory_hit_count": len(memory_chunks),
                     "context_sources": [c.get("source_document") for c in chunks],
                 },
             )

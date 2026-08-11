@@ -56,6 +56,10 @@ parallel invented store.
 ## Implementation notes for Part 1
 
 - Branch base: MCP / LangGraph progress (`cursor/mcp-playground-connection-2e12`)
+- **Same agent:** memory nodes extend `services/agent` — they do not replace
+  MCP ticket lookup, inventory tools, or RAG retrieve/generate
 - Keep memory writes behind an explicit allowlist derived from this policy
 - Reject memory candidates that violate the “must never” table before persist
 - Collection / company slug for RAG remain `brasaland_kb` / `brasaland`
+- Store path: `data/process/agent-memory/semantic.json` (override with
+  `AGENT_MEMORY_PATH`)

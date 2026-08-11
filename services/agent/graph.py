@@ -7,6 +7,9 @@ build/startup time rather than in production. Checkpointing uses
 
 Part 2 adds read-only ticket + inventory tool nodes and conditional routing
 between RAG and those tools based on the question content.
+
+Memory milestone extends the same graph with ``recall_memory`` /
+``write_memory`` — it does **not** replace MCP ticket lookup or RAG.
 """
 
 from __future__ import annotations
@@ -19,6 +22,7 @@ from uuid import uuid4
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
+from services.agent.memory.nodes import recall_memory_node, write_memory_node
 from services.agent.nodes import (
     answer_inventory_node,
     answer_ticket_node,
@@ -39,6 +43,7 @@ from services.agent.tracing import TraceRecord, save_trace
 REQUIRED_NODES = (
     "receive_question",
     "decide_route",
+    "recall_memory",
     "retrieve",
     "generate",
     "no_context",
@@ -49,6 +54,7 @@ REQUIRED_NODES = (
     "lookup_inventory",
     "answer_inventory",
     "inventory_fallback",
+    "write_memory",
 )
 
 _CHECKPOINTER = MemorySaver()
@@ -65,7 +71,12 @@ def _after_receive(state: AgentState) -> str:
 
 
 def _after_decide_route(state: AgentState) -> str:
-    """Conditional agent: ticket tool, inventory tool, or RAG."""
+    """Always recall durable memory before tools/RAG (extends, does not replace)."""
+    return "recall_memory"
+
+
+def _after_recall_memory(state: AgentState) -> str:
+    """Same routing as pre-memory decide_route — MCP tools and RAG unchanged."""
     route = state.get("route") or ""
     if route in ("ticket", "both", "ticket_inventory", "all"):
         return "lookup_ticket"
@@ -119,6 +130,7 @@ def build_agent_graph() -> StateGraph:
     graph = StateGraph(AgentState)
     graph.add_node("receive_question", receive_question)
     graph.add_node("decide_route", decide_route_node)
+    graph.add_node("recall_memory", recall_memory_node)
     graph.add_node("lookup_ticket", lookup_ticket_node)
     graph.add_node("answer_ticket", answer_ticket_node)
     graph.add_node("ticket_fallback", ticket_fallback_node)
@@ -129,6 +141,7 @@ def build_agent_graph() -> StateGraph:
     graph.add_node("generate", generate_node)
     graph.add_node("no_context", no_context_node)
     graph.add_node("empty_question", empty_question_node)
+    graph.add_node("write_memory", write_memory_node)
 
     graph.add_edge(START, "receive_question")
     graph.add_conditional_edges(
@@ -142,6 +155,11 @@ def build_agent_graph() -> StateGraph:
     graph.add_conditional_edges(
         "decide_route",
         _after_decide_route,
+        {"recall_memory": "recall_memory"},
+    )
+    graph.add_conditional_edges(
+        "recall_memory",
+        _after_recall_memory,
         {
             "lookup_ticket": "lookup_ticket",
             "lookup_inventory": "lookup_inventory",
@@ -180,12 +198,15 @@ def build_agent_graph() -> StateGraph:
             "end": END,
         },
     )
-    graph.add_edge("generate", END)
+    # Successful answer paths persist policy-approved memory, then end.
+    graph.add_edge("generate", "write_memory")
+    graph.add_edge("answer_ticket", "write_memory")
+    graph.add_edge("answer_inventory", "write_memory")
+    graph.add_edge("write_memory", END)
+    # Fallbacks / empty / no-context do not learn failed or unknown outcomes.
     graph.add_edge("no_context", END)
     graph.add_edge("empty_question", END)
-    graph.add_edge("answer_ticket", END)
     graph.add_edge("ticket_fallback", END)
-    graph.add_edge("answer_inventory", END)
     graph.add_edge("inventory_fallback", END)
     return graph
 
@@ -239,6 +260,7 @@ def inspect_checkpoints(thread_id: str, *, graph: Any | None = None) -> list[dic
                 "needs_ticket": values.get("needs_ticket"),
                 "needs_inventory": values.get("needs_inventory"),
                 "needs_rag": values.get("needs_rag"),
+                "memory_hit_count": len(values.get("memory_hits") or []),
             }
         )
     history.reverse()
@@ -267,6 +289,8 @@ def run_agent(question: str, *, thread_id: str | None = None) -> dict[str, Any]:
         "ticket_result": None,
         "inventory_query": None,
         "inventory_result": None,
+        "memory_hits": [],
+        "memory_writes": [],
         "sources_used": [],
         "steps": [],
     }
@@ -352,4 +376,6 @@ def run_agent(question: str, *, thread_id: str | None = None) -> dict[str, Any]:
         "sources_used": source_fields["sources_used"],
         "sources_order": source_fields["sources_order"],
         "source_summary": source_fields["source_summary"],
+        "memory_hits": list(final.get("memory_hits") or []),
+        "memory_writes": list(final.get("memory_writes") or []),
     }
