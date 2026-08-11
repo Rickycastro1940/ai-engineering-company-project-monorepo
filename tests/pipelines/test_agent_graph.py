@@ -24,6 +24,7 @@ from services.agent.graph import (
     validate_graph_structure,
 )
 from services.agent.tracing import load_trace
+from tests.pipelines.agent_test_helpers import grounded_turn
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONTEXT_COMPANY = REPO_ROOT / "CONTEXT-company.md"
@@ -143,7 +144,7 @@ def test_eval_retrieve_runs_before_generate(trace_dir: Path):
         trace_dir,
         **{
             "services.agent.nodes.retrieve": lambda q: [PROTEIN_STOCK_CHUNK],
-            "services.agent.nodes.generate_answer": lambda q, ctx: GROUNDED_ANSWER,
+            "services.agent.nodes.generate_agent_turn": lambda q, ctx, recalled=None: grounded_turn(),
         },
     )
     # Evals run against the persisted trace — not a second live execution.
@@ -173,7 +174,7 @@ def test_eval_empty_question_skips_retrieve(trace_dir: Path):
 
 def test_eval_no_context_when_retrieve_empty(trace_dir: Path):
     """Eval 3 — when retrieve returns nothing above threshold, use no_context."""
-    with patch("services.agent.nodes.generate_answer") as mock_generate:
+    with patch("services.agent.nodes.generate_agent_turn") as mock_generate:
         result = _run_and_save_trace(
             "What is Brasaland's secret sauce recipe?",
             trace_dir,
@@ -209,7 +210,7 @@ def test_eval_answer_grounded_in_context_knowledge_base(trace_dir: Path):
         trace_dir,
         **{
             "services.agent.nodes.retrieve": lambda q: [PROTEIN_STOCK_CHUNK],
-            "services.agent.nodes.generate_answer": lambda q, ctx: GROUNDED_ANSWER,
+            "services.agent.nodes.generate_agent_turn": lambda q, ctx, recalled=None: grounded_turn(),
         },
     )
 
@@ -261,16 +262,17 @@ def test_generate_answer_is_separate_from_retrieve():
 
 
 def test_node_contract_graph_never_calls_monolithic_query():
-    """Node contract: retrieve node → retrieve(); generate node → generate_answer(q, ctx).
+    """Node contract: retrieve → rag.retrieve; generate → generate_agent_turn(q, ctx).
 
     The monolithic ``query()`` (retrieve + generate) must not run inside any node.
+    Structured turn is still one model call (answer + memory_proposal).
     """
     import services.agent.nodes as nodes_mod
 
     assert not hasattr(nodes_mod, "query"), "nodes must not import monolithic query()"
 
     with patch("services.agent.nodes.retrieve", return_value=[PROTEIN_STOCK_CHUNK]) as mock_retrieve, patch(
-        "services.agent.nodes.generate_answer", return_value=GROUNDED_ANSWER
+        "services.agent.nodes.generate_agent_turn", return_value=grounded_turn()
     ) as mock_generate, patch("data.pipelines.rag.query") as mock_query, patch(
         "services.agent.graph._COMPILED_GRAPH", compile_agent_graph()
     ), patch("services.agent.graph.save_trace"):
@@ -319,7 +321,7 @@ def test_checkpointing_persists_thread_state():
     graph = compile_agent_graph()
     thread_id = "checkpoint-eval-thread"
     with patch("services.agent.nodes.retrieve", return_value=[PROTEIN_STOCK_CHUNK]), patch(
-        "services.agent.nodes.generate_answer", return_value=GROUNDED_ANSWER
+        "services.agent.nodes.generate_agent_turn", return_value=grounded_turn()
     ):
         graph.invoke(
             {
@@ -351,7 +353,7 @@ def test_every_run_produces_queryable_trace(trace_dir: Path):
     from services.agent.tracing import query_traces
 
     with patch("services.agent.nodes.retrieve", return_value=[PROTEIN_STOCK_CHUNK]), patch(
-        "services.agent.nodes.generate_answer", return_value=GROUNDED_ANSWER
+        "services.agent.nodes.generate_agent_turn", return_value=grounded_turn()
     ), patch("services.agent.tracing.DEFAULT_TRACE_DIR", trace_dir), patch(
         "services.agent.graph.save_trace"
     ) as mock_save:
@@ -377,7 +379,9 @@ def test_every_run_produces_queryable_trace(trace_dir: Path):
     retrieve_step = next(s for s in trace["steps"] if s["node_name"] == "retrieve")
     assert retrieve_step["output"]["chunk_count"] == 1
     generate_step = next(s for s in trace["steps"] if s["node_name"] == "generate")
-    assert generate_step["notes"].startswith("grounded answer from retrieved KB context")
+    assert "memory_proposal" in generate_step["notes"] or "structured turn" in generate_step["notes"]
+    assert generate_step["output"].get("second_model_call") is False
+    assert "memory_proposal" in (generate_step["output"] or {})
     # Trace file is queryable from disk (not just console print).
     assert (trace_dir / f"{result['trace_id']}.json").is_file()
 

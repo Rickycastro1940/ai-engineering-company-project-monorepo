@@ -45,8 +45,9 @@ traces instead of semantic memory):
 ## Implementation
 
 - Enforced in `services/agent/memory/policy.py` (`evaluate_memory_candidate`)
-- After each relevant interaction, **self-evaluation** decides new vs corrected
-  vs skip — see [`MEMORY_SELF_EVAL.md`](./MEMORY_SELF_EVAL.md)
-- Writes only via `MemoryInterface.write` after policy **and** self-eval
+- Self-eval is the structured ``memory_proposal`` field from the **same**
+  generate call ([`MEMORY_SELF_EVAL.md`](./MEMORY_SELF_EVAL.md)) — not a
+  second model call
+- Writes only via `MemoryInterface.write` after policy **and** an applicable proposal
 - Backend / R/W docs: [`MEMORY_BACKEND.md`](./MEMORY_BACKEND.md),
   [`MEMORY_INTERFACE.md`](./MEMORY_INTERFACE.md)

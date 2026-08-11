@@ -6,8 +6,9 @@ Required nodes (Part 1 + Part 2)
 2. ``decide_route`` — conditional router: RAG, ticket tool, or both (from
    question content; user does not pick the source).
 3. ``retrieve`` — calls ``data.pipelines.rag.retrieve`` (reuse, do not duplicate).
-4. ``generate`` — calls ``data.pipelines.rag.generate_answer(question, context)``
-   with the chunks the retrieve node already produced.
+4. ``generate`` — one model call via ``generate_agent_turn`` → user ``answer``
+   plus optional ``memory_proposal`` (same agent; not a second LLM call).
+   Reuses RAG grounding rules (``SYSTEM_PROMPT`` / client from ``data.pipelines.rag``).
 5. ``lookup_ticket`` — ticket status via company-tools MCP (not direct HTTP).
 6. ``answer_ticket`` / ``ticket_fallback`` — honest ticket answers / recovery.
 7. ``recall_memory`` / ``write_memory`` — durable semantic memory that **extends**
@@ -23,6 +24,8 @@ from typing import Any
 
 from data.pipelines.rag import NO_CONTEXT_ANSWER, generate_answer, retrieve
 
+from services.agent.generation import generate_agent_turn
+from services.agent.memory.proposal import MemoryProposal
 from services.agent.state import AgentState
 from services.agent.tools.contracts import (
     InventoryLookupInput,
@@ -46,7 +49,7 @@ from services.agent.tools.ticket_lookup import (
     honest_ticket_fallback_answer,
 )
 
-# Node contract: this module imports retrieve + generate_answer only — never query().
+# Node contract: retrieve from rag; generate via structured agent turn — never query().
 _MONOLITHIC_QUERY_FORBIDDEN = True
 
 
@@ -257,8 +260,13 @@ def answer_ticket_node(state: AgentState) -> dict[str, Any]:
     raw = state.get("ticket_result") or {}
     result = TicketLookupOutput.model_validate(raw)
     answer = format_ticket_answer(result)
+    # Ticket rows are not CONTEXT memorable domains — no memory_proposal.
+    no_proposal = MemoryProposal(
+        applicable=False, why="ticket_path_not_in_context_memorable_domains"
+    ).as_dict()
     return {
         "answer": answer,
+        "memory_proposal": no_proposal,
         "error": None,
         "route": "done",
         "steps": [
@@ -272,6 +280,7 @@ def answer_ticket_node(state: AgentState) -> dict[str, Any]:
                     "source": "ticket",
                     "answer": answer,
                     "ticket_count": len(result.tickets),
+                    "memory_proposal": no_proposal,
                 },
             )
         ],
@@ -420,8 +429,12 @@ def answer_inventory_node(state: AgentState) -> dict[str, Any]:
             answer = f"{ticket_text}\n\n{answer}"
         except Exception:  # noqa: BLE001
             pass
+    no_proposal = MemoryProposal(
+        applicable=False, why="inventory_path_not_in_context_memorable_domains"
+    ).as_dict()
     return {
         "answer": answer,
+        "memory_proposal": no_proposal,
         "error": None,
         "route": "done",
         "steps": [
@@ -436,6 +449,7 @@ def answer_inventory_node(state: AgentState) -> dict[str, Any]:
                     "answer": answer,
                     "product_count": len(result.products),
                     "used_ticket": bool(ticket_raw),
+                    "memory_proposal": no_proposal,
                 },
             )
         ],
@@ -557,14 +571,18 @@ def retrieve_node(state: AgentState) -> dict[str, Any]:
 
 
 def generate_node(state: AgentState) -> dict[str, Any]:
-    """Generate the final answer from already-retrieved context (+ optional ticket)."""
+    """One model call: user-facing ``answer`` + optional ``memory_proposal``.
+
+    Uses ``generate_agent_turn`` (structured JSON). Not a second LLM call or a
+    separate memory agent — same generate step with one extra output field.
+    """
     started = time.perf_counter()
     chunks = state.get("retrieved") or []
+    empty_proposal = MemoryProposal(applicable=False, why="no_retrieved_context")
     if not chunks:
-        from data.pipelines.rag import NO_CONTEXT_ANSWER as _NO
-
         return {
-            "answer": _NO,
+            "answer": NO_CONTEXT_ANSWER,
+            "memory_proposal": empty_proposal.as_dict(),
             "error": None,
             "route": "done",
             "steps": [
@@ -574,21 +592,32 @@ def generate_node(state: AgentState) -> dict[str, Any]:
                     "ok",
                     started,
                     notes="refused generation without retrieved context",
-                    output={"answer": _NO, "grounded": False, "source": "rag"},
+                    output={
+                        "answer": NO_CONTEXT_ANSWER,
+                        "grounded": False,
+                        "source": "rag",
+                        "memory_proposal": empty_proposal.as_dict(),
+                        "second_model_call": False,
+                    },
                 )
             ],
         }
-    # KB grounding uses retrieve chunks only. Recalled memory is applied via the
-    # explicit MemoryInterface.read results already in state — never by mutating
-    # the RAG system prompt or dumping the full SQLite store into the prompt.
-    from services.agent.memory.interface import get_agent_memory
+
     from services.agent.memory.nodes import recalled_records_from_state
 
+    recalled = recalled_records_from_state(state)
     try:
-        answer = generate_answer(state["question"], chunks)
+        turn = generate_agent_turn(
+            state["question"],
+            chunks,
+            recalled=recalled,
+        )
     except Exception as exc:  # noqa: BLE001
         return {
             "answer": None,
+            "memory_proposal": MemoryProposal(
+                applicable=False, why=f"generation_failed:{type(exc).__name__}"
+            ).as_dict(),
             "error": f"generation_failed:{type(exc).__name__}",
             "route": "error",
             "steps": [
@@ -602,12 +631,8 @@ def generate_node(state: AgentState) -> dict[str, Any]:
             ],
         }
 
-    memory = get_agent_memory()
-    recalled = recalled_records_from_state(state)
-    memory_notes = memory.format_turn_notes(recalled)
-    if memory_notes:
-        # Separate turn notes from system prompt / full-store accumulation.
-        answer = f"{answer}\n\n{memory_notes}"
+    answer = turn.answer
+    proposal = turn.memory_proposal.as_dict()
 
     ticket_raw = state.get("ticket_result")
     if ticket_raw:
@@ -629,6 +654,7 @@ def generate_node(state: AgentState) -> dict[str, Any]:
 
     return {
         "answer": answer,
+        "memory_proposal": proposal,
         "error": None,
         "route": "done",
         "steps": [
@@ -637,7 +663,10 @@ def generate_node(state: AgentState) -> dict[str, Any]:
                 "generate",
                 "ok",
                 started,
-                notes="grounded answer from retrieved KB context (+ MemoryInterface.read notes)",
+                notes=(
+                    "structured turn: answer + memory_proposal "
+                    "(one model call; recalled memory in prompt only)"
+                ),
                 output={
                     "answer_len": len(answer or ""),
                     "grounded": True,
@@ -646,7 +675,10 @@ def generate_node(state: AgentState) -> dict[str, Any]:
                     "used_inventory": bool(inventory_raw),
                     "used_memory": bool(recalled),
                     "memory_hit_count": len(recalled),
-                    "memory_via": "MemoryInterface.read",
+                    "memory_via": "MemoryInterface.read→prompt",
+                    "memory_proposal": proposal,
+                    "second_model_call": False,
+                    "separate_memory_agent": False,
                     "system_prompt_mutated": False,
                     "full_memory_store_in_prompt": False,
                     "context_sources": [c.get("source_document") for c in chunks],
@@ -659,8 +691,12 @@ def generate_node(state: AgentState) -> dict[str, Any]:
 def no_context_node(state: AgentState) -> dict[str, Any]:
     """Honest fallback when retrieve returns nothing above the score threshold."""
     started = time.perf_counter()
+    no_proposal = MemoryProposal(
+        applicable=False, why="unknown_answer_must_not_be_learned"
+    ).as_dict()
     return {
         "answer": NO_CONTEXT_ANSWER,
+        "memory_proposal": no_proposal,
         "error": None,
         "route": "done",
         "steps": [
@@ -670,7 +706,11 @@ def no_context_node(state: AgentState) -> dict[str, Any]:
                 "ok",
                 started,
                 notes="no chunks above threshold",
-                output={"answer": NO_CONTEXT_ANSWER, "source": "rag"},
+                output={
+                    "answer": NO_CONTEXT_ANSWER,
+                    "source": "rag",
+                    "memory_proposal": no_proposal,
+                },
             )
         ],
     }

@@ -23,6 +23,7 @@ from services.agent.tools.ticket_lookup import (
     lookup_ticket,
 )
 from services.agent.tracing import load_trace
+from tests.pipelines.agent_test_helpers import grounded_turn
 from services.api.incidents_store import get_incident, load_incidents
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -329,7 +330,7 @@ def test_eval_rag_required_question_skips_ticket_tool(trace_dir: Path):
             trace_dir,
             **{
                 "services.agent.nodes.retrieve": lambda q: [PROTEIN_STOCK_CHUNK],
-                "services.agent.nodes.generate_answer": lambda q, ctx: GROUNDED_ANSWER,
+                "services.agent.nodes.generate_agent_turn": lambda q, ctx, recalled=None: grounded_turn(),
             },
         )
 
@@ -391,7 +392,7 @@ def test_eval_decide_route_both_runs_ticket_then_rag(trace_dir: Path):
         **{
             "services.agent.nodes.lookup_ticket_via_mcp": lambda q, **_: ok_result,
             "services.agent.nodes.retrieve": lambda q: [PROTEIN_STOCK_CHUNK],
-            "services.agent.nodes.generate_answer": lambda q, ctx: GROUNDED_ANSWER,
+            "services.agent.nodes.generate_agent_turn": lambda q, ctx, recalled=None: grounded_turn(),
         },
     )
     trace = load_trace(result["trace_id"], trace_dir=trace_dir)

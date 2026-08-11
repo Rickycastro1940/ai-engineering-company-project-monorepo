@@ -1,11 +1,13 @@
-"""Agent memory must follow CONTEXT-company.md exactly (no generic extras)."""
+"""Agent memory: CONTEXT policy + structured memory_proposal (one generate call)."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 from data.pipelines import rag as rag_mod
+from services.agent.generation import parse_agent_turn_json
 from services.agent.graph import REQUIRED_NODES, build_agent_graph, compile_agent_graph
+from services.agent.memory.apply_proposal import decide_from_memory_proposal
 from services.agent.memory.interface import (
     DEFAULT_READ_LIMIT,
     AgentMemory,
@@ -23,7 +25,7 @@ from services.agent.memory.policy import (
     context_company_text,
     evaluate_memory_candidate,
 )
-from services.agent.memory.self_evaluate import self_evaluate_worth_remembering
+from services.agent.memory.proposal import MemoryProposal
 from services.agent.memory.store import MemoryRecord, MemoryStore
 from services.agent.nodes import lookup_ticket_node
 from services.agent.tools.mcp_incidents import lookup_ticket_via_mcp
@@ -34,7 +36,6 @@ def test_memory_policy_matches_context_company_md_exactly() -> None:
     ctx = context_company_text()
     assert CONTEXT_COMPANY_PATH.is_file()
 
-    # Forbidden — CONTEXT RAG constraints (exact phrases / requirements).
     assert "never convert" in ctx.casefold()
     assert "zero risk" in ctx.casefold()
     assert "100% safe" in ctx.casefold()
@@ -42,7 +43,6 @@ def test_memory_policy_matches_context_company_md_exactly() -> None:
     assert "chunks" in ctx.casefold() and "scores" in ctx.casefold()
     assert "qdrant" in ctx.casefold()
 
-    # Memorable — KB topic table + key people.
     for needle in (
         "brasaland-supplier-ordering",
         "brasaland-waste-protocol",
@@ -97,14 +97,12 @@ def test_context_forbidden_facts_are_rejected() -> None:
 
 
 def test_context_memorable_domains_are_accepted() -> None:
-    # supplier ordering (USD kept as written — not a conversion); no named person
     ok = evaluate_memory_candidate(
         "Emergency orders over 500 USD require Procurement Manager approval."
     )
     assert ok.allowed is True
     assert ok.kind == "supplier_ordering"
 
-    # Named CONTEXT people take the people kind (even when roles overlap topics).
     ok_lucia = evaluate_memory_candidate(
         "Emergency orders over 500 USD require approval from Lucía Fernández."
     )
@@ -135,7 +133,6 @@ def test_context_memorable_domains_are_accepted() -> None:
 
 
 def test_non_context_domains_are_not_memorable() -> None:
-    """Ticket/inventory rows are not CONTEXT memory topics — must be rejected."""
     denied = evaluate_memory_candidate(
         "Ticket BRS-000002: status=ABIERTO, category=EQUIPAMIENTO (confirmed via MCP)."
     )
@@ -149,11 +146,6 @@ def test_non_context_domains_are_not_memorable() -> None:
 
 
 def test_generic_extra_rules_are_not_required_by_context() -> None:
-    """Do not invent forbidden categories absent from CONTEXT-company.md."""
-    # A procurement fact that mentions 'password' in a non-CONTEXT sense should
-    # still be judged only by CONTEXT rules — if it maps to supplier_ordering
-    # and has no CONTEXT-forbidden phrases, policy scope is CONTEXT-only.
-    # (We still reject if it fails domain inference.)
     ctx = context_company_text().casefold()
     assert "social security" not in ctx
     assert "api_key" not in ctx
@@ -194,8 +186,30 @@ def test_compiled_graph_routes_ticket_through_recall_then_mcp() -> None:
     assert "lookup_ticket" in compiled.get_graph().nodes
 
 
-def test_self_eval_criterion_new_corrected_not_always() -> None:
-    """Explicit criterion: remember only new or corrected facts — not always."""
+def test_structured_turn_parses_answer_and_memory_proposal() -> None:
+    """One JSON object → user answer + optional memory_proposal (no second call)."""
+    raw = """
+    {
+      "answer": "Locations must keep 3 days of main protein inventory.",
+      "memory_proposal": {
+        "applicable": true,
+        "action": "add",
+        "fact": "Locations must keep 3 days of main protein inventory.",
+        "previous_fact": null,
+        "why": "New durable supplier-ordering fact."
+      }
+    }
+    """
+    turn = parse_agent_turn_json(raw)
+    assert "3 days" in turn.answer
+    assert turn.memory_proposal.applicable is True
+    assert turn.memory_proposal.action == "add"
+    assert turn.memory_proposal.fact is not None
+    assert "why" in (turn.memory_proposal.why or "").casefold() or turn.memory_proposal.why
+
+
+def test_memory_proposal_self_eval_not_always_write() -> None:
+    """applicable=false → skip; add → write; change → replace; duplicates skipped."""
     existing = [
         MemoryRecord(
             id="m1",
@@ -207,51 +221,53 @@ def test_self_eval_criterion_new_corrected_not_always() -> None:
         )
     ]
 
-    # Exact duplicate → skip (must not always write).
-    dup = self_evaluate_worth_remembering(
-        "Emergency orders over 500 USD require Procurement Manager approval.",
-        kind="supplier_ordering",
+    skip = decide_from_memory_proposal(
+        MemoryProposal(applicable=False, why="nothing new"),
+        existing=existing,
+    )
+    assert skip.remember is False
+    assert skip.verdict == "skip_not_applicable"
+
+    add = decide_from_memory_proposal(
+        MemoryProposal(
+            applicable=True,
+            action="add",
+            fact="Brasa Points loyalty tiers and redemption rules apply to members.",
+            why="New loyalty fact",
+        ),
+        existing=existing,
+    )
+    assert add.remember is True
+    assert add.verdict == "add"
+
+    change = decide_from_memory_proposal(
+        MemoryProposal(
+            applicable=True,
+            action="change",
+            fact="Emergency orders over 1000 USD require Procurement Manager approval.",
+            previous_fact="Emergency orders over 500 USD require Procurement Manager approval.",
+            why="Corrected approval threshold",
+        ),
+        existing=existing,
+    )
+    assert change.remember is True
+    assert change.verdict == "change"
+    assert change.replace_id == "m1"
+
+    dup = decide_from_memory_proposal(
+        MemoryProposal(
+            applicable=True,
+            action="add",
+            fact="Emergency orders over 500 USD require Procurement Manager approval.",
+            why="repeat",
+        ),
         existing=existing,
     )
     assert dup.remember is False
     assert dup.verdict == "skip_duplicate"
 
-    # Near-paraphrase / redundant → skip.
-    red = self_evaluate_worth_remembering(
-        "Emergency orders over 500 USD require Procurement Manager approval",
-        kind="supplier_ordering",
-        existing=existing,
-    )
-    assert red.remember is False
-    assert red.verdict in {"skip_duplicate", "skip_redundant"}
 
-    # Numeric correction → remember as corrected.
-    corr = self_evaluate_worth_remembering(
-        "Emergency orders over 1000 USD require Procurement Manager approval.",
-        kind="supplier_ordering",
-        existing=existing,
-    )
-    assert corr.remember is True
-    assert corr.verdict == "corrected"
-    assert corr.related_id == "m1"
-
-    # Unrelated domain fact → new.
-    fresh = self_evaluate_worth_remembering(
-        "Brasa Points loyalty tiers and redemption rules apply to members.",
-        kind="loyalty",
-        existing=existing,
-    )
-    assert fresh.remember is True
-    assert fresh.verdict == "new"
-
-    # Empty interaction → skip.
-    empty = self_evaluate_worth_remembering("", kind=None, existing=[])
-    assert empty.remember is False
-    assert empty.verdict == "skip_no_candidate"
-
-
-def test_write_memory_node_self_evaluates_before_write(tmp_path: Path, monkeypatch) -> None:
-    """write_memory must self-evaluate; duplicate interactions do not re-write."""
+def test_write_memory_node_uses_structured_proposal(tmp_path: Path, monkeypatch) -> None:
     store = MemoryStore(tmp_path / "semantic.sqlite")
     memory = AgentMemory(store)
     monkeypatch.setattr(
@@ -259,50 +275,68 @@ def test_write_memory_node_self_evaluates_before_write(tmp_path: Path, monkeypat
         lambda: memory,
     )
 
-    first = {
+    state = {
         "question": "emergency order approval?",
         "answer": "Emergency orders over 500 USD require Procurement Manager approval.",
-        "retrieved": [{"source_document": "brasaland-supplier-ordering.en.md"}],
+        "memory_proposal": {
+            "applicable": True,
+            "action": "add",
+            "fact": "Emergency orders over 500 USD require Procurement Manager approval.",
+            "previous_fact": None,
+            "why": "New durable supplier-ordering fact from grounded KB answer.",
+        },
         "memory_hits": [],
         "steps": [],
         "sources_used": [],
     }
-    out1 = write_memory_node(first)  # type: ignore[arg-type]
+    out1 = write_memory_node(state)  # type: ignore[arg-type]
     assert out1["memory_writes"]
-    assert out1["memory_self_evaluations"][0]["verdict"] == "new"
+    assert out1["memory_self_evaluations"][0]["verdict"] == "add"
     assert out1["steps"][0]["output"]["always_write"] is False
+    assert out1["steps"][0]["output"]["second_model_call"] is False
 
-    # Same interaction again → skip_duplicate (not always write).
-    out2 = write_memory_node(first)  # type: ignore[arg-type]
+    # Same proposal again → skip_duplicate (not always write).
+    out2 = write_memory_node(state)  # type: ignore[arg-type]
     assert out2["memory_writes"] == []
     assert out2["memory_self_evaluations"][0]["verdict"] == "skip_duplicate"
 
-    # Corrected threshold → write with corrected verdict.
-    corrected_state = {
-        **first,
-        "answer": "Emergency orders over 1000 USD require Procurement Manager approval.",
-    }
-    out3 = write_memory_node(corrected_state)  # type: ignore[arg-type]
+    # Change proposal replaces prior fact.
+    prior = store.list_records()[0].text
+    out3 = write_memory_node(
+        {
+            **state,
+            "memory_proposal": {
+                "applicable": True,
+                "action": "change",
+                "fact": "Emergency orders over 1000 USD require Procurement Manager approval.",
+                "previous_fact": prior,
+                "why": "Corrected approval threshold",
+            },
+        }
+    )  # type: ignore[arg-type]
     assert out3["memory_writes"]
-    assert out3["memory_self_evaluations"][0]["verdict"] == "corrected"
-    # Old 500 USD fact replaced.
+    assert out3["memory_self_evaluations"][0]["verdict"] == "change"
     texts = [r.text for r in store.list_records()]
     assert any("1000 USD" in t for t in texts)
     assert not any("500 USD" in t and "1000" not in t for t in texts)
 
 
-def test_write_memory_skips_when_no_candidates() -> None:
-    from services.agent.memory.nodes import write_memory_node as _write
-
-    out = _write(
+def test_write_memory_skips_when_proposal_not_applicable() -> None:
+    out = write_memory_node(
         {
             "question": "status of ticket BRS-000002?",
             "answer": "Ticket BRS-000002 is ABIERTO.",
-            "retrieved": [],
+            "memory_proposal": {
+                "applicable": False,
+                "action": None,
+                "fact": None,
+                "previous_fact": None,
+                "why": "ticket_path_not_in_context_memorable_domains",
+            },
             "memory_hits": [],
             "steps": [],
             "sources_used": [],
         }
     )
     assert out["memory_writes"] == []
-    assert out["memory_self_evaluations"][0]["verdict"] == "skip_no_candidate"
+    assert out["memory_self_evaluations"][0]["verdict"] == "skip_not_applicable"

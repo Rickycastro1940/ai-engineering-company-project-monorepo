@@ -22,6 +22,7 @@ from services.agent.grounding import (
     supplier_ordering_facts,
 )
 from services.agent.tracing import load_trace
+from tests.pipelines.agent_test_helpers import agent_turn
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -53,7 +54,7 @@ def trace_dir(tmp_path: Path) -> Path:
 
 def _run(question: str, trace_dir: Path, *, chunks, answer: str) -> dict:
     with patch("services.agent.nodes.retrieve", return_value=chunks), patch(
-        "services.agent.nodes.generate_answer", return_value=answer
+        "services.agent.nodes.generate_agent_turn", return_value=agent_turn(answer)
     ), patch("services.agent.tracing.DEFAULT_TRACE_DIR", trace_dir), patch(
         "services.agent.graph.save_trace"
     ) as mock_save:
@@ -71,13 +72,17 @@ def test_grounding_facts_exist_in_context_company_and_kb():
     assert facts["person"] == "Lucía Fernández"
 
 
-def test_agent_and_rag_share_generate_answer_function():
-    """LangGraph generate node must reuse the RAG pipeline's generate_answer."""
+def test_agent_generate_reuses_rag_grounding_and_retrieve():
+    """Generate uses structured agent turn; retrieve stays the RAG retrieve."""
     import data.pipelines.rag as rag
+    import services.agent.generation as generation
     import services.agent.nodes as nodes
 
-    assert nodes.generate_answer is rag.generate_answer
     assert nodes.retrieve is rag.retrieve
+    assert nodes.generate_agent_turn is generation.generate_agent_turn
+    # Same grounding system prompt / client as knowledge RAG (not a second agent).
+    assert generation.SYSTEM_PROMPT is rag.SYSTEM_PROMPT
+    assert generation.client is rag.client
 
 
 def test_grounded_trace_passes_acceptance_gate(trace_dir: Path):

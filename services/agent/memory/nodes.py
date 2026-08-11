@@ -5,9 +5,9 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from services.agent.memory.candidates import extract_memory_candidates
+from services.agent.memory.apply_proposal import decide_from_memory_proposal
 from services.agent.memory.interface import DEFAULT_READ_LIMIT, get_agent_memory
-from services.agent.memory.self_evaluate import self_evaluate_worth_remembering
+from services.agent.memory.proposal import MemoryProposal
 from services.agent.memory.store import MemoryRecord
 from services.agent.state import AgentState
 
@@ -97,87 +97,88 @@ def recall_memory_node(state: AgentState) -> dict[str, Any]:
 
 
 def write_memory_node(state: AgentState) -> dict[str, Any]:
-    """Self-evaluate then optionally ``memory.write`` after a relevant interaction.
+    """Persist from the generate-call ``memory_proposal`` when applicable.
 
-    Does **not** always persist. For each CONTEXT-admitted candidate the
-    explicit criterion in ``self_evaluate_worth_remembering`` decides
-    ``new`` / ``corrected`` (write) vs ``skip_*`` (no write).
+    Self-evaluation is the structured field from the **same** model call as the
+    user answer — not a second LLM call. CONTEXT policy still gates writes.
     """
     started = time.perf_counter()
     memory = get_agent_memory()
-    raw_candidates = extract_memory_candidates(state)
     written: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
     evaluations: list[dict[str, Any]] = []
 
-    if not raw_candidates:
-        evaluations.append(
-            {
-                "remember": False,
-                "verdict": "skip_no_candidate",
-                "reason": "no_policy_admitted_candidates_after_interaction",
-                "text": None,
-            }
-        )
+    raw_proposal = state.get("memory_proposal")
+    proposal: MemoryProposal | dict[str, Any] | None
+    if isinstance(raw_proposal, MemoryProposal):
+        proposal = raw_proposal
+    elif isinstance(raw_proposal, dict):
+        proposal = raw_proposal
     else:
-        for item in raw_candidates:
-            text = str(item.get("text") or "")
-            kind = item.get("kind")
-            related = list(memory.related_for_self_eval(text, kind=kind))
-            seen_ids = {r.id for r in related if r.id}
-            for hit_rec in _records_from_hits(state.get("memory_hits") or [], kind=kind):
-                if hit_rec.id and hit_rec.id in seen_ids:
-                    continue
-                related.append(hit_rec)
-                if hit_rec.id:
-                    seen_ids.add(hit_rec.id)
+        proposal = None
 
-            decision = self_evaluate_worth_remembering(
-                text, kind=kind, existing=related
-            )
-            evaluations.append(
+    kind_hint = None
+    if isinstance(proposal, MemoryProposal) and proposal.fact:
+        from services.agent.memory.policy import infer_kind
+
+        kind_hint = infer_kind(proposal.fact)
+    elif isinstance(proposal, dict) and proposal.get("fact"):
+        from services.agent.memory.policy import infer_kind
+
+        kind_hint = infer_kind(str(proposal["fact"]))
+
+    related = []
+    if proposal and (
+        (isinstance(proposal, MemoryProposal) and proposal.fact)
+        or (isinstance(proposal, dict) and proposal.get("fact"))
+    ):
+        fact_text = (
+            proposal.fact
+            if isinstance(proposal, MemoryProposal)
+            else str(proposal.get("fact") or "")
+        )
+        related = list(memory.related_for_self_eval(fact_text, kind=kind_hint))
+    seen = {r.id for r in related if r.id}
+    for hit_rec in _records_from_hits(state.get("memory_hits") or [], kind=kind_hint):
+        if hit_rec.id and hit_rec.id in seen:
+            continue
+        related.append(hit_rec)
+        if hit_rec.id:
+            seen.add(hit_rec.id)
+
+    decision = decide_from_memory_proposal(proposal, existing=related)
+    evaluations.append(decision.as_dict())
+
+    if decision.remember and decision.fact and decision.kind:
+        result = memory.write(
+            decision.fact,
+            kind=decision.kind,
+            source="memory_proposal",
+            metadata={
+                "self_eval": "structured_memory_proposal",
+                "verdict": decision.verdict,
+                "why": decision.reason,
+                "proposal": decision.proposal,
+            },
+            replace_id=decision.replace_id if decision.verdict == "change" else None,
+        )
+        if result.ok and result.record is not None:
+            written.append(result.record.as_dict())
+        else:
+            rejected.append(
                 {
-                    **decision.as_dict(),
-                    "text": text,
-                    "kind": kind,
-                    "source": item.get("source"),
+                    "fact": decision.fact,
+                    "reason": result.decision.reason,
                 }
             )
-
-            if not decision.remember:
-                rejected.append(
-                    {
-                        "text": text,
-                        "reason": f"self_eval:{decision.verdict}",
-                        "detail": decision.reason,
-                        "source": item.get("source"),
-                    }
-                )
-                continue
-
-            result = memory.write(
-                text,
-                kind=kind,
-                source=str(item.get("source") or "agent"),
-                metadata={
-                    **dict(item.get("metadata") or {}),
-                    "self_eval_verdict": decision.verdict,
-                    "self_eval_reason": decision.reason,
-                },
-                replace_id=(
-                    decision.related_id if decision.verdict == "corrected" else None
-                ),
-            )
-            if result.ok and result.record is not None:
-                written.append(result.record.as_dict())
-            else:
-                rejected.append(
-                    {
-                        "text": text,
-                        "reason": result.decision.reason,
-                        "source": item.get("source"),
-                    }
-                )
+    else:
+        rejected.append(
+            {
+                "fact": decision.fact,
+                "reason": f"self_eval:{decision.verdict}",
+                "detail": decision.reason,
+            }
+        )
 
     return {
         "memory_writes": written,
@@ -191,19 +192,20 @@ def write_memory_node(state: AgentState) -> dict[str, Any]:
                 "ok",
                 started,
                 notes=(
-                    f"self_eval then memory.write wrote={len(written)} "
-                    f"skipped={len(rejected)} "
-                    f"verdicts={[e.get('verdict') for e in evaluations]}"
+                    f"memory_proposal verdict={decision.verdict} "
+                    f"wrote={len(written)} (same-call structured field; not always write)"
                 ),
                 output={
                     "source": "memory",
-                    "api": "self_evaluate_worth_remembering+MemoryInterface.write",
+                    "api": "memory_proposal+MemoryInterface.write",
                     "always_write": False,
+                    "second_model_call": False,
                     "written_count": len(written),
                     "rejected_count": len(rejected),
                     "written_ids": [w.get("id") for w in written],
                     "self_evaluations": evaluations,
                     "rejected": rejected[:5],
+                    "memory_proposal": decision.proposal,
                 },
             )
         ],

@@ -15,9 +15,10 @@ inventory remains a read-only HTTP tool against the inventory manager.
   `lookup_ticket_via_mcp` only (does not replace MCP/tools/RAG).
 - [x] Enforce “must never enter memory” filters on every write (`memory/policy.py`).
 - [x] Persist only facts worth remembering (`data/process/agent-memory/semantic.sqlite`).
-- [x] **Self-evaluation after each relevant interaction** — explicit
-  new/corrected/skip criterion ([`docs/agent/MEMORY_SELF_EVAL.md`](../../docs/agent/MEMORY_SELF_EVAL.md));
-  does **not** always write.
+- [x] **Self-evaluation after each relevant interaction** — same generate call
+  returns structured `answer` + `memory_proposal` (add/change/why);
+  [`docs/agent/MEMORY_SELF_EVAL.md`](../../docs/agent/MEMORY_SELF_EVAL.md).
+  No second model call / separate memory agent.
 - [x] **Backend documented** — SQLite semantic + traces episodic
   ([`docs/agent/MEMORY_BACKEND.md`](../../docs/agent/MEMORY_BACKEND.md)).
 - [x] **Explicit read/write interface** — `MemoryInterface.read` /

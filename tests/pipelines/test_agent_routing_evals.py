@@ -37,6 +37,7 @@ from services.agent.tools.ticket_lookup import (
     TICKET_LOOKUP_TIMEOUT_SECONDS,
 )
 from services.agent.tracing import load_trace
+from tests.pipelines.agent_test_helpers import grounded_turn
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 INCIDENTS_CSV = REPO_ROOT / "scripts" / "incidents-COMPANY.csv"
@@ -225,7 +226,7 @@ def test_eval_rag_required_skips_tools(trace_dir: Path):
             trace_dir,
             **{
                 "services.agent.nodes.retrieve": lambda q: [PROTEIN_STOCK_CHUNK],
-                "services.agent.nodes.generate_answer": lambda q, ctx: GROUNDED_ANSWER,
+                "services.agent.nodes.generate_agent_turn": lambda q, ctx, recalled=None: grounded_turn(),
             },
         )
 

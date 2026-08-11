@@ -1,41 +1,68 @@
-# Post-interaction memory self-evaluation
+# Self-evaluation via structured `memory_proposal`
 
-After each relevant answer path (`generate` / `answer_ticket` /
-`answer_inventory` → `write_memory`), the agent **self-evaluates** whether
-anything is worth remembering. It does **not** always write.
+Self-evaluation and memory proposal use **one model call** on the existing
+generate step. There is **no** second LLM call, separate memory agent, or
+multi-agent architecture — only one extra structured field.
 
-## Explicit criterion
+## Single-call output
 
-Applied in order by `self_evaluate_worth_remembering`
-(`services/agent/memory/self_evaluate.py`):
-
-| Order | Verdict | Remember? | Rule |
-| ----- | ------- | --------- | ---- |
-| 0 | *(policy)* | no | CONTEXT-company.md allow/deny must already pass (`extract_memory_candidates`) |
-| 1 | `skip_no_candidate` | no | No admitted candidate after this interaction |
-| 2 | `skip_duplicate` | no | Same normalized text already stored for that kind |
-| 3 | `skip_redundant` | no | Token Jaccard ≥ **0.90** with an existing same-kind fact and no conflicting substance |
-| 4 | `corrected` | **yes** | Jaccard ≥ **0.35** with conflicting tokens (numbers, USD/COP, names, key phrases) → replace related id |
-| 5 | `new` | **yes** | No sufficiently related same-kind fact |
-
-Constants: `REDUNDANT_JACCARD = 0.90`, `CORRECTION_JACCARD = 0.35`.
-
-## Graph behavior
-
-```text
-answer_* / generate → write_memory
-                         │
-                         ├─ extract CONTEXT-admitted candidates
-                         ├─ self_evaluate_worth_remembering(...)
-                         ├─ skip_*  → no MemoryInterface.write
-                         └─ new | corrected → MemoryInterface.write
-                                              (corrected replaces related_id)
+```json
+{
+  "answer": "<user-facing response only>",
+  "memory_proposal": {
+    "applicable": true,
+    "action": "add",
+    "fact": "Locations must keep 3 days of main protein inventory.",
+    "previous_fact": null,
+    "why": "New durable supplier-ordering fact from grounded KB answer."
+  }
+}
 ```
 
-Trace fields: `state["memory_self_evaluations"]` and the `write_memory` step
-output (`always_write: false`, per-candidate verdicts).
+When nothing is worth remembering:
+
+```json
+{
+  "answer": "...",
+  "memory_proposal": {
+    "applicable": false,
+    "action": null,
+    "fact": null,
+    "previous_fact": null,
+    "why": "Duplicate of existing memory / not a CONTEXT domain / …"
+  }
+}
+```
+
+| Field | Role |
+| ----- | ---- |
+| `answer` | What the user sees (no proposal JSON inside) |
+| `memory_proposal.applicable` | Self-eval gate — do **not** always write |
+| `action` | `add` or `change` when applicable |
+| `fact` | What would be added or the corrected wording |
+| `previous_fact` | What changes (for `change`) |
+| `why` | Why it is new or a correction |
+
+Implementation: `services/agent/generation.py` → `generate_agent_turn`  
+Schema: `services/agent/memory/proposal.py` → `AgentTurnOutput` / `MemoryProposal`
+
+## After generate → `write_memory`
+
+```text
+generate (1× structured call)
+   ├─ state["answer"]            ← user-facing
+   └─ state["memory_proposal"]   ← self-eval field
+         ↓
+write_memory
+   ├─ decide_from_memory_proposal (CONTEXT policy hard gate)
+   ├─ applicable=false / policy deny / duplicate → skip
+   └─ add | change → MemoryInterface.write
+```
+
+Ticket / inventory answer paths set `applicable=false` (not CONTEXT memorable
+domains) without calling the model again.
 
 ## Related docs
 
-- Policy (what may ever be stored): [`MEMORY_POLICY.md`](./MEMORY_POLICY.md)
+- Policy: [`MEMORY_POLICY.md`](./MEMORY_POLICY.md)
 - R/W API: [`MEMORY_INTERFACE.md`](./MEMORY_INTERFACE.md)
