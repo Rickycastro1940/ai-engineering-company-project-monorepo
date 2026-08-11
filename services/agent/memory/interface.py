@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
+from services.agent.memory.consolidate import ConsolidationReport, consolidate_store
 from services.agent.memory.policy import MemoryDecision, evaluate_memory_candidate
 from services.agent.memory.store import MemoryRecord, MemoryStore, get_memory_store
 
@@ -23,6 +24,7 @@ class MemoryWriteResult:
     ok: bool
     record: MemoryRecord | None
     decision: MemoryDecision
+    consolidation: ConsolidationReport | None = None
 
 
 @runtime_checkable
@@ -43,7 +45,7 @@ class MemoryInterface(Protocol):
     ) -> MemoryWriteResult:
         """Persist one fact if policy allows; otherwise reject without storing.
 
-        ``replace_id`` is set when self-evaluation verdict is ``corrected``.
+        Successful writes trigger consolidation so the store stays bounded.
         """
 
 
@@ -51,7 +53,7 @@ class AgentMemory:
     """Policy-gated read/write façade over the SQLite semantic store.
 
     - ``read`` — selective retrieval (never “return everything for the prompt”)
-    - ``write`` — single-fact upsert after CONTEXT-company policy checks
+    - ``write`` — policy-gated upsert, then consolidate (dedupe / summarize / prune)
     """
 
     def __init__(self, store: MemoryStore | None = None) -> None:
@@ -69,6 +71,7 @@ class AgentMemory:
         source: str = "agent",
         metadata: dict[str, Any] | None = None,
         replace_id: str | None = None,
+        consolidate: bool = True,
     ) -> MemoryWriteResult:
         decision = evaluate_memory_candidate(text, kind=kind, source=source)
         if not decision.allowed or not decision.kind:
@@ -81,7 +84,21 @@ class AgentMemory:
             source=source,
             metadata=metadata,
         )
-        return MemoryWriteResult(ok=True, record=record, decision=decision)
+        report: ConsolidationReport | None = None
+        if consolidate:
+            report = consolidate_store(self._store)
+            refreshed = self._store.get(record.id)
+            if refreshed is None and report.summary_ids:
+                refreshed = self._store.get(report.summary_ids[-1])
+            if refreshed is not None:
+                record = refreshed
+        return MemoryWriteResult(
+            ok=True, record=record, decision=decision, consolidation=report
+        )
+
+    def consolidate(self) -> ConsolidationReport:
+        """Run store consolidation without writing a new fact."""
+        return consolidate_store(self._store)
 
     def related_for_self_eval(
         self,
@@ -97,15 +114,10 @@ class AgentMemory:
         same = [h for h in hits if h.kind == kind]
         if same:
             return same
-        # Fall back to same-kind scan so corrections are not missed when
-        # keyword overlap with other kinds crowded out the true peer.
         return [r for r in self._store.list_records() if r.kind == kind][:limit]
 
     def format_turn_notes(self, records: list[MemoryRecord]) -> str:
-        """Format **already-read** facts for this turn (bounded list only).
-
-        Used as a separate user-turn note — never written into the system prompt.
-        """
+        """Format **already-read** facts for this turn (bounded list only)."""
         if not records:
             return ""
         lines = [

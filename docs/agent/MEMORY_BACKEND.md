@@ -82,6 +82,13 @@ Explicit R/W API (no system-prompt accumulation):
 | Env | Default | Meaning |
 | --- | ------- | ------- |
 | `AGENT_MEMORY_PATH` | `data/process/agent-memory/semantic.sqlite` | SQLite file path |
+| `AGENT_MEMORY_MAX_FACTS` | `40` | Hard cap after consolidation (see [`MEMORY_CONSOLIDATION.md`](./MEMORY_CONSOLIDATION.md)) |
+
+## Consolidation
+
+After durable writes the store is consolidated: near-dedupe, extractive
+same-kind summaries, and low-relevance discard under the max-facts cap.
+Details: [`MEMORY_CONSOLIDATION.md`](./MEMORY_CONSOLIDATION.md).
 
 ## Dependencies
 

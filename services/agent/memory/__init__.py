@@ -8,6 +8,7 @@ Access is **only** through the explicit ``MemoryInterface`` (``read`` / ``write`
 The agent must not accumulate state by appending the full store to the system prompt.
 """
 
+from services.agent.memory.consolidate import ConsolidationReport, consolidate_store
 from services.agent.memory.interface import (
     DEFAULT_READ_LIMIT,
     AgentMemory,
@@ -23,6 +24,7 @@ __all__ = [
     "DEFAULT_READ_LIMIT",
     "AgentMemory",
     "AgentTurnOutput",
+    "ConsolidationReport",
     "MemoryDecision",
     "MemoryInterface",
     "MemoryProposal",
@@ -30,6 +32,7 @@ __all__ = [
     "MemoryStore",
     "MemoryWriteResult",
     "NOTHING_TO_REMEMBER_EXAMPLES",
+    "consolidate_store",
     "evaluate_memory_candidate",
     "get_agent_memory",
     "get_memory_store",

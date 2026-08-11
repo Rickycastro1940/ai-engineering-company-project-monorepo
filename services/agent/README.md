@@ -31,6 +31,9 @@ inventory remains a read-only HTTP tool against the inventory manager.
   (approve/reject/edit/topic_change/ambiguous), one pending proposal,
   default discard, JSONL audit
   ([`docs/agent/MEMORY_CONFIRMATION.md`](../../docs/agent/MEMORY_CONFIRMATION.md)).
+- [x] **Consolidation** — near-dedupe, extractive summarize, discard
+  low-relevance under a max-facts cap
+  ([`docs/agent/MEMORY_CONSOLIDATION.md`](../../docs/agent/MEMORY_CONSOLIDATION.md)).
 
 ```text
 receive → resolve_memory_confirmation → decide_route → recall_memory

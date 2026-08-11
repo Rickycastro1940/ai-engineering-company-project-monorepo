@@ -80,6 +80,53 @@ class MemoryStore:
                 )
                 conn.commit()
 
+    def count(self) -> int:
+        with self._connect() as conn:
+            row = conn.execute("SELECT COUNT(*) AS n FROM semantic_memory").fetchone()
+        return int(row["n"] if row is not None else 0)
+
+    def get(self, record_id: str) -> MemoryRecord | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT id, kind, text, source, created_at, updated_at, metadata_json
+                FROM semantic_memory WHERE id = ?
+                """,
+                (record_id,),
+            ).fetchone()
+        return self._row_to_record(row) if row is not None else None
+
+    def bump_access(self, record_ids: list[str]) -> None:
+        """Increment access_count / last_accessed_at for relevance scoring."""
+        if not record_ids:
+            return
+        now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        with self._lock:
+            with self._connect() as conn:
+                for rid in record_ids:
+                    row = conn.execute(
+                        "SELECT metadata_json FROM semantic_memory WHERE id = ?",
+                        (rid,),
+                    ).fetchone()
+                    if row is None:
+                        continue
+                    try:
+                        meta = json.loads(row["metadata_json"] or "{}")
+                    except json.JSONDecodeError:
+                        meta = {}
+                    if not isinstance(meta, dict):
+                        meta = {}
+                    try:
+                        meta["access_count"] = int(meta.get("access_count") or 0) + 1
+                    except (TypeError, ValueError):
+                        meta["access_count"] = 1
+                    meta["last_accessed_at"] = now
+                    conn.execute(
+                        "UPDATE semantic_memory SET metadata_json = ? WHERE id = ?",
+                        (json.dumps(meta, ensure_ascii=True, default=str), rid),
+                    )
+                conn.commit()
+
     def list_records(self) -> list[MemoryRecord]:
         with self._connect() as conn:
             rows = conn.execute(
@@ -172,7 +219,10 @@ class MemoryStore:
             if score:
                 scored.append((score, record))
         scored.sort(key=lambda pair: (-pair[0], pair[1].updated_at))
-        return [rec for _, rec in scored[: max(0, limit)]]
+        hits = [rec for _, rec in scored[: max(0, limit)]]
+        if hits:
+            self.bump_access([h.id for h in hits])
+        return hits
 
     def delete(self, record_id: str) -> bool:
         """Remove one semantic fact by id (used when self-eval says corrected)."""

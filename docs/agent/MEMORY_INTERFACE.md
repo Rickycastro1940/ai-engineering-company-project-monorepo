@@ -21,6 +21,7 @@ Implementation: `services/agent/memory/interface.py` → `AgentMemory`
 | `resolve_memory_confirmation` | explicit intent + optional `memory.write` | Approve/edit may write; reject/topic_change/ambiguous discard; see [`MEMORY_CONFIRMATION.md`](./MEMORY_CONFIRMATION.md) |
 | `generate` | `generate_agent_turn` → `answer` + `memory_proposal` | **One** model call; when applicable, answer ends with a remember/update **question** to the user |
 | `write_memory` | opens at most one pending proposal | **Never** writes semantics here — propose only |
+| *(after confirm)* | `MemoryInterface.write` → `consolidate` | Dedupe / summarize / prune — [`MEMORY_CONSOLIDATION.md`](./MEMORY_CONSOLIDATION.md) |
 
 ## What we refuse to do
 
