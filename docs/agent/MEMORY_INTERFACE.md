@@ -18,8 +18,8 @@ Implementation: `services/agent/memory/interface.py` → `AgentMemory`
 | Node | API | Behavior |
 | ---- | --- | -------- |
 | `recall_memory` | `memory.read(question, limit=5)` | Bounded retrieval into `state["memory_hits"]` (fed into the generate prompt) |
-| `generate` | `generate_agent_turn` → `answer` + `memory_proposal` | **One** model call; structured self-eval field (not a second call) |
-| `write_memory` | applies `memory_proposal` via `MemoryInterface.write` | Only when applicable + CONTEXT policy; see [`MEMORY_SELF_EVAL.md`](./MEMORY_SELF_EVAL.md) |
+| `generate` | `generate_agent_turn` → `answer` + `memory_proposal` | **One** model call; when applicable, answer ends with a remember/update **question** to the user |
+| `write_memory` | records pending proposal only | **Never** calls `MemoryInterface.write` on this step — see [`MEMORY_SELF_EVAL.md`](./MEMORY_SELF_EVAL.md) |
 
 ## What we refuse to do
 

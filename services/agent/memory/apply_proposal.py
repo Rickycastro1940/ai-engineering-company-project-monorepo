@@ -55,7 +55,11 @@ def decide_from_memory_proposal(
     *,
     existing: list[MemoryRecord],
 ) -> ProposalDecision:
-    """Turn a structured proposal into a write/skip decision (policy-gated)."""
+    """Turn a structured proposal into a propose/skip decision (policy-gated).
+
+``remember=True`` means the fact is worth **proposing to the user** — not that
+this step may call ``MemoryInterface.write``.
+"""
     if proposal is None:
         return ProposalDecision(
             remember=False,

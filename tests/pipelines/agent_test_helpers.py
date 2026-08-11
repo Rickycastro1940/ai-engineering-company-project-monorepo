@@ -33,7 +33,16 @@ def agent_turn(
 
 
 def grounded_turn(answer: str = GROUNDED_ANSWER) -> AgentTurnOutput:
-    """Default RAG mock: grounded answer + supplier-ordering memory proposal."""
+    """Default RAG mock: grounded answer, nothing to remember (most turns)."""
+    return agent_turn(
+        answer,
+        applicable=False,
+        why="test_fixture_nothing_to_remember",
+    )
+
+
+def grounded_turn_with_proposal(answer: str = GROUNDED_ANSWER) -> AgentTurnOutput:
+    """Grounded answer plus an applicable memory proposal (propose-to-user path)."""
     return agent_turn(
         answer,
         applicable=True,

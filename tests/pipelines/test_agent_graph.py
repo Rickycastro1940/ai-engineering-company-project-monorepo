@@ -381,6 +381,7 @@ def test_every_run_produces_queryable_trace(trace_dir: Path):
     generate_step = next(s for s in trace["steps"] if s["node_name"] == "generate")
     assert "memory_proposal" in generate_step["notes"] or "structured turn" in generate_step["notes"]
     assert generate_step["output"].get("second_model_call") is False
+    assert generate_step["output"].get("wrote_to_memory") is False
     assert "memory_proposal" in (generate_step["output"] or {})
     # Trace file is queryable from disk (not just console print).
     assert (trace_dir / f"{result['trace_id']}.json").is_file()
@@ -392,3 +393,27 @@ def test_every_run_produces_queryable_trace(trace_dir: Path):
         trace_dir=trace_dir,
     )
     assert any(t["trace_id"] == result["trace_id"] for t in hits)
+
+
+def test_applicable_proposal_asks_user_and_does_not_write(trace_dir: Path):
+    """Memorable facts are proposed in the answer; write_memory does not persist."""
+    from tests.pipelines.agent_test_helpers import grounded_turn_with_proposal
+
+    with patch("services.agent.nodes.retrieve", return_value=[PROTEIN_STOCK_CHUNK]), patch(
+        "services.agent.nodes.generate_agent_turn",
+        return_value=grounded_turn_with_proposal(),
+    ), patch("services.agent.tracing.DEFAULT_TRACE_DIR", trace_dir), patch(
+        "services.agent.graph.save_trace"
+    ) as mock_save:
+        from services.agent.tracing import save_trace as real_save
+
+        mock_save.side_effect = lambda record, **_: real_save(record, trace_dir=trace_dir)
+        with patch("services.agent.graph._COMPILED_GRAPH", compile_agent_graph()):
+            result = run_agent("What is the minimum stock rule for proteins?")
+
+    assert "Would you like me to remember this for later:" in (result.get("answer") or "")
+    assert result.get("memory_writes") == []
+    write_step = next(s for s in result["steps"] if s["node_name"] == "write_memory")
+    assert write_step["output"]["wrote_to_memory"] is False
+    assert write_step["output"]["proposed_to_user"] is True
+    assert write_step["output"]["written_count"] == 0

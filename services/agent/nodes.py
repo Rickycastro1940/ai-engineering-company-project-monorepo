@@ -603,7 +603,10 @@ def generate_node(state: AgentState) -> dict[str, Any]:
             ],
         }
 
-    from services.agent.memory.nodes import recalled_records_from_state
+    from services.agent.memory.nodes import (
+        recalled_records_from_state,
+        surface_memory_proposal_in_answer,
+    )
 
     recalled = recalled_records_from_state(state)
     try:
@@ -632,7 +635,6 @@ def generate_node(state: AgentState) -> dict[str, Any]:
         }
 
     answer = turn.answer
-    proposal = turn.memory_proposal.as_dict()
 
     ticket_raw = state.get("ticket_result")
     if ticket_raw:
@@ -652,6 +654,14 @@ def generate_node(state: AgentState) -> dict[str, Any]:
         except Exception:  # noqa: BLE001
             pass
 
+    # Policy-gate + append "Would you like me to remember…?" at end of user answer.
+    # Never writes durable memory on this step.
+    answer, proposal = surface_memory_proposal_in_answer(
+        answer,
+        turn.memory_proposal,
+        existing=recalled,
+    )
+
     return {
         "answer": answer,
         "memory_proposal": proposal,
@@ -664,8 +674,8 @@ def generate_node(state: AgentState) -> dict[str, Any]:
                 "ok",
                 started,
                 notes=(
-                    "structured turn: answer + memory_proposal "
-                    "(one model call; recalled memory in prompt only)"
+                    "structured turn: answer + memory_proposal question to user "
+                    "(one model call; no durable write on this step)"
                 ),
                 output={
                     "answer_len": len(answer or ""),
@@ -677,6 +687,8 @@ def generate_node(state: AgentState) -> dict[str, Any]:
                     "memory_hit_count": len(recalled),
                     "memory_via": "MemoryInterface.read→prompt",
                     "memory_proposal": proposal,
+                    "proposed_to_user": bool(proposal.get("applicable")),
+                    "wrote_to_memory": False,
                     "second_model_call": False,
                     "separate_memory_agent": False,
                     "system_prompt_mutated": False,

@@ -59,19 +59,20 @@ Per policy, the SQLite semantic store **rejects** before persist:
 - Currency conversions, absolute allergen safety claims, unknown-answer
   placeholders, secrets/tokens, payment/PII, speculative roles, RAG internals
 
-Failed tool paths and `no_context` answers do **not** write semantic memory
-(graph routes them away from `write_memory`).
+Failed tool paths and `no_context` answers do **not** propose semantic memory
+(`applicable=false`). The propose step never calls `MemoryInterface.write`.
 
 ## How it extends the MCP agent (does not replace it)
 
 ```text
 decide_route → recall_memory (MemoryInterface.read → SQLite)
             → lookup_ticket via MCP | inventory | RAG
-            → answer/generate → write_memory (MemoryInterface.write)
+            → generate (answer + memory_proposal question to user)
+            → write_memory (propose-only finalize; no write this step)
 ```
 
-Incidents Manager access remains **MCP-only**. SQLite only stores *approved
-summaries* of confirmed outcomes and ops facts — never a parallel incidents API.
+Incidents Manager access remains **MCP-only**. Durable SQLite writes wait for
+user confirmation in a later turn — this step only proposes.
 
 Explicit R/W API (no system-prompt accumulation):
 [`MEMORY_INTERFACE.md`](./MEMORY_INTERFACE.md).

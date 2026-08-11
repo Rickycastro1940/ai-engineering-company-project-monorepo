@@ -30,7 +30,9 @@ class AgentState(TypedDict, total=False):
     memory_hits: list[dict[str, Any]]
     memory_writes: list[dict[str, Any]]
     # From the same generate call (structured field) — not a second LLM call.
+    # When applicable, also surfaced as a question inside ``answer`` (no write yet).
     memory_proposal: dict[str, Any] | None
+    memory_pending_proposal: dict[str, Any] | None
     # Post-interaction self-eval decisions derived from memory_proposal.
     memory_self_evaluations: list[dict[str, Any]]
     sources_used: Annotated[list[str], operator.add]

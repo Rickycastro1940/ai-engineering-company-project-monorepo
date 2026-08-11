@@ -17,7 +17,9 @@ inventory remains a read-only HTTP tool against the inventory manager.
 - [x] Persist only facts worth remembering (`data/process/agent-memory/semantic.sqlite`).
 - [x] **Self-evaluation after each relevant interaction** — same generate call
   returns structured `answer` + `memory_proposal` (add/change/why);
-  [`docs/agent/MEMORY_SELF_EVAL.md`](../../docs/agent/MEMORY_SELF_EVAL.md).
+  when memorable, proposes to the user as a closing question and **does not**
+  write durable memory on that step
+  ([`docs/agent/MEMORY_SELF_EVAL.md`](../../docs/agent/MEMORY_SELF_EVAL.md)).
   No second model call / separate memory agent.
 - [x] **Backend documented** — SQLite semantic + traces episodic
   ([`docs/agent/MEMORY_BACKEND.md`](../../docs/agent/MEMORY_BACKEND.md)).

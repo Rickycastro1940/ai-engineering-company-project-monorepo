@@ -208,8 +208,8 @@ def test_structured_turn_parses_answer_and_memory_proposal() -> None:
     assert "why" in (turn.memory_proposal.why or "").casefold() or turn.memory_proposal.why
 
 
-def test_memory_proposal_self_eval_not_always_write() -> None:
-    """applicable=false → skip; add → write; change → replace; duplicates skipped."""
+def test_memory_proposal_self_eval_not_always_propose() -> None:
+    """applicable=false → skip; add/change are propose-worthy; duplicates skipped."""
     existing = [
         MemoryRecord(
             id="m1",
@@ -267,7 +267,32 @@ def test_memory_proposal_self_eval_not_always_write() -> None:
     assert dup.verdict == "skip_duplicate"
 
 
-def test_write_memory_node_uses_structured_proposal(tmp_path: Path, monkeypatch) -> None:
+def test_proposal_is_surfaced_as_question_in_user_answer() -> None:
+    from services.agent.memory.nodes import surface_memory_proposal_in_answer
+    from services.agent.memory.proposal import attach_proposal_question_to_answer
+
+    proposal = MemoryProposal(
+        applicable=True,
+        action="add",
+        fact="Emergency orders over 500 USD require Procurement Manager approval.",
+        why="New durable supplier-ordering fact",
+    )
+    answer = "Emergency orders over 500 USD need Procurement Manager approval."
+    with_q = attach_proposal_question_to_answer(answer, proposal)
+    assert with_q.startswith(answer)
+    assert "Would you like me to remember this for later:" in with_q
+    assert "500 USD" in with_q
+
+    surfaced, gated = surface_memory_proposal_in_answer(answer, proposal, existing=[])
+    assert gated["applicable"] is True
+    assert "Would you like me to remember this for later:" in surfaced
+    assert surfaced.strip().endswith("?")
+
+
+def test_write_memory_node_never_writes_on_propose_step(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Even an applicable proposal must not call MemoryInterface.write here."""
     store = MemoryStore(tmp_path / "semantic.sqlite")
     memory = AgentMemory(store)
     monkeypatch.setattr(
@@ -277,7 +302,11 @@ def test_write_memory_node_uses_structured_proposal(tmp_path: Path, monkeypatch)
 
     state = {
         "question": "emergency order approval?",
-        "answer": "Emergency orders over 500 USD require Procurement Manager approval.",
+        "answer": (
+            "Emergency orders over 500 USD require Procurement Manager approval.\n\n"
+            'Would you like me to remember this for later: '
+            '"Emergency orders over 500 USD require Procurement Manager approval."?'
+        ),
         "memory_proposal": {
             "applicable": True,
             "action": "add",
@@ -289,36 +318,15 @@ def test_write_memory_node_uses_structured_proposal(tmp_path: Path, monkeypatch)
         "steps": [],
         "sources_used": [],
     }
-    out1 = write_memory_node(state)  # type: ignore[arg-type]
-    assert out1["memory_writes"]
-    assert out1["memory_self_evaluations"][0]["verdict"] == "add"
-    assert out1["steps"][0]["output"]["always_write"] is False
-    assert out1["steps"][0]["output"]["second_model_call"] is False
-
-    # Same proposal again → skip_duplicate (not always write).
-    out2 = write_memory_node(state)  # type: ignore[arg-type]
-    assert out2["memory_writes"] == []
-    assert out2["memory_self_evaluations"][0]["verdict"] == "skip_duplicate"
-
-    # Change proposal replaces prior fact.
-    prior = store.list_records()[0].text
-    out3 = write_memory_node(
-        {
-            **state,
-            "memory_proposal": {
-                "applicable": True,
-                "action": "change",
-                "fact": "Emergency orders over 1000 USD require Procurement Manager approval.",
-                "previous_fact": prior,
-                "why": "Corrected approval threshold",
-            },
-        }
-    )  # type: ignore[arg-type]
-    assert out3["memory_writes"]
-    assert out3["memory_self_evaluations"][0]["verdict"] == "change"
-    texts = [r.text for r in store.list_records()]
-    assert any("1000 USD" in t for t in texts)
-    assert not any("500 USD" in t and "1000" not in t for t in texts)
+    out = write_memory_node(state)  # type: ignore[arg-type]
+    assert out["memory_writes"] == []
+    assert store.list_records() == []
+    assert out["memory_self_evaluations"][0]["verdict"] == "add"
+    assert out["memory_pending_proposal"] is not None
+    assert out["steps"][0]["output"]["wrote_to_memory"] is False
+    assert out["steps"][0]["output"]["proposed_to_user"] is True
+    assert out["steps"][0]["output"]["always_write"] is False
+    assert out["steps"][0]["output"]["second_model_call"] is False
 
 
 def test_write_memory_skips_when_proposal_not_applicable() -> None:
@@ -339,7 +347,10 @@ def test_write_memory_skips_when_proposal_not_applicable() -> None:
         }
     )
     assert out["memory_writes"] == []
+    assert out.get("memory_pending_proposal") is None
     assert out["memory_self_evaluations"][0]["verdict"] == "skip_not_applicable"
+    assert out["steps"][0]["output"]["wrote_to_memory"] is False
+    assert out["steps"][0]["output"]["proposed_to_user"] is False
 
 
 def test_documented_nothing_to_remember_examples() -> None:
@@ -380,3 +391,5 @@ def test_documented_nothing_to_remember_examples() -> None:
     assert "there is not enough information available" in lowered
     assert "applicable=false" in lowered
     assert "default" in lowered
+    assert "would you like me to remember" in lowered
+    assert "never write" in lowered or "proposing to the user" in lowered

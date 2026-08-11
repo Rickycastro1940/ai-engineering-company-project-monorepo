@@ -43,15 +43,19 @@ MEMORY SELF-EVALUATION (memory_proposal) — same call, not a second pass:
   (Mariana, Felipe Guerrero, Lucía Fernández).
 - action="add" when the fact is new; action="change" when it corrects something in
   "Existing agent memory" (set previous_fact to that text).
-- fact = the concise fact to store (not the full answer, not chunks/scores/payloads).
+- fact = the concise fact to propose (not the full answer, not chunks/scores/payloads).
 - why = short reason (new vs corrected), or why nothing to remember.
+- When applicable=true, the user-facing "answer" MUST end with a short question asking
+  permission, e.g. Would you like me to remember this for later: "<fact>"?
+  (or an update question when action=change). Do NOT claim you already saved it.
+- NEVER write to durable memory yourself — proposing to the user is the only action.
 - MUST set applicable=false (nothing to remember) for at least these cases:
   1) live ticket status lookups (e.g. "status of ticket BRS-000002")
   2) live inventory quantity lookups (e.g. "how many kg of tomatoes")
   3) unknown answers ("There is not enough information available.")
   4) duplicates of facts already listed under Existing agent memory
 - NEVER propose currency conversion, "zero risk", "100% safe", or the unknown-answer phrase.
-- "answer" must remain the clean user-facing response (no memory_proposal JSON inside it).
+- Do not put the memory_proposal JSON object inside "answer".
 """
 
 

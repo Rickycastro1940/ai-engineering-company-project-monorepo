@@ -58,13 +58,16 @@ class MemoryProposal(BaseModel):
 
     ``applicable=false`` (or omitted action/fact) means nothing worth remembering
     after this interaction — the agent must not always propose a write.
+
+    When applicable, the agent asks the user in the response (proposal question).
+    It does **not** write to durable memory on the same step.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     applicable: bool = Field(
         False,
-        description="True only when something new or corrected is worth remembering.",
+        description="True only when something new or corrected is worth proposing.",
     )
     action: Literal["add", "change"] | None = Field(
         None,
@@ -72,7 +75,7 @@ class MemoryProposal(BaseModel):
     )
     fact: str | None = Field(
         None,
-        description="The fact text to store (added or corrected wording).",
+        description="The fact text to propose (added or corrected wording).",
     )
     previous_fact: str | None = Field(
         None,
@@ -91,6 +94,37 @@ class MemoryProposal(BaseModel):
         """Standard dismiss proposal (applicable=false)."""
         return cls(applicable=False, why=why_code)
 
+    def user_facing_question(self) -> str | None:
+        """Closing question for the user response, or None if not applicable."""
+        if not self.applicable or not (self.fact or "").strip():
+            return None
+        fact = self.fact.strip()
+        if self.action == "change":
+            if self.previous_fact:
+                return (
+                    f'Would you like me to update what I remember from '
+                    f'"{self.previous_fact.strip()}" to "{fact}"?'
+                )
+            return f'Would you like me to update what I remember to: "{fact}"?'
+        return f'Would you like me to remember this for later: "{fact}"?'
+
+
+def attach_proposal_question_to_answer(answer: str, proposal: MemoryProposal) -> str:
+    """Append the memory-proposal question to the user-facing answer when applicable.
+
+    Idempotent if a similar question is already present. Never persists memory.
+    """
+    question = proposal.user_facing_question()
+    if not question:
+        return answer
+    lowered = (answer or "").casefold()
+    if "would you like me to remember" in lowered or "would you like me to update what i remember" in lowered:
+        return answer
+    base = (answer or "").rstrip()
+    if not base:
+        return question
+    return f"{base}\n\n{question}"
+
 
 class AgentTurnOutput(BaseModel):
     """Single-call structured output: user answer + optional memory proposal."""
@@ -105,3 +139,7 @@ class AgentTurnOutput(BaseModel):
 
     def as_dict(self) -> dict[str, Any]:
         return self.model_dump()
+
+    def answer_with_proposal_question(self) -> str:
+        """User-visible answer including the optional remember/update question."""
+        return attach_proposal_question_to_answer(self.answer, self.memory_proposal)

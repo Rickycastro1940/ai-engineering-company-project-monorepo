@@ -8,11 +8,15 @@ The agent must be able to dismiss **most** interactions as nothing to remember
 (`memory_proposal.applicable = false`). A proposal is the exception, not the
 default.
 
+When something **is** memorable, the agent proposes it **to the user inside the
+same response** (typically a closing question). It **never writes** to durable
+memory on this step.
+
 ## Single-call output
 
 ```json
 {
-  "answer": "<user-facing response only>",
+  "answer": "<grounded answer>\n\nWould you like me to remember this for later: \"Locations must keep 3 days of main protein inventory.\"?",
   "memory_proposal": {
     "applicable": true,
     "action": "add",
@@ -22,6 +26,11 @@ default.
   }
 }
 ```
+
+Example closing questions:
+
+- Add: `Would you like me to remember this for later: "<fact>"?`
+- Change: `Would you like me to update what I remember from "<previous>" to "<fact>"?`
 
 When nothing is worth remembering:
 
@@ -40,12 +49,27 @@ When nothing is worth remembering:
 
 | Field | Role |
 | ----- | ---- |
-| `answer` | What the user sees (no proposal JSON inside) |
-| `memory_proposal.applicable` | Self-eval gate — do **not** always write |
+| `answer` | What the user sees — includes the remember/update **question** when applicable |
+| `memory_proposal.applicable` | Self-eval gate — do **not** always propose |
 | `action` | `add` or `change` when applicable |
 | `fact` | What would be added or the corrected wording |
 | `previous_fact` | What changes (for `change`) |
 | `why` | Why it is new or a correction (or why nothing to remember) |
+
+## Propose to user — never write on this step
+
+```text
+generate (1× structured call)
+   ├─ state["answer"]            ← user-facing (+ proposal question if applicable)
+   └─ state["memory_proposal"]   ← structured self-eval field
+         ↓
+write_memory (name kept for graph continuity)
+   ├─ decide_from_memory_proposal (CONTEXT policy)
+   ├─ record pending proposal / skip
+   └─ MemoryInterface.write  →  NEVER on this step (wrote_to_memory=false)
+```
+
+Durable writes wait for an explicit user confirmation in a later turn (Part 2+).
 
 ## Examples that must NOT generate a proposal
 
@@ -82,30 +106,13 @@ must stay **false** (nothing durable / in-scope to store):
 - **User:** repeats a question whose durable fact is already in semantic memory
   (e.g. “3 days of protein stock” already stored).
 - **Why dismiss:** Nothing **new** or **corrected** — proposing again would be
-  “always write.”
-- **Expected proposal:** `applicable=false`, `why` ≈ `duplicate_of_existing_memory`
-  (write path also hard-skips exact duplicates if a stale proposal slips through).
+  “always propose.”
+- **Expected proposal:** `applicable=false`, `why` ≈ `duplicate_of_existing_memory`.
 
 Implementation: `services/agent/generation.py` → `generate_agent_turn`  
-Schema: `services/agent/memory/proposal.py` → `AgentTurnOutput` / `MemoryProposal`  
+Schema / question helper: `services/agent/memory/proposal.py`  
 Canonical dismissals: `NOTHING_TO_REMEMBER_EXAMPLES` in
 `services/agent/memory/proposal.py` (kept in sync with this section).
-
-## After generate → `write_memory`
-
-```text
-generate (1× structured call)
-   ├─ state["answer"]            ← user-facing
-   └─ state["memory_proposal"]   ← self-eval field
-         ↓
-write_memory
-   ├─ decide_from_memory_proposal (CONTEXT policy hard gate)
-   ├─ applicable=false / policy deny / duplicate → skip
-   └─ add | change → MemoryInterface.write
-```
-
-Ticket / inventory / no-context answer paths set `applicable=false` without
-calling the model again for memory.
 
 ## Related docs
 

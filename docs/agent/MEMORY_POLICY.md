@@ -48,6 +48,7 @@ traces instead of semantic memory):
 - Self-eval is the structured ``memory_proposal`` field from the **same**
   generate call ([`MEMORY_SELF_EVAL.md`](./MEMORY_SELF_EVAL.md)) — not a
   second model call
-- Writes only via `MemoryInterface.write` after policy **and** an applicable proposal
+- When applicable, the agent asks the user in the response; it does **not**
+  call `MemoryInterface.write` on that step
 - Backend / R/W docs: [`MEMORY_BACKEND.md`](./MEMORY_BACKEND.md),
   [`MEMORY_INTERFACE.md`](./MEMORY_INTERFACE.md)
