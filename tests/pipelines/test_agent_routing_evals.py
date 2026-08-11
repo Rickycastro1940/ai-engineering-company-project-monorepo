@@ -236,6 +236,7 @@ def test_eval_rag_required_skips_tools(trace_dir: Path):
 
     assert trace["node_order"] == [
         "receive_question",
+        "resolve_memory_confirmation",
         "decide_route",
         "recall_memory",
         "retrieve",

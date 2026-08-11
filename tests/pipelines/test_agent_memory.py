@@ -14,6 +14,7 @@ from services.agent.memory.interface import (
     MemoryInterface,
 )
 from services.agent.memory.nodes import write_memory_node
+from services.agent.memory.pending import PendingProposalStore
 from services.agent.memory.policy import (
     ALLOWED_KINDS,
     CONTEXT_COMPANY_PATH,
@@ -295,9 +296,18 @@ def test_write_memory_node_never_writes_on_propose_step(
     """Even an applicable proposal must not call MemoryInterface.write here."""
     store = MemoryStore(tmp_path / "semantic.sqlite")
     memory = AgentMemory(store)
+    pending = PendingProposalStore(tmp_path / "pending.json")
     monkeypatch.setattr(
         "services.agent.memory.nodes.get_agent_memory",
         lambda: memory,
+    )
+    monkeypatch.setattr(
+        "services.agent.memory.nodes.get_pending_store",
+        lambda: pending,
+    )
+    monkeypatch.setattr(
+        "services.agent.memory.nodes.log_memory_decision",
+        lambda **kw: None,
     )
 
     state = {
@@ -329,7 +339,18 @@ def test_write_memory_node_never_writes_on_propose_step(
     assert out["steps"][0]["output"]["second_model_call"] is False
 
 
-def test_write_memory_skips_when_proposal_not_applicable() -> None:
+def test_write_memory_skips_when_proposal_not_applicable(
+    tmp_path: Path, monkeypatch
+) -> None:
+    pending = PendingProposalStore(tmp_path / "pending.json")
+    monkeypatch.setattr(
+        "services.agent.memory.nodes.get_pending_store",
+        lambda: pending,
+    )
+    monkeypatch.setattr(
+        "services.agent.memory.nodes.get_agent_memory",
+        lambda: AgentMemory(MemoryStore(tmp_path / "sem.sqlite")),
+    )
     out = write_memory_node(
         {
             "question": "status of ticket BRS-000002?",

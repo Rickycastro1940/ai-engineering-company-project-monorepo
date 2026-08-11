@@ -1,8 +1,8 @@
 """LangGraph nodes that extend the existing agent with recall + propose memory.
 
-Part 1 writes nothing on the propose step: applicable proposals are shown to the
-user inside the answer; durable ``MemoryInterface.write`` waits for confirmation
-in a later step (not this node).
+Part 1: applicable proposals are shown to the user inside the answer. Durable
+writes happen only after explicit confirmation intent (see confirmation.py).
+At most one pending proposal may exist at a time.
 """
 
 from __future__ import annotations
@@ -11,7 +11,9 @@ import time
 from typing import Any
 
 from services.agent.memory.apply_proposal import decide_from_memory_proposal
+from services.agent.memory.audit import log_memory_decision
 from services.agent.memory.interface import DEFAULT_READ_LIMIT, get_agent_memory
+from services.agent.memory.pending import get_pending_store, new_pending_from_proposal
 from services.agent.memory.proposal import (
     MemoryProposal,
     attach_proposal_question_to_answer,
@@ -68,10 +70,7 @@ def _records_from_hits(
 
 
 def recall_memory_node(state: AgentState) -> dict[str, Any]:
-    """Explicit ``memory.read`` before tools/RAG (bounded; does not dump the store).
-
-    Does not replace MCP ticket lookup or RAG — only supplements state.
-    """
+    """Explicit ``memory.read`` before tools/RAG (bounded; does not dump the store)."""
     started = time.perf_counter()
     question = state.get("question") or ""
     memory = get_agent_memory()
@@ -105,14 +104,13 @@ def recall_memory_node(state: AgentState) -> dict[str, Any]:
 
 
 def write_memory_node(state: AgentState) -> dict[str, Any]:
-    """Finalize the turn's memory self-eval — propose only, never write here.
+    """Open at most one pending proposal for the user — never write semantics here.
 
-    Applicable proposals were already surfaced to the user inside ``answer``
-    (closing question). This node records the pending proposal for traces and
-    **must not** call ``MemoryInterface.write``.
+    If a pending proposal already exists, suppress a second one.
     """
     started = time.perf_counter()
     memory = get_agent_memory()
+    pending_store = get_pending_store()
     evaluations: list[dict[str, Any]] = []
 
     raw_proposal = state.get("memory_proposal")
@@ -123,6 +121,47 @@ def write_memory_node(state: AgentState) -> dict[str, Any]:
         proposal = raw_proposal
     else:
         proposal = None
+
+    # Hard rule: only one pending proposal at a time.
+    existing_pending = pending_store.get()
+    if existing_pending is not None:
+        evaluations.append(
+            {
+                "remember": False,
+                "verdict": "skip_pending_already_open",
+                "reason": "one_pending_proposal_limit",
+                "existing_pending_id": existing_pending.id,
+            }
+        )
+        return {
+            "memory_writes": [],
+            "memory_pending_proposal": existing_pending.as_dict(),
+            "memory_self_evaluations": evaluations,
+            "sources_used": [],
+            "route": "done",
+            "steps": [
+                _step(
+                    state,
+                    "write_memory",
+                    "ok",
+                    started,
+                    notes=(
+                        "suppressed new proposal — one pending already open "
+                        f"(id={existing_pending.id})"
+                    ),
+                    output={
+                        "source": "memory",
+                        "api": "memory_proposal_to_user",
+                        "always_write": False,
+                        "wrote_to_memory": False,
+                        "proposed_to_user": False,
+                        "suppressed_second_proposal": True,
+                        "pending_proposal": existing_pending.as_dict(),
+                        "self_evaluations": evaluations,
+                    },
+                )
+            ],
+        }
 
     kind_hint = None
     if isinstance(proposal, MemoryProposal) and proposal.fact:
@@ -156,26 +195,40 @@ def write_memory_node(state: AgentState) -> dict[str, Any]:
     decision = decide_from_memory_proposal(proposal, existing=related)
     evaluations.append(decision.as_dict())
 
-    pending = decision.proposal if decision.remember else None
-    # Hard rule for Part 1 propose step: never persist on this turn.
-    written: list[dict[str, Any]] = []
+    pending_dict: dict[str, Any] | None = None
+    proposed_to_user = False
+    if decision.remember and decision.proposal and decision.fact:
+        pending = new_pending_from_proposal(
+            {
+                **decision.proposal,
+                "action": decision.verdict if decision.verdict in {"add", "change"} else "add",
+                "fact": decision.fact,
+            },
+            originating_message=str(state.get("question") or ""),
+            kind=decision.kind,
+            replace_id=decision.replace_id,
+        )
+        pending_store.set(pending)
+        pending_dict = pending.as_dict()
+        proposed_to_user = True
+        log_memory_decision(
+            outcome="proposed",
+            originating_message=str(state.get("question") or ""),
+            proposal=pending_dict,
+            intent=None,
+            intent_reason="opened_pending_awaiting_user_confirmation",
+            detail={"verdict": decision.verdict},
+        )
 
     answer_text = (state.get("answer") or "").casefold()
     proposed_in_answer = (
         "would you like me to remember" in answer_text
         or "would you like me to update what i remember" in answer_text
     )
-    # Reflect what the user was already asked this turn (even if store later
-    # classifies the pending fact as a duplicate).
-    raw_applicable = False
-    if isinstance(proposal, MemoryProposal):
-        raw_applicable = bool(proposal.applicable)
-    elif isinstance(proposal, dict):
-        raw_applicable = bool(proposal.get("applicable"))
 
     return {
-        "memory_writes": written,
-        "memory_pending_proposal": pending,
+        "memory_writes": [],
+        "memory_pending_proposal": pending_dict,
         "memory_self_evaluations": evaluations,
         "sources_used": [],
         "route": "done",
@@ -187,14 +240,14 @@ def write_memory_node(state: AgentState) -> dict[str, Any]:
                 started,
                 notes=(
                     f"propose-only verdict={decision.verdict}; "
-                    f"wrote=0 (never writes on this step; user must confirm later)"
+                    f"wrote=0; pending_open={bool(pending_dict)}"
                 ),
                 output={
                     "source": "memory",
                     "api": "memory_proposal_to_user",
                     "always_write": False,
                     "wrote_to_memory": False,
-                    "proposed_to_user": proposed_in_answer or raw_applicable,
+                    "proposed_to_user": proposed_to_user or proposed_in_answer,
                     "second_model_call": False,
                     "written_count": 0,
                     "written_ids": [],
@@ -204,7 +257,7 @@ def write_memory_node(state: AgentState) -> dict[str, Any]:
                         if isinstance(proposal, MemoryProposal)
                         else proposal
                     ),
-                    "pending_proposal": pending,
+                    "pending_proposal": pending_dict,
                 },
             )
         ],
@@ -226,8 +279,13 @@ def surface_memory_proposal_in_answer(
 ) -> tuple[str, dict[str, Any]]:
     """Policy-gate a proposal and append the user-facing question when allowed.
 
+    Suppresses the question when a pending proposal is already open.
     Returns ``(answer_for_user, proposal_dict)``. Never writes to the store.
     """
+    if get_pending_store().has_pending():
+        dismissed = MemoryProposal.nothing_to_remember("one_pending_proposal_limit")
+        return answer, dismissed.as_dict()
+
     decision = decide_from_memory_proposal(proposal, existing=existing or [])
     if not decision.remember or not decision.fact:
         dismissed = MemoryProposal.nothing_to_remember(decision.reason)

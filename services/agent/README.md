@@ -27,10 +27,15 @@ inventory remains a read-only HTTP tool against the inventory manager.
   `MemoryInterface.write` ([`docs/agent/MEMORY_INTERFACE.md`](../../docs/agent/MEMORY_INTERFACE.md));
   does **not** accumulate state by appending the store to the system prompt.
 
+- [x] **User confirmation + auditable log** — explicit intent classification
+  (approve/reject/edit/topic_change/ambiguous), one pending proposal,
+  default discard, JSONL audit
+  ([`docs/agent/MEMORY_CONFIRMATION.md`](../../docs/agent/MEMORY_CONFIRMATION.md)).
+
 ```text
-… → decide_route → recall_memory → lookup_ticket (MCP) | lookup_inventory | retrieve
-                                         ↓
-                              answer_* / generate → write_memory → END
+receive → resolve_memory_confirmation → decide_route → recall_memory
+        → lookup_ticket (MCP) | inventory | retrieve
+        → answer_*/generate → write_memory (propose only; no write) → END
 ```
 
 ## MCP migration (company tools)

@@ -22,6 +22,7 @@ from uuid import uuid4
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
+from services.agent.memory.confirmation import resolve_memory_confirmation_node
 from services.agent.memory.nodes import recall_memory_node, write_memory_node
 from services.agent.nodes import (
     answer_inventory_node,
@@ -42,6 +43,7 @@ from services.agent.tracing import TraceRecord, save_trace
 
 REQUIRED_NODES = (
     "receive_question",
+    "resolve_memory_confirmation",
     "decide_route",
     "recall_memory",
     "retrieve",
@@ -66,8 +68,15 @@ class GraphStructureError(ValueError):
 
 
 def _after_receive(state: AgentState) -> str:
-    """Conditional edge: empty question → error path; else → decide_route."""
-    return "empty_question" if state.get("route") == "empty" else "decide_route"
+    """Conditional edge: empty question → error path; else → resolve confirmation."""
+    return "empty_question" if state.get("route") == "empty" else "resolve_memory_confirmation"
+
+
+def _after_resolve_memory_confirmation(state: AgentState) -> str:
+    """After confirming/discarding a pending proposal: ack-only or continue."""
+    if state.get("route") == "confirmation_done":
+        return "end"
+    return "decide_route"
 
 
 def _after_decide_route(state: AgentState) -> str:
@@ -129,6 +138,7 @@ def build_agent_graph() -> StateGraph:
     """Assemble nodes + conditional edges (not yet compiled)."""
     graph = StateGraph(AgentState)
     graph.add_node("receive_question", receive_question)
+    graph.add_node("resolve_memory_confirmation", resolve_memory_confirmation_node)
     graph.add_node("decide_route", decide_route_node)
     graph.add_node("recall_memory", recall_memory_node)
     graph.add_node("lookup_ticket", lookup_ticket_node)
@@ -149,7 +159,15 @@ def build_agent_graph() -> StateGraph:
         _after_receive,
         {
             "empty_question": "empty_question",
+            "resolve_memory_confirmation": "resolve_memory_confirmation",
+        },
+    )
+    graph.add_conditional_edges(
+        "resolve_memory_confirmation",
+        _after_resolve_memory_confirmation,
+        {
             "decide_route": "decide_route",
+            "end": END,
         },
     )
     graph.add_conditional_edges(
@@ -291,6 +309,10 @@ def run_agent(question: str, *, thread_id: str | None = None) -> dict[str, Any]:
         "inventory_result": None,
         "memory_hits": [],
         "memory_writes": [],
+        "memory_proposal": None,
+        "memory_pending_proposal": None,
+        "memory_confirmation": None,
+        "memory_self_evaluations": [],
         "sources_used": [],
         "steps": [],
     }
@@ -378,4 +400,6 @@ def run_agent(question: str, *, thread_id: str | None = None) -> dict[str, Any]:
         "source_summary": source_fields["source_summary"],
         "memory_hits": list(final.get("memory_hits") or []),
         "memory_writes": list(final.get("memory_writes") or []),
+        "memory_pending_proposal": final.get("memory_pending_proposal"),
+        "memory_confirmation": final.get("memory_confirmation"),
     }

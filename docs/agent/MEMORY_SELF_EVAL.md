@@ -116,5 +116,6 @@ Canonical dismissals: `NOTHING_TO_REMEMBER_EXAMPLES` in
 
 ## Related docs
 
+- Confirmation + audit: [`MEMORY_CONFIRMATION.md`](./MEMORY_CONFIRMATION.md)
 - Policy: [`MEMORY_POLICY.md`](./MEMORY_POLICY.md)
 - R/W API: [`MEMORY_INTERFACE.md`](./MEMORY_INTERFACE.md)

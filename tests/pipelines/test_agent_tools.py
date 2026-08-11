@@ -214,6 +214,7 @@ def test_eval_ticket_not_found_uses_fallback_never_invents_status(trace_dir: Pat
     trace = load_trace(result["trace_id"], trace_dir=trace_dir)
     assert trace["node_order"] == [
         "receive_question",
+        "resolve_memory_confirmation",
         "decide_route",
         "recall_memory",
         "lookup_ticket",
@@ -299,6 +300,7 @@ def test_eval_tool_required_question_uses_ticket_not_rag(trace_dir: Path):
     trace = load_trace(result["trace_id"], trace_dir=trace_dir)
     assert trace["node_order"] == [
         "receive_question",
+        "resolve_memory_confirmation",
         "decide_route",
         "recall_memory",
         "lookup_ticket",
@@ -338,6 +340,7 @@ def test_eval_rag_required_question_skips_ticket_tool(trace_dir: Path):
     trace = load_trace(result["trace_id"], trace_dir=trace_dir)
     assert trace["node_order"] == [
         "receive_question",
+        "resolve_memory_confirmation",
         "decide_route",
         "recall_memory",
         "retrieve",
@@ -459,6 +462,7 @@ def test_derive_sources_order_from_node_order():
     assert derive_sources_order(
         [
             "receive_question",
+            "resolve_memory_confirmation",
             "decide_route",
             "lookup_ticket",
             "retrieve",

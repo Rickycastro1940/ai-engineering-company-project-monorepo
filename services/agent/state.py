@@ -33,6 +33,8 @@ class AgentState(TypedDict, total=False):
     # When applicable, also surfaced as a question inside ``answer`` (no write yet).
     memory_proposal: dict[str, Any] | None
     memory_pending_proposal: dict[str, Any] | None
+    # Result of resolving a prior pending proposal (explicit intent classification).
+    memory_confirmation: dict[str, Any] | None
     # Post-interaction self-eval decisions derived from memory_proposal.
     memory_self_evaluations: list[dict[str, Any]]
     sources_used: Annotated[list[str], operator.add]

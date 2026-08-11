@@ -18,8 +18,9 @@ Implementation: `services/agent/memory/interface.py` → `AgentMemory`
 | Node | API | Behavior |
 | ---- | --- | -------- |
 | `recall_memory` | `memory.read(question, limit=5)` | Bounded retrieval into `state["memory_hits"]` (fed into the generate prompt) |
+| `resolve_memory_confirmation` | explicit intent + optional `memory.write` | Approve/edit may write; reject/topic_change/ambiguous discard; see [`MEMORY_CONFIRMATION.md`](./MEMORY_CONFIRMATION.md) |
 | `generate` | `generate_agent_turn` → `answer` + `memory_proposal` | **One** model call; when applicable, answer ends with a remember/update **question** to the user |
-| `write_memory` | records pending proposal only | **Never** calls `MemoryInterface.write` on this step — see [`MEMORY_SELF_EVAL.md`](./MEMORY_SELF_EVAL.md) |
+| `write_memory` | opens at most one pending proposal | **Never** writes semantics here — propose only |
 
 ## What we refuse to do
 
