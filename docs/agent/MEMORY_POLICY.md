@@ -63,3 +63,6 @@ parallel invented store.
 - Collection / company slug for RAG remain `brasaland_kb` / `brasaland`
 - Store path: `data/process/agent-memory/semantic.json` (override with
   `AGENT_MEMORY_PATH`)
+- **Dependencies:** Part 1 memory uses the existing stack only (stdlib +
+  LangGraph already in the project). Any *new* package must be added with
+  ``uv add`` — never ``pip install`` / ``pipenv``.
