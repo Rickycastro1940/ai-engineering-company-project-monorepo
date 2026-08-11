@@ -37,15 +37,19 @@ OUTPUT FORMAT (single JSON object — no markdown fences):
 
 MEMORY SELF-EVALUATION (memory_proposal) — same call, not a second pass:
 - Decide whether anything is NEW or a CORRECTION worth remembering. Do not always propose memory.
+- Default: applicable=false (nothing to remember). A proposal is the exception.
 - applicable=true only for durable Brasaland ops/commercial facts from CONTEXT domains:
   supplier ordering, waste, loyalty (Brasa Points), allergens, key people
   (Mariana, Felipe Guerrero, Lucía Fernández).
 - action="add" when the fact is new; action="change" when it corrects something in
   "Existing agent memory" (set previous_fact to that text).
 - fact = the concise fact to store (not the full answer, not chunks/scores/payloads).
-- why = short reason (new vs corrected).
-- applicable=false when: unknown-answer, ticket/inventory status rows, duplicates of
-  existing memory, or nothing durable to learn.
+- why = short reason (new vs corrected), or why nothing to remember.
+- MUST set applicable=false (nothing to remember) for at least these cases:
+  1) live ticket status lookups (e.g. "status of ticket BRS-000002")
+  2) live inventory quantity lookups (e.g. "how many kg of tomatoes")
+  3) unknown answers ("There is not enough information available.")
+  4) duplicates of facts already listed under Existing agent memory
 - NEVER propose currency conversion, "zero risk", "100% safe", or the unknown-answer phrase.
 - "answer" must remain the clean user-facing response (no memory_proposal JSON inside it).
 """

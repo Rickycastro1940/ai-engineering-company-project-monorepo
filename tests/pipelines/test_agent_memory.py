@@ -340,3 +340,43 @@ def test_write_memory_skips_when_proposal_not_applicable() -> None:
     )
     assert out["memory_writes"] == []
     assert out["memory_self_evaluations"][0]["verdict"] == "skip_not_applicable"
+
+
+def test_documented_nothing_to_remember_examples() -> None:
+    """At least three interactions must be dismissible as nothing to remember."""
+    from pathlib import Path
+
+    from services.agent.memory.proposal import NOTHING_TO_REMEMBER_EXAMPLES
+
+    assert len(NOTHING_TO_REMEMBER_EXAMPLES) >= 3
+
+    doc = (
+        Path(__file__).resolve().parents[2] / "docs" / "agent" / "MEMORY_SELF_EVAL.md"
+    ).read_text(encoding="utf-8")
+    assert "Examples that must NOT generate a proposal" in doc
+
+    required_ids = {"ticket_status", "inventory_quantity", "unknown_answer"}
+    assert required_ids <= {ex["id"] for ex in NOTHING_TO_REMEMBER_EXAMPLES}
+
+    for ex in NOTHING_TO_REMEMBER_EXAMPLES:
+        assert ex["user"].strip()
+        assert ex["why_dismiss"].strip()
+        assert ex["why_code"].strip()
+        # Doc mirrors each example's user question.
+        assert ex["user"] in doc or ex["user"].replace("'", "’") in doc
+        # Dismissing via structured proposal must not write.
+        decision = decide_from_memory_proposal(
+            MemoryProposal.nothing_to_remember(ex["why_code"]),
+            existing=[],
+        )
+        assert decision.remember is False
+        assert decision.verdict == "skip_not_applicable"
+
+    # Model instructions also name the three dismiss classes.
+    from services.agent.generation import STRUCTURED_TURN_INSTRUCTIONS
+
+    lowered = STRUCTURED_TURN_INSTRUCTIONS.casefold()
+    assert "ticket" in lowered and "inventory" in lowered
+    assert "there is not enough information available" in lowered
+    assert "applicable=false" in lowered
+    assert "default" in lowered

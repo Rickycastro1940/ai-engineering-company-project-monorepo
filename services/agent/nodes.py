@@ -261,8 +261,8 @@ def answer_ticket_node(state: AgentState) -> dict[str, Any]:
     result = TicketLookupOutput.model_validate(raw)
     answer = format_ticket_answer(result)
     # Ticket rows are not CONTEXT memorable domains — no memory_proposal.
-    no_proposal = MemoryProposal(
-        applicable=False, why="ticket_path_not_in_context_memorable_domains"
+    no_proposal = MemoryProposal.nothing_to_remember(
+        "ticket_path_not_in_context_memorable_domains"
     ).as_dict()
     return {
         "answer": answer,
@@ -429,8 +429,8 @@ def answer_inventory_node(state: AgentState) -> dict[str, Any]:
             answer = f"{ticket_text}\n\n{answer}"
         except Exception:  # noqa: BLE001
             pass
-    no_proposal = MemoryProposal(
-        applicable=False, why="inventory_path_not_in_context_memorable_domains"
+    no_proposal = MemoryProposal.nothing_to_remember(
+        "inventory_path_not_in_context_memorable_domains"
     ).as_dict()
     return {
         "answer": answer,
@@ -691,8 +691,8 @@ def generate_node(state: AgentState) -> dict[str, Any]:
 def no_context_node(state: AgentState) -> dict[str, Any]:
     """Honest fallback when retrieve returns nothing above the score threshold."""
     started = time.perf_counter()
-    no_proposal = MemoryProposal(
-        applicable=False, why="unknown_answer_must_not_be_learned"
+    no_proposal = MemoryProposal.nothing_to_remember(
+        "unknown_answer_must_not_be_learned"
     ).as_dict()
     return {
         "answer": NO_CONTEXT_ANSWER,

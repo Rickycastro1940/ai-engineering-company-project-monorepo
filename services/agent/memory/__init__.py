@@ -16,7 +16,7 @@ from services.agent.memory.interface import (
     get_agent_memory,
 )
 from services.agent.memory.policy import MemoryDecision, evaluate_memory_candidate
-from services.agent.memory.proposal import AgentTurnOutput, MemoryProposal
+from services.agent.memory.proposal import AgentTurnOutput, MemoryProposal, NOTHING_TO_REMEMBER_EXAMPLES
 from services.agent.memory.store import MemoryRecord, MemoryStore, get_memory_store
 
 __all__ = [
@@ -29,6 +29,7 @@ __all__ = [
     "MemoryRecord",
     "MemoryStore",
     "MemoryWriteResult",
+    "NOTHING_TO_REMEMBER_EXAMPLES",
     "evaluate_memory_candidate",
     "get_agent_memory",
     "get_memory_store",

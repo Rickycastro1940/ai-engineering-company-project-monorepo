@@ -2,13 +2,55 @@
 
 Not a second model call or a separate agent — one additional output field
 alongside the user-facing ``answer``.
+
+Most interactions must be dismissible as nothing to remember
+(``applicable=false``). See ``NOTHING_TO_REMEMBER_EXAMPLES`` and
+``docs/agent/MEMORY_SELF_EVAL.md``.
 """
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Final, Literal, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+class NothingToRememberExample(TypedDict):
+    id: str
+    user: str
+    why_dismiss: str
+    why_code: str
+
+
+# At least three documented interactions that must NOT generate a proposal.
+# Keep in sync with docs/agent/MEMORY_SELF_EVAL.md.
+NOTHING_TO_REMEMBER_EXAMPLES: Final[tuple[NothingToRememberExample, ...]] = (
+    {
+        "id": "ticket_status",
+        "user": "What is the status of ticket BRS-000002?",
+        "why_dismiss": (
+            "Incident rows are live MCP/tool state, not a CONTEXT memorable domain."
+        ),
+        "why_code": "ticket_path_not_in_context_memorable_domains",
+    },
+    {
+        "id": "inventory_quantity",
+        "user": "How many kg of tomatoes are in stock?",
+        "why_dismiss": (
+            "Inventory quantities change constantly; raw product rows are not "
+            "CONTEXT memorable topics."
+        ),
+        "why_code": "inventory_path_not_in_context_memorable_domains",
+    },
+    {
+        "id": "unknown_answer",
+        "user": "What is Brasaland's secret sauce recipe?",
+        "why_dismiss": (
+            "Unknown-answer placeholder must not be learned; no grounded KB fact."
+        ),
+        "why_code": "unknown_answer_must_not_be_learned",
+    },
+)
 
 
 class MemoryProposal(BaseModel):
@@ -38,11 +80,16 @@ class MemoryProposal(BaseModel):
     )
     why: str | None = Field(
         None,
-        description="Brief reason: why this is new or a correction.",
+        description="Brief reason: why this is new/corrected, or why nothing to remember.",
     )
 
     def as_dict(self) -> dict[str, Any]:
         return self.model_dump()
+
+    @classmethod
+    def nothing_to_remember(cls, why_code: str) -> MemoryProposal:
+        """Standard dismiss proposal (applicable=false)."""
+        return cls(applicable=False, why=why_code)
 
 
 class AgentTurnOutput(BaseModel):
