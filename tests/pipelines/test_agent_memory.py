@@ -11,6 +11,7 @@ from services.agent.memory.interface import (
     AgentMemory,
     MemoryInterface,
 )
+from services.agent.memory.nodes import write_memory_node
 from services.agent.memory.policy import (
     ALLOWED_KINDS,
     CONTEXT_COMPANY_PATH,
@@ -22,7 +23,8 @@ from services.agent.memory.policy import (
     context_company_text,
     evaluate_memory_candidate,
 )
-from services.agent.memory.store import MemoryStore
+from services.agent.memory.self_evaluate import self_evaluate_worth_remembering
+from services.agent.memory.store import MemoryRecord, MemoryStore
 from services.agent.nodes import lookup_ticket_node
 from services.agent.tools.mcp_incidents import lookup_ticket_via_mcp
 
@@ -190,3 +192,117 @@ def test_compiled_graph_routes_ticket_through_recall_then_mcp() -> None:
     compiled = compile_agent_graph()
     assert "recall_memory" in compiled.get_graph().nodes
     assert "lookup_ticket" in compiled.get_graph().nodes
+
+
+def test_self_eval_criterion_new_corrected_not_always() -> None:
+    """Explicit criterion: remember only new or corrected facts — not always."""
+    existing = [
+        MemoryRecord(
+            id="m1",
+            kind="supplier_ordering",
+            text="Emergency orders over 500 USD require Procurement Manager approval.",
+            source="test",
+            created_at="t0",
+            updated_at="t0",
+        )
+    ]
+
+    # Exact duplicate → skip (must not always write).
+    dup = self_evaluate_worth_remembering(
+        "Emergency orders over 500 USD require Procurement Manager approval.",
+        kind="supplier_ordering",
+        existing=existing,
+    )
+    assert dup.remember is False
+    assert dup.verdict == "skip_duplicate"
+
+    # Near-paraphrase / redundant → skip.
+    red = self_evaluate_worth_remembering(
+        "Emergency orders over 500 USD require Procurement Manager approval",
+        kind="supplier_ordering",
+        existing=existing,
+    )
+    assert red.remember is False
+    assert red.verdict in {"skip_duplicate", "skip_redundant"}
+
+    # Numeric correction → remember as corrected.
+    corr = self_evaluate_worth_remembering(
+        "Emergency orders over 1000 USD require Procurement Manager approval.",
+        kind="supplier_ordering",
+        existing=existing,
+    )
+    assert corr.remember is True
+    assert corr.verdict == "corrected"
+    assert corr.related_id == "m1"
+
+    # Unrelated domain fact → new.
+    fresh = self_evaluate_worth_remembering(
+        "Brasa Points loyalty tiers and redemption rules apply to members.",
+        kind="loyalty",
+        existing=existing,
+    )
+    assert fresh.remember is True
+    assert fresh.verdict == "new"
+
+    # Empty interaction → skip.
+    empty = self_evaluate_worth_remembering("", kind=None, existing=[])
+    assert empty.remember is False
+    assert empty.verdict == "skip_no_candidate"
+
+
+def test_write_memory_node_self_evaluates_before_write(tmp_path: Path, monkeypatch) -> None:
+    """write_memory must self-evaluate; duplicate interactions do not re-write."""
+    store = MemoryStore(tmp_path / "semantic.sqlite")
+    memory = AgentMemory(store)
+    monkeypatch.setattr(
+        "services.agent.memory.nodes.get_agent_memory",
+        lambda: memory,
+    )
+
+    first = {
+        "question": "emergency order approval?",
+        "answer": "Emergency orders over 500 USD require Procurement Manager approval.",
+        "retrieved": [{"source_document": "brasaland-supplier-ordering.en.md"}],
+        "memory_hits": [],
+        "steps": [],
+        "sources_used": [],
+    }
+    out1 = write_memory_node(first)  # type: ignore[arg-type]
+    assert out1["memory_writes"]
+    assert out1["memory_self_evaluations"][0]["verdict"] == "new"
+    assert out1["steps"][0]["output"]["always_write"] is False
+
+    # Same interaction again → skip_duplicate (not always write).
+    out2 = write_memory_node(first)  # type: ignore[arg-type]
+    assert out2["memory_writes"] == []
+    assert out2["memory_self_evaluations"][0]["verdict"] == "skip_duplicate"
+
+    # Corrected threshold → write with corrected verdict.
+    corrected_state = {
+        **first,
+        "answer": "Emergency orders over 1000 USD require Procurement Manager approval.",
+    }
+    out3 = write_memory_node(corrected_state)  # type: ignore[arg-type]
+    assert out3["memory_writes"]
+    assert out3["memory_self_evaluations"][0]["verdict"] == "corrected"
+    # Old 500 USD fact replaced.
+    texts = [r.text for r in store.list_records()]
+    assert any("1000 USD" in t for t in texts)
+    assert not any("500 USD" in t and "1000" not in t for t in texts)
+
+
+def test_write_memory_skips_when_no_candidates() -> None:
+    from services.agent.memory.nodes import write_memory_node as _write
+
+    out = _write(
+        {
+            "question": "status of ticket BRS-000002?",
+            "answer": "Ticket BRS-000002 is ABIERTO.",
+            "retrieved": [],
+            "memory_hits": [],
+            "steps": [],
+            "sources_used": [],
+        }
+    )
+    assert out["memory_writes"] == []
+    assert out["memory_self_evaluations"][0]["verdict"] == "skip_no_candidate"

@@ -39,8 +39,12 @@ class MemoryInterface(Protocol):
         kind: str | None = None,
         source: str = "agent",
         metadata: dict[str, Any] | None = None,
+        replace_id: str | None = None,
     ) -> MemoryWriteResult:
-        """Persist one fact if policy allows; otherwise reject without storing."""
+        """Persist one fact if policy allows; otherwise reject without storing.
+
+        ``replace_id`` is set when self-evaluation verdict is ``corrected``.
+        """
 
 
 class AgentMemory:
@@ -64,10 +68,13 @@ class AgentMemory:
         kind: str | None = None,
         source: str = "agent",
         metadata: dict[str, Any] | None = None,
+        replace_id: str | None = None,
     ) -> MemoryWriteResult:
         decision = evaluate_memory_candidate(text, kind=kind, source=source)
         if not decision.allowed or not decision.kind:
             return MemoryWriteResult(ok=False, record=None, decision=decision)
+        if replace_id:
+            self._store.delete(replace_id)
         record = self._store.upsert(
             text=text,
             kind=decision.kind,
@@ -75,6 +82,24 @@ class AgentMemory:
             metadata=metadata,
         )
         return MemoryWriteResult(ok=True, record=record, decision=decision)
+
+    def related_for_self_eval(
+        self,
+        text: str,
+        *,
+        kind: str | None = None,
+        limit: int = DEFAULT_READ_LIMIT,
+    ) -> list[MemoryRecord]:
+        """Bounded related facts used by post-interaction self-evaluation."""
+        hits = self.read(text, limit=limit)
+        if kind is None:
+            return hits
+        same = [h for h in hits if h.kind == kind]
+        if same:
+            return same
+        # Fall back to same-kind scan so corrections are not missed when
+        # keyword overlap with other kinds crowded out the true peer.
+        return [r for r in self._store.list_records() if r.kind == kind][:limit]
 
     def format_turn_notes(self, records: list[MemoryRecord]) -> str:
         """Format **already-read** facts for this turn (bounded list only).

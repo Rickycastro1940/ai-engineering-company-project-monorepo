@@ -18,7 +18,7 @@ Implementation: `services/agent/memory/interface.py` → `AgentMemory`
 | Node | API | Behavior |
 | ---- | --- | -------- |
 | `recall_memory` | `memory.read(question, limit=5)` | Bounded retrieval into `state["memory_hits"]` |
-| `write_memory` | `memory.write(...)` per candidate | Persist only if CONTEXT policy allows |
+| `write_memory` | `self_evaluate_worth_remembering` then optional `memory.write` | **Not always** — only `new` / `corrected` (see [`MEMORY_SELF_EVAL.md`](./MEMORY_SELF_EVAL.md)) |
 | `generate` | uses **already-read** hits only | RAG `generate_answer` stays KB-grounded; memory notes are separate turn notes |
 
 ## What we refuse to do

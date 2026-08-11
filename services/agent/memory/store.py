@@ -174,6 +174,17 @@ class MemoryStore:
         scored.sort(key=lambda pair: (-pair[0], pair[1].updated_at))
         return [rec for _, rec in scored[: max(0, limit)]]
 
+    def delete(self, record_id: str) -> bool:
+        """Remove one semantic fact by id (used when self-eval says corrected)."""
+        with self._lock:
+            with self._connect() as conn:
+                cur = conn.execute(
+                    "DELETE FROM semantic_memory WHERE id = ?",
+                    (record_id,),
+                )
+                conn.commit()
+                return cur.rowcount > 0
+
     def clear(self) -> None:
         with self._lock:
             with self._connect() as conn:

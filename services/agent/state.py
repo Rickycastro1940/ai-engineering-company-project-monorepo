@@ -29,5 +29,7 @@ class AgentState(TypedDict, total=False):
     # Durable semantic memory (extends MCP + RAG — does not replace them).
     memory_hits: list[dict[str, Any]]
     memory_writes: list[dict[str, Any]]
+    # Post-interaction self-eval verdicts (new / corrected / skip_*).
+    memory_self_evaluations: list[dict[str, Any]]
     sources_used: Annotated[list[str], operator.add]
     steps: Annotated[list[dict[str, Any]], operator.add]
