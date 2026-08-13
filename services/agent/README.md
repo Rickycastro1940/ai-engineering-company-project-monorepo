@@ -21,8 +21,15 @@ inventory remains a read-only HTTP tool against the inventory manager.
   and when the agent may step outside it (brief hello/thanks, then mandatory
   redirect). Three jailbreak / instruction-change variants are tested and
   documented in the PR.
+- [x] **Content and scope guardrails** — personal/non-company use (poems,
+  homework) is declined with a redirect to the Brasaland purpose; casual/
+  general questions (e.g. time in Tokyo) are allowed then steered back via
+  `answer_casual`; `output_guardrail` validates plain-answer format, blocks
+  leaked instructions / sensitive CONTEXT details (`brasaland_kb`, API paths),
+  and enforces CONTEXT wording.
 - [x] **Input guardrails** — jailbreak / prompt injection, currency conversion,
-  absolute allergen safety, out-of-scope (deterministic, before tools/LLM).
+  absolute allergen safety, personal use, hard out-of-scope (deterministic,
+  before tools/LLM).
 - [x] **Output guardrails** — same CONTEXT wording on the user-facing answer
   (never convert; never "zero risk" / "100% safe"; never leak prompt or
   chunks/scores/Qdrant).

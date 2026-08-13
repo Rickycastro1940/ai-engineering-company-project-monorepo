@@ -54,16 +54,48 @@ REASON_UNKNOWN_PLACEHOLDER_AS_FACT = "context_forbidden_unknown_answer_as_fact"
 REASON_RAG_INTERNALS = "context_forbidden_rag_chunks_scores_or_qdrant_payloads"
 REASON_JAILBREAK = "harness_blocked_prompt_injection"
 REASON_OFF_TOPIC = "harness_blocked_out_of_scope"
+REASON_PERSONAL_USE = "harness_blocked_personal_non_company_use"
 REASON_SYSTEM_PROMPT_LEAK = "harness_blocked_system_prompt_leak"
+REASON_SENSITIVE_CONTEXT_LEAK = "harness_blocked_sensitive_context_leak"
+REASON_BAD_OUTPUT_FORMAT = "harness_blocked_unexpected_answer_format"
+REASON_CASUAL_STEER = "harness_appended_company_steer_back"
 REASON_TOOL_WRITE_DENIED = "harness_blocked_tool_write"
 
 NO_CONTEXT_ANSWER = "There is not enough information available."
 
-SCOPE_REFUSAL = (
-    "I can only help with Brasaland commercial and operations topics: "
+AGENT_PURPOSE = (
+    "Brasaland commercial and operations topics: "
     "supplier ordering, waste protocol, Brasa Points loyalty, menu allergens, "
     "key people (Mariana, Felipe Guerrero, Lucía Fernández), live tickets, "
-    "and read-only inventory. "
+    "and read-only inventory"
+)
+
+SCOPE_REFUSAL = (
+    "I can only help with " + AGENT_PURPOSE + ". " + NO_CONTEXT_ANSWER
+)
+
+# Decline personal/non-company work; redirect to the agent's Brasaland purpose.
+PERSONAL_USE_REFUSAL = (
+    "I can't help with personal or non-company requests "
+    "(for example poems, homework, or personal errands). "
+    "I help with " + AGENT_PURPOSE + ". "
+    + NO_CONTEXT_ANSWER
+)
+
+# Appended after a brief casual/general reply to steer back into CONTEXT scope.
+COMPANY_STEER_BACK = (
+    "If you need anything on Brasaland commercial or operations — "
+    "supplier ordering, waste protocol, Brasa Points loyalty, menu allergens, "
+    "key people, tickets, or read-only inventory — ask me anytime."
+)
+
+SENSITIVE_CONTEXT_REFUSAL = (
+    "I can't share internal CONTEXT or retrieval implementation details. "
+    + NO_CONTEXT_ANSWER
+)
+
+BAD_FORMAT_REFUSAL = (
+    "I can only return a plain user-facing answer string. "
     + NO_CONTEXT_ANSWER
 )
 
@@ -137,6 +169,46 @@ _SYSTEM_PROMPT_LEAK = re.compile(
     r"|memory_proposal|AUTHORITY — SYSTEM INSTRUCTIONS|CONTEXT-company\.md)",
     re.IGNORECASE,
 )
+# CONTEXT-company.md implementation details that must never reach the user.
+# (chunks / scores / Qdrant are handled separately via RAG-internals strip.)
+_SENSITIVE_CONTEXT = re.compile(
+    r"\bbrasaland_kb\b"
+    r"|company\s+slug\s+in\s+payloads"
+    r"|POST\s+/knowledge/query"
+    r"|POST\s+/agent/query"
+    r"|CONTEXT-company\.md"
+    r"|collection\s+name\s*[:=]",
+    re.IGNORECASE,
+)
+# Raw structured model output must not be shown as the user-facing answer.
+_BAD_ANSWER_FORMAT = re.compile(
+    r"^\s*\{[\s\S]*\"(answer|memory_proposal)\"\s*:"
+    r"|^\s*```\s*json\b"
+    r"|\"memory_proposal\"\s*:\s*\{",
+    re.IGNORECASE,
+)
+_PERSONAL_USE = re.compile(
+    r"\b(write|compose|draft|create)\s+(me\s+)?(a\s+|an\s+)?"
+    r"(love\s+)?(poem|essay|story|song|letter|script|novel|joke|email)\b"
+    r"|\b(write|compose)\s+me\s+(a\s+|an\s+)?(python|javascript|java|code|script)\b"
+    r"|\bhelp\s+(me\s+)?(with\s+)?(my\s+)?"
+    r"(university|college|school|homework|assignment|thesis|exam)\b"
+    r"|\b(my\s+)?(homework|assignment|thesis|university\s+essay)\b"
+    r"|\blove\s+poem\b"
+    r"|\bpersonal\s+(advice|favor|errand|life|relationship)\b"
+    r"|\b(scrape|build)\s+(me\s+)?(a\s+)?",
+    re.IGNORECASE,
+)
+_CASUAL_GENERAL = re.compile(
+    r"\bwhat\s+time\s+(is\s+it|in)\b"
+    r"|\b(capital|population|weather|timezone)\s+(of|in)\b"
+    r"|\bwhat\s+is\s+the\s+capital\s+of\b"
+    r"|\bhow\s+(far|tall|old|many|much)\b"
+    r"|\bwho\s+(is|was)\s+(the\s+)?(president|prime\s+minister)\b"
+    r"|\b(distance|temperature)\s+(between|in|of)\b"
+    r"|\bwhat\s+day\s+(is\s+it|of\s+the\s+week)\b",
+    re.IGNORECASE,
+)
 _COMPANY_OR_SCOPE = re.compile(
     r"\b(brasaland|brasa|supplier|order|ordering|protein|emergency|waste"
     r"|loyalty|allergen|allergy|gluten|ticket|incident|inventory|stock"
@@ -187,6 +259,45 @@ def looks_like_system_prompt_leak(text: str) -> bool:
     return bool(_SYSTEM_PROMPT_LEAK.search(text or ""))
 
 
+def looks_like_sensitive_context_leak(text: str) -> bool:
+    """True when the answer exposes CONTEXT implementation details."""
+    return bool(_SENSITIVE_CONTEXT.search(text or ""))
+
+
+def looks_like_bad_answer_format(text: str) -> bool:
+    """True when the user-facing answer is raw JSON / structured model output."""
+    return bool(_BAD_ANSWER_FORMAT.search(text or ""))
+
+
+def is_personal_use_request(text: str) -> bool:
+    """Personal / non-company work the agent must decline and redirect away from."""
+    # Company-scoped asks stay in the normal RAG/tools path even if they use
+    # verbs like "write" (e.g. "write me a summary of the waste protocol").
+    if in_agent_scope(text):
+        return False
+    return bool(_PERSONAL_USE.search(text or ""))
+
+
+def is_casual_general(text: str) -> bool:
+    """General/world trivia allowed briefly, then steered back to Brasaland."""
+    q = text or ""
+    if in_agent_scope(q) or looks_like_jailbreak(q):
+        return False
+    if bool(_PERSONAL_USE.search(q)):
+        return False
+    return bool(_CASUAL_GENERAL.search(q))
+
+
+def casual_general_reply(question: str = "") -> str:
+    """Brief acknowledgment for casual asks + mandatory company steer-back."""
+    del question
+    return (
+        "I can chat briefly about general topics, but I don't have live world "
+        "data or tools for that here. "
+        + COMPANY_STEER_BACK
+    )
+
+
 def is_confirmation_utterance(text: str) -> bool:
     stripped = (text or "").strip()
     if len(stripped) > 160:
@@ -222,8 +333,10 @@ def in_agent_scope(text: str) -> bool:
 
 
 def looks_off_topic(text: str) -> bool:
-    """Default-deny: anything outside Brasaland agent scope is off-topic."""
+    """Hard out-of-scope: not company, not permitted small talk, not casual."""
     if in_agent_scope(text):
+        return False
+    if is_casual_general(text):
         return False
     return True
 

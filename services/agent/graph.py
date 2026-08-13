@@ -15,7 +15,9 @@ Harness / guardrails (Milestone 8 Part 2) add ``input_guardrail`` and
 ``output_guardrail`` around that graph so CONTEXT-company.md restrictions are
 enforced in code, not only in the system prompt. Permitted small talk
 (``hello`` / ``thanks``) short-circuits at ``decide_route`` →
-``answer_small_talk`` (no LLM, no retrieve, no memory write).
+``answer_small_talk``. Casual/general questions short-circuit to
+``answer_casual`` (brief reply + company steer-back). Personal/non-company
+use is blocked at input.
 """
 
 from __future__ import annotations
@@ -29,6 +31,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
 from services.agent.harness.nodes import (
+    answer_casual_node,
     answer_small_talk_node,
     input_guardrail_node,
     output_guardrail_node,
@@ -63,6 +66,7 @@ REQUIRED_NODES = (
     "no_context",
     "empty_question",
     "answer_small_talk",
+    "answer_casual",
     "lookup_ticket",
     "answer_ticket",
     "ticket_fallback",
@@ -108,9 +112,12 @@ def _after_resolve_memory_confirmation(state: AgentState) -> str:
 
 
 def _after_decide_route(state: AgentState) -> str:
-    """Small talk skips tools/RAG; otherwise recall memory then route as before."""
-    if state.get("route") == "small_talk":
+    """Small talk / casual skip tools/RAG; otherwise recall memory then route."""
+    route = state.get("route") or ""
+    if route == "small_talk":
         return "answer_small_talk"
+    if route == "casual":
+        return "answer_casual"
     return "recall_memory"
 
 
@@ -184,6 +191,7 @@ def build_agent_graph() -> StateGraph:
     graph.add_node("no_context", no_context_node)
     graph.add_node("empty_question", empty_question_node)
     graph.add_node("answer_small_talk", answer_small_talk_node)
+    graph.add_node("answer_casual", answer_casual_node)
     graph.add_node("write_memory", write_memory_node)
 
     graph.add_edge(START, "receive_question")
@@ -217,6 +225,7 @@ def build_agent_graph() -> StateGraph:
         {
             "recall_memory": "recall_memory",
             "answer_small_talk": "answer_small_talk",
+            "answer_casual": "answer_casual",
         },
     )
     graph.add_conditional_edges(
@@ -277,6 +286,7 @@ def build_agent_graph() -> StateGraph:
     graph.add_edge("no_context", END)
     graph.add_edge("empty_question", END)
     graph.add_edge("answer_small_talk", END)
+    graph.add_edge("answer_casual", END)
     graph.add_edge("ticket_fallback", END)
     graph.add_edge("inventory_fallback", END)
     return graph

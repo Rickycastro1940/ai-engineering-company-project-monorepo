@@ -11,11 +11,14 @@ from services.agent.harness.restrictions import (
     ALLERGEN_REFUSAL,
     CURRENCY_REFUSAL,
     JAILBREAK_REFUSAL,
+    PERSONAL_USE_REFUSAL,
     REASON_ALLERGEN_ABSOLUTE_SAFETY,
     REASON_CURRENCY_CONVERSION,
     REASON_JAILBREAK,
     REASON_OFF_TOPIC,
+    REASON_PERSONAL_USE,
     SCOPE_REFUSAL,
+    is_personal_use_request,
     looks_like_jailbreak,
     looks_off_topic,
     mentions_absolute_allergen_safety,
@@ -43,7 +46,9 @@ def check_input(question: str) -> InputGuardrailDecision:
     """Inspect the user turn once, before any model or tool call.
 
     Order: jailbreak → CONTEXT currency → CONTEXT allergen absolute safety →
-    agent scope. Jailbreak wins even when the rest of the text is in-scope.
+    personal/non-company use → hard out-of-scope. Casual/general questions are
+    allowed through (steered back later). Jailbreak wins even when the rest of
+    the text looks in-scope.
     """
     text = (question or "").strip()
     if not text:
@@ -66,6 +71,12 @@ def check_input(question: str) -> InputGuardrailDecision:
             allowed=False,
             reason=REASON_ALLERGEN_ABSOLUTE_SAFETY,
             refusal=ALLERGEN_REFUSAL,
+        )
+    if is_personal_use_request(text):
+        return InputGuardrailDecision(
+            allowed=False,
+            reason=REASON_PERSONAL_USE,
+            refusal=PERSONAL_USE_REFUSAL,
         )
     if looks_off_topic(text):
         return InputGuardrailDecision(

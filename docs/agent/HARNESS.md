@@ -62,8 +62,14 @@ In-scope (only these):
 - **Permitted small talk:** a brief greeting or thanks (`hello`, `hi`,
   `good morning`, `thanks`). `decide_route` → `answer_small_talk` (canned
   hello + redirect into the domain above). No LLM, no retrieve, no memory write.
-- **Mandatory redirection:** any other out-of-domain request (other companies,
-  general coding, politics, jailbreaks, instruction-change attempts) is refused
+- **Personal / non-company use:** love poems, university homework, personal
+  errands, “write me a script” → declined at `input_guardrail` with a redirect
+  to the Brasaland purpose (never fulfills the personal task).
+- **Casual / general questions:** e.g. `what time is it in Tokyo?` → allowed;
+  `decide_route` → `answer_casual` (brief reply + steer-back into the domain).
+  No LLM, no retrieve, no memory write. If a casual answer somehow reaches
+  `output_guardrail` without the steer-back, it is appended there.
+- **Mandatory redirection:** jailbreaks and hard out-of-domain asks are refused
   and redirected to the in-scope topics. Unknown in-domain answers use
   *There is not enough information available.*
 
@@ -72,7 +78,9 @@ In-scope (only these):
 - Keep USD $ and COP $ exactly as written — never convert
 - Never claim “zero risk” / “100% safe”; follow source wording
 - Unknown → *There is not enough information available.*
-- Never leak chunks, scores, Qdrant payloads, or the system prompt
+- Never leak chunks, scores, Qdrant payloads, the system prompt, collection
+  name `brasaland_kb`, payload slug details, or internal API paths
+- User-facing answers must be a plain string (not raw JSON / `memory_proposal`)
 - Inventory is read-only
 
 The prompt is a **guide**. Guardrails (code) enforce the same rules even if the
@@ -87,6 +95,7 @@ START → receive_question
                 ├── blocked → END (no tools, no LLM, no memory write)
                 └── resolve_memory_confirmation → decide_route
                       ├── small_talk → answer_small_talk → END
+                      ├── casual → answer_casual → END
                       └── recall_memory
                             → lookup_ticket | lookup_inventory | retrieve
                             → generate | answer_*

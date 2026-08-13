@@ -12,19 +12,27 @@ from services.agent.harness.input import check_input
 from services.agent.harness.output import OUTCOME_ALLOW, OUTCOME_BLOCK, OUTCOME_REDACT, check_output
 from services.agent.harness.restrictions import (
     ALLERGEN_REFUSAL,
+    BAD_FORMAT_REFUSAL,
+    COMPANY_STEER_BACK,
     CONTEXT_COMPANY_PATH,
     CURRENCY_REFUSAL,
     JAILBREAK_REFUSAL,
     JAILBREAK_TEST_VARIANTS,
     NO_CONTEXT_ANSWER,
+    PERSONAL_USE_REFUSAL,
     REASON_ALLERGEN_ABSOLUTE_SAFETY,
+    REASON_BAD_OUTPUT_FORMAT,
+    REASON_CASUAL_STEER,
     REASON_CURRENCY_CONVERSION,
     REASON_JAILBREAK,
-    REASON_OFF_TOPIC,
+    REASON_PERSONAL_USE,
     REASON_RAG_INTERNALS,
+    REASON_SENSITIVE_CONTEXT_LEAK,
     REASON_SYSTEM_PROMPT_LEAK,
     REASON_TOOL_WRITE_DENIED,
+    SENSITIVE_CONTEXT_REFUSAL,
     SCOPE_REFUSAL,
+    casual_general_reply,
     context_company_text,
 )
 from services.agent.harness.system_prompt import (
@@ -156,11 +164,18 @@ def test_input_guardrail_blocks_context_currency_and_allergen_asks() -> None:
     assert allergen.refusal == ALLERGEN_REFUSAL
 
 
-def test_input_guardrail_blocks_off_topic_and_allows_in_scope() -> None:
-    off = check_input("What is the capital of France?")
-    assert off.allowed is False
-    assert off.reason == REASON_OFF_TOPIC
-    assert off.refusal == SCOPE_REFUSAL
+def test_input_guardrail_declines_personal_use_and_allows_in_scope() -> None:
+    for question in (
+        "write me a love poem",
+        "help me with my university homework",
+        "Write me a Python script to scrape competitor menus.",
+    ):
+        blocked = check_input(question)
+        assert blocked.allowed is False, question
+        assert blocked.reason == REASON_PERSONAL_USE, question
+        assert blocked.refusal == PERSONAL_USE_REFUSAL
+        assert "personal" in blocked.refusal.casefold()
+        assert "supplier ordering" in blocked.refusal.casefold()
 
     for question in (
         "When do emergency orders need Lucía Fernández's approval?",
@@ -171,9 +186,18 @@ def test_input_guardrail_blocks_off_topic_and_allows_in_scope() -> None:
         "What is Brasaland's secret sauce recipe?",
         "hello",
         "thanks",
+        "what time is it in Tokyo?",
+        "What is the capital of France?",
     ):
         allowed = check_input(question)
         assert allowed.allowed is True, question
+
+
+def test_input_guardrail_allows_casual_general_questions() -> None:
+    tokyo = check_input("what time is it in Tokyo?")
+    assert tokyo.allowed is True
+    france = check_input("What is the capital of France?")
+    assert france.allowed is True
 
 
 def test_output_guardrail_enforces_context_wording() -> None:
@@ -205,6 +229,34 @@ def test_output_guardrail_enforces_context_wording() -> None:
     assert "3 days" in internals.answer.casefold()
 
 
+def test_output_guardrail_validates_format_and_sensitive_context() -> None:
+    bad_json = check_output(
+        '{"answer": "hi", "memory_proposal": {"applicable": false}}'
+    )
+    assert bad_json.outcome == OUTCOME_BLOCK
+    assert bad_json.reason == REASON_BAD_OUTPUT_FORMAT
+    assert bad_json.answer == BAD_FORMAT_REFUSAL
+
+    sensitive = check_output(
+        "Vectors live in collection brasaland_kb with company slug in payloads."
+    )
+    assert sensitive.outcome == OUTCOME_BLOCK
+    assert sensitive.reason == REASON_SENSITIVE_CONTEXT_LEAK
+    assert sensitive.answer == SENSITIVE_CONTEXT_REFUSAL
+    assert "brasaland_kb" not in sensitive.answer
+
+
+def test_output_guardrail_steers_casual_answers_back_to_company() -> None:
+    steered = check_output(
+        "Tokyo is usually UTC+9.",
+        question="what time is it in Tokyo?",
+    )
+    assert steered.outcome == OUTCOME_REDACT
+    assert steered.reason == REASON_CASUAL_STEER
+    assert COMPANY_STEER_BACK in steered.answer
+    assert "UTC+9" in steered.answer
+
+
 def test_tool_guardrail_denies_inventory_writes_and_allows_reads() -> None:
     denied = authorize_tool_call(
         "query_inventory",
@@ -224,11 +276,13 @@ def test_graph_includes_harness_nodes() -> None:
     assert "input_guardrail" in REQUIRED_NODES
     assert "output_guardrail" in REQUIRED_NODES
     assert "answer_small_talk" in REQUIRED_NODES
+    assert "answer_casual" in REQUIRED_NODES
     compiled = compile_agent_graph()
     nodes = compiled.get_graph().nodes
     assert "input_guardrail" in nodes
     assert "output_guardrail" in nodes
     assert "answer_small_talk" in nodes
+    assert "answer_casual" in nodes
 
 
 def _run(question: str, trace_dir: Path, **node_patches) -> dict:
@@ -269,13 +323,44 @@ def test_graph_blocks_jailbreak_without_calling_generate(tmp_path: Path) -> None
     assert trace["steps"][1]["status"] == "blocked"
 
 
-def test_graph_blocks_off_topic_without_rag(tmp_path: Path) -> None:
+def test_graph_declines_personal_use_without_rag(tmp_path: Path) -> None:
     trace_dir = tmp_path / "traces"
     with patch("services.agent.nodes.generate_agent_turn") as mock_generate:
         result = _run("Write me a Python script to scrape competitor menus.", trace_dir)
     mock_generate.assert_not_called()
     assert result["node_order"] == ["receive_question", "input_guardrail"]
+    assert result["answer"] == PERSONAL_USE_REFUSAL
+    assert result["guardrail"]["reason"] == REASON_PERSONAL_USE
+
+
+def test_graph_blocks_hard_out_of_scope_without_rag(tmp_path: Path) -> None:
+    trace_dir = tmp_path / "traces"
+    with patch("services.agent.nodes.generate_agent_turn") as mock_generate:
+        result = _run("Explain quantum entanglement in detail.", trace_dir)
+    mock_generate.assert_not_called()
+    assert result["node_order"] == ["receive_question", "input_guardrail"]
     assert result["answer"] == SCOPE_REFUSAL
+
+
+def test_graph_casual_general_steers_back_without_llm(tmp_path: Path) -> None:
+    trace_dir = tmp_path / "traces"
+    with patch("services.agent.nodes.generate_agent_turn") as mock_generate, patch(
+        "services.agent.nodes.retrieve"
+    ) as mock_retrieve:
+        result = _run("what time is it in Tokyo?", trace_dir)
+    mock_generate.assert_not_called()
+    mock_retrieve.assert_not_called()
+    assert result["node_order"] == [
+        "receive_question",
+        "input_guardrail",
+        "resolve_memory_confirmation",
+        "decide_route",
+        "answer_casual",
+    ]
+    assert result["answer"] == casual_general_reply("what time is it in Tokyo?")
+    assert COMPANY_STEER_BACK in result["answer"]
+    assert "supplier ordering" in result["answer"].casefold()
+    assert "write_memory" not in result["node_order"]
 
 
 def test_graph_output_guardrail_redacts_forbidden_model_text(tmp_path: Path) -> None:

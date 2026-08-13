@@ -8,6 +8,7 @@ from typing import Any
 from services.agent.harness.audit import log_guardrail_decision
 from services.agent.harness.input import check_input
 from services.agent.harness.output import OUTCOME_ALLOW, check_output
+from services.agent.harness.restrictions import casual_general_reply
 from services.agent.harness.system_prompt import SMALL_TALK_REPLY
 from services.agent.memory.proposal import MemoryProposal
 from services.agent.state import AgentState
@@ -102,6 +103,32 @@ def answer_small_talk_node(state: AgentState) -> dict[str, Any]:
                 started,
                 notes="permitted small talk; redirected to Brasaland domain",
                 output={"answer": SMALL_TALK_REPLY, "memory_proposal": no_proposal},
+            )
+        ],
+    }
+
+
+def answer_casual_node(state: AgentState) -> dict[str, Any]:
+    """Casual/general ask: brief reply, then steer back to Brasaland context."""
+    started = time.perf_counter()
+    question = state.get("question") or ""
+    answer = casual_general_reply(question)
+    no_proposal = MemoryProposal.nothing_to_remember(
+        "casual_general_not_memorable"
+    ).as_dict()
+    return {
+        "answer": answer,
+        "error": None,
+        "route": "done",
+        "memory_proposal": no_proposal,
+        "steps": [
+            _step(
+                state,
+                "answer_casual",
+                "ok",
+                started,
+                notes="casual/general allowed; steered back to Brasaland",
+                output={"answer": answer, "memory_proposal": no_proposal},
             )
         ],
     }

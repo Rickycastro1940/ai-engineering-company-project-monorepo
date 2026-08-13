@@ -25,7 +25,7 @@ from typing import Any
 from data.pipelines.rag import NO_CONTEXT_ANSWER, generate_answer, retrieve
 
 from services.agent.generation import generate_agent_turn
-from services.agent.harness.restrictions import is_permitted_small_talk
+from services.agent.harness.restrictions import is_casual_general, is_permitted_small_talk
 from services.agent.harness.tools import authorize_tool_call
 from services.agent.memory.proposal import MemoryProposal
 from services.agent.state import AgentState
@@ -156,6 +156,33 @@ def decide_route_node(state: AgentState) -> dict[str, Any]:
                         "ticket_query": None,
                         "inventory_query": None,
                         "decision": "small_talk",
+                    },
+                )
+            ],
+        }
+    if is_casual_general(question):
+        return {
+            "route": "casual",
+            "needs_ticket": False,
+            "needs_inventory": False,
+            "needs_rag": False,
+            "ticket_query": None,
+            "inventory_query": None,
+            "steps": [
+                _step(
+                    state,
+                    "decide_route",
+                    "ok",
+                    started,
+                    notes="route=casual (general ask; steer back to Brasaland)",
+                    output={
+                        "route": "casual",
+                        "needs_ticket": False,
+                        "needs_inventory": False,
+                        "needs_rag": False,
+                        "ticket_query": None,
+                        "inventory_query": None,
+                        "decision": "casual",
                     },
                 )
             ],

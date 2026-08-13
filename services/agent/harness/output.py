@@ -1,6 +1,8 @@
 """Deterministic output guardrails — run after generate / tool answers.
 
 Enforces CONTEXT-company.md wording even if the model ignored the system prompt.
+Validates expected answer format and blocks leaked instructions / sensitive
+CONTEXT implementation details before the response reaches the user.
 """
 
 from __future__ import annotations
@@ -9,13 +11,22 @@ from dataclasses import dataclass, replace
 
 from services.agent.harness.restrictions import (
     ALLERGEN_REFUSAL,
+    BAD_FORMAT_REFUSAL,
+    COMPANY_STEER_BACK,
     CURRENCY_REFUSAL,
     NO_CONTEXT_ANSWER,
     REASON_ALLERGEN_ABSOLUTE_SAFETY,
+    REASON_BAD_OUTPUT_FORMAT,
+    REASON_CASUAL_STEER,
     REASON_CURRENCY_CONVERSION,
     REASON_RAG_INTERNALS,
+    REASON_SENSITIVE_CONTEXT_LEAK,
     REASON_SYSTEM_PROMPT_LEAK,
+    SENSITIVE_CONTEXT_REFUSAL,
     SYSTEM_PROMPT_LEAK_REFUSAL,
+    is_casual_general,
+    looks_like_bad_answer_format,
+    looks_like_sensitive_context_leak,
     looks_like_system_prompt_leak,
     mentions_absolute_allergen_safety,
     mentions_currency_conversion,
@@ -50,13 +61,16 @@ class OutputGuardrailDecision:
 
 
 def check_output(answer: str | None, *, question: str = "") -> OutputGuardrailDecision:
-    """Validate the user-facing answer against CONTEXT restrictions.
+    """Validate the user-facing answer before it returns to the caller.
 
-    System-prompt leaks are blocked (not merely redacted). Currency conversion
-    and absolute allergen claims are replaced with the CONTEXT refusal. RAG
-    internals are stripped; if nothing remains, use the unknown-answer phrase.
+    Checks (in order):
+    1. Expected format — plain answer string, not raw JSON / memory_proposal
+    2. Leaked internal instructions / system prompt → block
+    3. Sensitive CONTEXT implementation details (collection, payloads, APIs)
+    4. CONTEXT currency / allergen absolute-safety wording
+    5. RAG internals (chunks / scores / Qdrant)
+    6. Casual/general questions → ensure company steer-back is present
     """
-    del question  # reserved for future model-based checks; unused by rules
     text = (answer or "").strip()
     if not text:
         return OutputGuardrailDecision(
@@ -65,11 +79,23 @@ def check_output(answer: str | None, *, question: str = "") -> OutputGuardrailDe
             answer=text,
         )
 
+    if looks_like_bad_answer_format(text):
+        return OutputGuardrailDecision(
+            outcome=OUTCOME_BLOCK,
+            reason=REASON_BAD_OUTPUT_FORMAT,
+            answer=BAD_FORMAT_REFUSAL,
+        )
     if looks_like_system_prompt_leak(text):
         return OutputGuardrailDecision(
             outcome=OUTCOME_BLOCK,
             reason=REASON_SYSTEM_PROMPT_LEAK,
             answer=SYSTEM_PROMPT_LEAK_REFUSAL,
+        )
+    if looks_like_sensitive_context_leak(text):
+        return OutputGuardrailDecision(
+            outcome=OUTCOME_BLOCK,
+            reason=REASON_SENSITIVE_CONTEXT_LEAK,
+            answer=SENSITIVE_CONTEXT_REFUSAL,
         )
     if mentions_currency_conversion(text):
         return OutputGuardrailDecision(
@@ -92,6 +118,15 @@ def check_output(answer: str | None, *, question: str = "") -> OutputGuardrailDe
             reason=REASON_RAG_INTERNALS,
             answer=cleaned,
         )
+
+    if is_casual_general(question) and COMPANY_STEER_BACK not in text:
+        steered = text.rstrip() + " " + COMPANY_STEER_BACK
+        return OutputGuardrailDecision(
+            outcome=OUTCOME_REDACT,
+            reason=REASON_CASUAL_STEER,
+            answer=steered,
+        )
+
     return OutputGuardrailDecision(outcome=OUTCOME_ALLOW, reason=None, answer=text)
 
 
