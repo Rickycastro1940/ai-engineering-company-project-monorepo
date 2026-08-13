@@ -27,6 +27,7 @@ from data.pipelines.rfp_intake.constants import (
     MIN_MARKDOWN_CHARS,
     STATUS_DISCARDED,
     STATUS_FAILED,
+    STATUS_INTAKE_COMPLETE,
 )
 from data.pipelines.rfp_intake.graph import (
     CX_GRAPH_FORBIDDEN_RFP_NODES,
@@ -37,6 +38,7 @@ from data.pipelines.rfp_intake.graph import (
 )
 from data.pipelines.rfp_intake.orchestration import (
     build_department_excerpt,
+    build_final_department_results,
     department_worker,
     department_worker_from_parts,
     orchestrator,
@@ -89,6 +91,7 @@ __all__ = [
     "IntakeResult",
     "REQUIRED_RFP_NODES",
     "build_department_excerpt",
+    "build_final_department_results",
     "build_rfp_intake_graph",
     "classifier_agent",
     "classify_document",
@@ -129,6 +132,7 @@ class IntakeResult:
     open_questions: list[str] = field(default_factory=list)
     part2_handoff: dict[str, Any] = field(default_factory=dict)
     ask_whom: list[dict[str, str]] = field(default_factory=list)
+    final_department_results: list[dict[str, Any]] = field(default_factory=list)
     trace: list[dict[str, Any]] = field(default_factory=list)
 
 
@@ -226,6 +230,20 @@ def run_intake_pipeline(*, pdf_path: Path, title: str | None = None) -> IntakeRe
             discard_rule_id,
         )
 
+    final_results: list[dict[str, Any]] = []
+    if status == STATUS_INTAKE_COMPLETE:
+        final_results = build_final_department_results(
+            sections=sections,
+            ask_whom=ask_whom,
+            departments_needed=depts,
+            requires_ceo_approval=requires_ceo,
+        )
+        metadata["final_department_results"] = final_results
+        metadata["open_questions"] = open_questions
+        metadata["ask_whom"] = ask_whom
+        if part2:
+            metadata["part2_handoff"] = part2
+
     return IntakeResult(
         status=status,
         metadata=metadata,
@@ -243,6 +261,7 @@ def run_intake_pipeline(*, pdf_path: Path, title: str | None = None) -> IntakeRe
         open_questions=open_questions,
         part2_handoff=part2,
         ask_whom=ask_whom,
+        final_department_results=final_results,
         trace=trace,
     )
 
@@ -277,6 +296,7 @@ def run_intake_from_bytes(
                 "part2_handoff": result.part2_handoff,
                 "ask_whom": result.ask_whom,
                 "open_questions": result.open_questions,
+                "final_department_results": result.final_department_results,
             },
             indent=2,
             ensure_ascii=False,

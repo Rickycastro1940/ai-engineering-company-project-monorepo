@@ -133,21 +133,50 @@ CONTEXT_SEED_EXPECTATIONS: Final[dict[str, dict]] = {
     "CONTEXT-brasaland-request-1.pdf": {
         "accept": True,
         "client_substr": "Sunset Bay",
+        "location_substr": "Florida",
         "departments": {"marketing", "operaciones", "procurement", "training"},
         "requires_ceo_approval": True,  # ~$60–75k > $50k
+        "contacts": {
+            "marketing": "Camila Ospina",
+            "operaciones": "Felipe Guerrero",
+            "procurement": "Lucía Fernández",
+            "training": "Jake Morrison",
+            "ceo": "Mariana Restrepo",
+        },
+        # Substrings that must appear in that department's key_aspects (grounded in PDF/CONTEXT)
+        "aspect_signals": {
+            "marketing": ("Sunset Bay", "exclusiv"),
+            "operaciones": ("Sunset Bay", "10 business days"),
+            "procurement": ("60,000", "75,000"),
+            "training": ("signature", "certif"),
+        },
         "notes": "formal RFP; exclusivity + new signature menu → training",
     },
     "CONTEXT-brasaland-request-2.pdf": {
         "accept": True,
         "client_substr": "Andes Tech",
+        "location_substr": "Medellín",
         "departments": {"marketing", "operaciones", "procurement"},
         "exclude_departments": {"training"},  # standard menu
         "requires_ceo_approval": False,
+        "contacts": {
+            "marketing": "Camila Ospina",
+            "operaciones": "Felipe Guerrero",
+            "procurement": "Lucía Fernández",
+        },
+        "aspect_signals": {
+            "marketing": ("Andes Tech",),
+            "operaciones": ("Andes Tech", "Medellín", "220"),
+            "procurement": ("open_questions", "not fully stated"),
+        },
         "notes": "informal RFP; standard menu → no training",
     },
     "CONTEXT-brasaland-request-3.pdf": {
         "accept": False,
         "discard": True,
+        "departments": set(),
+        "contacts": {},
+        "aspect_signals": {},
         "notes": "franchise inquiry; no scope/budget/deadline",
     },
 }

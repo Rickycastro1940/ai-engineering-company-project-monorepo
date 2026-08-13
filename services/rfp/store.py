@@ -214,6 +214,9 @@ def ticket_to_dict(ticket: RfpTicket) -> dict[str, Any]:
         except json.JSONDecodeError:
             return default
 
+    from data.pipelines.rfp_intake.constants import DEPARTMENT_OWNERS
+    from data.pipelines.rfp_intake.orchestration import build_final_department_results
+
     sections_rows = list_sections(ticket.ticket_id)
     sections = {
         row.department_id: _loads(row.key_aspects_json, []) for row in sections_rows
@@ -221,6 +224,8 @@ def ticket_to_dict(ticket: RfpTicket) -> dict[str, Any]:
     department_sections = [
         {
             "department_id": row.department_id,
+            "contact": DEPARTMENT_OWNERS.get(row.department_id, row.department_id),
+            "owner": DEPARTMENT_OWNERS.get(row.department_id, row.department_id),
             "key_aspects": _loads(row.key_aspects_json, []),
             "approval_status": row.approval_status,
         }
@@ -228,6 +233,13 @@ def ticket_to_dict(ticket: RfpTicket) -> dict[str, Any]:
     ]
     meta = _loads(ticket.metadata_json, {}) or {}
     handoff = _loads(ticket.part2_handoff_json, {}) or meta.get("part2_handoff", {})
+    ask_whom = handoff.get("ask_whom") or meta.get("ask_whom", [])
+    final_results = meta.get("final_department_results") or build_final_department_results(
+        sections=sections,
+        ask_whom=ask_whom,
+        departments_needed=_loads(ticket.departments_needed_json, []),
+        requires_ceo_approval=bool(ticket.requires_ceo_approval),
+    )
 
     return {
         "ticket_id": ticket.ticket_id,
@@ -239,6 +251,7 @@ def ticket_to_dict(ticket: RfpTicket) -> dict[str, Any]:
         "departments_needed": _loads(ticket.departments_needed_json, []),
         "sections": sections,
         "department_sections": department_sections,
+        "final_department_results": final_results,
         "unmapped_topics": _loads(ticket.unmapped_topics_json, []),
         "conflicts": _loads(ticket.conflicts_json, []),
         "intake_summary": ticket.intake_summary,
@@ -251,7 +264,7 @@ def ticket_to_dict(ticket: RfpTicket) -> dict[str, Any]:
         "part2_ready": bool(ticket.part2_ready),
         "part2_routed_at": ticket.part2_routed_at,
         "part2_handoff": handoff,
-        "ask_whom": handoff.get("ask_whom") or meta.get("ask_whom", []),
+        "ask_whom": ask_whom,
         "open_questions": handoff.get("open_questions") or meta.get("open_questions", []),
         "work_streams": handoff.get("work_streams", []),
         "created_at": ticket.created_at,

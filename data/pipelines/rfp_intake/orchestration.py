@@ -485,6 +485,74 @@ def synthesizer(
     )
 
 
+def build_final_department_results(
+    *,
+    sections: dict[str, list[str]],
+    ask_whom: list[dict[str, str]] | None = None,
+    departments_needed: list[str] | None = None,
+    requires_ceo_approval: bool = False,
+) -> list[dict[str, Any]]:
+    """Final Part 1 listing: per-department key_aspects + CONTEXT contact (owner).
+
+    Shape used by API / UI / evals so Sales can verify contacts against CONTEXT §2.1
+    and aspects against the sample RFP content.
+    """
+    ordered = list(departments_needed or [])
+    for dept in sections:
+        if dept not in ordered:
+            ordered.append(dept)
+    preferred = [
+        DEPARTMENT_MARKETING,
+        DEPARTMENT_OPERACIONES,
+        DEPARTMENT_PROCUREMENT,
+        DEPARTMENT_TRAINING,
+    ]
+    ordered = [d for d in preferred if d in ordered] + [
+        d for d in ordered if d not in preferred
+    ]
+
+    ask_by_dept = {
+        (a.get("department_id") or ""): a for a in (ask_whom or []) if a.get("department_id")
+    }
+    rows: list[dict[str, Any]] = []
+    for department_id in ordered:
+        aspects = list(sections.get(department_id) or [])
+        if not aspects:
+            continue
+        owner = DEPARTMENT_OWNERS.get(department_id, department_id)
+        ask = ask_by_dept.get(department_id) or {}
+        rows.append(
+            {
+                "department_id": department_id,
+                "label": DEPARTMENT_LABELS.get(department_id, department_id),
+                "contact": owner,
+                "owner": owner,
+                "key_aspects": aspects,
+                "ask": ask.get("ask") or (aspects[0] if aspects else ""),
+            }
+        )
+
+    if requires_ceo_approval:
+        ceo_ask = ask_by_dept.get("ceo") or {}
+        from data.pipelines.rfp_intake.constants import CEO_NAME
+
+        rows.append(
+            {
+                "department_id": "ceo",
+                "label": "CEO approval (Part 3)",
+                "contact": CEO_NAME,
+                "owner": CEO_NAME,
+                "key_aspects": [
+                    ceo_ask.get("ask")
+                    or "CEO approval required for estimated value > $50,000 USD/year"
+                ],
+                "ask": ceo_ask.get("ask")
+                or "CEO approval required for estimated value > $50,000 USD/year",
+            }
+        )
+    return rows
+
+
 def run_department_orchestration(
     *,
     markdown_text: str,
