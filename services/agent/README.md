@@ -27,6 +27,12 @@ inventory remains a read-only HTTP tool against the inventory manager.
   `answer_casual`; `output_guardrail` validates plain-answer format, blocks
   leaked instructions / sensitive CONTEXT details (`brasaland_kb`, API paths),
   and enforces CONTEXT wording.
+- [x] **Security guardrails (anti-injection)** — RAG documents and tool
+  outputs are sanitized and isolated in `<untrusted_rag_document>` /
+  `<untrusted_tool_output>` (never system instructions);
+  `reject_instruction_change` blocks the three instruction-change rephrasings;
+  deterministic tests in `tests/pipelines/test_agent_anti_injection.py` (no
+  live LLM as the only gate).
 - [x] **Input guardrails** — jailbreak / prompt injection, currency conversion,
   absolute allergen safety, personal use, hard out-of-scope (deterministic,
   before tools/LLM).

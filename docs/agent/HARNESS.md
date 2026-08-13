@@ -86,6 +86,18 @@ In-scope (only these):
 The prompt is a **guide**. Guardrails (code) enforce the same rules even if the
 model ignores the prompt. See [`GUARDRAILS.md`](./GUARDRAILS.md).
 
+## Anti-injection (RAG + tools)
+
+External text is isolated before any model call:
+
+- RAG chunks → `sanitize_retrieved_chunks` at `retrieve`, then
+  `<untrusted_rag_document>` in the user role (`format_isolated_rag_context`)
+- Tool payloads → `<untrusted_tool_output>`; answers sanitized
+- Recalled memory → `<untrusted_memory_record>`
+- Instruction-change requests → `reject_instruction_change` (three rephrasings)
+
+None of that untrusted text is ever concatenated into the system role.
+
 ## Graph
 
 ```text
@@ -107,5 +119,5 @@ START → receive_question
 ## Tests
 
 ```bash
-uv run pytest tests/pipelines/test_agent_guardrails.py tests/pipelines/test_agent_graph.py tests/pipelines/test_agent_memory.py tests/pipelines/test_agent_tools.py tests/pipelines/test_agent_routing_evals.py tests/pipelines/test_agent_grounding.py -q
+uv run pytest tests/pipelines/test_agent_guardrails.py tests/pipelines/test_agent_anti_injection.py tests/pipelines/test_agent_graph.py tests/pipelines/test_agent_memory.py tests/pipelines/test_agent_tools.py tests/pipelines/test_agent_routing_evals.py tests/pipelines/test_agent_grounding.py -q
 ```

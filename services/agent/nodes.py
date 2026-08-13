@@ -25,6 +25,7 @@ from typing import Any
 from data.pipelines.rag import NO_CONTEXT_ANSWER, generate_answer, retrieve
 
 from services.agent.generation import generate_agent_turn
+from services.agent.harness.external import sanitize_external_text, sanitize_retrieved_chunks
 from services.agent.harness.restrictions import is_casual_general, is_permitted_small_talk
 from services.agent.harness.tools import authorize_tool_call
 from services.agent.memory.proposal import MemoryProposal
@@ -347,7 +348,8 @@ def answer_ticket_node(state: AgentState) -> dict[str, Any]:
     started = time.perf_counter()
     raw = state.get("ticket_result") or {}
     result = TicketLookupOutput.model_validate(raw)
-    answer = format_ticket_answer(result)
+    # Tool text is untrusted external data — neutralize instruction-like phrases.
+    answer = sanitize_external_text(format_ticket_answer(result))
     # Ticket rows are not CONTEXT memorable domains — no memory_proposal.
     no_proposal = MemoryProposal.nothing_to_remember(
         "ticket_path_not_in_context_memorable_domains"
@@ -542,12 +544,12 @@ def answer_inventory_node(state: AgentState) -> dict[str, Any]:
     started = time.perf_counter()
     raw = state.get("inventory_result") or {}
     result = InventoryLookupOutput.model_validate(raw)
-    answer = format_inventory_answer(result)
+    answer = sanitize_external_text(format_inventory_answer(result))
     ticket_raw = state.get("ticket_result")
     if ticket_raw:
         try:
             ticket_out = TicketLookupOutput.model_validate(ticket_raw)
-            ticket_text = format_ticket_answer(ticket_out)
+            ticket_text = sanitize_external_text(format_ticket_answer(ticket_out))
             answer = f"{ticket_text}\n\n{answer}"
         except Exception:  # noqa: BLE001
             pass
@@ -635,7 +637,7 @@ def retrieve_node(state: AgentState) -> dict[str, Any]:
     """
     started = time.perf_counter()
     try:
-        chunks = retrieve(state["question"])
+        chunks = sanitize_retrieved_chunks(retrieve(state["question"]))
     except Exception as exc:  # noqa: BLE001 — surface as graph error, not stack to client
         return {
             "retrieved": [],

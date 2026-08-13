@@ -18,8 +18,8 @@ from services.agent.harness.restrictions import (
     REASON_OFF_TOPIC,
     REASON_PERSONAL_USE,
     SCOPE_REFUSAL,
+    is_instruction_change_request,
     is_personal_use_request,
-    looks_like_jailbreak,
     looks_off_topic,
     mentions_absolute_allergen_safety,
     mentions_currency_conversion,
@@ -42,24 +42,38 @@ class InputGuardrailDecision:
         }
 
 
-def check_input(question: str) -> InputGuardrailDecision:
-    """Inspect the user turn once, before any model or tool call.
+def reject_instruction_change(question: str) -> InputGuardrailDecision | None:
+    """Explicit rejection for instruction-change / jailbreak requests.
 
-    Order: jailbreak → CONTEXT currency → CONTEXT allergen absolute safety →
-    personal/non-company use → hard out-of-scope. Casual/general questions are
-    allowed through (steered back later). Jailbreak wins even when the rest of
-    the text looks in-scope.
+    Covers the three documented rephrasings in ``INSTRUCTION_CHANGE_VARIANTS``
+    plus related patterns (ignore previous instructions, developer mode, …).
+    Returns a block decision, or ``None`` when the turn is not an
+    instruction-change attempt.
     """
-    text = (question or "").strip()
-    if not text:
-        return InputGuardrailDecision(allowed=True, reason=None, refusal=None)
-
-    if looks_like_jailbreak(text):
+    if is_instruction_change_request(question or ""):
         return InputGuardrailDecision(
             allowed=False,
             reason=REASON_JAILBREAK,
             refusal=JAILBREAK_REFUSAL,
         )
+    return None
+
+
+def check_input(question: str) -> InputGuardrailDecision:
+    """Inspect the user turn once, before any model or tool call.
+
+    Order: instruction-change / jailbreak → CONTEXT currency → CONTEXT allergen
+    absolute safety → personal/non-company use → hard out-of-scope.
+    Casual/general questions are allowed through (steered back later).
+    Instruction-change wins even when the rest of the text looks in-scope.
+    """
+    text = (question or "").strip()
+    if not text:
+        return InputGuardrailDecision(allowed=True, reason=None, refusal=None)
+
+    blocked = reject_instruction_change(text)
+    if blocked is not None:
+        return blocked
     if mentions_currency_conversion(text):
         return InputGuardrailDecision(
             allowed=False,
