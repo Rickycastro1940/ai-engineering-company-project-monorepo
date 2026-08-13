@@ -143,16 +143,24 @@ def convert_pdf_to_markdown(pdf_path: Path) -> str:
 
 
 def compute_readability_scores(markdown_text: str) -> dict[str, float]:
-    words = re.findall(r"\b\w+\b", markdown_text or "")
+    """Compute per-document readability metrics (CONTEXT §2.3).
+
+    Always returns at least length stats; Flesch-family scores when text is long enough.
+    """
+    text = markdown_text or ""
+    words = re.findall(r"\b\w+\b", text)
+    scores: dict[str, float] = {
+        "word_count": float(len(words)),
+        "char_count": float(len(text)),
+    }
     if len(words) < 100:
-        return {}
+        return scores
     try:
         import nltk
         from readability import Readability
 
         nltk.download("punkt_tab", quiet=True)
-        analyzer = Readability(markdown_text)
-        scores: dict[str, float] = {}
+        analyzer = Readability(text)
         for name, getter in (
             ("flesch_reading_ease", analyzer.flesch),
             ("flesch_kincaid_grade", analyzer.flesch_kincaid),
@@ -166,8 +174,8 @@ def compute_readability_scores(markdown_text: str) -> dict[str, float]:
                 continue
         return scores
     except Exception as exc:  # noqa: BLE001
-        logger.debug("readability skipped: %s", exc)
-        return {}
+        logger.debug("readability formulas skipped: %s", exc)
+        return scores
 
 
 def run_intake_pipeline(*, pdf_path: Path, title: str | None = None) -> IntakeResult:
