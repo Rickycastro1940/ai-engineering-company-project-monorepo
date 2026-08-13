@@ -1,0 +1,60 @@
+{
+  "trace_id": "69f983b02a17462e88d4225ef6e7469e",
+  "status": "ok",
+  "question": "What is the minimum stock rule for proteins?",
+  "answer": "Every Brasaland location must keep at least 3 days of main protein inventory. Emergency orders over 500 USD need approval from Lucía Fernández.",
+  "error": null,
+  "steps": [
+    {
+      "node_name": "receive_question",
+      "sequence": 1,
+      "status": "ok",
+      "duration_ms": 0,
+      "notes": "question accepted",
+      "output": {
+        "accepted": true,
+        "question_len": 44
+      }
+    },
+    {
+      "node_name": "retrieve",
+      "sequence": 2,
+      "status": "ok",
+      "duration_ms": 0,
+      "notes": "chunks=1 route=generate",
+      "output": {
+        "chunk_count": 1,
+        "sources": [
+          "supplier-ordering"
+        ],
+        "scores": [
+          0.91
+        ]
+      }
+    },
+    {
+      "node_name": "generate",
+      "sequence": 3,
+      "status": "ok",
+      "duration_ms": 0,
+      "notes": "grounded answer from retrieved KB context",
+      "output": {
+        "answer_len": 143,
+        "grounded": true,
+        "context_sources": [
+          "supplier-ordering"
+        ]
+      }
+    }
+  ],
+  "started_at": "2026-08-05T15:28:39.044766+00:00",
+  "ended_at": "2026-08-05T15:28:39.050039+00:00",
+  "duration_ms": 5,
+  "node_order": [
+    "receive_question",
+    "retrieve",
+    "generate"
+  ],
+  "retrieved_count": 1,
+  "route": "done"
+}

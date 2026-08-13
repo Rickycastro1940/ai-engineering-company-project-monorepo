@@ -1,0 +1,6 @@
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100   980    0   774  100   206   8328   2216 --:--:-- --:--:-- --:--:-- 10652
+event: message
+data: {"jsonrpc":"2.0","id":5,"result":{"content":[{"type":"text","text":"{\n  \"ok\": false,\n  \"products\": null,\n  \"message\": \"Inventory tool is read-only. Write operations are not permitted on this MCP server.\",\n  \"error_code\": \"INVENTORY_WRITE_FORBIDDEN\",\n  \"tool\": \"query_inventory\",\n  \"details\": {\n    \"action\": \"update\",\n    \"rejected_fields\": {\n      \"quantity\": 30\n    }\n  },\n  \"duration_ms\": 0\n}"}],"structuredContent":{"ok":false,"products":null,"message":"Inventory tool is read-only. Write operations are not permitted on this MCP server.","error_code":"INVENTORY_WRITE_FORBIDDEN","tool":"query_inventory","details":{"action":"update","rejected_fields":{"quantity":30}},"duration_ms":0},"isError":false}}
+
