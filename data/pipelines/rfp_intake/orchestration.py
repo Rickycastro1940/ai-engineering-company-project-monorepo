@@ -444,6 +444,17 @@ def synthesizer(
         "ceo_approver": CEO_NAME if requires_ceo_approval else None,
         "ask_whom": ask_whom,
         "open_questions": open_all,
+        "work_streams": [
+            {
+                "department_id": w.department_id,
+                "owner": w.owner,
+                "label": DEPARTMENT_LABELS.get(w.department_id, w.department_id),
+                "key_aspects": list(w.key_aspects),
+                "open_questions": list(w.open_questions),
+                "next_action": "draft_section",
+            }
+            for w in worker_results
+        ],
     }
 
     return SynthesisResult(

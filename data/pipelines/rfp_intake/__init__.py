@@ -37,6 +37,11 @@ from data.pipelines.rfp_intake.orchestration import (
     run_department_orchestration,
     synthesizer as _synthesizer_impl,
 )
+from data.pipelines.rfp_intake.routing import (
+    build_part2_handoff,
+    route_intake_to_part2,
+    validate_part2_handoff,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +92,9 @@ __all__ = [
     "run_department_orchestration",
     "run_intake_from_bytes",
     "run_intake_pipeline",
+    "build_part2_handoff",
+    "route_intake_to_part2",
+    "validate_part2_handoff",
     "synthesize_intake",
 ]
 

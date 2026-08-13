@@ -124,6 +124,28 @@ def list_rfp_tickets(limit: int = 50) -> dict[str, Any]:
     return {"tickets": rows, "count": len(rows)}
 
 
+@router.get("/part2/queue")
+def part2_queue(limit: int = 50) -> dict[str, Any]:
+    """DB-backed Part 2 queue (same API process — not a second service)."""
+    from services.rfp.store import list_part2_queue
+
+    items = list_part2_queue(limit=limit)
+    return {"queue": items, "count": len(items)}
+
+
+@router.get("/tickets/{ticket_id}/part2-handoff")
+def get_part2_handoff(ticket_id: str) -> dict[str, Any]:
+    """Return ticket_id + synthesizer work_streams for Part 2 (no PDF reparse)."""
+    from services.rfp.store import load_part2_handoff
+
+    try:
+        return load_part2_handoff(ticket_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Ticket not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @router.get("/tickets/{ticket_id}")
 def get_rfp_ticket(ticket_id: str) -> dict[str, Any]:
     ticket = get_ticket(ticket_id)

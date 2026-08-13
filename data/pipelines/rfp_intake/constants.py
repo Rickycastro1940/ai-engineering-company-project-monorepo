@@ -52,3 +52,7 @@ MIN_MARKDOWN_CHARS: Final = 40
 DISCARD_EMPTY_DOCUMENT: Final = "empty_document"
 DISCARD_NOT_AN_RFP: Final = "not_an_rfp"
 DISCARD_MISSING_CORE_FIELDS: Final = "missing_core_fields"
+
+# Part 2 handoff contract
+HANDOFF_SCHEMA_VERSION: Final = "1.0"
+PART2_READY_STATUS: Final = STATUS_INTAKE_COMPLETE

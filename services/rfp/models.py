@@ -40,6 +40,10 @@ class RfpTicket(SQLModel, table=True):
     error_message: Optional[str] = None
     readability_json: str = Field(default="{}", sa_column=Column(Text))
     trace_json: str = Field(default="[]", sa_column=Column(Text))
+    # Part 2 routing — flag + persisted handoff contract (no second API)
+    part2_ready: bool = Field(default=False, index=True)
+    part2_routed_at: Optional[str] = None
+    part2_handoff_json: Optional[str] = Field(default=None, sa_column=Column(Text))
     created_at: str = Field(default_factory=_now)
     updated_at: str = Field(default_factory=_now)
 

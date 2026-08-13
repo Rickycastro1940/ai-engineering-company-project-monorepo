@@ -7,6 +7,8 @@ from typing import Any
 
 from sqlmodel import Session, select
 
+from data.pipelines.rfp_intake.constants import STATUS_INTAKE_COMPLETE
+from data.pipelines.rfp_intake.routing import route_intake_to_part2, validate_part2_handoff
 from services.api.database import create_db_and_tables, get_engine, reset_engine
 from services.rfp.models import RfpDepartmentSection, RfpTicket, _now
 
@@ -17,7 +19,9 @@ __all__ = [
     "create_analyzing_ticket",
     "get_ticket",
     "init_db",
+    "list_part2_queue",
     "list_tickets",
+    "load_part2_handoff",
     "reset_engine",
     "save_intake_result",
     "ticket_to_dict",
@@ -65,8 +69,62 @@ def list_sections(ticket_id: str) -> list[RfpDepartmentSection]:
         return [r.model_copy(deep=True) for r in rows]
 
 
+def list_part2_queue(*, limit: int = 50) -> list[dict[str, Any]]:
+    """Queue of tickets routed to Part 2 (DB flag + intake_complete)."""
+    init_db()
+    with Session(get_engine()) as session:
+        rows = session.exec(
+            select(RfpTicket)
+            .where(RfpTicket.part2_ready == True)  # noqa: E712
+            .where(RfpTicket.status == STATUS_INTAKE_COMPLETE)
+            .order_by(RfpTicket.part2_routed_at.desc())
+            .limit(limit)
+        ).all()
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            handoff = {}
+            if row.part2_handoff_json:
+                try:
+                    handoff = json.loads(row.part2_handoff_json)
+                except json.JSONDecodeError:
+                    handoff = {}
+            out.append(
+                {
+                    "ticket_id": row.ticket_id,
+                    "status": row.status,
+                    "part2_ready": row.part2_ready,
+                    "part2_routed_at": row.part2_routed_at,
+                    "departments_needed": json.loads(
+                        row.departments_needed_json or "[]"
+                    ),
+                    "work_stream_count": len(handoff.get("work_streams") or []),
+                    "requires_ceo_approval": row.requires_ceo_approval,
+                }
+            )
+        return out
+
+
+def load_part2_handoff(ticket_id: str) -> dict[str, Any]:
+    """Load Part 2 contract by ticket_id — no PDF reparse."""
+    ticket = get_ticket(ticket_id)
+    if ticket is None:
+        raise KeyError(ticket_id)
+    if not ticket.part2_handoff_json:
+        raise ValueError(f"Ticket {ticket_id} has no Part 2 handoff payload")
+    try:
+        contract = json.loads(ticket.part2_handoff_json)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Corrupt part2_handoff_json for {ticket_id}") from exc
+    validate_part2_handoff(contract)
+    if contract.get("ticket_id") != ticket_id:
+        raise ValueError("Handoff ticket_id mismatch")
+    if contract.get("reparse_pdf_required") is True:
+        raise ValueError("Handoff incorrectly requires PDF reparse")
+    return contract
+
+
 def save_intake_result(ticket_id: str, result: Any, *, source_pdf_path: str) -> RfpTicket:
-    """Persist Ticket + RFP metadata + DepartmentSection.key_aspects rows."""
+    """Persist Ticket + RFP metadata + DepartmentSection.key_aspects + Part 2 route."""
     init_db()
     with Session(get_engine()) as session:
         ticket = session.get(RfpTicket, ticket_id)
@@ -95,6 +153,28 @@ def save_intake_result(ticket_id: str, result: Any, *, source_pdf_path: str) -> 
             raise ValueError(
                 f"Refusing to persist discarded ticket {ticket_id} without discard_reason"
             )
+
+        # Route to Part 2 when intake succeeded (flag + DB handoff contract).
+        handoff = route_intake_to_part2(
+            ticket_id=ticket_id,
+            intake_result=result,
+            source_pdf_path=source_pdf_path,
+        )
+        if handoff is not None:
+            ticket.part2_ready = True
+            ticket.part2_routed_at = handoff.get("routed_at")
+            ticket.part2_handoff_json = json.dumps(handoff, ensure_ascii=False)
+            # Keep metadata mirror for UI / older readers
+            meta = dict(result.metadata or {})
+            meta["part2_handoff"] = handoff
+            meta["ask_whom"] = handoff.get("ask_whom", [])
+            meta["open_questions"] = handoff.get("open_questions", [])
+            ticket.metadata_json = json.dumps(meta, ensure_ascii=False)
+        else:
+            ticket.part2_ready = False
+            ticket.part2_routed_at = None
+            ticket.part2_handoff_json = None
+
         session.add(ticket)
 
         # Replace department sections (Part 1: key_aspects only)
@@ -140,6 +220,7 @@ def ticket_to_dict(ticket: RfpTicket) -> dict[str, Any]:
         for row in sections_rows
     ]
     meta = _loads(ticket.metadata_json, {}) or {}
+    handoff = _loads(ticket.part2_handoff_json, {}) or meta.get("part2_handoff", {})
 
     return {
         "ticket_id": ticket.ticket_id,
@@ -160,9 +241,12 @@ def ticket_to_dict(ticket: RfpTicket) -> dict[str, Any]:
         "error_message": ticket.error_message,
         "readability_scores": _loads(ticket.readability_json, {}),
         "trace": _loads(ticket.trace_json, []),
-        "part2_handoff": meta.get("part2_handoff", {}),
-        "ask_whom": meta.get("ask_whom", []),
-        "open_questions": meta.get("open_questions", []),
+        "part2_ready": bool(ticket.part2_ready),
+        "part2_routed_at": ticket.part2_routed_at,
+        "part2_handoff": handoff,
+        "ask_whom": handoff.get("ask_whom") or meta.get("ask_whom", []),
+        "open_questions": handoff.get("open_questions") or meta.get("open_questions", []),
+        "work_streams": handoff.get("work_streams", []),
         "created_at": ticket.created_at,
         "updated_at": ticket.updated_at,
     }

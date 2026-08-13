@@ -231,8 +231,9 @@
                     ? `what to ask whom:\n${askWhom.map((a) => `  - Ask ${a.owner}: ${a.ask}`).join('\n')}`
                     : null,
                 handoff.next_part
-                    ? `Part 2 handoff: ${handoff.message || 'ready for drafting'}`
+                    ? `Part 2 handoff: ${handoff.message || 'ready for drafting'} (ticket ${data.ticket_id})`
                     : null,
+                data.part2_ready ? `part2_ready: true · work_streams: ${(data.work_streams || handoff.work_streams || []).length}` : null,
                 data.intake_summary ? `summary:\n${data.intake_summary}` : null,
             ].filter(Boolean);
             return lines.join('\n');
