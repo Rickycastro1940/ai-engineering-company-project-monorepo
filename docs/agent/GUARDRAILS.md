@@ -151,6 +151,18 @@ Every **block** or **redirect** is appended to
 
 Allows are **not** logged (minimal).
 
+### Eval: every block/redirect logged with failure type
+
+Eval: `tests/pipelines/test_agent_guardrail_failure_type_logging.py` — proves:
+
+1. Every documented reason maps to `structural` | `content` | `security`
+2. `log_guardrail_decision` always writes `failure_type` on block/redirect
+3. Graph paths (input block, small-talk/casual redirect, output block, external
+   neutralize) each leave a typed JSONL row
+4. Tool write denial is audited as `security`
+
+Companion: `tests/pipelines/test_agent_guardrail_observability.py`.
+
 **Summary (counts for this session):**
 
 ```bash
@@ -206,4 +218,5 @@ uv run python -m services.agent.harness --reset
   `tests/pipelines/test_agent_anti_injection.py`,
   `tests/pipelines/test_agent_rag_tool_never_system_instruction.py`,
   `tests/pipelines/test_agent_harness_deterministic_coverage.py`,
+  `tests/pipelines/test_agent_guardrail_failure_type_logging.py`,
   `tests/pipelines/test_agent_guardrail_observability.py`

@@ -37,6 +37,9 @@ inventory remains a read-only HTTP tool against the inventory manager.
 - [x] **Deterministic harness coverage** — guards and isolation are covered by
   fixtures/mocks; a live LLM is not the only gate. Eval:
   `tests/pipelines/test_agent_harness_deterministic_coverage.py`.
+- [x] **Failure-type logging** — every block/redirect is audited with
+  `failure_type` (`structural` / `content` / `security`). Eval:
+  `tests/pipelines/test_agent_guardrail_failure_type_logging.py`.
 - [x] **Company system prompt** — `services/agent/harness/system_prompt.py`
   (scope + CONTEXT restrictions). Prompt is a guide; code gates enforce it.
 - [x] **Secure system prompt** — system instructions live only in the system
