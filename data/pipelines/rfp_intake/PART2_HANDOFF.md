@@ -1,12 +1,13 @@
 # Part 2 handoff contract (RFP intake → drafting)
 
 Part 1 routes accepted tickets into the rest of the agentic flow **without a
-second API process**. Routing uses:
+second API process**. Routing uses **all** of:
 
 | Mechanism | Where |
 | --------- | ----- |
-| **DB flag** | `rfp_tickets.part2_ready` |
-| **DB field** | `rfp_tickets.part2_handoff_json` (full contract) |
+| **Queue flag** | `rfp_tickets.part2_ready` (indexed; selects Part 2 queue) |
+| **DB field** | `rfp_tickets.part2_handoff_json` (full contract JSON) |
+| **Documented contract** | this file + `routing.build_part2_handoff` / `validate_part2_handoff` |
 | **Queue view** | tickets with `part2_ready=true` + `status=intake_complete` |
 | **HTTP (same app)** | `GET /rfp/part2/queue`, `GET /rfp/tickets/{id}/part2-handoff` |
 
@@ -14,8 +15,12 @@ second API process**. Routing uses:
 
 Part 2 **must not re-parse the PDF**. Start from:
 
-1. `ticket_id`
+1. `ticket_id` (always present in the persisted handoff)
 2. Synthesizer payload: `work_streams[]` each with `department_id`, `owner`, `key_aspects`, `open_questions`
+   (plus top-level `synthesizer` block with `departments_for_drafting` / `owners` / `ask_whom`)
+
+Evals: `tests/pipelines/test_rfp_part2_handoff_contract.py`, `tests/pipelines/test_rfp_routing.py`.
+
 
 Markdown and metadata already live on the ticket row if needed for grounding;
 `reparse_pdf_required` is always `false` in a valid contract.
