@@ -14,3 +14,4 @@ Each subfolder under `agents/` should represent **one concrete agent** (for exam
 | Agent | Location | Status |
 |-------|----------|--------|
 | Brasaland support agent (LangGraph Part 1) | [`services/agent/`](../services/agent/) | Migration + explicit RAG flow with traces |
+| Brasaland RFP intake (Part 1 scaffold) | [`rfp-intake/`](./rfp-intake/) | Kickoff — CONTEXT readiness only |
