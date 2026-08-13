@@ -30,6 +30,10 @@ inventory remains a read-only HTTP tool against the inventory manager.
 - [x] **Multiple guardrails (not one generic check)** — independent input,
   output, tool, external-isolation, and redirect gates with distinct reason
   codes. Eval: `tests/pipelines/test_agent_multiple_guardrails.py`.
+- [x] **Tool/RAG never system instructions** — poisoned RAG chunks and tool
+  payloads are sanitized and isolated in the user/tool roles only; they never
+  appear in the system-role message. Eval:
+  `tests/pipelines/test_agent_rag_tool_never_system_instruction.py`.
 - [x] **Company system prompt** — `services/agent/harness/system_prompt.py`
   (scope + CONTEXT restrictions). Prompt is a guide; code gates enforce it.
 - [x] **Secure system prompt** — system instructions live only in the system

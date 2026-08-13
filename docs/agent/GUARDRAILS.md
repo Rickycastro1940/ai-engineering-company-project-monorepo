@@ -61,6 +61,22 @@ Eval: `tests/pipelines/test_agent_personal_chatbot_correction.py`.
 Deterministic tests (no live LLM as the gate):
 `tests/pipelines/test_agent_anti_injection.py`.
 
+### Eval: tool/RAG content never treated as system instructions
+
+Demonstration fixtures poison a RAG document and a tool payload with
+instruction-change phrasing. The harness must:
+
+1. Wrap them in `<untrusted_rag_document>` / `<untrusted_tool_output>`
+2. Neutralize instruction-like phrases
+3. Place them only in the **user** (or tool) role via `build_turn_messages` /
+   `generate_agent_turn`
+4. Keep `messages[0]` (system) equal to the harness prompt — never containing
+   the poisoned body
+
+Eval: `tests/pipelines/test_agent_rag_tool_never_system_instruction.py`
+(4 cases: RAG isolation, tool isolation, `generate_agent_turn` capture,
+graph retrieve sanitize-before-generate).
+
 ## CONTEXT-company.md (exact)
 
 | Restriction | CONTEXT wording | Input | Output |
@@ -172,4 +188,5 @@ uv run python -m services.agent.harness --reset
 - `services/agent/harness/observability.py` — failure-type classification + session summary
 - Tests: `tests/pipelines/test_agent_guardrails.py`,
   `tests/pipelines/test_agent_anti_injection.py`,
+  `tests/pipelines/test_agent_rag_tool_never_system_instruction.py`,
   `tests/pipelines/test_agent_guardrail_observability.py`
