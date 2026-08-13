@@ -74,11 +74,30 @@ Blocked turns still return `{ "answer": "...", "trace_id": "..." }` with a
 CONTEXT-aligned refusal. They **do not** call the LLM, tools, or
 `MemoryInterface.write`.
 
-## Audit
+## Observability
 
-Every decision is appended to
-`data/process/agent-guardrails/guardrail_decisions.jsonl`
-(`layer`, `outcome`, `reason`, `question`).
+Every **block** or **redirect** is appended to
+`data/process/agent-guardrails/guardrail_decisions.jsonl` with:
+
+| Field | Meaning |
+| ----- | ------- |
+| `action` | `block` or `redirect` |
+| `failure_type` | `structural` (bad answer format), `content` (scope / CONTEXT wording / small-talk / casual steer), or `security` (jailbreak, prompt leak, sensitive CONTEXT, RAG internals, tool write, external injection) |
+| `guardrail` | Which gate fired (`input`, `output`, `tool`, `external`, `small_talk`, `casual`) |
+| `reason` | Stable reason code |
+| `session_id` | Current test/run session |
+
+Allows are **not** logged (minimal).
+
+**Summary (counts for this session):**
+
+```bash
+curl -s http://127.0.0.1:8000/agent/guardrails/summary
+uv run python -m services.agent.harness
+# new session:
+curl -s -X POST http://127.0.0.1:8000/agent/guardrails/session
+uv run python -m services.agent.harness --reset
+```
 
 ## Evidence examples
 
@@ -119,5 +138,8 @@ Every decision is appended to
 - `services/agent/harness/external.py` — RAG / tool / memory isolation + sanitize
 - `services/agent/harness/tools.py` — `authorize_tool_call`
 - `services/agent/harness/nodes.py` — graph nodes (`answer_casual`, …)
+- `services/agent/harness/audit.py` — JSONL log of blocks/redirects
+- `services/agent/harness/observability.py` — failure-type classification + session summary
 - Tests: `tests/pipelines/test_agent_guardrails.py`,
-  `tests/pipelines/test_agent_anti_injection.py`
+  `tests/pipelines/test_agent_anti_injection.py`,
+  `tests/pipelines/test_agent_guardrail_observability.py`

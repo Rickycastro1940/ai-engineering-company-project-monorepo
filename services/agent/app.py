@@ -7,6 +7,8 @@ Run (from repo root):
 Endpoints:
   POST /agent/query
   GET  /agent/traces/{trace_id}
+  GET  /agent/guardrails/summary
+  POST /agent/guardrails/session
 """
 
 from __future__ import annotations

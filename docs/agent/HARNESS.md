@@ -98,6 +98,18 @@ External text is isolated before any model call:
 
 None of that untrusted text is ever concatenated into the system role.
 
+## Observability
+
+Blocks and redirects are logged with `failure_type` (`structural` /
+`content` / `security`). Session summary:
+
+```bash
+GET /agent/guardrails/summary
+uv run python -m services.agent.harness
+```
+
+See [`GUARDRAILS.md`](./GUARDRAILS.md).
+
 ## Graph
 
 ```text
@@ -119,5 +131,5 @@ START → receive_question
 ## Tests
 
 ```bash
-uv run pytest tests/pipelines/test_agent_guardrails.py tests/pipelines/test_agent_anti_injection.py tests/pipelines/test_agent_graph.py tests/pipelines/test_agent_memory.py tests/pipelines/test_agent_tools.py tests/pipelines/test_agent_routing_evals.py tests/pipelines/test_agent_grounding.py -q
+uv run pytest tests/pipelines/test_agent_guardrails.py tests/pipelines/test_agent_anti_injection.py tests/pipelines/test_agent_guardrail_observability.py tests/pipelines/test_agent_graph.py tests/pipelines/test_agent_memory.py tests/pipelines/test_agent_tools.py tests/pipelines/test_agent_routing_evals.py tests/pipelines/test_agent_grounding.py -q
 ```

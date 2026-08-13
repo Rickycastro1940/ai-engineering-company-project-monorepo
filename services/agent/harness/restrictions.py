@@ -59,7 +59,17 @@ REASON_SYSTEM_PROMPT_LEAK = "harness_blocked_system_prompt_leak"
 REASON_SENSITIVE_CONTEXT_LEAK = "harness_blocked_sensitive_context_leak"
 REASON_BAD_OUTPUT_FORMAT = "harness_blocked_unexpected_answer_format"
 REASON_CASUAL_STEER = "harness_appended_company_steer_back"
+REASON_SMALL_TALK_REDIRECT = "harness_redirected_small_talk"
+REASON_CASUAL_REDIRECT = "harness_redirected_casual_general"
+REASON_EXTERNAL_INJECTION = "harness_neutralized_external_injection"
 REASON_TOOL_WRITE_DENIED = "harness_blocked_tool_write"
+
+# Observability buckets for blocks / redirects.
+FAILURE_STRUCTURAL = "structural"
+FAILURE_CONTENT = "content"
+FAILURE_SECURITY = "security"
+ACTION_BLOCK = "block"
+ACTION_REDIRECT = "redirect"
 
 NO_CONTEXT_ANSWER = "There is not enough information available."
 

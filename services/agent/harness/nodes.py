@@ -8,7 +8,12 @@ from typing import Any
 from services.agent.harness.audit import log_guardrail_decision
 from services.agent.harness.input import check_input
 from services.agent.harness.output import OUTCOME_ALLOW, check_output
-from services.agent.harness.restrictions import casual_general_reply
+from services.agent.harness.restrictions import (
+    ACTION_REDIRECT,
+    REASON_CASUAL_REDIRECT,
+    REASON_SMALL_TALK_REDIRECT,
+    casual_general_reply,
+)
 from services.agent.harness.system_prompt import SMALL_TALK_REPLY
 from services.agent.memory.proposal import MemoryProposal
 from services.agent.state import AgentState
@@ -38,15 +43,17 @@ def input_guardrail_node(state: AgentState) -> dict[str, Any]:
     started = time.perf_counter()
     question = state.get("question") or ""
     decision = check_input(question)
-    log_guardrail_decision(
-        layer="input",
-        outcome="allow" if decision.allowed else "block",
-        reason=decision.reason,
-        question=question,
-        detail=decision.as_dict(),
-    )
     payload = decision.as_dict()
     if not decision.allowed:
+        log_guardrail_decision(
+            layer="input",
+            guardrail="input",
+            outcome="block",
+            action="block",
+            reason=decision.reason,
+            question=question,
+            detail=payload,
+        )
         no_proposal = MemoryProposal.nothing_to_remember(
             f"input_guardrail:{decision.reason}"
         ).as_dict()
@@ -87,6 +94,16 @@ def input_guardrail_node(state: AgentState) -> dict[str, Any]:
 def answer_small_talk_node(state: AgentState) -> dict[str, Any]:
     """Permitted greeting: hello, then mandatory redirect into CONTEXT domain."""
     started = time.perf_counter()
+    question = state.get("question") or ""
+    log_guardrail_decision(
+        layer="input",
+        guardrail="small_talk",
+        outcome="redirect",
+        action=ACTION_REDIRECT,
+        reason=REASON_SMALL_TALK_REDIRECT,
+        question=question,
+        detail={"answer": SMALL_TALK_REPLY},
+    )
     no_proposal = MemoryProposal.nothing_to_remember(
         "permitted_small_talk_not_memorable"
     ).as_dict()
@@ -113,6 +130,15 @@ def answer_casual_node(state: AgentState) -> dict[str, Any]:
     started = time.perf_counter()
     question = state.get("question") or ""
     answer = casual_general_reply(question)
+    log_guardrail_decision(
+        layer="input",
+        guardrail="casual",
+        outcome="redirect",
+        action=ACTION_REDIRECT,
+        reason=REASON_CASUAL_REDIRECT,
+        question=question,
+        detail={"answer": answer},
+    )
     no_proposal = MemoryProposal.nothing_to_remember(
         "casual_general_not_memorable"
     ).as_dict()
@@ -140,13 +166,17 @@ def output_guardrail_node(state: AgentState) -> dict[str, Any]:
     question = state.get("question") or ""
     original = state.get("answer")
     decision = check_output(original, question=question)
-    log_guardrail_decision(
-        layer="output",
-        outcome=decision.outcome,
-        reason=decision.reason,
-        question=question,
-        detail=decision.as_dict(),
-    )
+    if decision.outcome != OUTCOME_ALLOW:
+        action = "block" if not decision.allowed else ACTION_REDIRECT
+        log_guardrail_decision(
+            layer="output",
+            guardrail="output",
+            outcome=decision.outcome,
+            action=action,
+            reason=decision.reason,
+            question=question,
+            detail=decision.as_dict(),
+        )
     payload = decision.as_dict()
     updates: dict[str, Any] = {
         "answer": decision.answer,

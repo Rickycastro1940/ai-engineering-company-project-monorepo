@@ -25,8 +25,19 @@ from typing import Any
 from data.pipelines.rag import NO_CONTEXT_ANSWER, generate_answer, retrieve
 
 from services.agent.generation import generate_agent_turn
-from services.agent.harness.external import sanitize_external_text, sanitize_retrieved_chunks
-from services.agent.harness.restrictions import is_casual_general, is_permitted_small_talk
+from services.agent.harness.audit import log_guardrail_decision
+from services.agent.harness.external import (
+    NEUTRALIZED_INSTRUCTION_MARKER,
+    sanitize_external_text,
+    sanitize_retrieved_chunks,
+)
+from services.agent.harness.restrictions import (
+    ACTION_BLOCK,
+    ACTION_REDIRECT,
+    REASON_EXTERNAL_INJECTION,
+    is_casual_general,
+    is_permitted_small_talk,
+)
 from services.agent.harness.tools import authorize_tool_call
 from services.agent.memory.proposal import MemoryProposal
 from services.agent.state import AgentState
@@ -280,6 +291,15 @@ def lookup_ticket_node(state: AgentState) -> dict[str, Any]:
         query.model_dump(exclude_none=True),
     )
     if not tool_gate.allowed:
+        log_guardrail_decision(
+            layer="tool",
+            guardrail="tool",
+            outcome="block",
+            action=ACTION_BLOCK,
+            reason=tool_gate.reason,
+            question=state.get("question") or "",
+            detail=tool_gate.as_dict(),
+        )
         result = TicketLookupOutput(
             ok=False,
             tickets=[],
@@ -476,6 +496,15 @@ def lookup_inventory_node(state: AgentState) -> dict[str, Any]:
         query.model_dump(exclude_none=True),
     )
     if not tool_gate.allowed:
+        log_guardrail_decision(
+            layer="tool",
+            guardrail="tool",
+            outcome="block",
+            action=ACTION_BLOCK,
+            reason=tool_gate.reason,
+            question=state.get("question") or "",
+            detail=tool_gate.as_dict(),
+        )
         result = InventoryLookupOutput(
             ok=False,
             products=[],
@@ -637,7 +666,22 @@ def retrieve_node(state: AgentState) -> dict[str, Any]:
     """
     started = time.perf_counter()
     try:
-        chunks = sanitize_retrieved_chunks(retrieve(state["question"]))
+        raw_chunks = retrieve(state["question"])
+        chunks = sanitize_retrieved_chunks(raw_chunks)
+        neutralized = any(
+            NEUTRALIZED_INSTRUCTION_MARKER in str(item.get("text") or "")
+            for item in chunks
+        )
+        if neutralized:
+            log_guardrail_decision(
+                layer="external",
+                guardrail="external",
+                outcome="redirect",
+                action=ACTION_REDIRECT,
+                reason=REASON_EXTERNAL_INJECTION,
+                question=state.get("question") or "",
+                detail={"chunk_count": len(chunks), "neutralized": True},
+            )
     except Exception as exc:  # noqa: BLE001 — surface as graph error, not stack to client
         return {
             "retrieved": [],

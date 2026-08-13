@@ -11,6 +11,14 @@ collect_ignore = [
 ]
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _start_guardrail_test_session() -> None:
+    """One observability session id for the whole pytest run."""
+    from services.agent.harness.observability import start_guardrail_session
+
+    start_guardrail_session()
+
+
 @pytest.fixture(autouse=True)
 def _reset_agent_singletons() -> None:
     """Do not leak pending memory / guardrail audit across tests."""

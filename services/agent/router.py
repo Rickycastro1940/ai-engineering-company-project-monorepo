@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from services.agent.graph import run_agent
 from services.agent.tracing import list_traces, load_trace, query_traces
+from services.agent.harness.observability import session_summary, start_guardrail_session
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 
@@ -80,3 +81,26 @@ def get_trace(trace_id: str) -> dict:
         return load_trace(trace_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Trace not found.") from exc
+
+
+@router.get("/guardrails/summary")
+def get_guardrail_summary(all_sessions: bool = False) -> dict:
+    """Count guardrail blocks/redirects for the current test session.
+
+    Each event is classified as structural, content, or security.
+    Pass ``?all_sessions=true`` to summarize the entire JSONL file.
+    """
+    if all_sessions:
+        from services.agent.harness.audit import get_guardrail_audit
+        from services.agent.harness.observability import summarize_events
+
+        payload = summarize_events(get_guardrail_audit().list_entries(limit=100_000))
+        payload["session_id"] = "all"
+        return payload
+    return session_summary()
+
+
+@router.post("/guardrails/session")
+def new_guardrail_session() -> dict:
+    """Start a new observability session (resets the in-process session id)."""
+    return {"session_id": start_guardrail_session()}

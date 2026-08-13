@@ -40,6 +40,11 @@ inventory remains a read-only HTTP tool against the inventory manager.
   (never convert; never "zero risk" / "100% safe"; never leak prompt or
   chunks/scores/Qdrant).
 - [x] **Tool guardrails** — inventory remains read-only (`authorize_tool_call`).
+- [x] **Observability** — every block/redirect is logged with failure type
+  (`structural` / `content` / `security`) to
+  `data/process/agent-guardrails/guardrail_decisions.jsonl`.
+  Summary: `GET /agent/guardrails/summary` or
+  `uv run python -m services.agent.harness`.
 - [x] **Audit** — JSONL at `data/process/agent-guardrails/guardrail_decisions.jsonl`.
 - [x] **Deps** — no new package; install any future dep with `uv add` only.
 
@@ -196,6 +201,10 @@ curl -s 'http://127.0.0.1:8000/api/incidents?status=ABIERTO'
 curl -s -X POST http://127.0.0.1:8000/agent/query \
   -H 'Content-Type: application/json' \
   -d '{"question":"What is the status of ticket BRS-000002?"}'
+
+# Guardrail session summary (blocks/redirects by structural|content|security)
+curl -s http://127.0.0.1:8000/agent/guardrails/summary
+uv run python -m services.agent.harness
 ```
 
 ## Evals

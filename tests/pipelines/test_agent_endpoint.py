@@ -75,4 +75,6 @@ def test_agent_coexists_with_health_and_traces_routes():
     assert "/agent/query" in paths
     assert "/agent/traces" in paths
     assert "/agent/traces/{trace_id}" in paths
+    assert "/agent/guardrails/summary" in paths
+    assert "/agent/guardrails/session" in paths
     assert client.get("/health").json()["status"] == "ok"
