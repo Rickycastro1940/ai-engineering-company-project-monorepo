@@ -25,6 +25,7 @@ from typing import Any
 from data.pipelines.rag import NO_CONTEXT_ANSWER, generate_answer, retrieve
 
 from services.agent.generation import generate_agent_turn
+from services.agent.harness.restrictions import is_permitted_small_talk
 from services.agent.harness.tools import authorize_tool_call
 from services.agent.memory.proposal import MemoryProposal
 from services.agent.state import AgentState
@@ -132,6 +133,33 @@ def decide_route_node(state: AgentState) -> dict[str, Any]:
     """
     started = time.perf_counter()
     question = state.get("question") or ""
+    if is_permitted_small_talk(question):
+        return {
+            "route": "small_talk",
+            "needs_ticket": False,
+            "needs_inventory": False,
+            "needs_rag": False,
+            "ticket_query": None,
+            "inventory_query": None,
+            "steps": [
+                _step(
+                    state,
+                    "decide_route",
+                    "ok",
+                    started,
+                    notes="route=small_talk (permitted greeting; redirect to domain)",
+                    output={
+                        "route": "small_talk",
+                        "needs_ticket": False,
+                        "needs_inventory": False,
+                        "needs_rag": False,
+                        "ticket_query": None,
+                        "inventory_query": None,
+                        "decision": "small_talk",
+                    },
+                )
+            ],
+        }
     decision = classify_sources(question)
     label = {
         "ticket": "ticket_tool",

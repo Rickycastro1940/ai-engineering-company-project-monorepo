@@ -15,6 +15,12 @@ inventory remains a read-only HTTP tool against the inventory manager.
   replace RAG, MCP tools, or memory.
 - [x] **Company system prompt** — `services/agent/harness/system_prompt.py`
   (scope + CONTEXT restrictions). Prompt is a guide; code gates enforce it.
+- [x] **Secure system prompt** — system instructions live only in the system
+  role; the user turn is wrapped in `<untrusted_user_input>` and never shares
+  that authority. The prompt names Brasaland’s domain (Colombia + Florida)
+  and when the agent may step outside it (brief hello/thanks, then mandatory
+  redirect). Three jailbreak / instruction-change variants are tested and
+  documented in the PR.
 - [x] **Input guardrails** — jailbreak / prompt injection, currency conversion,
   absolute allergen safety, out-of-scope (deterministic, before tools/LLM).
 - [x] **Output guardrails** — same CONTEXT wording on the user-facing answer

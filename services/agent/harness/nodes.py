@@ -8,6 +8,7 @@ from typing import Any
 from services.agent.harness.audit import log_guardrail_decision
 from services.agent.harness.input import check_input
 from services.agent.harness.output import OUTCOME_ALLOW, check_output
+from services.agent.harness.system_prompt import SMALL_TALK_REPLY
 from services.agent.memory.proposal import MemoryProposal
 from services.agent.state import AgentState
 
@@ -77,6 +78,30 @@ def input_guardrail_node(state: AgentState) -> dict[str, Any]:
                 started,
                 notes="input allowed",
                 output=payload,
+            )
+        ],
+    }
+
+
+def answer_small_talk_node(state: AgentState) -> dict[str, Any]:
+    """Permitted greeting: hello, then mandatory redirect into CONTEXT domain."""
+    started = time.perf_counter()
+    no_proposal = MemoryProposal.nothing_to_remember(
+        "permitted_small_talk_not_memorable"
+    ).as_dict()
+    return {
+        "answer": SMALL_TALK_REPLY,
+        "error": None,
+        "route": "done",
+        "memory_proposal": no_proposal,
+        "steps": [
+            _step(
+                state,
+                "answer_small_talk",
+                "ok",
+                started,
+                notes="permitted small talk; redirected to Brasaland domain",
+                output={"answer": SMALL_TALK_REPLY, "memory_proposal": no_proposal},
             )
         ],
     }
