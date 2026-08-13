@@ -33,3 +33,8 @@ pythonpath = ["."]
 
 [tool.uv]
 package = false
+
+[dependency-groups]
+dev = [
+    "playwright>=1.62.0",
+]
