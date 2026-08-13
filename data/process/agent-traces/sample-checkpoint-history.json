@@ -1,0 +1,82 @@
+{
+  "thread_id": "sample-checkpoint-demo",
+  "checkpoints": [
+    {
+      "index": 0,
+      "next": [
+        "__start__"
+      ],
+      "created_at": "2026-08-05T14:40:32.615734+00:00",
+      "question": null,
+      "route": null,
+      "answer": null,
+      "error": null,
+      "retrieved_count": 0,
+      "step_count": 0,
+      "node_order": []
+    },
+    {
+      "index": 1,
+      "next": [
+        "receive_question"
+      ],
+      "created_at": "2026-08-05T14:40:32.616663+00:00",
+      "question": "What is the minimum stock rule for proteins?",
+      "route": "",
+      "answer": null,
+      "error": null,
+      "retrieved_count": 0,
+      "step_count": 0,
+      "node_order": []
+    },
+    {
+      "index": 2,
+      "next": [
+        "retrieve"
+      ],
+      "created_at": "2026-08-05T14:40:32.617522+00:00",
+      "question": "What is the minimum stock rule for proteins?",
+      "route": "retrieve",
+      "answer": null,
+      "error": null,
+      "retrieved_count": 0,
+      "step_count": 1,
+      "node_order": [
+        "receive_question"
+      ]
+    },
+    {
+      "index": 3,
+      "next": [
+        "generate"
+      ],
+      "created_at": "2026-08-05T14:40:32.618362+00:00",
+      "question": "What is the minimum stock rule for proteins?",
+      "route": "generate",
+      "answer": null,
+      "error": null,
+      "retrieved_count": 1,
+      "step_count": 2,
+      "node_order": [
+        "receive_question",
+        "retrieve"
+      ]
+    },
+    {
+      "index": 4,
+      "next": [],
+      "created_at": "2026-08-05T14:40:32.618952+00:00",
+      "question": "What is the minimum stock rule for proteins?",
+      "route": "done",
+      "answer": "Every Brasaland location must keep at least 3 days of main protein inventory.",
+      "error": null,
+      "retrieved_count": 1,
+      "step_count": 3,
+      "node_order": [
+        "receive_question",
+        "retrieve",
+        "generate"
+      ]
+    }
+  ]
+}

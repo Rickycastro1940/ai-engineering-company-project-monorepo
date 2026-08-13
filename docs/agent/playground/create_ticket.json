@@ -1,0 +1,6 @@
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  1377    0  1058  100   319   9505   2865 --:--:-- --:--:-- --:--:-- 12405
+event: message
+data: {"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"{\n  \"ok\": true,\n  \"action\": \"create\",\n  \"ticket\": {\n    \"incident_id\": \"BRS-000013\",\n    \"date\": \"2026-08-10\",\n    \"location_id\": \"COL-01\",\n    \"category\": \"EQUIPAMIENTO\",\n    \"description\": \"Playground complete flow grill fault\",\n    \"status\": \"ABIERTO\",\n    \"customer_id\": null,\n    \"satisfaction_score\": null,\n    \"reporter_id\": null,\n    \"source\": \"incident_manager\"\n  },\n  \"error_code\": null,\n  \"message\": null,\n  \"tool\": null,\n  \"details\": null,\n  \"duration_ms\": 15\n}"}],"structuredContent":{"ok":true,"action":"create","ticket":{"incident_id":"BRS-000013","date":"2026-08-10","location_id":"COL-01","category":"EQUIPAMIENTO","description":"Playground complete flow grill fault","status":"ABIERTO","customer_id":null,"satisfaction_score":null,"reporter_id":null,"source":"incident_manager"},"error_code":null,"message":null,"tool":null,"details":null,"duration_ms":15},"isError":false}}
+
