@@ -93,6 +93,21 @@ gate:
 Eval: `tests/pipelines/test_agent_harness_deterministic_coverage.py`
 (companion suite: `test_agent_anti_injection.py`).
 
+### Eval: CONTEXT.md field names, KB topics, and restrictions
+
+Eval: `tests/pipelines/test_agent_context_md_respect.py` — proves the
+implementation respects ``CONTEXT.md`` (identical to ``CONTEXT-company.md``):
+
+1. **Field names** — knowledge `{question}`→`{answer}`; agent `{question}`→
+   `{answer, trace_id}`; collection `brasaland_kb`; slug `brasaland`
+2. **KB topics** — four CONTEXT files on disk; harness `IN_SCOPE_KB_TOPICS`
+   and system prompt cover supplier / waste / loyalty / allergens topics
+3. **Restrictions** — currency never-convert, allergen absolute-safety bans,
+   unknown-answer phrase, no chunks/scores/Qdrant — enforced by
+   `check_input` / `check_output` (not prompt-only)
+
+Companion continuity suite: `test_agent_continuity_context.py`.
+
 ## CONTEXT-company.md (exact)
 
 | Restriction | CONTEXT wording | Input | Output |
@@ -219,4 +234,5 @@ uv run python -m services.agent.harness --reset
   `tests/pipelines/test_agent_rag_tool_never_system_instruction.py`,
   `tests/pipelines/test_agent_harness_deterministic_coverage.py`,
   `tests/pipelines/test_agent_guardrail_failure_type_logging.py`,
+  `tests/pipelines/test_agent_context_md_respect.py`,
   `tests/pipelines/test_agent_guardrail_observability.py`

@@ -40,6 +40,9 @@ inventory remains a read-only HTTP tool against the inventory manager.
 - [x] **Failure-type logging** — every block/redirect is audited with
   `failure_type` (`structural` / `content` / `security`). Eval:
   `tests/pipelines/test_agent_guardrail_failure_type_logging.py`.
+- [x] **CONTEXT.md field names / KB topics / restrictions** — APIs, allow-list,
+  prompt, and guardrails match `CONTEXT.md` (same as `CONTEXT-company.md`).
+  Eval: `tests/pipelines/test_agent_context_md_respect.py`.
 - [x] **Company system prompt** — `services/agent/harness/system_prompt.py`
   (scope + CONTEXT restrictions). Prompt is a guide; code gates enforce it.
 - [x] **Secure system prompt** — system instructions live only in the system
