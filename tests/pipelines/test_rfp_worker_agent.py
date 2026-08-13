@@ -49,8 +49,38 @@ def _subtask_for_seed(pdf_name: str, department_id: str) -> DepartmentSubtask:
     )
 
 
+def test_marketing_worker_unit_synthetic_no_pdf() -> None:
+    """Pure unit: marketing worker with synthetic metadata + excerpt (no PDF)."""
+    subtask = DepartmentSubtask(
+        department_id=DEPARTMENT_MARKETING,
+        owner=DEPARTMENT_OWNERS[DEPARTMENT_MARKETING],
+        label="Marketing",
+        excerpt=(
+            "Brand exclusivity for Synthetic Co. Co-branding partnership. "
+            "Offer validity discussed for campaign window."
+        ),
+        shared_metadata={
+            "client_name": "Synthetic Co",
+            "location": "Bogotá",
+            "service_type": "co-branding",
+            "scope": "exclusivity and co-branded concession",
+            "deadline": "2026-10-15",
+        },
+    )
+    result = department_worker(subtask)
+    assert result.department_id == DEPARTMENT_MARKETING
+    assert result.owner == TICKET_OWNER
+    assert result.key_aspects
+    assert result.excerpt_chars == len(subtask.excerpt)
+    joined = " ".join(result.key_aspects)
+    assert "Synthetic Co" in joined
+    assert "30 days" in joined or "validity" in joined.casefold()
+    assert "we will charge $" not in joined.casefold()
+    assert "guaranteed 100" not in joined.casefold()
+
+
 def test_marketing_worker_unit_formal_sunset_bay() -> None:
-    """Unit: marketing worker on formal CONTEXT seed #1."""
+    """Unit: marketing worker on formal CONTEXT seed #1 (at least one worker)."""
     subtask = _subtask_for_seed("CONTEXT-brasaland-request-1.pdf", DEPARTMENT_MARKETING)
     result = department_worker(subtask)
 
@@ -61,8 +91,31 @@ def test_marketing_worker_unit_formal_sunset_bay() -> None:
     joined = " ".join(result.key_aspects)
     assert "30 days" in joined or "validity" in joined.casefold()
     assert "CONTEXT remit" in joined or "Brand" in joined or "exclusiv" in joined.casefold()
-    # Must not invent prices
     assert "we will charge $" not in joined.casefold()
+
+
+def test_operaciones_worker_unit_synthetic_volume_from_excerpt() -> None:
+    """Pure unit: operaciones worker surfaces stated headcount, never invents."""
+    subtask = DepartmentSubtask(
+        department_id=DEPARTMENT_OPERACIONES,
+        owner=DEPARTMENT_OWNERS[DEPARTMENT_OPERACIONES],
+        label="Operaciones",
+        excerpt="Weekly catering for 220 employees at the Medellín office campus.",
+        shared_metadata={
+            "client_name": "Andes Demo",
+            "location": "Medellín, Colombia",
+            "service_type": "weekly catering",
+            "scope": "standard menu for 220 employees",
+            "deadline": "2026-08-18",
+        },
+    )
+    result = department_worker(subtask)
+    assert result.owner == "Felipe Guerrero"
+    assert result.key_aspects
+    joined = " ".join(result.key_aspects)
+    assert "220" in joined
+    assert "10 business days" in joined
+    assert "exactly 9999" not in joined.casefold()
 
 
 def test_operaciones_worker_unit_informal_andes() -> None:
@@ -75,7 +128,6 @@ def test_operaciones_worker_unit_informal_andes() -> None:
     assert result.key_aspects
     joined = " ".join(result.key_aspects)
     assert "10 business days" in joined or "feasibility" in joined.casefold()
-    # Volume 220 is in the RFP — may appear; invented figures must not
     assert "guaranteed 999" not in joined.casefold()
     assert DEPARTMENT_CONTRIBUTIONS[DEPARTMENT_OPERACIONES].split(":")[0] in joined or (
         "CONTEXT remit" in joined
