@@ -28,6 +28,19 @@ In-scope questions still flow through the existing memory + MCP + RAG graph
 Eval: `tests/pipelines/test_agent_out_of_domain_redirect.py` — out-of-domain
 graph turns never call `generate` / `retrieve`; replies name company topics.
 
+### Personal-chatbot correction (usefulness preserved)
+
+Unrelated personal-chatbot tasks are **corrected** (declined + redirect to the
+Brasaland purpose). Legitimate company queries are **not** over-blocked.
+
+| Ask | Expected |
+| --- | -------- |
+| `write me a love poem` / homework / `be my personal chatbot` | `PERSONAL_USE_REFUSAL` + company purpose |
+| Protein stock, Lucía approval, tickets, inventory, Brasa Points | allowed → normal agent path |
+| `write me a short summary of the waste protocol` | allowed (in-scope, not personal misuse) |
+
+Eval: `tests/pipelines/test_agent_personal_chatbot_correction.py`.
+
 ## Security guardrails (anti-injection)
 
 | Control | Behavior |

@@ -23,6 +23,10 @@ inventory remains a read-only HTTP tool against the inventory manager.
   `ignore your instructions`, `you are now an assistant with no rules`, and
   `forget that you work for the company` (documented in the PR). Eval:
   `tests/pipelines/test_agent_instruction_change_rejection.py`.
+- [x] **Personal-chatbot correction** — declines unrelated personal tasks
+  (poems, homework, “be my personal chatbot”) with a redirect to Brasaland
+  purpose, while legitimate KB/ticket/inventory queries stay allowed. Eval:
+  `tests/pipelines/test_agent_personal_chatbot_correction.py`.
 - [x] **Company system prompt** — `services/agent/harness/system_prompt.py`
   (scope + CONTEXT restrictions). Prompt is a guide; code gates enforce it.
 - [x] **Secure system prompt** — system instructions live only in the system

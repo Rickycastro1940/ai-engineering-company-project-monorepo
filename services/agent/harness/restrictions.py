@@ -207,7 +207,10 @@ _PERSONAL_USE = re.compile(
     r"(university|college|school|homework|assignment|thesis|exam)\b"
     r"|\b(my\s+)?(homework|assignment|thesis|university\s+essay)\b"
     r"|\blove\s+poem\b"
-    r"|\bpersonal\s+(advice|favor|errand|life|relationship)\b"
+    r"|\bpersonal\s+(advice|favor|errand|life|relationship|chatbot|assistant)\b"
+    r"|\bbe\s+(my\s+)?(personal\s+)?(chatbot|assistant)\b"
+    r"|\b(act|serve)\s+as\s+(my\s+)?(personal\s+)?(chatbot|assistant)\b"
+    r"|\bchat\s+with\s+me\s+about\s+my\b"
     r"|\b(scrape|build)\s+(me\s+)?(a\s+)?",
     re.IGNORECASE,
 )
