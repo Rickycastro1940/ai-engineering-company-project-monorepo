@@ -73,7 +73,10 @@ def test_pipeline_seed_3_franchise_discarded() -> None:
     result = run_intake_pipeline(pdf_path=pdf)
     assert result.status == STATUS_DISCARDED
     assert result.discard_reason
+    assert result.discard_rule_id
     assert result.departments_needed == []
+    assert result.intake_summary == result.discard_reason
+    assert "department_worker" not in {e["node"] for e in result.trace}
 
 
 def test_http_ticket_upload_seed_pdfs(client: TestClient) -> None:

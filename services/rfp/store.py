@@ -89,6 +89,12 @@ def save_intake_result(ticket_id: str, result: Any, *, source_pdf_path: str) -> 
         ticket.readability_json = json.dumps(result.readability_scores)
         ticket.trace_json = json.dumps(result.trace, ensure_ascii=False)
         ticket.updated_at = _now()
+
+        # Discarded tickets must surface why — never persist a silent reject.
+        if ticket.status == "discarded" and not (ticket.discard_reason or "").strip():
+            raise ValueError(
+                f"Refusing to persist discarded ticket {ticket_id} without discard_reason"
+            )
         session.add(ticket)
 
         # Replace department sections (Part 1: key_aspects only)

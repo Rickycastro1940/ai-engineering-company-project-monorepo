@@ -2,6 +2,9 @@
 
 Business logic lives here (not in HTTP routers). Departments / discard rules
 come from CONTEXT-company.md Milestone 9.
+
+Flow: convert → classifier_agent (first agent) → department workers → synthesize.
+Invalid RFPs stop after the classifier with status=discarded (never silent).
 """
 
 from __future__ import annotations
@@ -15,8 +18,13 @@ from typing import Any
 
 from markitdown import MarkItDown
 
+from data.pipelines.rfp_intake.classifier import (
+    ClassifierDecision,
+    assert_no_silent_discard,
+    classifier_agent,
+    classify_document,
+)
 from data.pipelines.rfp_intake.constants import (
-    CEO_USD_THRESHOLD,
     DEPARTMENT_IDS,
     DEPARTMENT_MARKETING,
     DEPARTMENT_OPERACIONES,
@@ -31,16 +39,24 @@ from data.pipelines.rfp_intake.constants import (
 
 logger = logging.getLogger(__name__)
 
+# Back-compat name used in older call sites / docs
+ClassifyResult = ClassifierDecision
 
-@dataclass
-class ClassifyResult:
-    status: str
-    metadata: dict[str, Any] = field(default_factory=dict)
-    departments_needed: list[str] = field(default_factory=list)
-    unmapped_topics: list[str] = field(default_factory=list)
-    requires_ceo_approval: bool = False
-    discard_reason: str | None = None
-    discard_rule_id: str | None = None
+__all__ = [
+    "ClassifyResult",
+    "ClassifierDecision",
+    "IntakeResult",
+    "build_department_excerpt",
+    "classifier_agent",
+    "classify_document",
+    "compute_readability_scores",
+    "convert_document_to_markdown",
+    "convert_pdf_to_markdown",
+    "department_worker",
+    "run_intake_from_bytes",
+    "run_intake_pipeline",
+    "synthesize_intake",
+]
 
 
 @dataclass
@@ -109,162 +125,6 @@ def compute_readability_scores(markdown_text: str) -> dict[str, float]:
     except Exception as exc:  # noqa: BLE001
         logger.debug("readability skipped: %s", exc)
         return {}
-
-
-def _parse_usd_upper_bound(text: str) -> float | None:
-    patterns = [
-        r"\$\s*([\d,]+(?:\.\d+)?)\s*[-–]\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:usd|USD)?",
-        r"\$\s*([\d,]+(?:\.\d+)?)\s*(?:[-–]\s*([\d,]+(?:\.\d+)?))?\s*(?:usd|USD)",
-        r"([\d,]+(?:\.\d+)?)\s*[-–]\s*([\d,]+(?:\.\d+)?)\s*k\s*USD",
-    ]
-    # Also match "~$60–75k USD/year"
-    k_match = re.search(
-        r"\$?\s*([\d]+)\s*[-–]\s*([\d]+)\s*k\s*USD", text, re.IGNORECASE
-    )
-    if k_match:
-        return max(float(k_match.group(1)), float(k_match.group(2))) * 1000.0
-    for pattern in patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if not match:
-            continue
-        values = [float(g.replace(",", "")) for g in match.groups() if g]
-        if values:
-            return max(values)
-    return None
-
-
-def _count_missing_core_fields(metadata: dict[str, Any]) -> int:
-    missing = 0
-    if not (metadata.get("client_name") or "").strip():
-        missing += 1
-    if not (metadata.get("scope") or metadata.get("service_type") or "").strip():
-        missing += 1
-    if not (metadata.get("deadline") or "").strip():
-        missing += 1
-    return missing
-
-
-def _heuristic_classify(markdown_text: str) -> ClassifyResult | None:
-    """Deterministic classifier for curriculum seed PDFs and obvious cases."""
-    text = markdown_text.casefold()
-
-    # Seed #3 — franchise inquiry (reject)
-    if "franquicia" in text or "franchise" in text:
-        if not any(
-            token in text
-            for token in (
-                "catering",
-                "concession",
-                "co-brand",
-                "scope of work",
-                "rfp reference",
-                "proposal due",
-                "menú estándar",
-                "menu estándar",
-                "contrato por un año",
-            )
-        ):
-            return ClassifyResult(
-                status=STATUS_DISCARDED,
-                metadata={"client_name": "Andrés Salazar"},
-                discard_reason=(
-                    "Franchise inquiry with no corporate scope, budget, or proposal "
-                    "deadline; not a Brasaland B2B RFP."
-                ),
-                discard_rule_id="missing_core_fields",
-            )
-
-    # Seed #1 — Sunset Bay (accept, all four depts)
-    if "sunset bay" in text:
-        upper = _parse_usd_upper_bound(markdown_text) or 75_000.0
-        return ClassifyResult(
-            status=STATUS_INTAKE_COMPLETE,
-            metadata={
-                "client_name": "Sunset Bay Resorts, LLC",
-                "location": "Florida, US",
-                "service_type": "Co-branded food & beverage concession partnership",
-                "scope": (
-                    "3 resort concession stands, co-branded signature menu, exclusivity"
-                ),
-                "deadline": "2026-09-02",
-                "budget_range": "$60,000-$75,000 USD/year",
-                "estimated_contract_value_usd": upper,
-            },
-            departments_needed=[
-                DEPARTMENT_MARKETING,
-                DEPARTMENT_OPERACIONES,
-                DEPARTMENT_PROCUREMENT,
-                DEPARTMENT_TRAINING,
-            ],
-            requires_ceo_approval=upper > CEO_USD_THRESHOLD,
-        )
-
-    # Seed #2 — Andes Tech (accept; no training)
-    if "andes tech" in text:
-        return ClassifyResult(
-            status=STATUS_INTAKE_COMPLETE,
-            metadata={
-                "client_name": "Andes Tech Solutions",
-                "location": "Medellín, Colombia",
-                "service_type": "Weekly corporate catering",
-                "scope": (
-                    "~220 employees, Tuesdays and Thursdays, standard menu, 1-year contract"
-                ),
-                "deadline": "2026-08-18",
-                "budget_range": None,
-                "estimated_contract_value_usd": None,
-            },
-            departments_needed=[
-                DEPARTMENT_MARKETING,
-                DEPARTMENT_OPERACIONES,
-                DEPARTMENT_PROCUREMENT,
-            ],
-            requires_ceo_approval=False,
-        )
-
-    return None
-
-
-def classify_document(markdown_text: str) -> ClassifyResult:
-    heuristic = _heuristic_classify(markdown_text)
-    if heuristic is not None:
-        return heuristic
-
-    # Fallback: core-field missing rule (≥2 of 3)
-    metadata = {
-        "client_name": None,
-        "location": None,
-        "service_type": None,
-        "scope": None,
-        "deadline": None,
-        "budget_range": None,
-        "estimated_contract_value_usd": None,
-    }
-    # Light regex extraction for unknown docs
-    org = re.search(r"(?:Issuing Organization|Organization|Client):\s*(.+)", markdown_text)
-    if org:
-        metadata["client_name"] = org.group(1).strip()
-    due = re.search(r"(?:Proposal Due Date|Due Date|Deadline):\s*(.+)", markdown_text)
-    if due:
-        metadata["deadline"] = due.group(1).strip()
-
-    missing = _count_missing_core_fields(metadata)
-    if missing >= 2:
-        return ClassifyResult(
-            status=STATUS_DISCARDED,
-            metadata=metadata,
-            discard_reason="Missing required RFP core fields (client, scope, deadline).",
-            discard_rule_id="missing_core_fields",
-        )
-
-    # Unknown but partially filled — route marketing + operaciones by default
-    return ClassifyResult(
-        status=STATUS_INTAKE_COMPLETE,
-        metadata=metadata,
-        departments_needed=[DEPARTMENT_MARKETING, DEPARTMENT_OPERACIONES],
-        requires_ceo_approval=False,
-        unmapped_topics=[],
-    )
 
 
 def build_department_excerpt(markdown_text: str, department_id: str, *, max_chars: int = 2000) -> str:
@@ -379,7 +239,11 @@ def synthesize_intake(
 
 
 def run_intake_pipeline(*, pdf_path: Path, title: str | None = None) -> IntakeResult:
-    """Full Part 1 pipeline: convert → classify → workers → synthesize."""
+    """Full Part 1 pipeline: convert → classifier_agent → workers → synthesize.
+
+    The classifier is the first agent after convert. Invalid documents stop here
+    with ``status=discarded`` and an explicit discard_reason (never silent).
+    """
     trace: list[dict[str, Any]] = []
 
     def _event(node: str, **payload: Any) -> None:
@@ -407,12 +271,17 @@ def run_intake_pipeline(*, pdf_path: Path, title: str | None = None) -> IntakeRe
     scores = compute_readability_scores(markdown)
     _event("readability", scores=scores)
 
-    classified = classify_document(markdown)
+    # First agent: valid RFP?
+    classified = classifier_agent(markdown)
+    assert_no_silent_discard(classified)
     _event(
-        "classify",
+        "classifier_agent",
+        is_valid_rfp=classified.is_valid_rfp,
         status=classified.status,
         departments_needed=classified.departments_needed,
         discard_reason=classified.discard_reason,
+        discard_rule_id=classified.discard_rule_id,
+        rationale=classified.rationale,
     )
 
     metadata = dict(classified.metadata)
@@ -420,7 +289,13 @@ def run_intake_pipeline(*, pdf_path: Path, title: str | None = None) -> IntakeRe
         metadata["title"] = title
     metadata["readability_scores"] = scores
 
-    if classified.status == STATUS_DISCARDED:
+    if not classified.is_valid_rfp:
+        reason = classified.discard_reason or ""
+        logger.warning(
+            "Intake stopped after classifier_agent: %s (%s)",
+            reason,
+            classified.discard_rule_id,
+        )
         return IntakeResult(
             status=STATUS_DISCARDED,
             metadata=metadata,
@@ -428,11 +303,11 @@ def run_intake_pipeline(*, pdf_path: Path, title: str | None = None) -> IntakeRe
             sections={},
             unmapped_topics=classified.unmapped_topics,
             conflicts=[],
-            intake_summary=classified.discard_reason or "Discarded",
+            intake_summary=reason,
             requires_ceo_approval=False,
             markdown_text=markdown,
             readability_scores=scores,
-            discard_reason=classified.discard_reason,
+            discard_reason=reason,
             discard_rule_id=classified.discard_rule_id,
             trace=trace,
         )

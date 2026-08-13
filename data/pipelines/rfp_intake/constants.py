@@ -47,3 +47,8 @@ CEO_USD_THRESHOLD: Final = 50_000.0
 CEO_NAME: Final = "Mariana Restrepo"
 
 MIN_MARKDOWN_CHARS: Final = 40
+
+# Classifier discard rules (never discard without a rule id + reason)
+DISCARD_EMPTY_DOCUMENT: Final = "empty_document"
+DISCARD_NOT_AN_RFP: Final = "not_an_rfp"
+DISCARD_MISSING_CORE_FIELDS: Final = "missing_core_fields"
