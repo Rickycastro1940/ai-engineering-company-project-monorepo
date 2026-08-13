@@ -20,21 +20,28 @@ from markitdown import MarkItDown
 
 from data.pipelines.rfp_intake.classifier import (
     ClassifierDecision,
-    assert_no_silent_discard,
     classifier_agent,
     classify_document,
 )
 from data.pipelines.rfp_intake.constants import (
-    DEPARTMENT_IDS,
     MIN_MARKDOWN_CHARS,
     STATUS_DISCARDED,
     STATUS_FAILED,
-    STATUS_INTAKE_COMPLETE,
+)
+from data.pipelines.rfp_intake.graph import (
+    CX_GRAPH_FORBIDDEN_RFP_NODES,
+    REQUIRED_RFP_NODES,
+    build_rfp_intake_graph,
+    get_compiled_rfp_intake_graph,
+    invoke_rfp_intake_graph,
 )
 from data.pipelines.rfp_intake.orchestration import (
     build_department_excerpt,
+    department_worker,
     department_worker_from_parts,
+    orchestrator,
     run_department_orchestration,
+    synthesizer,
     synthesizer as _synthesizer_impl,
 )
 from data.pipelines.rfp_intake.routing import (
@@ -47,9 +54,6 @@ logger = logging.getLogger(__name__)
 
 # Back-compat name used in older call sites / docs
 ClassifyResult = ClassifierDecision
-
-# Back-compat: old signature department_worker(dept, metadata, excerpt) -> list[str]
-department_worker = department_worker_from_parts
 
 
 def synthesize_intake(
@@ -79,16 +83,23 @@ def synthesize_intake(
 
 
 __all__ = [
+    "CX_GRAPH_FORBIDDEN_RFP_NODES",
     "ClassifyResult",
     "ClassifierDecision",
     "IntakeResult",
+    "REQUIRED_RFP_NODES",
     "build_department_excerpt",
+    "build_rfp_intake_graph",
     "classifier_agent",
     "classify_document",
     "compute_readability_scores",
     "convert_document_to_markdown",
     "convert_pdf_to_markdown",
     "department_worker",
+    "department_worker_from_parts",
+    "get_compiled_rfp_intake_graph",
+    "invoke_rfp_intake_graph",
+    "orchestrator",
     "run_department_orchestration",
     "run_intake_from_bytes",
     "run_intake_pipeline",
@@ -96,6 +107,7 @@ __all__ = [
     "route_intake_to_part2",
     "validate_part2_handoff",
     "synthesize_intake",
+    "synthesizer",
 ]
 
 
@@ -179,106 +191,58 @@ def compute_readability_scores(markdown_text: str) -> dict[str, float]:
 
 
 def run_intake_pipeline(*, pdf_path: Path, title: str | None = None) -> IntakeResult:
-    """Part 1: convert → classifier → orchestrator → workers → synthesizer.
+    """Part 1 via dedicated ``rfp_intake`` LangGraph (not the CX agent graph).
+
+    Graph nodes (separate agent callables): convert → readability →
+    classifier_agent → (discard END | orchestrator → department_worker →
+    synthesizer).
 
     On success: ``status=intake_complete`` with Sales-facing summary and Part 2 handoff.
     Invalid RFPs stop after the classifier with ``status=discarded`` (never silent).
     """
-    trace: list[dict[str, Any]] = []
+    final = invoke_rfp_intake_graph(pdf_path=pdf_path, title=title)
+    status = str(final.get("status") or STATUS_FAILED)
+    metadata = dict(final.get("metadata") or {})
+    depts = list(final.get("departments_needed") or [])
+    sections = dict(final.get("sections") or {})
+    markdown = str(final.get("markdown_text") or "")
+    scores = dict(final.get("readability_scores") or {})
+    conflicts = list(final.get("conflicts") or [])
+    open_questions = list(final.get("open_questions") or [])
+    ask_whom = list(final.get("ask_whom") or [])
+    part2 = dict(final.get("part2_handoff") or {})
+    requires_ceo = bool(final.get("requires_ceo_approval"))
+    summary = str(final.get("intake_summary") or "")
+    discard_reason = final.get("discard_reason")
+    discard_rule_id = final.get("discard_rule_id")
+    error_message = final.get("error_message")
+    unmapped = list(final.get("unmapped_topics") or [])
+    trace = list(final.get("trace") or [])
 
-    def _event(node: str, **payload: Any) -> None:
-        trace.append({"node": node, "payload": payload})
-
-    try:
-        markdown = convert_document_to_markdown(pdf_path)
-        _event("convert", markdown_chars=len(markdown), source=str(pdf_path.name))
-    except Exception as exc:  # noqa: BLE001
-        return IntakeResult(
-            status=STATUS_FAILED,
-            metadata={},
-            departments_needed=[],
-            sections={},
-            unmapped_topics=[],
-            conflicts=[],
-            intake_summary="",
-            requires_ceo_approval=False,
-            markdown_text="",
-            readability_scores={},
-            error_message=f"convert_failed:{type(exc).__name__}: {exc}",
-            trace=trace,
-        )
-
-    scores = compute_readability_scores(markdown)
-    _event("readability", scores=scores)
-
-    classified = classifier_agent(markdown)
-    assert_no_silent_discard(classified)
-    _event(
-        "classifier_agent",
-        is_valid_rfp=classified.is_valid_rfp,
-        status=classified.status,
-        departments_needed=classified.departments_needed,
-        discard_reason=classified.discard_reason,
-        discard_rule_id=classified.discard_rule_id,
-        rationale=classified.rationale,
-    )
-
-    metadata = dict(classified.metadata)
-    if title:
-        metadata["title"] = title
-    metadata["readability_scores"] = scores
-
-    if not classified.is_valid_rfp:
-        reason = classified.discard_reason or ""
+    if status == STATUS_DISCARDED:
         logger.warning(
             "Intake stopped after classifier_agent: %s (%s)",
-            reason,
-            classified.discard_rule_id,
+            discard_reason,
+            discard_rule_id,
         )
-        return IntakeResult(
-            status=STATUS_DISCARDED,
-            metadata=metadata,
-            departments_needed=[],
-            sections={},
-            unmapped_topics=classified.unmapped_topics,
-            conflicts=[],
-            intake_summary=reason,
-            requires_ceo_approval=False,
-            markdown_text=markdown,
-            readability_scores=scores,
-            discard_reason=reason,
-            discard_rule_id=classified.discard_rule_id,
-            trace=trace,
-        )
-
-    depts = [d for d in classified.departments_needed if d in DEPARTMENT_IDS]
-    sections, synthesis, orch_events = run_department_orchestration(
-        markdown_text=markdown,
-        metadata=metadata,
-        departments_needed=depts,
-        requires_ceo_approval=classified.requires_ceo_approval,
-    )
-    for event in orch_events:
-        trace.append(event)
-
-    metadata["open_questions"] = synthesis.open_questions
-    metadata["part2_handoff"] = synthesis.part2_handoff
-    metadata["ask_whom"] = synthesis.ask_whom
 
     return IntakeResult(
-        status=STATUS_INTAKE_COMPLETE,
+        status=status,
         metadata=metadata,
         departments_needed=depts,
         sections=sections,
-        unmapped_topics=classified.unmapped_topics,
-        conflicts=synthesis.conflicts,
-        intake_summary=synthesis.intake_summary,
-        requires_ceo_approval=classified.requires_ceo_approval,
+        unmapped_topics=unmapped,
+        conflicts=conflicts,
+        intake_summary=summary,
+        requires_ceo_approval=requires_ceo,
         markdown_text=markdown,
         readability_scores=scores,
-        open_questions=synthesis.open_questions,
-        part2_handoff=synthesis.part2_handoff,
-        ask_whom=synthesis.ask_whom,
+        discard_reason=discard_reason,
+        discard_rule_id=discard_rule_id,
+        error_message=error_message,
+        open_questions=open_questions,
+        part2_handoff=part2,
+        ask_whom=ask_whom,
         trace=trace,
     )
 

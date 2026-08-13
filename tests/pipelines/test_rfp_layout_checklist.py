@@ -61,6 +61,7 @@ def test_pipeline_package_is_pure_python_no_second_http() -> None:
 
 def test_pipeline_lives_under_data_pipelines_rfp_intake_not_cx_graph() -> None:
     assert (REPO / "data" / "pipelines" / "rfp_intake" / "__init__.py").is_file()
+    assert (REPO / "data" / "pipelines" / "rfp_intake" / "graph.py").is_file()
     # CX support-agent graph must not register RFP nodes.
     for name in REQUIRED_NODES:
         assert "rfp" not in name.casefold()
