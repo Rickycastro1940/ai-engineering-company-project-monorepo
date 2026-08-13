@@ -212,6 +212,8 @@
 
         function formatTicket(data, filename) {
             const meta = data.metadata || {};
+            const handoff = data.part2_handoff || meta.part2_handoff || {};
+            const askWhom = data.ask_whom || meta.ask_whom || [];
             const lines = [
                 `status: ${data.status}`,
                 `ticket_id: ${data.ticket_id}`,
@@ -225,6 +227,12 @@
                     : null,
                 data.requires_ceo_approval ? 'CEO approval required (> $50,000 USD/year)' : null,
                 data.discard_reason ? `discard_reason: ${data.discard_reason}` : null,
+                askWhom.length
+                    ? `what to ask whom:\n${askWhom.map((a) => `  - Ask ${a.owner}: ${a.ask}`).join('\n')}`
+                    : null,
+                handoff.next_part
+                    ? `Part 2 handoff: ${handoff.message || 'ready for drafting'}`
+                    : null,
                 data.intake_summary ? `summary:\n${data.intake_summary}` : null,
             ].filter(Boolean);
             return lines.join('\n');

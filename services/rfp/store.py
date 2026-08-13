@@ -139,6 +139,7 @@ def ticket_to_dict(ticket: RfpTicket) -> dict[str, Any]:
         }
         for row in sections_rows
     ]
+    meta = _loads(ticket.metadata_json, {}) or {}
 
     return {
         "ticket_id": ticket.ticket_id,
@@ -146,7 +147,7 @@ def ticket_to_dict(ticket: RfpTicket) -> dict[str, Any]:
         "title": ticket.title,
         "source_pdf_path": ticket.source_pdf_path,
         "markdown_length": ticket.markdown_length,
-        "metadata": _loads(ticket.metadata_json, {}),
+        "metadata": meta,
         "departments_needed": _loads(ticket.departments_needed_json, []),
         "sections": sections,
         "department_sections": department_sections,
@@ -159,6 +160,9 @@ def ticket_to_dict(ticket: RfpTicket) -> dict[str, Any]:
         "error_message": ticket.error_message,
         "readability_scores": _loads(ticket.readability_json, {}),
         "trace": _loads(ticket.trace_json, []),
+        "part2_handoff": meta.get("part2_handoff", {}),
+        "ask_whom": meta.get("ask_whom", []),
+        "open_questions": meta.get("open_questions", []),
         "created_at": ticket.created_at,
         "updated_at": ticket.updated_at,
     }

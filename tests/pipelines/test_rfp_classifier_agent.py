@@ -110,4 +110,5 @@ def test_pipeline_continues_past_classifier_when_valid() -> None:
     nodes = [e["node"] for e in result.trace]
     assert "classifier_agent" in nodes
     assert "department_worker" in nodes
-    assert "synthesize" in nodes
+    assert "synthesizer" in nodes or "synthesize" in nodes
+    assert "orchestrator" in nodes
