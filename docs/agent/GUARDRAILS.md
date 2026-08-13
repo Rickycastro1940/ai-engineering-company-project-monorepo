@@ -22,8 +22,11 @@ In-scope questions still flow through the existing memory + MCP + RAG graph
 | **Personal / non-company** (love poem, university homework, “write me a script”) | Decline at `input_guardrail`; redirect to the Brasaland agent purpose |
 | **Casual / general** (what time in Tokyo?, capital of France?) | Allowed; `decide_route` → `answer_casual` (brief reply + `COMPANY_STEER_BACK`). No LLM / retrieve / memory write |
 | **Permitted small talk** (hello / thanks) | `answer_small_talk` redirect into domain |
-| **Hard out-of-scope** (e.g. explain quantum entanglement) | Scope refusal + redirect |
+| **Hard out-of-scope** (e.g. explain quantum entanglement) | Scope refusal + redirect to Brasaland purpose (not a general-assistant answer) |
 | **In-scope Brasaland** | Normal MCP / RAG / memory path; then `output_guardrail` |
+
+Eval: `tests/pipelines/test_agent_out_of_domain_redirect.py` — out-of-domain
+graph turns never call `generate` / `retrieve`; replies name company topics.
 
 ## Security guardrails (anti-injection)
 

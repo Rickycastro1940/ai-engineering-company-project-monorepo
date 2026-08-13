@@ -51,3 +51,20 @@ file — a generic prompt is not accepted.
 ```bash
 uv run pytest tests/pipelines/test_agent_continuity_context.py -q
 ```
+
+## Out-of-domain redirect (not a general assistant)
+
+Out-of-domain queries are **not** answered like a general-purpose chatbot.
+They are refused or briefly acknowledged, then redirected into Brasaland
+CONTEXT topics (supplier ordering, waste, Brasa Points, allergens, people,
+tickets, inventory).
+
+| Out-of-domain turn | Behavior |
+| ------------------ | -------- |
+| Hard off-topic (quantum physics, sports trivia, stock tips) | `SCOPE_REFUSAL` — decline + name Brasaland purpose |
+| Personal use (love poem, homework, “write me a script”) | `PERSONAL_USE_REFUSAL` — decline + redirect to purpose |
+| Casual/general (time in Tokyo, capital of France) | `answer_casual` — brief note + `COMPANY_STEER_BACK` |
+| Small talk (hello) | `answer_small_talk` — greet + redirect into domain |
+
+Evidence: `tests/pipelines/test_agent_out_of_domain_redirect.py` (graph never
+calls `generate` / `retrieve` on these turns).
