@@ -214,6 +214,19 @@
             const meta = data.metadata || {};
             const handoff = data.part2_handoff || meta.part2_handoff || {};
             const askWhom = data.ask_whom || meta.ask_whom || [];
+            const finals = data.final_department_results
+                || meta.final_department_results
+                || (data.department_sections || []).map((s) => ({
+                    department_id: s.department_id,
+                    contact: s.contact || s.owner,
+                    key_aspects: s.key_aspects || [],
+                }));
+            const deptBlock = finals.length
+                ? `per-department key aspects + contacts:\n${finals.map((row) => {
+                    const aspects = (row.key_aspects || []).map((a) => `    · ${a}`).join('\n');
+                    return `  - ${row.department_id} → ${row.contact || row.owner || '?'}\n${aspects}`;
+                }).join('\n')}`
+                : null;
             const lines = [
                 `status: ${data.status}`,
                 `ticket_id: ${data.ticket_id}`,
@@ -227,6 +240,7 @@
                     : null,
                 data.requires_ceo_approval ? 'CEO approval required (> $50,000 USD/year)' : null,
                 data.discard_reason ? `discard_reason: ${data.discard_reason}` : null,
+                deptBlock,
                 askWhom.length
                     ? `what to ask whom:\n${askWhom.map((a) => `  - Ask ${a.owner}: ${a.ask}`).join('\n')}`
                     : null,
