@@ -165,7 +165,7 @@
             const f = fileInput.files && fileInput.files[0];
             dropzone.textContent = f
                 ? `Selected: ${f.name} (${Math.round(f.size / 1024)} KB)`
-                : 'Drop a PDF, DOCX, HTML, or Markdown file here — or choose a file below.';
+                : 'Drop a PDF RFP here — or choose a file below (DOCX/HTML/Markdown also accepted).';
         }
 
         ['dragenter', 'dragover'].forEach(evt => {
