@@ -16,6 +16,11 @@ url: str = os.environ.get("SUPABASE_URL")
 key: str = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(url, key)
 
+# RFP intake upload (backoffice UI posts here). Must be registered before StaticFiles.
+from services.rfp import router as rfp_router  # noqa: E402
+
+app.include_router(rfp_router)
+
 class PipelineTriggerRequest(BaseModel):
     start_date: str
     end_date: str
