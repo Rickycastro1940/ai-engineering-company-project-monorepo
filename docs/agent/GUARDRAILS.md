@@ -77,6 +77,22 @@ Eval: `tests/pipelines/test_agent_rag_tool_never_system_instruction.py`
 (4 cases: RAG isolation, tool isolation, `generate_agent_turn` capture,
 graph retrieve sanitize-before-generate).
 
+### Eval: deterministic harness coverage (fixtures / mocks)
+
+Automated tests cover guards and isolation **without** a live LLM as the only
+gate:
+
+| Layer | How it is tested |
+| ----- | ---------------- |
+| Input / instruction-change | Fixed string fixtures → `check_input` / `reject_instruction_change` |
+| Output | Fixed answer fixtures → `check_output` |
+| Tool | Fixed tool name/args → `authorize_tool_call` |
+| RAG / tool isolation | Poisoned payload fixtures → sanitize + `<untrusted_*>` wrappers |
+| Graph | `generate_agent_turn` / `retrieve` **mocked**; jailbreak stops at `input_guardrail` |
+
+Eval: `tests/pipelines/test_agent_harness_deterministic_coverage.py`
+(companion suite: `test_agent_anti_injection.py`).
+
 ## CONTEXT-company.md (exact)
 
 | Restriction | CONTEXT wording | Input | Output |
@@ -189,4 +205,5 @@ uv run python -m services.agent.harness --reset
 - Tests: `tests/pipelines/test_agent_guardrails.py`,
   `tests/pipelines/test_agent_anti_injection.py`,
   `tests/pipelines/test_agent_rag_tool_never_system_instruction.py`,
+  `tests/pipelines/test_agent_harness_deterministic_coverage.py`,
   `tests/pipelines/test_agent_guardrail_observability.py`
