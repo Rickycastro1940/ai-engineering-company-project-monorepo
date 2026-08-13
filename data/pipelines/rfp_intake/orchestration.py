@@ -253,7 +253,12 @@ def json_ish(metadata: dict[str, Any]) -> str:
 def _grounded_aspects(
     department_id: str, metadata: dict[str, Any], excerpt: str
 ) -> list[str]:
-    """Build key_aspects from metadata + excerpt only (no invented volumes)."""
+    """Build key_aspects from metadata + excerpt using CONTEXT §2.1 contributions."""
+    from data.pipelines.rfp_intake.constants import (
+        DEPARTMENT_CONTRIBUTIONS,
+        TICKET_OWNER,
+    )
+
     client = metadata.get("client_name") or "the client"
     location = metadata.get("location")
     scope = metadata.get("scope") or metadata.get("service_type") or ""
@@ -261,14 +266,19 @@ def _grounded_aspects(
     budget = metadata.get("budget_range")
     value = metadata.get("estimated_contract_value_usd")
     excerpt_one_line = " ".join((excerpt or "").split())[:180]
+    contribution = DEPARTMENT_CONTRIBUTIONS.get(department_id, "")
 
     aspects: list[str] = []
+    if contribution:
+        aspects.append(f"CONTEXT remit: {contribution}")
 
     if department_id == DEPARTMENT_MARKETING:
-        aspects.append(f"Ticket owner handoff for {client} (Camila Ospina / Sales)")
-        aspects.append("Offer validity period must be 30 days from issuance")
+        aspects.append(
+            f"Ticket owner ({TICKET_OWNER} / Marketing-as-Sales) for {client}"
+        )
+        aspects.append("Offer validity period must be 30 days from issuance (CONTEXT §5)")
         if "exclusiv" in (excerpt + scope).casefold():
-            aspects.append("Exclusivity / co-branding terms present in RFP extract")
+            aspects.append("Exclusivity / brand terms present in RFP extract")
         elif "co-brand" in (excerpt + scope).casefold():
             aspects.append("Co-branding partnership language present in RFP extract")
         else:
@@ -277,9 +287,13 @@ def _grounded_aspects(
             aspects.append(f"Proposal deadline from RFP: {deadline}")
 
     elif department_id == DEPARTMENT_OPERACIONES:
-        aspects.append(f"Operational feasibility for {client}" + (f" @ {location}" if location else ""))
-        aspects.append("Setup/delivery timeline must be ≥10 business days (guideline)")
-        # Ground volume only if present in metadata/excerpt
+        aspects.append(
+            f"Operational feasibility for {client}"
+            + (f" @ {location}" if location else "")
+        )
+        aspects.append(
+            "Setup/delivery timeline must be ≥10 business days (CONTEXT §5)"
+        )
         vol = re.search(
             r"(\d[\d,]*)\s*(employees|empleados|diners|personas|resorts|properties|locations)",
             f"{scope}\n{excerpt}",
@@ -294,7 +308,9 @@ def _grounded_aspects(
             aspects.append(f"Ops extract: {excerpt_one_line}…")
 
     elif department_id == DEPARTMENT_PROCUREMENT:
-        aspects.append("Costing must keep USD $ and COP $ exactly as written — never convert")
+        aspects.append(
+            "Ingredient cost / supplier lead times — keep USD $ and COP $ as written"
+        )
         if budget:
             aspects.append(f"Budget range from RFP: {budget}")
         elif value is not None:
@@ -311,9 +327,13 @@ def _grounded_aspects(
             aspects.append(f"Procurement extract: {excerpt_one_line}…")
 
     elif department_id == DEPARTMENT_TRAINING:
-        aspects.append("New recipe / signature-menu development if required by RFP")
+        aspects.append(
+            "New recipe / signature-menu development time if required by RFP"
+        )
         aspects.append("Certification and quality standards rollout plan")
-        if "signature" in (excerpt + scope).casefold() or "menú" in (excerpt + scope).casefold():
+        if "signature" in (excerpt + scope).casefold() or "menú" in (
+            excerpt + scope
+        ).casefold():
             aspects.append("Signature / new menu language found in department extract")
         if excerpt_one_line:
             aspects.append(f"Training extract: {excerpt_one_line}…")
@@ -321,13 +341,12 @@ def _grounded_aspects(
     else:
         aspects.append(f"Review {department_id} requirements for {client}")
 
-    # Strip anything that looks like an invented absolute figure claim
     cleaned = [
         a
         for a in aspects
         if not any(p.search(a) for p in _INVENTED_FIGURE_PATTERNS)
     ]
-    return cleaned[:6]
+    return cleaned[:7]
 
 
 def department_worker(subtask: DepartmentSubtask) -> WorkerResult:
