@@ -46,7 +46,18 @@ def test_no_new_api_service_router_calls_pipeline() -> None:
     assert "include_router(rfp_router)" in agent_app
     # No dedicated services/rfp_api app module.
     assert not (REPO / "services" / "rfp_api").exists()
+    assert not (REPO / "services" / "rfp" / "app.py").exists()
+    assert not (REPO / "services" / "rfp" / "main.py").exists()
 
+
+def test_pipeline_package_is_pure_python_no_second_http() -> None:
+    """Same API-only pipeline under data/pipelines/ — no HTTP in the package."""
+    root = REPO / "data" / "pipelines" / "rfp_intake"
+    for path in root.glob("*.py"):
+        src = path.read_text(encoding="utf-8").casefold()
+        assert "fastapi" not in src
+        assert "uvicorn" not in src
+        assert "apirouter" not in src
 
 def test_pipeline_lives_under_data_pipelines_rfp_intake_not_cx_graph() -> None:
     assert (REPO / "data" / "pipelines" / "rfp_intake" / "__init__.py").is_file()
