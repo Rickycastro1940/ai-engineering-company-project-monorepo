@@ -18,7 +18,9 @@ supabase: Client = create_client(url, key)
 
 # RFP intake upload (backoffice UI posts here). Must be registered before StaticFiles.
 from services.rfp import router as rfp_router  # noqa: E402
+from services.rfp.store import init_db  # noqa: E402
 
+init_db()
 app.include_router(rfp_router)
 
 class PipelineTriggerRequest(BaseModel):

@@ -22,8 +22,9 @@ dependencies = [
     "langchain-mcp-adapters>=0.1.0",
     "pyjwt[crypto]>=2.9.0",
     "fastmcp>=3.4.6",
-    "markitdown>=0.1.7",
+    "markitdown[pdf]>=0.1.7",
     "py-readability-metrics>=1.4.5",
+    "sqlmodel>=0.0.39",
 ]
 
 [tool.pytest.ini_options]

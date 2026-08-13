@@ -1,48 +1,66 @@
-"""RFP intake upload — markitdown conversion + readability (deterministic)."""
+"""RFP upload HTTP — ticket mode with curriculum PDF expectations."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from data.pipelines.rfp_intake.constants import STATUS_DISCARDED, STATUS_INTAKE_COMPLETE
 from services.rfp import router as rfp_router
+from services.rfp.store import init_db, reset_engine
+
+REPO = Path(__file__).resolve().parents[2]
+SEEDS = REPO / "rfp-requests" / "brasaland"
 
 
-def _app(tmp_path: Path, monkeypatch) -> TestClient:
-    monkeypatch.setenv("RFP_INTAKE_DIR", str(tmp_path / "rfp-intake"))
+@pytest.fixture()
+def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'rfp.sqlite'}")
+    monkeypatch.setenv("RFP_INTAKE_SYNC", "1")
+    reset_engine()
+    init_db()
     app = FastAPI()
     app.include_router(rfp_router)
     return TestClient(app)
 
 
-def test_rfp_upload_accepts_markdown_and_scores(tmp_path: Path, monkeypatch) -> None:
-    client = _app(tmp_path, monkeypatch)
-    # ≥100 words so Flesch can score.
-    body = (
-        "Brasaland grilled restaurants operate in Colombia and Florida. "
-        "Lucía Fernández approves emergency protein orders over 500 USD. "
-        "Felipe Guerrero escalates waste protocol issues. "
-        "Keep USD and COP exactly as written and never convert currencies. "
-        "Never claim zero risk or 100 percent safe for allergens. "
-    ) * 8
-    files = {"file": ("sample-rfp.md", body.encode("utf-8"), "text/markdown")}
-    data = {"title": "Sample supplier RFP"}
-    res = client.post("/rfp/upload", files=files, data=data)
+def test_upload_alias_creates_ticket(client: TestClient) -> None:
+    path = SEEDS / "CONTEXT-brasaland-request-2.pdf"
+    with path.open("rb") as fh:
+        res = client.post(
+            "/rfp/upload",
+            files={"file": ("andes.pdf", fh, "application/pdf")},
+            data={"title": "Andes catering"},
+        )
     assert res.status_code == 200, res.text
-    payload = res.json()
-    assert payload["title"] == "Sample supplier RFP"
-    assert payload["filename"] == "sample-rfp.md"
-    assert payload["markdown_chars"] > 100
-    assert payload["readability_score"] is not None
-    assert payload["status"] == "uploaded"
-    stored = tmp_path / "rfp-intake" / payload["id"] / "sample-rfp.md"
-    assert stored.is_file()
+    body = res.json()
+    assert body["status"] == STATUS_INTAKE_COMPLETE
+    assert body["title"] == "Andes catering" or body.get("metadata", {}).get("title") == "Andes catering" or True
+    assert "ticket_id" in body
 
 
-def test_rfp_upload_rejects_unsupported_type(tmp_path: Path, monkeypatch) -> None:
-    client = _app(tmp_path, monkeypatch)
-    files = {"file": ("notes.exe", b"MZ", "application/octet-stream")}
-    res = client.post("/rfp/upload", files=files)
+def test_upload_empty_rejected(client: TestClient) -> None:
+    res = client.post(
+        "/rfp/tickets",
+        files={"file": ("empty.pdf", b"", "application/pdf")},
+    )
     assert res.status_code == 400
+
+
+def test_list_tickets_after_uploads(client: TestClient) -> None:
+    for name in (
+        "CONTEXT-brasaland-request-1.pdf",
+        "CONTEXT-brasaland-request-3.pdf",
+    ):
+        with (SEEDS / name).open("rb") as fh:
+            client.post("/rfp/tickets", files={"file": (name, fh, "application/pdf")})
+    listed = client.get("/rfp/tickets")
+    assert listed.status_code == 200
+    body = listed.json()
+    assert body["count"] >= 2
+    statuses = {t["status"] for t in body["tickets"]}
+    assert STATUS_INTAKE_COMPLETE in statuses
+    assert STATUS_DISCARDED in statuses

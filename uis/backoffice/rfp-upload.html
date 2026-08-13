@@ -142,7 +142,9 @@
 
             <div id="status" role="status" aria-live="polite"></div>
             <p class="meta">
-                Posts to <code>POST /rfp/upload</code> on the reporting / backoffice API.
+                Posts to <code>POST /rfp/tickets</code> then polls <code>GET /rfp/tickets/{id}</code>
+                until <code>intake_complete</code> or <code>discarded</code>.
+                Sample PDFs: <code>rfp-requests/brasaland/</code>.
             </p>
         </form>
     </div>
@@ -195,6 +197,39 @@
             statusEl.textContent = '';
         });
 
+        async function pollTicket(ticketId) {
+            const terminal = new Set(['intake_complete', 'discarded', 'failed']);
+            for (let i = 0; i < 60; i++) {
+                const res = await fetch(`/rfp/tickets/${ticketId}`);
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Poll failed');
+                if (terminal.has(data.status)) return data;
+                setStatus('info', `Analyzing… (${data.status}) ticket ${ticketId}`);
+                await new Promise((r) => setTimeout(r, 500));
+            }
+            throw new Error('Timed out waiting for intake');
+        }
+
+        function formatTicket(data, filename) {
+            const meta = data.metadata || {};
+            const lines = [
+                `status: ${data.status}`,
+                `ticket_id: ${data.ticket_id}`,
+                `file: ${filename}`,
+                meta.client_name ? `client: ${meta.client_name}` : null,
+                meta.location ? `location: ${meta.location}` : null,
+                meta.service_type ? `service: ${meta.service_type}` : null,
+                meta.deadline ? `deadline: ${meta.deadline}` : null,
+                (data.departments_needed || []).length
+                    ? `departments: ${data.departments_needed.join(', ')}`
+                    : null,
+                data.requires_ceo_approval ? 'CEO approval required (> $50,000 USD/year)' : null,
+                data.discard_reason ? `discard_reason: ${data.discard_reason}` : null,
+                data.intake_summary ? `summary:\n${data.intake_summary}` : null,
+            ].filter(Boolean);
+            return lines.join('\n');
+        }
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const file = fileInput.files && fileInput.files[0];
@@ -212,20 +247,18 @@
             setStatus('info', 'Uploading…');
 
             try {
-                const res = await fetch('/rfp/upload', { method: 'POST', body });
+                const res = await fetch('/rfp/tickets', { method: 'POST', body });
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok) {
                     throw new Error(data.detail || data.message || `Upload failed (${res.status})`);
                 }
-                const lines = [
-                    'Upload accepted.',
-                    `id: ${data.id || 'n/a'}`,
-                    `filename: ${data.filename || file.name}`,
-                    data.markdown_chars != null ? `extracted markdown chars: ${data.markdown_chars}` : null,
-                    data.readability_score != null ? `readability score: ${data.readability_score}` : null,
-                    data.stored_path ? `stored: ${data.stored_path}` : null,
-                ].filter(Boolean);
-                setStatus('ok', lines.join('\n'));
+                const ticketId = data.ticket_id || data.id;
+                let final = data;
+                if (data.status === 'analyzing' || !data.terminal) {
+                    final = await pollTicket(ticketId);
+                }
+                const kind = final.status === 'discarded' || final.status === 'failed' ? 'err' : 'ok';
+                setStatus(kind, formatTicket(final, file.name));
             } catch (err) {
                 setStatus('err', err.message || String(err));
             } finally {
