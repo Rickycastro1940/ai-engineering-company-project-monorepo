@@ -128,12 +128,12 @@
             <input type="text" id="title" name="title" placeholder="e.g. Florida protein supplier RFP Q3" autocomplete="off">
             <p class="hint">If empty, the uploaded file name is used.</p>
 
-            <label for="file">RFP document</label>
+            <label for="file">RFP PDF</label>
             <div class="dropzone" id="dropzone">
-                Drop a PDF, DOCX, HTML, or Markdown file here — or choose a file below.
+                Drop a PDF RFP here — or choose a file below (DOCX/HTML/Markdown also accepted).
             </div>
             <input type="file" id="file" name="file" accept=".pdf,.doc,.docx,.txt,.md,.html,.htm,.rtf" required>
-            <p class="hint">Max practical size depends on the API. Prefer text-extractable PDFs or DOCX.</p>
+            <p class="hint">One upload creates one ticket (<code>analyzing</code>). Prefer text-extractable PDFs.</p>
 
             <div class="actions">
                 <button type="submit" id="submit-btn">Upload for intake</button>

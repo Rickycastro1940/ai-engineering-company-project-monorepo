@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,19 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 RAW_DIR = REPO_ROOT / "data" / "raw" / "rfp"
 
 router = APIRouter(prefix="/rfp", tags=["rfp-intake"])
+
+
+def _safe_filename(filename: str) -> str:
+    return re.sub(r"[^\w.\-]+", "_", Path(filename).name)[:180] or "rfp.pdf"
+
+
+def _persist_upload(ticket_id: str, raw: bytes, filename: str) -> Path:
+    """Store upload under data/raw/rfp/<ticket_id>/ (runtime artifact)."""
+    store = RAW_DIR / ticket_id
+    store.mkdir(parents=True, exist_ok=True)
+    path = store / _safe_filename(filename)
+    path.write_bytes(raw)
+    return path
 
 
 def _run_pipeline_job(ticket_id: str, raw: bytes, filename: str, title: str | None) -> None:
@@ -49,7 +63,12 @@ def _run_pipeline_job(ticket_id: str, raw: bytes, filename: str, title: str | No
             readability_scores={},
             error_message=f"{type(exc).__name__}: {exc}",
         )
-        save_intake_result(ticket_id, failed, source_pdf_path="")
+        pdf_path = store / _safe_filename(filename)
+        try:
+            rel = str(pdf_path.relative_to(REPO_ROOT)) if pdf_path.is_file() else ""
+        except ValueError:
+            rel = str(pdf_path) if pdf_path.is_file() else ""
+        save_intake_result(ticket_id, failed, source_pdf_path=rel)
 
 
 def _sync_mode() -> bool:
@@ -62,13 +81,16 @@ async def create_ticket(
     file: UploadFile = File(...),
     title: str | None = Form(default=None),
 ) -> dict[str, Any]:
-    """Ticket-mode upload: returns immediately with status=analyzing (or sync result)."""
+    """Ticket-mode upload: returns quickly with status=analyzing; pipeline runs async."""
     original = file.filename or "rfp.pdf"
     raw = await file.read()
     if not raw:
         raise HTTPException(status_code=400, detail="Empty file.")
 
     ticket = create_analyzing_ticket(title=(title or "").strip() or None)
+    # Persist PDF under data/raw/ before returning so analyzing tickets have artifacts.
+    _persist_upload(ticket.ticket_id, raw, original)
+
     if _sync_mode():
         _run_pipeline_job(ticket.ticket_id, raw, original, title)
         saved = get_ticket(ticket.ticket_id)
@@ -82,6 +104,7 @@ async def create_ticket(
         "ticket_id": ticket.ticket_id,
         "status": STATUS_ANALYZING,
         "created_at": ticket.created_at,
+        "terminal": False,
     }
 
 
