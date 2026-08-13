@@ -6,11 +6,19 @@ way out in `output_guardrail`.
 
 ## Layers
 
+More than one guardrail is implemented — **not** a single generic validation.
+Each layer is a separate module/node with its own reason codes:
+
 | Layer | When | Blocks / rewrites |
 | ----- | ---- | ----------------- |
-| **Input** | After `receive_question`, before confirmation / tools / RAG / LLM | Jailbreak / prompt injection; currency conversion asks; “zero risk” / “100% safe” asks; **personal / non-company use**; hard out-of-scope |
-| **Tool** | Before MCP ticket / inventory HTTP | Inventory create/update/delete (read-only agent) |
-| **Output** | After `generate` / `answer_ticket` / `answer_inventory` | Unexpected answer format (raw JSON / `memory_proposal`); system-prompt leaks; sensitive CONTEXT implementation details; currency / absolute allergen claims; chunks/scores/Qdrant; casual answers missing company steer-back |
+| **Input** (`check_input` / `reject_instruction_change`) | After `receive_question`, before confirmation / tools / RAG / LLM | Jailbreak / prompt injection; currency conversion asks; “zero risk” / “100% safe” asks; **personal / non-company use**; hard out-of-scope |
+| **Tool** (`authorize_tool_call`) | Before MCP ticket / inventory HTTP | Inventory create/update/delete (read-only agent) |
+| **External** (`sanitize_*` / `<untrusted_*>` wrappers) | On RAG chunks + tool payloads before the model | Instruction-like phrases neutralized; never system-role |
+| **Redirect** (`answer_small_talk` / `answer_casual`) | After decide_route for hello / casual | Steer back into Brasaland CONTEXT |
+| **Output** (`check_output`) | After `generate` / `answer_ticket` / `answer_inventory` | Unexpected answer format (raw JSON / `memory_proposal`); system-prompt leaks; sensitive CONTEXT implementation details; currency / absolute allergen claims; chunks/scores/Qdrant; casual answers missing company steer-back |
+
+Eval: `tests/pipelines/test_agent_multiple_guardrails.py` (≥8 distinct reason
+codes; independent fixtures for input / output / tool / external).
 
 In-scope questions still flow through the existing memory + MCP + RAG graph
 (see [`HARNESS.md`](./HARNESS.md)).

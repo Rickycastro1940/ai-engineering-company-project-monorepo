@@ -27,6 +27,9 @@ inventory remains a read-only HTTP tool against the inventory manager.
   (poems, homework, “be my personal chatbot”) with a redirect to Brasaland
   purpose, while legitimate KB/ticket/inventory queries stay allowed. Eval:
   `tests/pipelines/test_agent_personal_chatbot_correction.py`.
+- [x] **Multiple guardrails (not one generic check)** — independent input,
+  output, tool, external-isolation, and redirect gates with distinct reason
+  codes. Eval: `tests/pipelines/test_agent_multiple_guardrails.py`.
 - [x] **Company system prompt** — `services/agent/harness/system_prompt.py`
   (scope + CONTEXT restrictions). Prompt is a guide; code gates enforce it.
 - [x] **Secure system prompt** — system instructions live only in the system
