@@ -1,4 +1,4 @@
-"""RFP persistence via SQLModel (Postgres/Supabase) — not TinyDB."""
+"""RFP persistence via SQLModel (Postgres/Supabase)."""
 
 from __future__ import annotations
 

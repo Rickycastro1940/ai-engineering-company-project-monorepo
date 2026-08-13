@@ -1,6 +1,6 @@
 """SQLModel entities for RFP intake (CONTEXT Milestone 9).
 
-Persisted in PostgreSQL (Supabase) via DATABASE_URL — never TinyDB.
+Persisted in PostgreSQL (Supabase) via DATABASE_URL.
 """
 
 from __future__ import annotations
