@@ -7,7 +7,7 @@ from typing import Any
 
 from sqlmodel import Session, select
 
-from data.pipelines.rfp_intake.constants import STATUS_INTAKE_COMPLETE
+from data.pipelines.rfp_intake.constants import PART1_STATUSES, STATUS_INTAKE_COMPLETE
 from data.pipelines.rfp_intake.routing import route_intake_to_part2, validate_part2_handoff
 from services.api.database import create_db_and_tables, get_engine, reset_engine
 from services.rfp.models import RfpDepartmentSection, RfpTicket, _now
@@ -147,6 +147,13 @@ def save_intake_result(ticket_id: str, result: Any, *, source_pdf_path: str) -> 
         ticket.readability_json = json.dumps(result.readability_scores)
         ticket.trace_json = json.dumps(result.trace, ensure_ascii=False)
         ticket.updated_at = _now()
+
+        # Part 1 statuses only — never persist waiting_for_approval / drafting / etc.
+        if ticket.status not in PART1_STATUSES:
+            raise ValueError(
+                f"Refusing to persist non-Part-1 ticket status {ticket.status!r} "
+                f"for {ticket_id} (expected one of {sorted(PART1_STATUSES)})"
+            )
 
         # Discarded tickets must surface why — never persist a silent reject.
         if ticket.status == "discarded" and not (ticket.discard_reason or "").strip():

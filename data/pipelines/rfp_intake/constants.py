@@ -25,8 +25,28 @@ STATUS_INTAKE_COMPLETE: Final = "intake_complete"
 STATUS_DISCARDED: Final = "discarded"
 STATUS_FAILED: Final = "failed"
 
+# Part 1 may only set these ticket statuses (never Part 3 approval states).
+PART1_STATUSES: Final = frozenset(
+    {STATUS_ANALYZING, STATUS_INTAKE_COMPLETE, STATUS_DISCARDED, STATUS_FAILED}
+)
 P1_TERMINAL: Final = frozenset(
     {STATUS_INTAKE_COMPLETE, STATUS_DISCARDED, STATUS_FAILED}
+)
+
+# Later-part statuses — must not appear on Part 1 intake tickets
+STATUS_DRAFTING: Final = "drafting"
+STATUS_UNDER_EVALUATION: Final = "under_evaluation"
+STATUS_NEEDS_HUMAN_REVIEW: Final = "needs_human_review"
+STATUS_WAITING_FOR_APPROVAL: Final = "waiting_for_approval"
+STATUS_DONE: Final = "done"
+PART2_PLUS_STATUSES: Final = frozenset(
+    {
+        STATUS_DRAFTING,
+        STATUS_UNDER_EVALUATION,
+        STATUS_NEEDS_HUMAN_REVIEW,
+        STATUS_WAITING_FOR_APPROVAL,
+        STATUS_DONE,
+    }
 )
 
 # Departments — exact CONTEXT §2.1 ids (use operaciones, never the English id)
