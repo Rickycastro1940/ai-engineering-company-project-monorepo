@@ -187,6 +187,7 @@ def test_eval_no_context_when_retrieve_empty(trace_dir: Path):
     assert trace["answer"] == NO_CONTEXT_ANSWER
     assert trace["node_order"] == [
         "receive_question",
+        "input_guardrail",
         "resolve_memory_confirmation",
         "decide_route",
         "recall_memory",
@@ -287,11 +288,13 @@ def test_node_contract_graph_never_calls_monolithic_query():
     assert context_arg == [PROTEIN_STOCK_CHUNK]
     assert result["node_order"] == [
         "receive_question",
+        "input_guardrail",
         "resolve_memory_confirmation",
         "decide_route",
         "recall_memory",
         "retrieve",
         "generate",
+        "output_guardrail",
         "write_memory",
     ]
 
@@ -369,17 +372,20 @@ def test_every_run_produces_queryable_trace(trace_dir: Path):
     assert trace["trace_id"] == result["trace_id"]
     assert trace["node_order"] == [
         "receive_question",
+        "input_guardrail",
         "resolve_memory_confirmation",
         "decide_route",
         "recall_memory",
         "retrieve",
         "generate",
+        "output_guardrail",
         "write_memory",
     ]
-    assert len(trace["steps"]) == 7
+    assert len(trace["steps"]) == 9
     assert trace["steps"][0]["node_name"] == "receive_question"
-    assert trace["steps"][1]["node_name"] == "resolve_memory_confirmation"
-    assert trace["steps"][2]["node_name"] == "decide_route"
+    assert trace["steps"][1]["node_name"] == "input_guardrail"
+    assert trace["steps"][2]["node_name"] == "resolve_memory_confirmation"
+    assert trace["steps"][3]["node_name"] == "decide_route"
     retrieve_step = next(s for s in trace["steps"] if s["node_name"] == "retrieve")
     assert retrieve_step["output"]["chunk_count"] == 1
     generate_step = next(s for s in trace["steps"] if s["node_name"] == "generate")
