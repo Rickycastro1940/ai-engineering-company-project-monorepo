@@ -16,5 +16,7 @@ data/process/agent-traces/*
 
 data/process/agent-memory/*
 !data/process/agent-memory/.gitkeep
+data/process/agent-guardrails/*
+!data/process/agent-guardrails/.gitkeep
 *.sqlite
 *.sqlite-journal

@@ -25,6 +25,7 @@ from typing import Any
 from data.pipelines.rag import NO_CONTEXT_ANSWER, generate_answer, retrieve
 
 from services.agent.generation import generate_agent_turn
+from services.agent.harness.tools import authorize_tool_call
 from services.agent.memory.proposal import MemoryProposal
 from services.agent.state import AgentState
 from services.agent.tools.contracts import (
@@ -116,7 +117,7 @@ def receive_question(state: AgentState) -> dict[str, Any]:
                 "receive_question",
                 "ok",
                 started,
-                notes="question accepted; next=decide_route",
+                notes="question accepted; next=input_guardrail",
                 output={"accepted": True, "question_len": len(question)},
             )
         ],
@@ -218,6 +219,38 @@ def lookup_ticket_node(state: AgentState) -> dict[str, Any]:
         }
 
     # MCP client path — never call the Incidents Manager HTTP API directly.
+    tool_gate = authorize_tool_call(
+        "lookup_ticket",
+        query.model_dump(exclude_none=True),
+    )
+    if not tool_gate.allowed:
+        result = TicketLookupOutput(
+            ok=False,
+            tickets=[],
+            error="tool_guardrail_denied",
+            message=tool_gate.refusal or "Tool call denied by harness.",
+        )
+        return {
+            "ticket_result": result.model_dump(),
+            "route": _next_after_ticket(state, result),
+            "sources_used": ["ticket"],
+            "guardrail": tool_gate.as_dict(),
+            "steps": [
+                _step(
+                    state,
+                    "lookup_ticket",
+                    "blocked",
+                    started,
+                    notes=f"tool_guardrail:{tool_gate.reason}",
+                    output={
+                        **result.model_dump(),
+                        "timeout_seconds": TICKET_LOOKUP_TIMEOUT_SECONDS,
+                        "guardrail": tool_gate.as_dict(),
+                    },
+                )
+            ],
+        }
+
     result = lookup_ticket_via_mcp(query, timeout_seconds=TICKET_LOOKUP_TIMEOUT_SECONDS)
     next_route = _next_after_ticket(state, result)
 
@@ -376,6 +409,40 @@ def lookup_inventory_node(state: AgentState) -> dict[str, Any]:
                     output={
                         **result.model_dump(),
                         "timeout_seconds": INVENTORY_LOOKUP_TIMEOUT_SECONDS,
+                    },
+                )
+            ],
+        }
+
+    tool_gate = authorize_tool_call(
+        "lookup_inventory",
+        query.model_dump(exclude_none=True),
+    )
+    if not tool_gate.allowed:
+        result = InventoryLookupOutput(
+            ok=False,
+            products=[],
+            error="tool_guardrail_denied",
+            message=tool_gate.refusal or "Tool call denied by harness.",
+        )
+        next_route = _next_after_inventory(state, result)
+        return {
+            "inventory_result": result.model_dump(),
+            "route": next_route,
+            "sources_used": ["inventory"],
+            "guardrail": tool_gate.as_dict(),
+            "answer": tool_gate.refusal,
+            "steps": [
+                _step(
+                    state,
+                    "lookup_inventory",
+                    "blocked",
+                    started,
+                    notes=f"tool_guardrail:{tool_gate.reason}",
+                    output={
+                        **result.model_dump(),
+                        "timeout_seconds": INVENTORY_LOOKUP_TIMEOUT_SECONDS,
+                        "guardrail": tool_gate.as_dict(),
                     },
                 )
             ],

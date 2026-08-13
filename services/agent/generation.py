@@ -18,10 +18,11 @@ from data.pipelines.rag import (
     client,
 )
 
+from services.agent.harness.system_prompt import agent_system_prompt
 from services.agent.memory.proposal import AgentTurnOutput, MemoryProposal
 from services.agent.memory.store import MemoryRecord
 
-# Appended to the shared SYSTEM_PROMPT for the agent turn only.
+# Appended to the harness system prompt for the agent turn only.
 STRUCTURED_TURN_INSTRUCTIONS = """
 OUTPUT FORMAT (single JSON object — no markdown fences):
 {
@@ -103,7 +104,9 @@ def generate_agent_turn(
         messages=[
             {
                 "role": "system",
-                "content": SYSTEM_PROMPT + "\n" + STRUCTURED_TURN_INSTRUCTIONS,
+                "content": agent_system_prompt(base=SYSTEM_PROMPT)
+                + "\n"
+                + STRUCTURED_TURN_INSTRUCTIONS,
             },
             {"role": "user", "content": user_prompt},
         ],

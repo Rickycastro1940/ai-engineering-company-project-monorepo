@@ -10,6 +10,10 @@ between RAG and those tools based on the question content.
 
 Memory milestone extends the same graph with ``recall_memory`` /
 ``write_memory`` — it does **not** replace MCP ticket lookup or RAG.
+
+Harness / guardrails (Milestone 8 Part 2) add ``input_guardrail`` and
+``output_guardrail`` around that graph so CONTEXT-company.md restrictions are
+enforced in code, not only in the system prompt.
 """
 
 from __future__ import annotations
@@ -22,6 +26,7 @@ from uuid import uuid4
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
+from services.agent.harness.nodes import input_guardrail_node, output_guardrail_node
 from services.agent.memory.confirmation import resolve_memory_confirmation_node
 from services.agent.memory.nodes import recall_memory_node, write_memory_node
 from services.agent.nodes import (
@@ -43,6 +48,7 @@ from services.agent.tracing import TraceRecord, save_trace
 
 REQUIRED_NODES = (
     "receive_question",
+    "input_guardrail",
     "resolve_memory_confirmation",
     "decide_route",
     "recall_memory",
@@ -56,6 +62,7 @@ REQUIRED_NODES = (
     "lookup_inventory",
     "answer_inventory",
     "inventory_fallback",
+    "output_guardrail",
     "write_memory",
 )
 
@@ -68,8 +75,22 @@ class GraphStructureError(ValueError):
 
 
 def _after_receive(state: AgentState) -> str:
-    """Conditional edge: empty question → error path; else → resolve confirmation."""
-    return "empty_question" if state.get("route") == "empty" else "resolve_memory_confirmation"
+    """Conditional edge: empty question → error path; else → input guardrail."""
+    return "empty_question" if state.get("route") == "empty" else "input_guardrail"
+
+
+def _after_input_guardrail(state: AgentState) -> str:
+    """Blocked input never reaches tools, RAG, or the LLM."""
+    if state.get("route") == "guardrail_blocked":
+        return "end"
+    return "resolve_memory_confirmation"
+
+
+def _after_output_guardrail(state: AgentState) -> str:
+    """Hard blocks skip memory writes so forbidden text is never stored."""
+    if state.get("route") == "guardrail_blocked":
+        return "end"
+    return "write_memory"
 
 
 def _after_resolve_memory_confirmation(state: AgentState) -> str:
@@ -138,7 +159,9 @@ def build_agent_graph() -> StateGraph:
     """Assemble nodes + conditional edges (not yet compiled)."""
     graph = StateGraph(AgentState)
     graph.add_node("receive_question", receive_question)
+    graph.add_node("input_guardrail", input_guardrail_node)
     graph.add_node("resolve_memory_confirmation", resolve_memory_confirmation_node)
+    graph.add_node("output_guardrail", output_guardrail_node)
     graph.add_node("decide_route", decide_route_node)
     graph.add_node("recall_memory", recall_memory_node)
     graph.add_node("lookup_ticket", lookup_ticket_node)
@@ -159,7 +182,15 @@ def build_agent_graph() -> StateGraph:
         _after_receive,
         {
             "empty_question": "empty_question",
+            "input_guardrail": "input_guardrail",
+        },
+    )
+    graph.add_conditional_edges(
+        "input_guardrail",
+        _after_input_guardrail,
+        {
             "resolve_memory_confirmation": "resolve_memory_confirmation",
+            "end": END,
         },
     )
     graph.add_conditional_edges(
@@ -216,10 +247,18 @@ def build_agent_graph() -> StateGraph:
             "end": END,
         },
     )
-    # Successful answer paths persist policy-approved memory, then end.
-    graph.add_edge("generate", "write_memory")
-    graph.add_edge("answer_ticket", "write_memory")
-    graph.add_edge("answer_inventory", "write_memory")
+    # Successful answers pass output guardrails before any memory write.
+    graph.add_edge("generate", "output_guardrail")
+    graph.add_edge("answer_ticket", "output_guardrail")
+    graph.add_edge("answer_inventory", "output_guardrail")
+    graph.add_conditional_edges(
+        "output_guardrail",
+        _after_output_guardrail,
+        {
+            "write_memory": "write_memory",
+            "end": END,
+        },
+    )
     graph.add_edge("write_memory", END)
     # Fallbacks / empty / no-context do not learn failed or unknown outcomes.
     graph.add_edge("no_context", END)
@@ -279,6 +318,7 @@ def inspect_checkpoints(thread_id: str, *, graph: Any | None = None) -> list[dic
                 "needs_inventory": values.get("needs_inventory"),
                 "needs_rag": values.get("needs_rag"),
                 "memory_hit_count": len(values.get("memory_hits") or []),
+                "guardrail": values.get("guardrail"),
             }
         )
     history.reverse()
@@ -315,6 +355,7 @@ def run_agent(question: str, *, thread_id: str | None = None) -> dict[str, Any]:
         "memory_self_evaluations": [],
         "sources_used": [],
         "steps": [],
+        "guardrail": None,
     }
 
     try:
@@ -402,4 +443,5 @@ def run_agent(question: str, *, thread_id: str | None = None) -> dict[str, Any]:
         "memory_writes": list(final.get("memory_writes") or []),
         "memory_pending_proposal": final.get("memory_pending_proposal"),
         "memory_confirmation": final.get("memory_confirmation"),
+        "guardrail": final.get("guardrail"),
     }

@@ -4,7 +4,33 @@ LangGraph orchestration around the existing Brasaland RAG flow. Ticket status
 goes through the **company-tools MCP server** (`langchain-mcp-adapters`);
 inventory remains a read-only HTTP tool against the inventory manager.
 
+## Milestone 8 — Harness and Guardrails (Part 2 of 2)
+
+- [x] **Read `CONTEXT-company.md`** — identity, KB topics, scope, and
+  restrictions for the system prompt and guardrails
+  ([`docs/agent/HARNESS.md`](../../docs/agent/HARNESS.md),
+  [`docs/agent/GUARDRAILS.md`](../../docs/agent/GUARDRAILS.md)).
+- [x] **Same LangGraph + MCP + memory agent** — branch `feature/agent-guardrails`
+  from Part 1 memory work. Guardrail nodes extend the graph; they do not
+  replace RAG, MCP tools, or memory.
+- [x] **Company system prompt** — `services/agent/harness/system_prompt.py`
+  (scope + CONTEXT restrictions). Prompt is a guide; code gates enforce it.
+- [x] **Input guardrails** — jailbreak / prompt injection, currency conversion,
+  absolute allergen safety, out-of-scope (deterministic, before tools/LLM).
+- [x] **Output guardrails** — same CONTEXT wording on the user-facing answer
+  (never convert; never "zero risk" / "100% safe"; never leak prompt or
+  chunks/scores/Qdrant).
+- [x] **Tool guardrails** — inventory remains read-only (`authorize_tool_call`).
+- [x] **Audit** — JSONL at `data/process/agent-guardrails/guardrail_decisions.jsonl`.
+- [x] **Deps** — no new package; install any future dep with `uv add` only.
+
+```text
+receive → input_guardrail → [blocked END | resolve_memory_confirmation → …]
+        → generate / answer_* → output_guardrail → [blocked END | write_memory]
+```
+
 ## Milestone — Agent Memory (Part 1 of 2)
+
 
 - [x] **Read `CONTEXT-company.md`** — memory allow/deny derived in
   [`docs/agent/MEMORY_POLICY.md`](../../docs/agent/MEMORY_POLICY.md).
@@ -41,9 +67,9 @@ inventory remains a read-only HTTP tool against the inventory manager.
   ([`docs/agent/MEMORY_DESIGN_DECISIONS.md`](../../docs/agent/MEMORY_DESIGN_DECISIONS.md)).
 
 ```text
-receive → resolve_memory_confirmation → decide_route → recall_memory
+receive → input_guardrail → resolve_memory_confirmation → decide_route → recall_memory
         → lookup_ticket (MCP) | inventory | retrieve
-        → answer_*/generate → write_memory (propose only; no write) → END
+        → answer_*/generate → output_guardrail → write_memory (propose only; no write) → END
 ```
 
 ## MCP migration (company tools)

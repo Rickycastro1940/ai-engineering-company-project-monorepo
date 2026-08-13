@@ -39,3 +39,5 @@ class AgentState(TypedDict, total=False):
     memory_self_evaluations: list[dict[str, Any]]
     sources_used: Annotated[list[str], operator.add]
     steps: Annotated[list[dict[str, Any]], operator.add]
+    # Latest harness / guardrail decision (input, output, or tool).
+    guardrail: dict[str, Any] | None

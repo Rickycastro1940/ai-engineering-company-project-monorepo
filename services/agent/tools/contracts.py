@@ -107,6 +107,7 @@ class TicketLookupOutput(BaseModel):
             "service_error",
             "invalid_input",
             "auth_error",
+            "tool_guardrail_denied",
         ]
         | None
     ) = None
@@ -173,6 +174,7 @@ class InventoryLookupOutput(BaseModel):
             "service_error",
             "invalid_input",
             "auth_error",
+            "tool_guardrail_denied",
         ]
         | None
     ) = None
