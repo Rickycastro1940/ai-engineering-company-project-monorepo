@@ -28,7 +28,8 @@ LangChain middleware or Llama Guard, install it with **`uv add` only**.
 
 Source of truth: [`CONTEXT-company.md`](../../CONTEXT-company.md).
 A generic prompt is not accepted. The agent being hardened is this same
-LangGraph + MCP + memory support agent.
+LangGraph + MCP + memory support agent. Continuity (tools / KB / domain vs
+prior sprints): [`CONTINUITY.md`](./CONTINUITY.md).
 
 ### Authority — system vs user
 

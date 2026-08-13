@@ -12,7 +12,10 @@ inventory remains a read-only HTTP tool against the inventory manager.
   [`docs/agent/GUARDRAILS.md`](../../docs/agent/GUARDRAILS.md)).
 - [x] **Same LangGraph + MCP + memory agent** — branch `feature/agent-guardrails`
   from Part 1 memory work. Guardrail nodes extend the graph; they do not
-  replace RAG, MCP tools, or memory.
+  replace RAG, MCP tools, or memory. Continuity eval:
+  [`docs/agent/CONTINUITY.md`](../../docs/agent/CONTINUITY.md),
+  `tests/pipelines/test_agent_continuity_context.py` (tools + KB + domain
+  match `CONTEXT-company.md`).
 - [x] **Company system prompt** — `services/agent/harness/system_prompt.py`
   (scope + CONTEXT restrictions). Prompt is a guide; code gates enforce it.
 - [x] **Secure system prompt** — system instructions live only in the system
