@@ -18,5 +18,7 @@ data/process/agent-memory/*
 !data/process/agent-memory/.gitkeep
 data/process/agent-guardrails/*
 !data/process/agent-guardrails/.gitkeep
+data/process/rfp-intake/*
+!data/process/rfp-intake/.gitkeep
 *.sqlite
 *.sqlite-journal
