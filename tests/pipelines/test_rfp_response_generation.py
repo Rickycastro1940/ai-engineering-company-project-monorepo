@@ -177,6 +177,8 @@ def test_pipeline_sunset_bay_all_sections_pass() -> None:
     for section in result.section_results:
         assert section["draft_content"]
         assert section["passed"] is True
+        assert section["generator_agent"] == f"{section['department_id']}_generator_agent"
+        assert "Pricing proposal section" in section["draft_content"]
         ev = section["evaluation_results"]
         assert ev["readability"]["passed"]
         assert ev["relevance"]["passed"]

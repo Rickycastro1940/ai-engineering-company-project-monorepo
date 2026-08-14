@@ -16,8 +16,12 @@ compliance guidelines, §6 Part 2 deliverable).
 - **Generators must not re-ingest the raw PDF as primary input**
   (`generate_department_draft` rejects `pdf_path` / `markdown_text` kwargs;
   synthesizer payload strips PDF fields).
-- Per active department: **generator** writes `draft_content`, then **evaluators**
-  score **readability**, **relevance**, and **compliance** (§5).
+- Per active department: a **generator agent** (`marketing_generator_agent`,
+  `operaciones_generator_agent`, `procurement_generator_agent`,
+  `training_generator_agent`) receives **that department's Part 1 summary**
+  (`work_streams[].key_aspects`) and writes that department's section of the
+  **pricing proposal** (CONTEXT §2.1 remit). Then evaluators score
+  readability, relevance, and compliance (§5).
 - Generator–evaluator loop with `MAX_SECTION_ITERATIONS=2` (KPI: avg < 2).
 - Persist on `RfpDepartmentSection`: `draft_content`, `evaluation_results_json`.
 - Ticket statuses: `drafting` → `under_evaluation` →

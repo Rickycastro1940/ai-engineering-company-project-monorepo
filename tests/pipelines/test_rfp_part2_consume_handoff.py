@@ -208,6 +208,11 @@ def test_pipeline_uses_part1_route_handoff_key_aspects_not_parallel_summary() ->
     gen = [e for e in result.trace if e["node"] == "generate_evaluate_sections"]
     assert gen
     assert all(e["payload"]["input"] == "part1_work_stream_key_aspects" for e in gen)
+    assert all(e["payload"]["part1_summary_used"] is True for e in gen)
+    assert all(
+        e["payload"]["generator_agent"] == f"{e['payload']['department_id']}_generator_agent"
+        for e in gen
+    )
 
 
 def test_discarded_ticket_not_in_part2_ready_path(client: TestClient) -> None:

@@ -18,6 +18,10 @@ from data.pipelines.rfp_intake.constants import (
     STATUS_WAITING_FOR_APPROVAL,
 )
 from data.pipelines.rfp_response.compliance_rules import MAX_SECTION_ITERATIONS
+from data.pipelines.rfp_response.agents import (
+    Part1DepartmentSummary,
+    get_generator_agent,
+)
 from data.pipelines.rfp_response.handoff_consume import (
     PRIMARY_GENERATOR_INPUT,
     Part1HandoffNotReady,
@@ -136,11 +140,14 @@ def generate_evaluate_sections_node(state: RfpResponseState) -> dict[str, Any]:
         dept = stream.get("department_id") or ""
         if not dept:
             continue
-        loop_result: SectionLoopResult = run_section_loop(
-            department_id=dept,
+        summary = Part1DepartmentSummary.from_work_stream(
+            stream,
             metadata=metadata,
-            key_aspects=list(stream.get("key_aspects") or []),
-            open_questions=list(stream.get("open_questions") or []),
+            ticket_id=str(state.get("ticket_id") or payload.get("ticket_id") or ""),
+        )
+        agent = get_generator_agent(dept)
+        loop_result: SectionLoopResult = run_section_loop(
+            summary=summary,
             max_iterations=max_iter,
         )
         results.append(loop_result.to_dict())
@@ -149,11 +156,13 @@ def generate_evaluate_sections_node(state: RfpResponseState) -> dict[str, Any]:
                 "node": "generate_evaluate_sections",
                 "payload": {
                     "department_id": dept,
+                    "generator_agent": agent.agent_name,
                     "iterations": loop_result.iterations,
                     "passed": loop_result.evaluation.passed,
                     "exhausted": loop_result.exhausted,
-                    "key_aspects_count": len(stream.get("key_aspects") or []),
+                    "key_aspects_count": len(summary.key_aspects),
                     "input": "part1_work_stream_key_aspects",
+                    "part1_summary_used": True,
                 },
             }
         )
