@@ -160,6 +160,9 @@ def test_get_ticket_sees_drafting_and_under_evaluation_during_run(
 
     def poll() -> None:
         while not stop.wait(0.02):
+            ticket = get_ticket(ticket_id)
+            if ticket is not None:
+                seen.append(ticket.status)
             r = client.get(f"/rfp/tickets/{ticket_id}")
             if r.status_code == 200:
                 seen.append(r.json()["status"])
