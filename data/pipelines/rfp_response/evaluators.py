@@ -49,6 +49,7 @@ class EvaluationResult:
     relevance: DimensionResult
     compliance: DimensionResult
     feedback: list[str] = field(default_factory=list)
+    feedback_for_generator: list[str] = field(default_factory=list)
     parallel: bool = True
     evaluator_agents: list[str] = field(default_factory=list)
 
@@ -78,6 +79,7 @@ class EvaluationResult:
             "relevance": _dim(self.relevance),
             "compliance": _dim(self.compliance),
             "feedback": list(self.feedback),
+            "feedback_for_generator": list(self.feedback_for_generator or self.feedback),
             "parallel": self.parallel,
             "evaluator_agents": list(self.evaluator_agents),
         }
@@ -451,6 +453,7 @@ def evaluate_section(
         relevance=relevance,
         compliance=compliance,
         feedback=feedback,
+        feedback_for_generator=list(feedback),
         parallel=True,
         evaluator_agents=[a.agent_name for a in EVALUATOR_AGENTS],
     )

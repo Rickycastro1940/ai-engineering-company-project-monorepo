@@ -38,6 +38,8 @@ from data.pipelines.rfp_response.evaluators import (
     EvaluationResult,
     evaluate_section,
 )
+from data.pipelines.rfp_response.loop import run_section_loop
+from data.pipelines.rfp_response.part3_handoff import build_part3_handoff
 
 __all__ = [
     "EVALUATOR_AGENTS",
@@ -50,6 +52,7 @@ __all__ = [
     "REQUIRED_RESPONSE_NODES",
     "ResponsePipelineResult",
     "assert_part1_routing_ready",
+    "build_part3_handoff",
     "build_rfp_response_graph",
     "get_compiled_rfp_response_graph",
     "get_generator_agent",
@@ -71,6 +74,8 @@ class ResponsePipelineResult:
     all_passed: bool = False
     error_message: str | None = None
     trace: list[dict[str, Any]] = field(default_factory=list)
+    part3_handoff: dict[str, Any] = field(default_factory=dict)
+    discarded: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -81,6 +86,8 @@ class ResponsePipelineResult:
             "all_passed": self.all_passed,
             "error_message": self.error_message,
             "trace": list(self.trace),
+            "part3_handoff": dict(self.part3_handoff),
+            "discarded": self.discarded,
         }
 
 
@@ -108,6 +115,8 @@ def run_response_pipeline(
         all_passed=bool(final.get("all_passed")),
         error_message=final.get("error_message"),
         trace=list(final.get("trace") or []),
+        part3_handoff=dict(final.get("part3_handoff") or {}),
+        discarded=bool(final.get("discarded", False)),
     )
 
 

@@ -28,6 +28,10 @@ compliance guidelines, §6 Part 2 deliverable).
   as `POST /knowledge/query`) so policy/brand language is real. Disable with
   `RFP_KB_GROUNDING=0`. Failures never block drafting.
 - Generator–evaluator loop with `MAX_SECTION_ITERATIONS=2` (KPI: avg < 2).
+  Failed sections return to **the same** department generator with
+  `EvaluationResult.feedback_for_generator`. Hitting the limit keeps the last
+  draft + EvaluationResult, sets section/ticket to `needs_human_review`, and
+  still includes the section in the Part 3 handoff (never discarded).
 - Persist on `RfpDepartmentSection`: `draft_content`, `evaluation_results_json`.
 - Ticket statuses: `drafting` → `under_evaluation` →
   `waiting_for_approval` (all pass) or `needs_human_review` (exhausted).

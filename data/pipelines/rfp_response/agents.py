@@ -194,6 +194,7 @@ class DepartmentGeneratorAgent(ABC):
         summary: Part1DepartmentSummary,
         *,
         feedback: list[str] | None = None,
+        feedback_for_generator: list[str] | None = None,
         iteration: int = 1,
     ) -> DraftResult:
         summary = self.receive_part1_summary(summary)
@@ -205,7 +206,7 @@ class DepartmentGeneratorAgent(ABC):
         location = _location(meta)
         service = meta.get("service_type") or meta.get("scope") or "corporate catering"
         deadline = meta.get("deadline") or "as agreed"
-        fb = list(feedback or [])
+        fb = list(feedback_for_generator if feedback_for_generator is not None else (feedback or []))
 
         lines: list[str] = [
             f"# Pricing proposal section — {label}",
@@ -396,8 +397,19 @@ def run_generator_agent(
     summary: Part1DepartmentSummary,
     *,
     feedback: list[str] | None = None,
+    feedback_for_generator: list[str] | None = None,
     iteration: int = 1,
 ) -> DraftResult:
-    """Dispatch the department's generator agent with its Part 1 summary."""
+    """Dispatch the department's generator agent with its Part 1 summary.
+
+    On a failed evaluation, callers pass ``feedback_for_generator`` from the
+    ``EvaluationResult`` so this same department agent can revise.
+    """
     agent = get_generator_agent(summary.department_id)
-    return agent.generate(summary, feedback=feedback, iteration=iteration)
+    fb = feedback_for_generator if feedback_for_generator is not None else feedback
+    return agent.generate(
+        summary,
+        feedback=fb,
+        feedback_for_generator=fb,
+        iteration=iteration,
+    )

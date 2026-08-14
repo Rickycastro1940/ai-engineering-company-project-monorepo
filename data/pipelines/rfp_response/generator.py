@@ -60,6 +60,7 @@ def generate_department_draft(
     key_aspects: list[str],
     open_questions: list[str] | None = None,
     feedback: list[str] | None = None,
+    feedback_for_generator: list[str] | None = None,
     iteration: int = 1,
     ticket_id: str | None = None,
     owner: str | None = None,
@@ -95,4 +96,9 @@ def generate_department_draft(
         metadata=metadata,
         ticket_id=ticket_id,
     )
-    return run_generator_agent(summary, feedback=feedback, iteration=iteration)
+    return run_generator_agent(
+        summary,
+        feedback=feedback,
+        feedback_for_generator=feedback_for_generator,
+        iteration=iteration,
+    )

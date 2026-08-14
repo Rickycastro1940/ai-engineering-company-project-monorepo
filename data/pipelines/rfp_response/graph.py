@@ -31,6 +31,7 @@ from data.pipelines.rfp_response.handoff_consume import (
     synthesizer_payload_from_handoff,
 )
 from data.pipelines.rfp_response.loop import SectionLoopResult, run_section_loop
+from data.pipelines.rfp_response.part3_handoff import build_part3_handoff
 
 REQUIRED_RESPONSE_NODES: tuple[str, ...] = (
     "load_handoff",
@@ -54,6 +55,8 @@ class RfpResponseState(TypedDict, total=False):
     error_message: str | None
     trace: list[dict[str, Any]]
     max_iterations: int
+    part3_handoff: dict[str, Any]
+    discarded: bool
 
 
 def _event(state: RfpResponseState, node: str, **payload: Any) -> list[dict[str, Any]]:
@@ -205,26 +208,34 @@ def finalize_status_node(state: RfpResponseState) -> dict[str, Any]:
     if state.get("error_message"):
         return {
             "status": "failed",
+            "discarded": False,
             "trace": _event(state, "finalize_status", error=state.get("error_message")),
         }
+    sections = list(state.get("section_results") or [])
     all_passed = bool(state.get("all_passed"))
-    exhausted_any = any(
-        r.get("exhausted") for r in (state.get("section_results") or [])
-    )
+    exhausted_any = any(r.get("exhausted") for r in sections)
     if all_passed:
-        # Ready for Part 3 human approvals
         status = STATUS_WAITING_FOR_APPROVAL
-    elif exhausted_any:
-        status = STATUS_NEEDS_HUMAN_REVIEW
     else:
+        # Iteration limit and/or remaining failures → human review, never discard
         status = STATUS_NEEDS_HUMAN_REVIEW
+    part3 = build_part3_handoff(
+        ticket_id=str(state.get("ticket_id") or ""),
+        ticket_status=status,
+        section_results=sections,
+    )
     return {
         "status": status,
+        "discarded": False,
+        "part3_handoff": part3,
         "trace": _event(
             state,
             "finalize_status",
             status=status,
             all_passed=all_passed,
+            exhausted_any=exhausted_any,
+            discarded=False,
+            part3_sections=len(part3.get("sections") or []),
             average_iterations=state.get("average_iterations"),
         ),
     }

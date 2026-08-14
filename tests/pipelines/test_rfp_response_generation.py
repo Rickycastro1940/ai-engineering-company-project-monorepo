@@ -276,6 +276,10 @@ def test_section_loop_exhaustion_path(monkeypatch: pytest.MonkeyPatch) -> None:
     assert loop.exhausted is True
     assert loop.iterations == 2
     assert loop.evaluation.passed is False
+    assert loop.draft_content
+    assert loop.section_status == STATUS_NEEDS_HUMAN_REVIEW
+    assert loop.include_in_part3 is True
+    assert loop.history[1]["feedback_for_generator"]
 
 
 def test_evaluate_section_dimensions_present() -> None:

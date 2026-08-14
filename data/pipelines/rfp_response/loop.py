@@ -1,10 +1,18 @@
-"""Generator → evaluator iteration loop per department (CONTEXT §3 KPI)."""
+"""Generator → evaluator iteration loop per department (CONTEXT §3 KPI).
+
+If a section fails evaluation it returns to **that department's** generator
+agent with ``EvaluationResult.feedback_for_generator``. The loop is capped at
+``MAX_SECTION_ITERATIONS`` (default 2). Exhaustion keeps the last draft +
+EvaluationResult, marks ``needs_human_review``, and still includes the
+section in the Part 3 handoff (ticket is never discarded).
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any
 
+from data.pipelines.rfp_intake.constants import STATUS_NEEDS_HUMAN_REVIEW
 from data.pipelines.rfp_response.compliance_rules import MAX_SECTION_ITERATIONS
 from data.pipelines.rfp_response.evaluators import EvaluationResult, evaluate_section
 from data.pipelines.rfp_response.agents import (
@@ -13,6 +21,7 @@ from data.pipelines.rfp_response.agents import (
     get_generator_agent,
     run_generator_agent,
 )
+from data.pipelines.rfp_response.part3_handoff import section_status_for_loop
 
 
 @dataclass
@@ -26,18 +35,26 @@ class SectionLoopResult:
     history: list[dict[str, Any]] = field(default_factory=list)
     generator_agent: str = ""
     kb_grounded: bool = False
+    section_status: str = "pending"
+    include_in_part3: bool = True
 
     def to_dict(self) -> dict[str, Any]:
+        ev = self.evaluation.to_dict()
         return {
             "department_id": self.department_id,
             "owner": self.owner,
             "draft_content": self.draft_content,
-            "evaluation_results": self.evaluation.to_dict(),
+            "evaluation_results": ev,
+            "feedback_for_generator": list(
+                self.evaluation.feedback_for_generator or self.evaluation.feedback
+            ),
             "iterations": self.iterations,
             "exhausted": self.exhausted,
             "passed": self.evaluation.passed,
             "generator_agent": self.generator_agent,
             "kb_grounded": self.kb_grounded,
+            "section_status": self.section_status,
+            "include_in_part3": True,
             "history": list(self.history),
         }
 
@@ -52,11 +69,7 @@ def run_section_loop(
     summary: Part1DepartmentSummary | None = None,
     ticket_id: str | None = None,
 ) -> SectionLoopResult:
-    """Draft → evaluate → revise until pass or iteration limit.
-
-    Prefers a ``Part1DepartmentSummary`` (per-department Part 1 handoff). The
-    department's generator agent is the only writer of ``draft_content``.
-    """
+    """Draft → evaluate → revise until pass or iteration limit."""
     if summary is None:
         if not department_id:
             raise ValueError("run_section_loop requires department_id or summary")
@@ -70,15 +83,19 @@ def run_section_loop(
             ticket_id=ticket_id,
         )
     agent = get_generator_agent(summary.department_id)
-    feedback: list[str] = []
+    feedback_for_generator: list[str] = []
     history: list[dict[str, Any]] = []
     draft: DraftResult | None = None
     evaluation: EvaluationResult | None = None
 
     limit = max(1, int(max_iterations))
+
     for iteration in range(1, limit + 1):
+        # Always the corresponding department generator — never a different agent
         draft = run_generator_agent(
-            summary, feedback=feedback, iteration=iteration
+            summary,
+            feedback_for_generator=feedback_for_generator or None,
+            iteration=iteration,
         )
         evaluation = evaluate_section(
             department_id=summary.department_id,
@@ -86,16 +103,19 @@ def run_section_loop(
             key_aspects=list(summary.key_aspects),
             metadata=dict(summary.metadata),
         )
+        fb = list(evaluation.feedback_for_generator or evaluation.feedback)
         history.append(
             {
                 "iteration": iteration,
                 "generator_agent": agent.agent_name,
+                "returned_to_generator": agent.agent_name if not evaluation.passed else None,
                 "part1_summary_used": draft.part1_summary_used,
                 "kb_grounded": draft.kb_grounded,
                 "kb_sources": list(draft.kb_sources),
                 "passed": evaluation.passed,
                 "evaluators_parallel": evaluation.parallel,
                 "evaluator_agents": list(evaluation.evaluator_agents),
+                "feedback_for_generator": fb,
                 "feedback": list(evaluation.feedback),
                 "scores": {
                     "readability": evaluation.readability.score,
@@ -115,18 +135,23 @@ def run_section_loop(
                 history=history,
                 generator_agent=agent.agent_name,
                 kb_grounded=draft.kb_grounded,
+                section_status=section_status_for_loop(passed=True, exhausted=False),
+                include_in_part3=True,
             )
-        feedback = list(evaluation.feedback)
+        # Fail → return to the same generator with EvaluationResult.feedback_for_generator
+        feedback_for_generator = fb
 
     assert draft is not None and evaluation is not None
     return SectionLoopResult(
         department_id=summary.department_id,
         owner=draft.owner,
-        draft_content=draft.draft_content,
-        evaluation=evaluation,
+        draft_content=draft.draft_content,  # last draft kept
+        evaluation=evaluation,  # last EvaluationResult kept
         iterations=limit,
         exhausted=True,
         history=history,
         generator_agent=agent.agent_name,
         kb_grounded=draft.kb_grounded,
+        section_status=STATUS_NEEDS_HUMAN_REVIEW,
+        include_in_part3=True,
     )

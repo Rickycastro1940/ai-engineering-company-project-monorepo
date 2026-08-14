@@ -262,7 +262,19 @@ def save_response_result(ticket_id: str, result: Any) -> RfpTicket:
             )
             if section.get("passed"):
                 row.approval_status = row.approval_status or "pending"
+            elif section.get("exhausted") or section.get("section_status") == STATUS_NEEDS_HUMAN_REVIEW:
+                row.approval_status = STATUS_NEEDS_HUMAN_REVIEW
             row.updated_at = _now()
+
+        meta["part3_handoff"] = getattr(result, "part3_handoff", None) or (
+            result.get("part3_handoff") if isinstance(result, dict) else None
+        ) or {}
+        meta["part2_response"]["discarded"] = False
+        ticket.metadata_json = json.dumps(meta, ensure_ascii=False)
+        # Exhausted tickets stay in the flow for Part 3 — never discarded
+        if status == STATUS_NEEDS_HUMAN_REVIEW:
+            ticket.discard_reason = None
+            ticket.discard_rule_id = None
 
         session.add(ticket)
         session.commit()
@@ -414,6 +426,7 @@ def ticket_to_dict(ticket: RfpTicket) -> dict[str, Any]:
         "part2_routed_at": ticket.part2_routed_at,
         "part2_handoff": handoff,
         "part2_response": meta.get("part2_response"),
+        "part3_handoff": meta.get("part3_handoff") or {},
         "ask_whom": ask_whom,
         "open_questions": handoff.get("open_questions") or meta.get("open_questions", []),
         "work_streams": handoff.get("work_streams", []),
