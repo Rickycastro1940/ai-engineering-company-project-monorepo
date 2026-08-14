@@ -33,10 +33,15 @@ from data.pipelines.rfp_response.handoff_consume import (
     assert_part1_routing_ready,
     synthesizer_payload_from_handoff,
 )
-from data.pipelines.rfp_response.loop import run_section_loop
+from data.pipelines.rfp_response.evaluators import (
+    EVALUATOR_AGENTS,
+    EvaluationResult,
+    evaluate_section,
+)
 
 __all__ = [
-    "DraftResult",
+    "EVALUATOR_AGENTS",
+    "EvaluationResult",
     "GENERATOR_AGENTS",
     "MAX_SECTION_ITERATIONS",
     "PRIMARY_GENERATOR_INPUT",

@@ -183,6 +183,8 @@ def test_pipeline_sunset_bay_all_sections_pass() -> None:
         assert ev["readability"]["passed"]
         assert ev["relevance"]["passed"]
         assert ev["compliance"]["passed"]
+        assert ev["parallel"] is True
+        assert "readability_evaluator_agent" in ev["evaluator_agents"]
         for pillar in BRAND_PILLARS:
             assert pillar in section["draft_content"].casefold()
 
@@ -223,6 +225,10 @@ def test_http_generate_response_persists_drafts(client: TestClient) -> None:
         assert row.draft_content
         assert row.evaluation_results_json
         assert "readability" in row.evaluation_results_json
+        parsed = row.evaluation_results_json
+        assert "relevance" in parsed
+        assert "compliance" in parsed
+        assert "evaluator_agents" in parsed
 
     detail = ticket_to_dict(get_ticket(ticket_id))  # type: ignore[arg-type]
     assert detail["part2_response"]["all_passed"] is True

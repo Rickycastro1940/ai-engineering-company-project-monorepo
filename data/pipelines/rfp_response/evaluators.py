@@ -1,5 +1,6 @@
-"""Part 2 evaluators — readability, relevance, and CONTEXT §5 compliance.
+"""Part 2 evaluator agents — readability, relevance, and CONTEXT §5 compliance.
 
+Three agents run **in parallel** over each generated section (ThreadPoolExecutor).
 Compliance checks map 1:1 to CONTEXT-company.md §5 via
 `compliance_rules.CONTEXT_SECTION_5_RULES`.
 """
@@ -7,8 +8,10 @@ Compliance checks map 1:1 to CONTEXT-company.md §5 via
 from __future__ import annotations
 
 import re
+from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Final
 
 from data.pipelines.rfp_response.compliance_rules import (
     BRAND_PILLARS,
@@ -29,16 +32,25 @@ class DimensionResult:
     notes: list[str] = field(default_factory=list)
     failures: list[str] = field(default_factory=list)
     rule_ids: list[str] = field(default_factory=list)
+    evaluator_agent: str = ""
 
 
 @dataclass
 class EvaluationResult:
+    """Structured per-section evaluation (CONTEXT §2.3 ``evaluation_results``).
+
+    Shape is equivalent to DepartmentSection.evaluation_results:
+    readability + relevance + compliance scores, pass flags, and feedback.
+    """
+
     department_id: str
     passed: bool
     readability: DimensionResult
     relevance: DimensionResult
     compliance: DimensionResult
     feedback: list[str] = field(default_factory=list)
+    parallel: bool = True
+    evaluator_agents: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         def _dim(d: DimensionResult) -> dict[str, Any]:
@@ -49,17 +61,34 @@ class EvaluationResult:
                 "notes": list(d.notes),
                 "failures": list(d.failures),
                 "rule_ids": list(d.rule_ids),
+                "evaluator_agent": d.evaluator_agent,
             }
 
+        scores = {
+            "readability": self.readability.score,
+            "relevance": self.relevance.score,
+            "compliance": self.compliance.score,
+        }
         return {
             "department_id": self.department_id,
             "passed": self.passed,
+            "scores": scores,
             "dimensions": {name: _dim(getattr(self, name)) for name in EVAL_DIMENSIONS},
             "readability": _dim(self.readability),
             "relevance": _dim(self.relevance),
             "compliance": _dim(self.compliance),
             "feedback": list(self.feedback),
+            "parallel": self.parallel,
+            "evaluator_agents": list(self.evaluator_agents),
         }
+
+
+@dataclass(frozen=True)
+class EvaluatorContext:
+    department_id: str
+    draft_content: str
+    key_aspects: list[str]
+    metadata: dict[str, Any]
 
 
 # Setup/delivery promises under MIN_SETUP_BUSINESS_DAYS (CONTEXT §5)
@@ -105,30 +134,43 @@ def evaluate_readability(draft: str) -> DimensionResult:
         failures.append("Excessive ALL-CAPS reduces readability.")
         score -= 0.3
 
-    # Use py-readability-metrics (TextStat / Flesch) when available — advisory for
-    # sales-facing copy. Formal RFP sections often score low on Flesch; do not fail
-    # solely on the metric. Hard gates remain length / CAPS / structure above.
+    # Required library path: py-readability-metrics (``readability.Readability``).
+    # Formal proposal copy often scores low on Flesch; do not fail solely on it.
+    notes.append("library=py-readability-metrics")
     try:
         from readability import Readability  # type: ignore
 
-        if len(words) >= 100:
-            r = Readability(text)
-            flesch_score = float(r.flesch().score)
+        r = Readability(text)
+        try:
+            flesch = r.flesch()
+            flesch_score = float(flesch.score)
             notes.append(f"flesch_reading_ease={flesch_score:.1f}")
             if flesch_score < 30:
                 notes.append(
                     "Flesch score low for sales-facing copy; prefer shorter sentences."
                 )
                 score -= 0.05
-    except Exception as exc:  # noqa: BLE001 — optional metric path
-        notes.append(f"textstat_skipped={type(exc).__name__}")
+        except Exception as exc:  # noqa: BLE001 — library needs enough sentences
+            notes.append(f"flesch_skipped={type(exc).__name__}")
+        try:
+            fog = r.gunning_fog()
+            notes.append(f"gunning_fog={float(fog.score):.1f}")
+        except Exception as exc:  # noqa: BLE001
+            notes.append(f"gunning_fog_skipped={type(exc).__name__}")
+    except Exception as exc:  # noqa: BLE001
+        notes.append(f"py-readability-metrics_skipped={type(exc).__name__}")
 
     score = max(0.0, min(1.0, score))
     passed = not failures and score >= 0.6
     if passed:
         notes.append(f"word_count={len(words)}")
     return DimensionResult(
-        name="readability", passed=passed, score=score, notes=notes, failures=failures
+        name="readability",
+        passed=passed,
+        score=score,
+        notes=notes,
+        failures=failures,
+        evaluator_agent="readability_evaluator_agent",
     )
 
 
@@ -154,6 +196,16 @@ def evaluate_relevance(
         failures.append("Draft missing client_name from intake metadata.")
         score -= 0.3
 
+    # Does this section answer what the RFP asked (location / service type)?
+    location = str(metadata.get("location") or "").strip()
+    if location and location.casefold() not in text:
+        notes.append("RFP location not restated in this section.")
+        score -= 0.05
+    service = str(metadata.get("service_type") or metadata.get("scope") or "").strip()
+    if service and service.casefold() not in text:
+        notes.append("RFP service_type/scope weakly covered.")
+        score -= 0.05
+
     hits = 0
     for aspect in key_aspects or []:
         token = aspect.casefold()[:48].strip()
@@ -172,7 +224,12 @@ def evaluate_relevance(
     score = max(0.0, min(1.0, score))
     passed = not failures and score >= 0.6
     return DimensionResult(
-        name="relevance", passed=passed, score=score, notes=notes, failures=failures
+        name="relevance",
+        passed=passed,
+        score=score,
+        notes=notes,
+        failures=failures,
+        evaluator_agent="relevance_evaluator_agent",
     )
 
 
@@ -293,7 +350,76 @@ def evaluate_compliance(draft: str, *, metadata: dict[str, Any] | None = None) -
         notes=notes,
         failures=failures,
         rule_ids=ordered_rules,
+        evaluator_agent="compliance_evaluator_agent",
     )
+
+
+class EvaluatorAgent(ABC):
+    """One evaluator agent for one dimension of a generated section."""
+
+    agent_name: str
+    dimension: str
+
+    @abstractmethod
+    def evaluate(self, ctx: EvaluatorContext) -> DimensionResult:
+        raise NotImplementedError
+
+
+class ReadabilityEvaluatorAgent(EvaluatorAgent):
+    """Sales-facing readability via py-readability-metrics + structure checks."""
+
+    agent_name = "readability_evaluator_agent"
+    dimension = "readability"
+
+    def evaluate(self, ctx: EvaluatorContext) -> DimensionResult:
+        return evaluate_readability(ctx.draft_content)
+
+
+class RelevanceEvaluatorAgent(EvaluatorAgent):
+    """Does the section answer what the RFP asked (Part 1 key_aspects + metadata)?"""
+
+    agent_name = "relevance_evaluator_agent"
+    dimension = "relevance"
+
+    def evaluate(self, ctx: EvaluatorContext) -> DimensionResult:
+        return evaluate_relevance(
+            ctx.draft_content,
+            department_id=ctx.department_id,
+            key_aspects=list(ctx.key_aspects),
+            metadata=dict(ctx.metadata),
+        )
+
+
+class ComplianceEvaluatorAgent(EvaluatorAgent):
+    """CONTEXT-company.md §5 business constraints."""
+
+    agent_name = "compliance_evaluator_agent"
+    dimension = "compliance"
+
+    def evaluate(self, ctx: EvaluatorContext) -> DimensionResult:
+        return evaluate_compliance(ctx.draft_content, metadata=dict(ctx.metadata))
+
+
+EVALUATOR_AGENTS: Final[tuple[EvaluatorAgent, ...]] = (
+    ReadabilityEvaluatorAgent(),
+    RelevanceEvaluatorAgent(),
+    ComplianceEvaluatorAgent(),
+)
+
+
+def run_evaluators_parallel(ctx: EvaluatorContext) -> dict[str, DimensionResult]:
+    """Run all evaluator agents concurrently over the same generated section."""
+    agents = list(EVALUATOR_AGENTS)
+    results: dict[str, DimensionResult] = {}
+    workers = max(1, len(agents))
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="rfp-eval") as pool:
+        futures = {pool.submit(agent.evaluate, ctx): agent for agent in agents}
+        for fut in as_completed(futures):
+            agent = futures[fut]
+            dim = fut.result()
+            dim.evaluator_agent = agent.agent_name
+            results[agent.dimension] = dim
+    return results
 
 
 def evaluate_section(
@@ -303,14 +429,17 @@ def evaluate_section(
     key_aspects: list[str],
     metadata: dict[str, Any],
 ) -> EvaluationResult:
-    readability = evaluate_readability(draft_content)
-    relevance = evaluate_relevance(
-        draft_content,
+    """Fan-out readability / relevance / compliance agents in parallel."""
+    ctx = EvaluatorContext(
         department_id=department_id,
-        key_aspects=key_aspects,
-        metadata=metadata,
+        draft_content=draft_content,
+        key_aspects=list(key_aspects or []),
+        metadata=dict(metadata or {}),
     )
-    compliance = evaluate_compliance(draft_content, metadata=metadata)
+    dims = run_evaluators_parallel(ctx)
+    readability = dims["readability"]
+    relevance = dims["relevance"]
+    compliance = dims["compliance"]
     feedback: list[str] = []
     for dim in (readability, relevance, compliance):
         feedback.extend(dim.failures)
@@ -322,4 +451,6 @@ def evaluate_section(
         relevance=relevance,
         compliance=compliance,
         feedback=feedback,
+        parallel=True,
+        evaluator_agents=[a.agent_name for a in EVALUATOR_AGENTS],
     )

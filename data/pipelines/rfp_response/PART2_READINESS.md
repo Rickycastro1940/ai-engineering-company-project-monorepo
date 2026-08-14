@@ -16,12 +16,13 @@ compliance guidelines, §6 Part 2 deliverable).
 - **Generators must not re-ingest the raw PDF as primary input**
   (`generate_department_draft` rejects `pdf_path` / `markdown_text` kwargs;
   synthesizer payload strips PDF fields).
-- Per active department: a **generator agent** (`marketing_generator_agent`,
-  `operaciones_generator_agent`, `procurement_generator_agent`,
-  `training_generator_agent`) receives **that department's Part 1 summary**
-  (`work_streams[].key_aspects`) and writes that department's section of the
-  **pricing proposal** (CONTEXT §2.1 remit). Then evaluators score
-  readability, relevance, and compliance (§5).
+- Per active department: a **generator agent** writes that department's
+  pricing-proposal section from the Part 1 summary, then **three evaluator
+  agents run in parallel** over the generated section:
+  `readability_evaluator_agent` (`py-readability-metrics`),
+  `relevance_evaluator_agent` (does the draft answer the RFP / key_aspects),
+  `compliance_evaluator_agent` (CONTEXT-company.md §5). Persist a structured
+  `EvaluationResult` on `RfpDepartmentSection.evaluation_results_json`.
 - Optional (not graded): generators may ground drafts in the existing
   Brasaland knowledge base (`data.pipelines.rag.retrieve`, same source docs
   as `POST /knowledge/query`) so policy/brand language is real. Disable with

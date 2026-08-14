@@ -6,11 +6,13 @@ Flow per ticket (from Part 1 handoff, no PDF reparse):
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
 from data.pipelines.rfp_intake.constants import (
+    DEPARTMENT_IDS,
     STATUS_DRAFTING,
     STATUS_INTAKE_COMPLETE,
     STATUS_NEEDS_HUMAN_REVIEW,
@@ -136,31 +138,50 @@ def generate_evaluate_sections_node(state: RfpResponseState) -> dict[str, Any]:
         }
     )
 
-    for stream in payload.get("work_streams") or []:
+    streams = [
+        stream
+        for stream in (payload.get("work_streams") or [])
+        if stream.get("department_id")
+    ]
+    ticket_id = str(state.get("ticket_id") or payload.get("ticket_id") or "")
+
+    def _run_stream(stream: dict[str, Any]) -> tuple[SectionLoopResult, str, int]:
         dept = stream.get("department_id") or ""
-        if not dept:
-            continue
         summary = Part1DepartmentSummary.from_work_stream(
-            stream,
-            metadata=metadata,
-            ticket_id=str(state.get("ticket_id") or payload.get("ticket_id") or ""),
+            stream, metadata=metadata, ticket_id=ticket_id
         )
         agent = get_generator_agent(dept)
-        loop_result: SectionLoopResult = run_section_loop(
-            summary=summary,
-            max_iterations=max_iter,
-        )
+        loop_result = run_section_loop(summary=summary, max_iterations=max_iter)
+        return loop_result, agent.agent_name, len(summary.key_aspects)
+
+    workers = max(1, min(4, len(streams)))
+    gathered: list[tuple[SectionLoopResult, str, int]] = []
+    if streams:
+        with ThreadPoolExecutor(
+            max_workers=workers, thread_name_prefix="rfp-section-eval"
+        ) as pool:
+            futs = [pool.submit(_run_stream, stream) for stream in streams]
+            for fut in as_completed(futs):
+                gathered.append(fut.result())
+
+    order = {d: i for i, d in enumerate(sorted(DEPARTMENT_IDS))}
+    gathered.sort(key=lambda item: order.get(item[0].department_id, 99))
+
+    for loop_result, agent_name, aspects_count in gathered:
         results.append(loop_result.to_dict())
+        ev = loop_result.evaluation
         trace.append(
             {
                 "node": "generate_evaluate_sections",
                 "payload": {
-                    "department_id": dept,
-                    "generator_agent": agent.agent_name,
+                    "department_id": loop_result.department_id,
+                    "generator_agent": agent_name,
+                    "evaluator_agents": list(ev.evaluator_agents),
+                    "evaluators_parallel": ev.parallel,
                     "iterations": loop_result.iterations,
-                    "passed": loop_result.evaluation.passed,
+                    "passed": ev.passed,
                     "exhausted": loop_result.exhausted,
-                    "key_aspects_count": len(summary.key_aspects),
+                    "key_aspects_count": aspects_count,
                     "input": "part1_work_stream_key_aspects",
                     "part1_summary_used": True,
                     "kb_grounded": loop_result.kb_grounded,

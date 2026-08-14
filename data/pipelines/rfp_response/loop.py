@@ -94,6 +94,8 @@ def run_section_loop(
                 "kb_grounded": draft.kb_grounded,
                 "kb_sources": list(draft.kb_sources),
                 "passed": evaluation.passed,
+                "evaluators_parallel": evaluation.parallel,
+                "evaluator_agents": list(evaluation.evaluator_agents),
                 "feedback": list(evaluation.feedback),
                 "scores": {
                     "readability": evaluation.readability.score,
