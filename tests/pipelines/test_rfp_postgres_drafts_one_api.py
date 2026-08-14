@@ -157,9 +157,9 @@ def test_canonical_host_mounts_same_rfp_router() -> None:
 def test_generate_response_lives_on_existing_services_rfp_router() -> None:
     assert rfp_api_router.prefix == "/rfp"
     paths = {getattr(route, "path", "") for route in rfp_api_router.routes}
-    assert "/tickets" in paths
-    assert "/tickets/{ticket_id}" in paths
-    assert "/tickets/{ticket_id}/generate-response" in paths
+    assert "/rfp/tickets" in paths
+    assert "/rfp/tickets/{ticket_id}" in paths
+    assert "/rfp/tickets/{ticket_id}/generate-response" in paths
     routes_src = (SERVICES_RFP / "routes.py").read_text(encoding="utf-8")
     assert "from data.pipelines.rfp_response import" in routes_src
     assert "run_response_for_ticket" in routes_src
