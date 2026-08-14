@@ -27,6 +27,7 @@ from data.pipelines.rfp_response.agents import (
     get_generator_agent,
     run_generator_agent,
 )
+from data.pipelines.rfp_response.compliance_rules import SECTION_REQUIRED_HEADINGS
 from data.pipelines.rfp_response.generator import generate_department_draft
 
 REPO = Path(__file__).resolve().parents[2]
@@ -129,6 +130,8 @@ def test_each_agent_writes_department_specific_pricing_section() -> None:
         assert remit.split(",")[0].strip() in text or remit[:20] in text
         for marker in _SECTION_MARKERS[dept]:
             assert marker in text, f"{dept} missing {marker!r}"
+        for heading in SECTION_REQUIRED_HEADINGS[dept]:
+            assert f"## {heading}".casefold() in text, f"{dept} missing heading {heading!r}"
 
     # Sections must not be interchangeable — ops is not a brand-terms letter
     assert "cost per event" in drafts[DEPARTMENT_OPERACIONES]

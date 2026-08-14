@@ -17,11 +17,16 @@ compliance guidelines, §6 Part 2 deliverable).
   (`generate_department_draft` rejects `pdf_path` / `markdown_text` kwargs;
   synthesizer payload strips PDF fields).
 - Per active department: a **generator agent** writes that department's
-  pricing-proposal section from the Part 1 summary, then **three evaluator
+  proposal section in the **CONTEXT §2.1 format** (required headings taken
+  from the contribution column: brand terms / exclusivity / co-branding /
+  offer validity; kitchen/staff capacity / setup times / cost per event;
+  ingredient cost based on volume / supplier lead times; new recipe or
+  standard / development and certification time). Then **three evaluator
   agents run in parallel** over the generated section:
   `readability_evaluator_agent` (`py-readability-metrics`),
-  `relevance_evaluator_agent` (does the draft answer the RFP / key_aspects),
-  `compliance_evaluator_agent` (CONTEXT-company.md §5). Persist a structured
+  `relevance_evaluator_agent` (§2.1 headings + owner + Part 1 `key_aspects`),
+  `compliance_evaluator_agent` (CONTEXT-company.md §5 bullets, not a generic
+  SaaS policy checklist). Persist a structured
   `EvaluationResult` on `RfpDepartmentSection.evaluation_results_json`.
 - Optional (not graded): generators may ground drafts in the existing
   Brasaland knowledge base (`data.pipelines.rag.retrieve`, same source docs
@@ -50,7 +55,8 @@ Source of truth: `compliance_rules.CONTEXT_SECTION_5_RULES` →
 6. `ceo_threshold` — >$50k flagged for CEO (Part 3; Mariana Restrepo)
 
 Also: readability (sales-facing; TextStat/Flesch when available) and
-relevance (grounded in Part 1 `key_aspects` + metadata — not the PDF).
+relevance (CONTEXT §2.1 section headings + owner + Part 1 `key_aspects`
+and RFP metadata — not a generic SaaS outline, not the PDF).
 
 ## Layout
 

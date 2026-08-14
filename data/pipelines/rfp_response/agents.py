@@ -25,8 +25,11 @@ from data.pipelines.rfp_intake.constants import (
 )
 from data.pipelines.rfp_response.compliance_rules import (
     BRAND_PILLARS,
+    CEO_NAME,
+    CEO_USD_THRESHOLD,
     MIN_SETUP_BUSINESS_DAYS,
     OFFER_VALIDITY_PHRASE,
+    SECTION_REQUIRED_HEADINGS,
 )
 from data.pipelines.rfp_response.kb_grounding import (
     format_kb_section,
@@ -143,6 +146,39 @@ def _budget_line(metadata: dict[str, Any]) -> str:
     )
 
 
+def _contract_exceeds_ceo_threshold(metadata: dict[str, Any]) -> bool:
+    if metadata.get("requires_ceo_approval"):
+        return True
+    value = metadata.get("estimated_contract_value_usd")
+    if value is None:
+        return False
+    try:
+        return float(value) > CEO_USD_THRESHOLD
+    except (TypeError, ValueError):
+        return False
+
+
+def _ceo_approval_block(metadata: dict[str, Any]) -> list[str]:
+    if not _contract_exceeds_ceo_threshold(metadata):
+        return []
+    return [
+        "## CEO approval (CONTEXT §5)",
+        (
+            f"Estimated annual value exceeds USD ${CEO_USD_THRESHOLD:,.0f}/year. "
+            f"Additional CEO approval is required from {CEO_NAME} before the "
+            "final document is generated (Part 3)."
+        ),
+        "",
+    ]
+
+
+def _required_headings(department_id: str) -> tuple[str, ...]:
+    headings = SECTION_REQUIRED_HEADINGS.get(department_id)
+    if not headings:
+        raise KeyError(f"No CONTEXT §2.1 section format for {department_id!r}")
+    return headings
+
+
 def _compliance_footer(*, feedback: list[str]) -> list[str]:
     lines: list[str] = []
     if feedback:
@@ -165,6 +201,11 @@ def _compliance_footer(*, feedback: list[str]) -> list[str]:
             )
         if "competitor" in joined_fb:
             lines.append("Competitor names removed; proposal uses Brasaland branding only.")
+        if "ceo" in joined_fb or "mariana" in joined_fb or "50,000" in joined_fb:
+            lines.append(
+                f"Additional CEO approval required from {CEO_NAME} for contracts "
+                f"above USD ${CEO_USD_THRESHOLD:,.0f}/year."
+            )
         lines.append("")
     return lines
 
@@ -215,17 +256,23 @@ class DepartmentGeneratorAgent(ABC):
             f"Client: {client} | Location: {location}",
             f"Service: {service} | Proposal deadline: {deadline}",
             "",
-            _pillars_paragraph(),
-            f"Offer validity period for this proposal: {OFFER_VALIDITY_PHRASE}.",
-            "",
             "## Department remit (CONTEXT §2.1)",
             remit or f"Department contribution for {self.department_id}.",
             "",
-            "## Part 1 summary received (handoff key_aspects)",
-            "This agent drafts only from the department-relevant summary produced in Part 1.",
-            _aspects_block(summary.key_aspects),
+            _pillars_paragraph(),
+            f"Offer validity period for this proposal: {OFFER_VALIDITY_PHRASE}.",
             "",
         ]
+        lines.extend(_ceo_approval_block(meta))
+        lines.extend(
+            [
+                "## Part 1 summary received (handoff key_aspects)",
+                "This agent drafts only from the department-relevant summary produced in Part 1.",
+                _aspects_block(summary.key_aspects),
+                "",
+                "## Proposal section (CONTEXT §2.1 format)",
+            ]
+        )
         lines.extend(self.build_pricing_proposal_section(summary, client=client, location=location))
         extra_q = " ".join(summary.key_aspects[:3])
         kb_snips = lookup_department_knowledge(self.department_id, extra_query=extra_q)
@@ -278,17 +325,23 @@ class MarketingGeneratorAgent(DepartmentGeneratorAgent):
         client: str,
         location: str,
     ) -> list[str]:
+        brand, exclusivity, cobranding, validity = _required_headings(self.department_id)
         return [
-            "## Pricing proposal — brand, exclusivity, and commercial terms",
-            f"Marketing (Camila Ospina) owns this ticket and frames the commercial offer for {client} "
-            f"at {location}. Co-branding and exclusivity language is included only where the Part 1 "
-            "summary shows the RFP requested it — we do not invent partnership scope.",
-            "Commercial terms in this section cover brand usage, campaign coordination, and the "
-            f"public-facing offer window. Offer validity period: {OFFER_VALIDITY_PHRASE}.",
-            "Any listed commercial envelope uses both USD $ and COP $ labels; Marketing does not "
-            "convert currencies or invent a TRM.",
-            "This is the Sales-facing cover of the pricing proposal: other departments attach "
-            "operations, ingredient cost, and training time in their own sections.",
+            f"## {brand}",
+            f"Marketing ({DEPARTMENT_OWNERS[self.department_id]}) owns this ticket and "
+            f"sets brand-usage terms for {client} at {location}. Brand language follows "
+            "Brasaland identity only — we do not invent marks or campaign slogans absent "
+            "from the Part 1 summary.",
+            f"## {exclusivity}",
+            "Exclusivity is granted only where the Part 1 summary shows the RFP requested "
+            "it. We do not invent an exclusive territory or term.",
+            f"## {cobranding}",
+            "Co-branding and campaign coordination appear only when the RFP (via Part 1 "
+            "key_aspects) asks for a co-branded concession, menu, or joint campaign.",
+            f"## {validity}",
+            f"Offer validity period: {OFFER_VALIDITY_PHRASE}.",
+            "Any listed commercial envelope uses both USD $ and COP $ labels; Marketing "
+            "does not convert currencies or invent a TRM.",
             "",
         ]
 
@@ -306,17 +359,22 @@ class OperacionesGeneratorAgent(DepartmentGeneratorAgent):
         client: str,
         location: str,
     ) -> list[str]:
+        kitchen, setup, cost_per_event = _required_headings(self.department_id)
         return [
-            "## Pricing proposal — operational feasibility and cost per event",
-            f"Restaurant Operations prices kitchen staffing, prep, setup, and service for {client} "
-            f"at {location} using only volume figures present in the Part 1 summary.",
-            f"Setup and delivery commitments are never shorter than {MIN_SETUP_BUSINESS_DAYS} "
-            "business days (Brasaland guideline). We do not promise same-week go-live.",
-            "Cost-per-event estimates remain subject to diner counts / location counts stated in "
-            "the Part 1 key_aspects. Missing headcount stays an open question — we do not invent it.",
-            "When a per-event figure is stated, it is labeled in both USD $ and COP $ without "
-            "inventing an exchange rate. Operations does not quote ingredient unit costs "
-            "(that is the procurement section).",
+            f"## {kitchen}",
+            f"Restaurant Operations ({DEPARTMENT_OWNERS[self.department_id]}) sizes kitchen "
+            f"and staff capacity for {client} at {location} using only volume figures "
+            "present in the Part 1 summary. Missing headcount stays an open question — "
+            "we do not invent it.",
+            f"## {setup}",
+            f"Setup times and delivery commitments are never shorter than "
+            f"{MIN_SETUP_BUSINESS_DAYS} business days (Brasaland guideline). We do not "
+            "promise same-week go-live.",
+            f"## {cost_per_event}",
+            "Cost per event remains subject to diner counts / location counts stated in "
+            "the Part 1 key_aspects. When a per-event figure is stated, it is labeled in "
+            "both USD $ and COP $ without inventing an exchange rate. Operations does not "
+            "quote ingredient unit costs (that is the procurement section).",
             "",
         ]
 
@@ -334,16 +392,20 @@ class ProcurementGeneratorAgent(DepartmentGeneratorAgent):
         client: str,
         location: str,
     ) -> list[str]:
+        ingredient_cost, lead_times = _required_headings(self.department_id)
         return [
-            "## Pricing proposal — ingredient cost and supplier lead times",
-            f"Procurement estimates ingredient cost for {client} ({location}) from the volume "
-            "and budget language in the Part 1 summary only.",
+            f"## {ingredient_cost}",
+            f"Procurement ({DEPARTMENT_OWNERS[self.department_id]}) estimates ingredient "
+            f"cost for {client} ({location}) from the volume and budget language in the "
+            "Part 1 summary only.",
             _budget_line(summary.metadata),
-            "Supplier lead times follow Brasaland procurement procedure; emergency orders follow "
-            "documented approval thresholds. Lead time in this pricing section is never shorter "
-            f"than {MIN_SETUP_BUSINESS_DAYS} business days when tied to first delivery.",
-            "All prices in this section are expressed with both USD $ and COP $ labels when a "
-            "monetary figure is stated. Procurement does not invent unit prices or FX.",
+            "All prices in this section are expressed with both USD $ and COP $ labels "
+            "when a monetary figure is stated. Procurement does not invent unit prices or FX.",
+            f"## {lead_times}",
+            "Supplier lead times follow Brasaland procurement procedure; emergency orders "
+            "follow documented approval thresholds. Lead time in this pricing section is "
+            f"never shorter than {MIN_SETUP_BUSINESS_DAYS} business days when tied to "
+            "first delivery.",
             "",
         ]
 
@@ -361,16 +423,20 @@ class TrainingGeneratorAgent(DepartmentGeneratorAgent):
         client: str,
         location: str,
     ) -> list[str]:
+        recipe, cert_time = _required_headings(self.department_id)
         return [
-            "## Pricing proposal — training, recipe development, and certification time",
-            f"Training prices development and certification effort for {client} only when the "
-            "Part 1 summary shows a new recipe, signature dish, or quality standard.",
-            "If the client requested the existing standard menu only, certification scope stays "
-            "limited to a brand quality refresh — no invented curriculum and no invented hours.",
-            f"Training calendar respects the {MIN_SETUP_BUSINESS_DAYS} business-day minimum "
-            "before go-live so operations can absorb certified recipes.",
-            "Any training-related fee in this pricing section is labeled in both USD $ and COP $ "
-            "when a figure is stated; we do not invent a rate card.",
+            f"## {recipe}",
+            f"Training ({DEPARTMENT_OWNERS[self.department_id]}) prices a new recipe or "
+            f"standard for {client} only when the Part 1 summary shows a new recipe, "
+            "signature dish, or quality standard. If the client requested the existing "
+            "standard menu only, this heading records that no new recipe is in scope — "
+            "no invented curriculum.",
+            f"## {cert_time}",
+            "Development and certification time needed is taken from the Part 1 summary "
+            f"when present. The training calendar respects the {MIN_SETUP_BUSINESS_DAYS} "
+            "business-day minimum before go-live so operations can absorb certified recipes. "
+            "Any training-related fee is labeled in both USD $ and COP $ when a figure is "
+            "stated; we do not invent a rate card or hours.",
             "",
         ]
 

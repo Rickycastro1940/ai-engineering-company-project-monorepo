@@ -92,6 +92,8 @@ def test_context_section_5_rules_match_company_md() -> None:
         "ceo_threshold",
     }
     assert {r["id"] for r in CONTEXT_SECTION_5_RULES} == expected_ids
+    bullets = [line[2:].strip() for line in section.splitlines() if line.startswith("- ")]
+    assert bullets == [r["guideline"] for r in CONTEXT_SECTION_5_RULES]
     assert "cop" in section_cf and "usd" in section_cf
     for pillar in BRAND_PILLARS:
         assert pillar in section_cf

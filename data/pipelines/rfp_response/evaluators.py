@@ -15,12 +15,16 @@ from typing import Any, Final
 
 from data.pipelines.rfp_response.compliance_rules import (
     BRAND_PILLARS,
+    CEO_NAME,
     CEO_USD_THRESHOLD,
+    CONTEXT_SECTION_5_RULES,
     EVAL_DIMENSIONS,
     FORBIDDEN_COMPETITOR_NAMES,
     MIN_SETUP_BUSINESS_DAYS,
     OFFER_VALIDITY_DAYS,
     OFFER_VALIDITY_PHRASE,
+    SECTION_OWNERS,
+    SECTION_REQUIRED_HEADINGS,
 )
 
 
@@ -98,7 +102,7 @@ _SETUP_TOO_SHORT = re.compile(
     r"(?:setup|delivery|deliver|instalaci[oó]n|lead\s*time|timeline)"
     r"[^\n.]{0,40}?"
     r"(?:in|within|under|en|of)?\s*"
-    r"([1-9]|10)\s*(?:business\s*)?days?",
+    r"([1-9]|10)(?!\d)\s*(?:business\s*)?days?",
     re.I,
 )
 _MONEY = re.compile(
@@ -183,7 +187,11 @@ def evaluate_relevance(
     key_aspects: list[str],
     metadata: dict[str, Any],
 ) -> DimensionResult:
-    """Ground the draft in Part 1 handoff (key_aspects + metadata), not the PDF."""
+    """Section must match CONTEXT §2.1 format and answer the Part 1 RFP summary.
+
+    Generic SaaS outlines (SLA, SOC 2, implementation plan) are not a substitute
+    for the department contribution headings in CONTEXT-company.md §2.1.
+    """
     text = (draft or "").casefold()
     notes: list[str] = []
     failures: list[str] = []
@@ -192,6 +200,27 @@ def evaluate_relevance(
     if department_id.casefold() not in text and department_id.replace("_", " ") not in text:
         failures.append(f"Draft does not reference department `{department_id}`.")
         score -= 0.4
+
+    owner = SECTION_OWNERS.get(department_id, "")
+    if owner and owner.casefold() not in text:
+        failures.append(
+            f"Section format (CONTEXT §2.1) missing owner {owner}."
+        )
+        score -= 0.3
+
+    missing_headings = [
+        heading
+        for heading in SECTION_REQUIRED_HEADINGS.get(department_id, ())
+        if heading.casefold() not in text
+    ]
+    if missing_headings:
+        failures.append(
+            "Section format (CONTEXT §2.1) missing required heading(s): "
+            + ", ".join(missing_headings)
+        )
+        score -= 0.2 * min(3, len(missing_headings))
+    else:
+        notes.append("context_section_2_1_format_ok")
 
     client = str(metadata.get("client_name") or "").strip()
     if client and client.casefold() not in text:
@@ -235,31 +264,17 @@ def evaluate_relevance(
     )
 
 
-def evaluate_compliance(draft: str, *, metadata: dict[str, Any] | None = None) -> DimensionResult:
-    """Validate CONTEXT-company.md §5 business constraints on a section draft.
-
-    Each failure is tagged with a ``rule_id`` from CONTEXT_SECTION_5_RULES.
-    """
-    text = draft or ""
-    text_cf = text.casefold()
-    notes: list[str] = []
-    failures: list[str] = []
-    rule_ids: list[str] = []
-    score = 1.0
-    meta = metadata or {}
-
-    # --- brand_pillars -------------------------------------------------------
-    missing_pillars = [p for p in BRAND_PILLARS if p not in text_cf]
-    if missing_pillars:
-        failures.append(
-            "[brand_pillars] Missing brand pillar(s): " + ", ".join(missing_pillars)
+def _check_brand_pillars(text_cf: str, _meta: dict[str, Any]) -> tuple[list[str], list[str]]:
+    missing = [p for p in BRAND_PILLARS if p not in text_cf]
+    if missing:
+        return (
+            ["[brand_pillars] Missing brand pillar(s): " + ", ".join(missing)],
+            [],
         )
-        rule_ids.append("brand_pillars")
-        score -= 0.25 * len(missing_pillars)
-    else:
-        notes.append("brand_pillars_ok")
+    return [], ["brand_pillars_ok"]
 
-    # --- offer_validity ------------------------------------------------------
+
+def _check_offer_validity(text_cf: str, _meta: dict[str, Any]) -> tuple[list[str], list[str]]:
     validity_ok = (
         OFFER_VALIDITY_PHRASE.casefold() in text_cf
         or (
@@ -269,15 +284,20 @@ def evaluate_compliance(draft: str, *, metadata: dict[str, Any] | None = None) -
         or "30 days from issuance" in text_cf
     )
     if not validity_ok:
-        failures.append(
-            f"[offer_validity] Offer validity period ({OFFER_VALIDITY_PHRASE}) not stated."
+        return (
+            [
+                f"[offer_validity] Offer validity period ({OFFER_VALIDITY_PHRASE}) not stated."
+            ],
+            [],
         )
-        rule_ids.append("offer_validity")
-        score -= 0.25
-    else:
-        notes.append("offer_validity_ok")
+    return [], ["offer_validity_ok"]
 
-    # --- min_setup_business_days ---------------------------------------------
+
+def _check_min_setup_business_days(
+    text: str, _meta: dict[str, Any]
+) -> tuple[list[str], list[str]]:
+    failures: list[str] = []
+    notes: list[str] = []
     for match in _SETUP_TOO_SHORT.finditer(text):
         days = int(match.group(1))
         if days < MIN_SETUP_BUSINESS_DAYS:
@@ -285,60 +305,126 @@ def evaluate_compliance(draft: str, *, metadata: dict[str, Any] | None = None) -
                 f"[min_setup_business_days] Setup/delivery promise of {days} days is "
                 f"below {MIN_SETUP_BUSINESS_DAYS} business days."
             )
-            rule_ids.append("min_setup_business_days")
-            score -= 0.4
-
+    text_cf = text.casefold()
     if (
-        "business days" in text_cf
+        not failures
+        and "business days" in text_cf
         and str(MIN_SETUP_BUSINESS_DAYS) in text_cf
-        and "min_setup_business_days" not in rule_ids
     ):
         notes.append("setup_sla_mentioned")
+    return failures, notes
 
-    # --- no_competitors ------------------------------------------------------
+
+def _check_no_competitors(text_cf: str, _meta: dict[str, Any]) -> tuple[list[str], list[str]]:
+    failures: list[str] = []
     for name in FORBIDDEN_COMPETITOR_NAMES:
         if name in text_cf:
             failures.append(f"[no_competitors] Mentions competitor {name!r} (forbidden).")
-            rule_ids.append("no_competitors")
-            score -= 0.5
+    return failures, []
 
-    # --- dual_currency -------------------------------------------------------
+
+def _check_dual_currency(text: str, _meta: dict[str, Any]) -> tuple[list[str], list[str]]:
+    failures: list[str] = []
+    notes: list[str] = []
+    text_cf = text.casefold()
     if _MONEY.search(text) or _HAS_USD.search(text) or _HAS_COP.search(text):
         if not (_HAS_USD.search(text) and _HAS_COP.search(text)):
             failures.append(
                 "[dual_currency] Monetary figures must be expressed with both "
                 "USD $ and COP $ labels."
             )
-            rule_ids.append("dual_currency")
-            score -= 0.3
         else:
             notes.append("dual_currency_ok")
-
-    # Never invent FX / TRM (supports honest dual-currency labeling)
     if re.search(r"converted at|exchange rate of|usando trm", text_cf):
         failures.append(
             "[dual_currency] Do not invent currency conversion / TRM rates."
         )
-        if "dual_currency" not in rule_ids:
-            rule_ids.append("dual_currency")
-        score -= 0.3
+    return failures, notes
 
-    # --- ceo_threshold (Part 2 flags; Part 3 enforces approval) --------------
+
+def _check_ceo_threshold(text: str, meta: dict[str, Any]) -> tuple[list[str], list[str]]:
+    """Flag (and require mention of) CEO approval when value exceeds $50,000 USD/year."""
+    notes: list[str] = []
+    failures: list[str] = []
+    text_cf = text.casefold()
     value = meta.get("estimated_contract_value_usd")
+    requires = bool(meta.get("requires_ceo_approval"))
+    over = requires
+    parsed: float | None = None
     if value is not None:
         try:
-            if float(value) > CEO_USD_THRESHOLD:
-                notes.append(
-                    f"ceo_approval_required_part3 "
-                    f"(value_usd={float(value):.0f} > {CEO_USD_THRESHOLD:.0f})"
-                )
-                rule_ids.append("ceo_threshold")
+            parsed = float(value)
+            over = over or parsed > CEO_USD_THRESHOLD
         except (TypeError, ValueError):
             notes.append("ceo_threshold_value_unparseable")
+    if not over:
+        return [], notes
+    amount = parsed if parsed is not None else CEO_USD_THRESHOLD
+    notes.append(
+        f"ceo_approval_required_part3 (value_usd={amount:.0f} > {CEO_USD_THRESHOLD:.0f})"
+    )
+    mentions_ceo = CEO_NAME.casefold() in text_cf or (
+        "ceo" in text_cf and "approval" in text_cf
+    )
+    if not mentions_ceo:
+        failures.append(
+            f"[ceo_threshold] Estimated contracts above ${CEO_USD_THRESHOLD:,.0f} USD/year "
+            f"must flag additional CEO approval ({CEO_NAME}) before the final document "
+            "is generated."
+        )
+    return failures, notes
+
+
+_COMPLIANCE_CHECKERS: Final[dict[str, Any]] = {
+    "brand_pillars": _check_brand_pillars,
+    "offer_validity": _check_offer_validity,
+    "min_setup_business_days": _check_min_setup_business_days,
+    "no_competitors": _check_no_competitors,
+    "dual_currency": _check_dual_currency,
+    "ceo_threshold": _check_ceo_threshold,
+}
+
+
+def evaluate_compliance(draft: str, *, metadata: dict[str, Any] | None = None) -> DimensionResult:
+    """Validate CONTEXT-company.md §5 business constraints on a section draft.
+
+    Each CONTEXT_SECTION_5_RULES entry is checked; failures are tagged with
+    that rule's ``id`` so feedback maps 1:1 to company guidelines.
+    """
+    text = draft or ""
+    text_cf = text.casefold()
+    notes: list[str] = []
+    failures: list[str] = []
+    rule_ids: list[str] = []
+    score = 1.0
+    meta = metadata or {}
+
+    for rule in CONTEXT_SECTION_5_RULES:
+        rule_id = rule["id"]
+        checker = _COMPLIANCE_CHECKERS[rule_id]
+        # Checkers that scan raw text (setup regex, dual-currency, CEO) need `text`.
+        if rule_id in {"min_setup_business_days", "dual_currency", "ceo_threshold"}:
+            rule_failures, rule_notes = checker(text, meta)
+        else:
+            rule_failures, rule_notes = checker(text_cf, meta)
+        notes.extend(rule_notes)
+        if rule_failures:
+            failures.extend(rule_failures)
+            rule_ids.append(rule_id)
+            score -= 0.25 if rule_id != "min_setup_business_days" else 0.4
+            if rule_id == "no_competitors":
+                score -= 0.25  # already 0.25; total 0.5 to match prior severity
+            if rule_id == "brand_pillars":
+                missing_n = max(1, len([p for p in BRAND_PILLARS if p not in text_cf]))
+                score -= 0.25 * (missing_n - 1)
+        elif rule_id == "ceo_threshold" and any(
+            n.startswith("ceo_approval_required_part3") for n in rule_notes
+        ):
+            # Part 2 flags the guideline; Part 3 enforces the extra approval.
+            rule_ids.append(rule_id)
 
     score = max(0.0, min(1.0, score))
     passed = not failures and score >= 0.7
-    # Deduplicate rule_ids while preserving order
     seen: set[str] = set()
     ordered_rules: list[str] = []
     for rid in rule_ids:
@@ -378,7 +464,7 @@ class ReadabilityEvaluatorAgent(EvaluatorAgent):
 
 
 class RelevanceEvaluatorAgent(EvaluatorAgent):
-    """Does the section answer what the RFP asked (Part 1 key_aspects + metadata)?"""
+    """Does the section match CONTEXT §2.1 format and answer the Part 1 RFP summary?"""
 
     agent_name = "relevance_evaluator_agent"
     dimension = "relevance"

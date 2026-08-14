@@ -114,6 +114,10 @@ def synthesizer_payload_from_handoff(handoff: dict[str, Any]) -> dict[str, Any]:
     metadata = dict(handoff.get("metadata") or {})
     for banned in _NON_PRIMARY_FIELDS:
         metadata.pop(banned, None)
+    if handoff.get("requires_ceo_approval"):
+        metadata["requires_ceo_approval"] = True
+    if handoff.get("ceo_approver"):
+        metadata.setdefault("ceo_approver", handoff["ceo_approver"])
 
     return {
         "ticket_id": handoff.get("ticket_id"),
