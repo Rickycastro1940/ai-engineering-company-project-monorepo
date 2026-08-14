@@ -185,7 +185,15 @@ def generate_evaluate_sections_node(state: RfpResponseState) -> dict[str, Any]:
         ) as pool:
             futs = [pool.submit(_run_stream, stream) for stream in streams]
             for fut in as_completed(futs):
-                gathered.append(fut.result())
+                item = fut.result()
+                gathered.append(item)
+                # Persist each finished department immediately so GET /tickets/{id}
+                # reflects generation/evaluation progress while others still run.
+                _persist_ticket_progress(
+                    ticket_id,
+                    STATUS_UNDER_EVALUATION,
+                    section_results=[item[0].to_dict()],
+                )
 
     order = {d: i for i, d in enumerate(sorted(DEPARTMENT_IDS))}
     gathered.sort(key=lambda item: order.get(item[0].department_id, 99))
