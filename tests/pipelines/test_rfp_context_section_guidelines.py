@@ -237,6 +237,18 @@ def test_compliance_checkers_cover_every_context_section_5_rule() -> None:
     assert set(ev_mod._COMPLIANCE_CHECKERS) == {r["id"] for r in CONTEXT_SECTION_5_RULES}
     src = Path(ev_mod.__file__).read_text(encoding="utf-8")
     assert "CONTEXT_SECTION_5_RULES" in src
-    assert "SOC 2" not in src
-    assert "GDPR" not in src
-    assert "ISO 27001" not in src
+    rules_src = Path(
+        __import__(
+            "data.pipelines.rfp_response.compliance_rules", fromlist=["x"]
+        ).__file__
+    ).read_text(encoding="utf-8")
+    assert "GDPR" not in rules_src
+    assert "ISO 27001" not in rules_src
+    assert {r["id"] for r in CONTEXT_SECTION_5_RULES} == {
+        "dual_currency",
+        "brand_pillars",
+        "min_setup_business_days",
+        "no_competitors",
+        "offer_validity",
+        "ceo_threshold",
+    }

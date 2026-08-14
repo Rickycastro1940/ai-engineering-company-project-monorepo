@@ -99,10 +99,10 @@ class EvaluatorContext:
 
 # Setup/delivery promises under MIN_SETUP_BUSINESS_DAYS (CONTEXT §5)
 _SETUP_TOO_SHORT = re.compile(
-    r"(?:setup|delivery|deliver|instalaci[oó]n|lead\s*time|timeline)"
+    r"\b(?:setup|delivery|instalaci[oó]n|lead\s*time|timeline)\b"
     r"[^\n.]{0,40}?"
-    r"(?:in|within|under|en|of)?\s*"
-    r"([1-9]|10)(?!\d)\s*(?:business\s*)?days?",
+    r"(?:in|within|under|en|of|than)?\s*"
+    r"(\d+)\s*(?:business\s*)?days?",
     re.I,
 )
 _MONEY = re.compile(
@@ -189,8 +189,8 @@ def evaluate_relevance(
 ) -> DimensionResult:
     """Section must match CONTEXT §2.1 format and answer the Part 1 RFP summary.
 
-    Generic SaaS outlines (SLA, SOC 2, implementation plan) are not a substitute
-    for the department contribution headings in CONTEXT-company.md §2.1.
+    Generic vendor outlines are not a substitute for the department contribution
+    headings in CONTEXT-company.md §2.1.
     """
     text = (draft or "").casefold()
     notes: list[str] = []
