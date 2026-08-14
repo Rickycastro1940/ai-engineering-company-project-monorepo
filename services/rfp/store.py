@@ -7,7 +7,15 @@ from typing import Any
 
 from sqlmodel import Session, select
 
-from data.pipelines.rfp_intake.constants import PART1_STATUSES, STATUS_INTAKE_COMPLETE
+from data.pipelines.rfp_intake.constants import (
+    PART1_STATUSES,
+    PART2_PLUS_STATUSES,
+    STATUS_DRAFTING,
+    STATUS_INTAKE_COMPLETE,
+    STATUS_NEEDS_HUMAN_REVIEW,
+    STATUS_UNDER_EVALUATION,
+    STATUS_WAITING_FOR_APPROVAL,
+)
 from data.pipelines.rfp_intake.routing import route_intake_to_part2, validate_part2_handoff
 from services.api.database import create_db_and_tables, get_engine, reset_engine
 from services.rfp.models import RfpDepartmentSection, RfpTicket, _now
@@ -24,8 +32,18 @@ __all__ = [
     "load_part2_handoff",
     "reset_engine",
     "save_intake_result",
+    "save_response_result",
     "ticket_to_dict",
 ]
+
+PART2_ALLOWED_STATUSES = frozenset(
+    {
+        STATUS_DRAFTING,
+        STATUS_UNDER_EVALUATION,
+        STATUS_NEEDS_HUMAN_REVIEW,
+        STATUS_WAITING_FOR_APPROVAL,
+    }
+)
 
 
 def init_db() -> None:
@@ -121,6 +139,100 @@ def load_part2_handoff(ticket_id: str) -> dict[str, Any]:
     if contract.get("reparse_pdf_required") is True:
         raise ValueError("Handoff incorrectly requires PDF reparse")
     return contract
+
+
+def save_response_result(ticket_id: str, result: Any) -> RfpTicket:
+    """Persist Part 2 drafts + evaluation_results; advance ticket status."""
+    init_db()
+    status = getattr(result, "status", None) or (
+        result.get("status") if isinstance(result, dict) else None
+    )
+    section_results = getattr(result, "section_results", None)
+    if section_results is None and isinstance(result, dict):
+        section_results = result.get("section_results")
+    section_results = list(section_results or [])
+    trace = getattr(result, "trace", None)
+    if trace is None and isinstance(result, dict):
+        trace = result.get("trace")
+    trace = list(trace or [])
+    avg = getattr(result, "average_iterations", None)
+    if avg is None and isinstance(result, dict):
+        avg = result.get("average_iterations")
+    all_passed = getattr(result, "all_passed", None)
+    if all_passed is None and isinstance(result, dict):
+        all_passed = result.get("all_passed")
+
+    if status not in PART2_ALLOWED_STATUSES:
+        raise ValueError(
+            f"Refusing to persist non-Part-2 ticket status {status!r} "
+            f"for {ticket_id} (expected one of {sorted(PART2_ALLOWED_STATUSES)})"
+        )
+
+    with Session(get_engine()) as session:
+        ticket = session.get(RfpTicket, ticket_id)
+        if ticket is None:
+            raise KeyError(ticket_id)
+        if ticket.status not in {
+            STATUS_INTAKE_COMPLETE,
+            STATUS_DRAFTING,
+            STATUS_UNDER_EVALUATION,
+            STATUS_NEEDS_HUMAN_REVIEW,
+            STATUS_WAITING_FOR_APPROVAL,
+        }:
+            raise ValueError(
+                f"Ticket {ticket_id} status {ticket.status!r} cannot enter Part 2 response"
+            )
+
+        ticket.status = status
+        ticket.updated_at = _now()
+        try:
+            meta = json.loads(ticket.metadata_json or "{}")
+        except json.JSONDecodeError:
+            meta = {}
+        if not isinstance(meta, dict):
+            meta = {}
+        meta["part2_response"] = {
+            "average_iterations": avg,
+            "all_passed": bool(all_passed),
+            "section_count": len(section_results),
+        }
+        ticket.metadata_json = json.dumps(meta, ensure_ascii=False)
+
+        try:
+            existing_trace = json.loads(ticket.trace_json or "[]")
+        except json.JSONDecodeError:
+            existing_trace = []
+        if not isinstance(existing_trace, list):
+            existing_trace = []
+        existing_trace.extend(trace)
+        ticket.trace_json = json.dumps(existing_trace, ensure_ascii=False)
+
+        for section in section_results:
+            dept = section.get("department_id")
+            if not dept:
+                continue
+            row = session.exec(
+                select(RfpDepartmentSection).where(
+                    RfpDepartmentSection.ticket_id == ticket_id,
+                    RfpDepartmentSection.department_id == dept,
+                )
+            ).first()
+            if row is None:
+                row = RfpDepartmentSection(ticket_id=ticket_id, department_id=dept)
+                session.add(row)
+            row.draft_content = section.get("draft_content") or ""
+            row.evaluation_results_json = json.dumps(
+                section.get("evaluation_results") or {},
+                ensure_ascii=False,
+            )
+            if section.get("passed"):
+                row.approval_status = row.approval_status or "pending"
+            row.updated_at = _now()
+
+        session.add(ticket)
+        session.commit()
+        session.refresh(ticket)
+        return ticket.model_copy(deep=True)
 
 
 def save_intake_result(ticket_id: str, result: Any, *, source_pdf_path: str) -> RfpTicket:
@@ -227,6 +339,8 @@ def ticket_to_dict(ticket: RfpTicket) -> dict[str, Any]:
             "contact": DEPARTMENT_OWNERS.get(row.department_id, row.department_id),
             "owner": DEPARTMENT_OWNERS.get(row.department_id, row.department_id),
             "key_aspects": _loads(row.key_aspects_json, []),
+            "draft_content": row.draft_content,
+            "evaluation_results": _loads(row.evaluation_results_json, {}),
             "approval_status": row.approval_status,
         }
         for row in sections_rows
@@ -264,6 +378,7 @@ def ticket_to_dict(ticket: RfpTicket) -> dict[str, Any]:
         "part2_ready": bool(ticket.part2_ready),
         "part2_routed_at": ticket.part2_routed_at,
         "part2_handoff": handoff,
+        "part2_response": meta.get("part2_response"),
         "ask_whom": ask_whom,
         "open_questions": handoff.get("open_questions") or meta.get("open_questions", []),
         "work_streams": handoff.get("work_streams", []),
