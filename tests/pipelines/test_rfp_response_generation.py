@@ -22,7 +22,11 @@ from data.pipelines.rfp_response import (
 )
 from data.pipelines.rfp_response.compliance_rules import (
     BRAND_PILLARS,
+    CEO_USD_THRESHOLD,
+    CONTEXT_SECTION_5_RULES,
     MAX_SECTION_ITERATIONS,
+    MIN_SETUP_BUSINESS_DAYS,
+    OFFER_VALIDITY_PHRASE,
 )
 from data.pipelines.rfp_response.evaluators import (
     evaluate_compliance,
@@ -74,6 +78,32 @@ def test_response_graph_registers_required_nodes() -> None:
         assert name in nodes
 
 
+def test_context_section_5_rules_match_company_md() -> None:
+    """Evaluator rule catalog must stay aligned with CONTEXT-company.md §5."""
+    text = CONTEXT.read_text(encoding="utf-8")
+    section = text.split("## 5. Business Constraints")[1].split("## 6.")[0]
+    section_cf = section.casefold()
+    expected_ids = {
+        "dual_currency",
+        "brand_pillars",
+        "min_setup_business_days",
+        "no_competitors",
+        "offer_validity",
+        "ceo_threshold",
+    }
+    assert {r["id"] for r in CONTEXT_SECTION_5_RULES} == expected_ids
+    assert "cop" in section_cf and "usd" in section_cf
+    for pillar in BRAND_PILLARS:
+        assert pillar in section_cf
+    assert "10 business days" in section_cf
+    assert "competitors by name" in section_cf
+    assert "30 days from issuance" in section_cf
+    assert "50,000" in section
+    assert MIN_SETUP_BUSINESS_DAYS == 10
+    assert OFFER_VALIDITY_PHRASE.casefold() in section_cf
+    assert CEO_USD_THRESHOLD == 50_000.0
+
+
 def test_compliance_rejects_competitor_and_short_setup() -> None:
     bad = (
         "We beat McDonald's on price. Setup in 3 business days. "
@@ -81,10 +111,31 @@ def test_compliance_rejects_competitor_and_short_setup() -> None:
     )
     result = evaluate_compliance(bad, metadata={})
     assert result.passed is False
+    assert "no_competitors" in result.rule_ids
+    assert "min_setup_business_days" in result.rule_ids
+    assert "dual_currency" in result.rule_ids
     joined = " ".join(result.failures).casefold()
     assert "competitor" in joined or "mcdonald" in joined
     assert "business days" in joined or "3" in joined
     assert "cop" in joined or "usd" in joined
+
+
+def test_compliance_flags_ceo_threshold_from_metadata() -> None:
+    draft = generate_department_draft(
+        department_id="procurement",
+        metadata={
+            "client_name": "Sunset Bay",
+            "location": "Florida",
+            "estimated_contract_value_usd": 65_000,
+        },
+        key_aspects=["Supplier exclusivity terms for Sunset Bay"],
+    ).draft_content
+    result = evaluate_compliance(
+        draft, metadata={"estimated_contract_value_usd": 65_000}
+    )
+    assert result.passed is True
+    assert "ceo_threshold" in result.rule_ids
+    assert any("ceo_approval_required_part3" in n for n in result.notes)
 
 
 def test_compliance_accepts_guideline_compliant_draft() -> None:

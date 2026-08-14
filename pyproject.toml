@@ -25,6 +25,7 @@ dependencies = [
     "markitdown[pdf]>=0.1.7",
     "py-readability-metrics>=1.4.5",
     "sqlmodel>=0.0.39",
+    "nltk>=3.10.3",
 ]
 
 [tool.pytest.ini_options]
