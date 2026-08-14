@@ -7,7 +7,15 @@ from typing import Any
 
 from sqlmodel import Session, select
 
-from data.pipelines.rfp_intake.constants import PART1_STATUSES, STATUS_INTAKE_COMPLETE
+from data.pipelines.rfp_intake.constants import (
+    PART1_STATUSES,
+    PART2_PLUS_STATUSES,
+    STATUS_DRAFTING,
+    STATUS_INTAKE_COMPLETE,
+    STATUS_NEEDS_HUMAN_REVIEW,
+    STATUS_UNDER_EVALUATION,
+    STATUS_WAITING_FOR_APPROVAL,
+)
 from data.pipelines.rfp_intake.routing import route_intake_to_part2, validate_part2_handoff
 from services.api.database import create_db_and_tables, get_engine, reset_engine
 from services.rfp.models import RfpDepartmentSection, RfpTicket, _now
@@ -22,10 +30,22 @@ __all__ = [
     "list_part2_queue",
     "list_tickets",
     "load_part2_handoff",
+    "load_ready_part2_handoff",
+    "persist_part2_progress",
     "reset_engine",
     "save_intake_result",
+    "save_response_result",
     "ticket_to_dict",
 ]
+
+PART2_ALLOWED_STATUSES = frozenset(
+    {
+        STATUS_DRAFTING,
+        STATUS_UNDER_EVALUATION,
+        STATUS_NEEDS_HUMAN_REVIEW,
+        STATUS_WAITING_FOR_APPROVAL,
+    }
+)
 
 
 def init_db() -> None:
@@ -121,6 +141,218 @@ def load_part2_handoff(ticket_id: str) -> dict[str, Any]:
     if contract.get("reparse_pdf_required") is True:
         raise ValueError("Handoff incorrectly requires PDF reparse")
     return contract
+
+
+def load_ready_part2_handoff(ticket_id: str) -> tuple[dict[str, Any], str, bool]:
+    """Load handoff only when Part 1 marked the ticket ready for Part 2.
+
+    Returns ``(handoff, ticket.status, ticket.part2_ready)``.
+    Raises ``ValueError`` when status/flag/contract are not Part-1-ready.
+    """
+    from data.pipelines.rfp_response.handoff_consume import (
+        Part1HandoffNotReady,
+        assert_part1_routing_ready,
+    )
+
+    ticket = get_ticket(ticket_id)
+    if ticket is None:
+        raise KeyError(ticket_id)
+
+    handoff: dict[str, Any] | None = None
+    if ticket.part2_handoff_json:
+        try:
+            handoff = json.loads(ticket.part2_handoff_json)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Corrupt part2_handoff_json for {ticket_id}") from exc
+
+    try:
+        contract = assert_part1_routing_ready(
+            ticket_id=ticket_id,
+            status=ticket.status,
+            part2_ready=bool(ticket.part2_ready),
+            handoff=handoff,
+        )
+    except Part1HandoffNotReady as exc:
+        raise ValueError(str(exc)) from exc
+    return contract, ticket.status, bool(ticket.part2_ready)
+
+
+def _upsert_section_drafts(
+    session: Session,
+    ticket_id: str,
+    section_results: list[dict[str, Any]],
+) -> None:
+    """Persist draft_content + evaluation_results on DepartmentSection rows."""
+    for section in section_results:
+        dept = section.get("department_id")
+        if not dept:
+            continue
+        row = session.exec(
+            select(RfpDepartmentSection).where(
+                RfpDepartmentSection.ticket_id == ticket_id,
+                RfpDepartmentSection.department_id == dept,
+            )
+        ).first()
+        if row is None:
+            row = RfpDepartmentSection(ticket_id=ticket_id, department_id=dept)
+            session.add(row)
+        if section.get("draft_content"):
+            row.draft_content = section.get("draft_content") or ""
+        if section.get("evaluation_results") is not None:
+            row.evaluation_results_json = json.dumps(
+                section.get("evaluation_results") or {},
+                ensure_ascii=False,
+            )
+        if section.get("passed"):
+            row.approval_status = row.approval_status or "pending"
+        elif section.get("exhausted") or section.get("section_status") == STATUS_NEEDS_HUMAN_REVIEW:
+            row.approval_status = STATUS_NEEDS_HUMAN_REVIEW
+        row.updated_at = _now()
+
+
+def persist_part2_progress(
+    ticket_id: str,
+    *,
+    status: str,
+    section_results: list[dict[str, Any]] | None = None,
+) -> bool:
+    """Write Part 2 ticket status (+ optional drafts/evals) to Postgres.
+
+    The Part 1 ticket starts at ``intake_complete`` and is updated in place:
+    ``drafting`` → ``under_evaluation`` → ``needs_human_review`` /
+    ``waiting_for_approval``. Missing tickets (in-memory pipeline runs) are
+    ignored so unit tests without a DB row still work.
+    """
+    if not (ticket_id or "").strip():
+        return False
+    if status not in PART2_ALLOWED_STATUSES:
+        return False
+    init_db()
+    with Session(get_engine()) as session:
+        ticket = session.get(RfpTicket, ticket_id)
+        if ticket is None:
+            return False
+        if ticket.status not in {
+            STATUS_INTAKE_COMPLETE,
+            STATUS_DRAFTING,
+            STATUS_UNDER_EVALUATION,
+            STATUS_NEEDS_HUMAN_REVIEW,
+            STATUS_WAITING_FOR_APPROVAL,
+        }:
+            return False
+
+        try:
+            meta = json.loads(ticket.metadata_json or "{}")
+        except json.JSONDecodeError:
+            meta = {}
+        if not isinstance(meta, dict):
+            meta = {}
+        history = list(meta.get("part2_status_history") or [])
+        if not history:
+            history.append(ticket.status)
+        if not history or history[-1] != status:
+            history.append(status)
+        meta["part2_status_history"] = history
+        ticket.metadata_json = json.dumps(meta, ensure_ascii=False)
+        ticket.status = status
+        ticket.updated_at = _now()
+        if section_results:
+            _upsert_section_drafts(session, ticket_id, section_results)
+        if status == STATUS_NEEDS_HUMAN_REVIEW:
+            ticket.discard_reason = None
+            ticket.discard_rule_id = None
+        session.add(ticket)
+        session.commit()
+        return True
+
+
+def save_response_result(ticket_id: str, result: Any) -> RfpTicket:
+    """Persist Part 2 drafts + evaluation_results; advance ticket status."""
+    init_db()
+    status = getattr(result, "status", None) or (
+        result.get("status") if isinstance(result, dict) else None
+    )
+    section_results = getattr(result, "section_results", None)
+    if section_results is None and isinstance(result, dict):
+        section_results = result.get("section_results")
+    section_results = list(section_results or [])
+    trace = getattr(result, "trace", None)
+    if trace is None and isinstance(result, dict):
+        trace = result.get("trace")
+    trace = list(trace or [])
+    avg = getattr(result, "average_iterations", None)
+    if avg is None and isinstance(result, dict):
+        avg = result.get("average_iterations")
+    all_passed = getattr(result, "all_passed", None)
+    if all_passed is None and isinstance(result, dict):
+        all_passed = result.get("all_passed")
+
+    if status not in PART2_ALLOWED_STATUSES:
+        raise ValueError(
+            f"Refusing to persist non-Part-2 ticket status {status!r} "
+            f"for {ticket_id} (expected one of {sorted(PART2_ALLOWED_STATUSES)})"
+        )
+
+    with Session(get_engine()) as session:
+        ticket = session.get(RfpTicket, ticket_id)
+        if ticket is None:
+            raise KeyError(ticket_id)
+        if ticket.status not in {
+            STATUS_INTAKE_COMPLETE,
+            STATUS_DRAFTING,
+            STATUS_UNDER_EVALUATION,
+            STATUS_NEEDS_HUMAN_REVIEW,
+            STATUS_WAITING_FOR_APPROVAL,
+        }:
+            raise ValueError(
+                f"Ticket {ticket_id} status {ticket.status!r} cannot enter Part 2 response"
+            )
+
+        try:
+            meta = json.loads(ticket.metadata_json or "{}")
+        except json.JSONDecodeError:
+            meta = {}
+        if not isinstance(meta, dict):
+            meta = {}
+        meta["part2_response"] = {
+            "average_iterations": avg,
+            "all_passed": bool(all_passed),
+            "section_count": len(section_results),
+            "discarded": False,
+        }
+        history = list(meta.get("part2_status_history") or [])
+        if not history:
+            history.append(ticket.status)
+        if not history or history[-1] != status:
+            history.append(status)
+        meta["part2_status_history"] = history
+        ticket.status = status
+        ticket.updated_at = _now()
+
+        try:
+            existing_trace = json.loads(ticket.trace_json or "[]")
+        except json.JSONDecodeError:
+            existing_trace = []
+        if not isinstance(existing_trace, list):
+            existing_trace = []
+        existing_trace.extend(trace)
+        ticket.trace_json = json.dumps(existing_trace, ensure_ascii=False)
+
+        _upsert_section_drafts(session, ticket_id, section_results)
+
+        meta["part3_handoff"] = getattr(result, "part3_handoff", None) or (
+            result.get("part3_handoff") if isinstance(result, dict) else None
+        ) or {}
+        ticket.metadata_json = json.dumps(meta, ensure_ascii=False)
+        # Exhausted tickets stay in the flow for Part 3 — never discarded
+        if status == STATUS_NEEDS_HUMAN_REVIEW:
+            ticket.discard_reason = None
+            ticket.discard_rule_id = None
+
+        session.add(ticket)
+        session.commit()
+        session.refresh(ticket)
+        return ticket.model_copy(deep=True)
 
 
 def save_intake_result(ticket_id: str, result: Any, *, source_pdf_path: str) -> RfpTicket:
@@ -227,6 +459,8 @@ def ticket_to_dict(ticket: RfpTicket) -> dict[str, Any]:
             "contact": DEPARTMENT_OWNERS.get(row.department_id, row.department_id),
             "owner": DEPARTMENT_OWNERS.get(row.department_id, row.department_id),
             "key_aspects": _loads(row.key_aspects_json, []),
+            "draft_content": row.draft_content,
+            "evaluation_results": _loads(row.evaluation_results_json, {}),
             "approval_status": row.approval_status,
         }
         for row in sections_rows
@@ -264,6 +498,9 @@ def ticket_to_dict(ticket: RfpTicket) -> dict[str, Any]:
         "part2_ready": bool(ticket.part2_ready),
         "part2_routed_at": ticket.part2_routed_at,
         "part2_handoff": handoff,
+        "part2_response": meta.get("part2_response"),
+        "part2_status_history": meta.get("part2_status_history") or [],
+        "part3_handoff": meta.get("part3_handoff") or {},
         "ask_whom": ask_whom,
         "open_questions": handoff.get("open_questions") or meta.get("open_questions", []),
         "work_streams": handoff.get("work_streams", []),

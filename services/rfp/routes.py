@@ -146,6 +146,32 @@ def get_part2_handoff(ticket_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
+@router.post("/tickets/{ticket_id}/generate-response")
+def generate_response(ticket_id: str) -> dict[str, Any]:
+    """Part 2: consume Part 1 ready handoff only (no PDF reparse / no parallel summary)."""
+    from data.pipelines.rfp_response import Part1HandoffNotReady, run_response_for_ticket
+    from services.rfp.store import save_response_result
+
+    try:
+        result = run_response_for_ticket(ticket_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Ticket not found") from exc
+    except (ValueError, Part1HandoffNotReady) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    if result.error_message:
+        raise HTTPException(status_code=409, detail=result.error_message)
+    try:
+        saved = save_response_result(ticket_id, result)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    payload = ticket_to_dict(saved)
+    payload["part2_pipeline"] = result.to_dict()
+    payload["part3_handoff"] = result.part3_handoff or payload.get("part3_handoff") or {}
+    return payload
+
+
 @router.get("/tickets/{ticket_id}")
 def get_rfp_ticket(ticket_id: str) -> dict[str, Any]:
     ticket = get_ticket(ticket_id)

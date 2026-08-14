@@ -68,13 +68,30 @@ Markdown and metadata already live on the ticket row if needed for grounding;
 
 ## Part 2 entry (Python)
 
+Canonical path — queue flag + DB field + documented contract:
+
+```python
+from data.pipelines.rfp_response import run_response_for_ticket
+# Internally: load_ready_part2_handoff(ticket_id)
+#   → assert part2_ready + status=intake_complete
+#   → validate part2_handoff_json (ticket_id + work_streams[].key_aspects)
+#   → generators draft from key_aspects only (never re-ingest PDF)
+
+result = run_response_for_ticket(ticket_id)
+```
+
+Queue / contract inspection:
+
 ```python
 from services.rfp.store import load_part2_handoff, list_part2_queue
 
 for item in list_part2_queue():
     handoff = load_part2_handoff(item["ticket_id"])
-    # handoff["work_streams"][i]["key_aspects"] — draft without PDF
+    # handoff["ticket_id"] + handoff["work_streams"][i]["key_aspects"]
 ```
+
+HTTP (same app): `GET /rfp/part2/queue`, `GET /rfp/tickets/{id}/part2-handoff`,
+`POST /rfp/tickets/{id}/generate-response`.
 
 Builder: `data.pipelines.rfp_intake.routing.build_part2_handoff` /
 `route_intake_to_part2`.

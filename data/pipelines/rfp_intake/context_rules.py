@@ -7,7 +7,11 @@ derived from CONTEXT §2.1–§2.2 and §4. Do not invent alternate departments
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
 from typing import Final
+
+CONTEXT_COMPANY_MD: Final = Path(__file__).resolve().parents[3] / "CONTEXT-company.md"
 
 # --- CONTEXT §2.1 — exact department_id values (Spanish id for operaciones) ---
 CONTEXT_DEPARTMENT_IDS: Final[tuple[str, ...]] = (
@@ -46,6 +50,47 @@ CONTEXT_DEPARTMENT_CONTRIBUTIONS: Final[dict[str, str]] = {
         "If the request requires a new recipe or standard, the development and "
         "certification time needed"
     ),
+}
+
+
+def _heading_case(phrase: str) -> str:
+    text = phrase.strip().rstrip(".")
+    if not text:
+        return text
+    return text[0].upper() + text[1:]
+
+
+def section_headings_from_contribution(department_id: str, contribution: str) -> tuple[str, ...]:
+    """Turn the CONTEXT §2.1 contribution column into required section headings.
+
+    These headings *are* the expected format of each department's proposal
+    section — not a generic SaaS RFP outline.
+    """
+    text = contribution.strip()
+    if department_id == "marketing":
+        text = re.sub(r"\.?\s*Owns the ticket\.?\s*$", "", text, flags=re.I)
+        parts = [p.strip() for p in text.split(",") if p.strip()]
+    elif department_id == "operaciones":
+        if ":" in text:
+            text = text.split(":", 1)[1]
+        parts = [p.strip() for p in text.split(",") if p.strip()]
+    elif department_id == "training":
+        parts = [p.strip() for p in text.split(",") if p.strip()]
+        cleaned: list[str] = []
+        for part in parts:
+            part = re.sub(r"^If the request requires\s+", "", part, flags=re.I)
+            part = re.sub(r"^(the|a|an)\s+", "", part, flags=re.I)
+            cleaned.append(part.strip().rstrip("."))
+        parts = cleaned
+    else:
+        parts = [p.strip() for p in text.split(",") if p.strip()]
+    return tuple(_heading_case(p) for p in parts if p)
+
+
+# Required ``##`` headings for each department's Part 2 section (CONTEXT §2.1).
+CONTEXT_SECTION_REQUIRED_HEADINGS: Final[dict[str, tuple[str, ...]]] = {
+    dept_id: section_headings_from_contribution(dept_id, contrib)
+    for dept_id, contrib in CONTEXT_DEPARTMENT_CONTRIBUTIONS.items()
 }
 
 # Forbidden generic ids that would ignore Brasaland CONTEXT
@@ -185,9 +230,98 @@ CONTEXT_SEED_EXPECTATIONS: Final[dict[str, dict]] = {
 CONTEXT_CEO_USD_THRESHOLD: Final[float] = 50_000.0
 CONTEXT_CEO_NAME: Final[str] = "Mariana Restrepo"
 
+# CONTEXT §5 — verbatim guidelines the compliance evaluator must enforce
+CONTEXT_SECTION_5_TITLE: Final = (
+    "Business Constraints (Guidelines for the Compliance Evaluator)"
+)
+CONTEXT_SECTION_5_GUIDELINES: Final[tuple[str, ...]] = (
+    "Every price must be expressed in both COP and USD.",
+    (
+        "Every proposal must mention, at least once, the brand's three pillars: "
+        "consistent quality, warm experience, speed of service."
+    ),
+    "No section may promise setup/delivery times shorter than 10 business days.",
+    "No proposal may mention competitors by name.",
+    "Every proposal must include an offer validity period (30 days from issuance).",
+    (
+        "Estimated contracts above $50,000 USD/year require an additional CEO "
+        "approval before the final document is generated."
+    ),
+)
+
+CONTEXT_BRAND_PILLARS: Final[tuple[str, ...]] = (
+    "consistent quality",
+    "warm experience",
+    "speed of service",
+)
+CONTEXT_MIN_SETUP_BUSINESS_DAYS: Final[int] = 10
+CONTEXT_OFFER_VALIDITY_DAYS: Final[int] = 30
+CONTEXT_OFFER_VALIDITY_PHRASE: Final = "30 days from issuance"
+
+# Colombia + Florida grilled / QSR names a Brasaland proposal must not cite.
+# Not a generic SaaS vendor list (Salesforce, Oracle, …).
+CONTEXT_FORBIDDEN_COMPETITORS: Final[tuple[str, ...]] = (
+    "el corral",
+    "frisby",
+    "presto",
+    "mcdonald",
+    "burger king",
+    "kfc",
+    "wendy",
+    "outback",
+    "texas roadhouse",
+    "chipotle",
+    "subway",
+)
+
 # Ticket owner = Marketing / Camila (CONTEXT: Marketing is "Sales")
 CONTEXT_TICKET_OWNER: Final[str] = "Camila Ospina"
 CONTEXT_TICKET_OWNER_DEPARTMENT: Final[str] = "marketing"
+
+
+def read_context_company_md() -> str:
+    """Load CONTEXT-company.md from the repo root."""
+    return CONTEXT_COMPANY_MD.read_text(encoding="utf-8")
+
+
+def parse_context_department_table(text: str | None = None) -> list[dict[str, str]]:
+    """Parse CONTEXT §2.1 markdown table rows (id, label, owner, contribution)."""
+    source = text if text is not None else read_context_company_md()
+    start = source.find("### 2.1")
+    end = source.find("### 2.2")
+    if start == -1 or end == -1 or end <= start:
+        raise ValueError("CONTEXT-company.md is missing section 2.1 / 2.2 markers")
+    block = source[start:end]
+    rows: list[dict[str, str]] = []
+    pattern = re.compile(
+        r"\|\s*`(?P<id>[a-z_]+)`\s*\|\s*(?P<label>[^|]+?)\s*\|\s*"
+        r"(?P<owner>[^|]+?)\s*\|\s*(?P<contrib>[^|]+?)\s*\|"
+    )
+    for match in pattern.finditer(block):
+        dept_id = match.group("id").strip()
+        if dept_id == "department_id":
+            continue
+        rows.append(
+            {
+                "department_id": dept_id,
+                "label": match.group("label").strip(),
+                "owner": match.group("owner").strip(),
+                "contribution": match.group("contrib").strip(),
+            }
+        )
+    return rows
+
+
+def parse_context_section_5_bullets(text: str | None = None) -> tuple[str, ...]:
+    """Extract the CONTEXT §5 guideline bullets (compliance evaluator source)."""
+    source = text if text is not None else read_context_company_md()
+    start = source.find("## 5. Business Constraints")
+    end = source.find("## 6.")
+    if start == -1 or end == -1 or end <= start:
+        raise ValueError("CONTEXT-company.md is missing section 5 / 6 markers")
+    block = source[start:end]
+    bullets = [m.strip() for m in re.findall(r"^-\s+(.+)$", block, flags=re.M)]
+    return tuple(bullets)
 
 
 def select_departments_from_content(text_cf: str, *, service_type: str | None = None) -> list[str]:
