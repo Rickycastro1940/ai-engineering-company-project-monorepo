@@ -19,6 +19,7 @@ from data.pipelines.rfp_intake.constants import (
 )
 from data.pipelines.rfp_response.compliance_rules import MAX_SECTION_ITERATIONS
 from data.pipelines.rfp_response.handoff_consume import (
+    PRIMARY_GENERATOR_INPUT,
     Part1HandoffNotReady,
     assert_part1_routing_ready,
     synthesizer_payload_from_handoff,
@@ -96,6 +97,9 @@ def load_handoff_node(state: RfpResponseState) -> dict[str, Any]:
             ticket_id=ticket_id,
             work_streams=len(payload.get("work_streams") or []),
             source="part1_handoff_contract",
+            primary_input=PRIMARY_GENERATOR_INPUT,
+            queue_flag="part2_ready",
+            db_field="part2_handoff_json",
             reparse_pdf_required=False,
         ),
     }

@@ -1,7 +1,11 @@
 """Department section generators — produce draft_content from Part 1 key_aspects.
 
-Does not re-parse the PDF. Grounds drafts in handoff metadata + key_aspects +
-CONTEXT §5 business constraints (so first-pass drafts usually pass compliance).
+Primary input is Part 1 routing handoff only:
+  ticket_id + work_streams[].key_aspects (+ intake metadata / open_questions).
+
+Does **not** re-ingest the raw PDF (no converter import, no pdf_path, no
+markdown re-summary). Grounds drafts in handoff metadata + key_aspects +
+CONTEXT §5.
 """
 
 from __future__ import annotations
@@ -22,6 +26,19 @@ from data.pipelines.rfp_response.compliance_rules import (
     BRAND_PILLARS,
     MIN_SETUP_BUSINESS_DAYS,
     OFFER_VALIDITY_PHRASE,
+)
+
+# Rejected if callers try to smuggle PDF / raw-markdown as generator input
+_FORBIDDEN_GENERATOR_KWARGS = frozenset(
+    {
+        "pdf_path",
+        "source_pdf_path",
+        "pdf_bytes",
+        "raw_pdf",
+        "markdown_text",
+        "markdown",
+        "document_path",
+    }
 )
 
 
@@ -86,15 +103,43 @@ def generate_department_draft(
     open_questions: list[str] | None = None,
     feedback: list[str] | None = None,
     iteration: int = 1,
+    **kwargs: Any,
 ) -> DraftResult:
-    """Generate a proposal section for one CONTEXT department."""
+    """Generate a proposal section from Part 1 key_aspects (never the raw PDF)."""
+    banned = _FORBIDDEN_GENERATOR_KWARGS.intersection(kwargs)
+    if banned:
+        raise TypeError(
+            "Generators must not re-ingest the raw PDF as primary input; "
+            f"forbidden kwargs: {sorted(banned)}. "
+            "Use Part 1 handoff ticket_id + work_streams.key_aspects."
+        )
+    if not key_aspects:
+        raise ValueError(
+            "Generators require Part 1 work_streams.key_aspects "
+            "(synthesizer payload) — PDF is not an accepted substitute"
+        )
+
+    # Strip any accidental PDF pointers from metadata before drafting
+    clean_meta = {
+        k: v
+        for k, v in dict(metadata or {}).items()
+        if k
+        not in {
+            "source_pdf_path",
+            "pdf_path",
+            "markdown_text",
+            "markdown",
+            "raw_pdf",
+        }
+    }
+
     owner = DEPARTMENT_OWNERS.get(department_id, department_id)
     label = DEPARTMENT_LABELS.get(department_id, department_id)
     remit = DEPARTMENT_CONTRIBUTIONS.get(department_id, "")
-    client = _client(metadata)
-    location = _location(metadata)
-    service = metadata.get("service_type") or metadata.get("scope") or "corporate catering"
-    deadline = metadata.get("deadline") or "as agreed"
+    client = _client(clean_meta)
+    location = _location(clean_meta)
+    service = clean_meta.get("service_type") or clean_meta.get("scope") or "corporate catering"
+    deadline = clean_meta.get("deadline") or "as agreed"
     fb = list(feedback or [])
     questions = list(open_questions or [])
 
@@ -142,7 +187,7 @@ def generate_department_draft(
         lines.extend(
             [
                 "## Ingredient cost and supplier lead times",
-                _budget_line(metadata),
+                _budget_line(clean_meta),
                 "Supplier lead times follow Brasaland procurement procedure; "
                 "emergency orders follow documented approval thresholds.",
                 "All prices in this section are expressed with both USD $ and COP $ labels "

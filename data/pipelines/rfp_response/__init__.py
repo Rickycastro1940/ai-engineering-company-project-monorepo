@@ -21,6 +21,7 @@ from data.pipelines.rfp_response.graph import (
     invoke_rfp_response_graph,
 )
 from data.pipelines.rfp_response.handoff_consume import (
+    PRIMARY_GENERATOR_INPUT,
     Part1HandoffNotReady,
     assert_part1_routing_ready,
     synthesizer_payload_from_handoff,
@@ -29,6 +30,7 @@ from data.pipelines.rfp_response.loop import run_section_loop
 
 __all__ = [
     "MAX_SECTION_ITERATIONS",
+    "PRIMARY_GENERATOR_INPUT",
     "Part1HandoffNotReady",
     "REQUIRED_RESPONSE_NODES",
     "ResponsePipelineResult",

@@ -1,19 +1,44 @@
 """Consume Part 1 routing handoff — sole Part 2 entry contract.
 
-Part 2 must start from tickets Part 1 marked ready:
-  status == intake_complete
-  part2_ready == True
-  part2_handoff_json validated (ticket_id + work_streams[].key_aspects)
+Part 2 entry reads Part 1's routing handoff via **all** of:
+
+| Mechanism | Where |
+| --------- | ----- |
+| Queue flag | ``rfp_tickets.part2_ready`` |
+| DB field | ``rfp_tickets.part2_handoff_json`` |
+| Documented contract | ``data/pipelines/rfp_intake/PART2_HANDOFF.md`` + |
+|  | ``routing.validate_part2_handoff`` |
+
+Required payload for generators (primary input — **not** the raw PDF):
+
+1. ``ticket_id``
+2. Synthesizer / ``work_streams[].key_aspects`` (+ metadata, open_questions)
 
 Do not re-parse the PDF. Do not invent a parallel summary path.
+See also ``services.rfp.store.load_ready_part2_handoff``.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Final
 
 from data.pipelines.rfp_intake.constants import STATUS_INTAKE_COMPLETE
 from data.pipelines.rfp_intake.routing import validate_part2_handoff
+
+# Fields that may appear on the handoff for audit only — never primary generator input
+_NON_PRIMARY_FIELDS: Final[frozenset[str]] = frozenset(
+    {
+        "source_pdf_path",
+        "markdown_available_in_db",
+        "markdown_text",
+        "pdf_path",
+        "raw_pdf",
+    }
+)
+
+PRIMARY_GENERATOR_INPUT: Final[str] = (
+    "part1_handoff:ticket_id+work_streams.key_aspects+metadata"
+)
 
 
 class Part1HandoffNotReady(ValueError):
@@ -81,14 +106,25 @@ def assert_part1_routing_ready(
 
 
 def synthesizer_payload_from_handoff(handoff: dict[str, Any]) -> dict[str, Any]:
-    """Extract the synthesizer / workstream structure Part 2 generators consume."""
+    """Extract synthesizer / workstream structure Part 2 generators consume.
+
+    Explicitly omits ``source_pdf_path`` and other raw-PDF fields so generators
+    cannot treat the PDF as primary input.
+    """
+    metadata = dict(handoff.get("metadata") or {})
+    for banned in _NON_PRIMARY_FIELDS:
+        metadata.pop(banned, None)
+
     return {
         "ticket_id": handoff.get("ticket_id"),
-        "metadata": dict(handoff.get("metadata") or {}),
+        "primary_input": PRIMARY_GENERATOR_INPUT,
+        "metadata": metadata,
         "departments_needed": list(handoff.get("departments_needed") or []),
         "ask_whom": list(handoff.get("ask_whom") or []),
         "open_questions": list(handoff.get("open_questions") or []),
         "requires_ceo_approval": bool(handoff.get("requires_ceo_approval")),
         "synthesizer": dict(handoff.get("synthesizer") or {}),
         "work_streams": list(handoff.get("work_streams") or []),
+        # Audit-only pointer from Part 1 (must not be opened by generators)
+        "source_pdf_path_audit_only": handoff.get("source_pdf_path"),
     }

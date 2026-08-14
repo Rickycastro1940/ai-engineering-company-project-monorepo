@@ -230,10 +230,12 @@ def test_http_generate_response_persists_drafts(client: TestClient) -> None:
 def test_no_pdf_reparse_required_in_part2_pipeline() -> None:
     src = (PIPELINE / "graph.py").read_text(encoding="utf-8")
     assert "reparse_pdf_required" in src
-    assert "MarkItDown" not in src
+    assert "PRIMARY_GENERATOR_INPUT" in src
     for path in PIPELINE.glob("*.py"):
         text = path.read_text(encoding="utf-8")
-        assert "MarkItDown" not in text
+        assert "import markitdown" not in text.casefold()
+        assert "from markitdown" not in text.casefold()
+        assert "convert_document_to_markdown" not in text
 
 
 def test_section_loop_exhaustion_path(monkeypatch: pytest.MonkeyPatch) -> None:

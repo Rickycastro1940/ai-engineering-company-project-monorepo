@@ -6,12 +6,16 @@ compliance guidelines, §6 Part 2 deliverable).
 ## Part 2 scope
 
 - **Build on Part 1** — do not rewrite classifier / routing.
-- Start only from tickets Part 1 marked ready:
-  - `status == intake_complete`
-  - `part2_ready == true` (queue flag)
-  - `part2_handoff_json` validated (`ticket_id` + `work_streams[].key_aspects`)
-- Input = synthesizer payload from that contract (see `handoff_consume.py`).
-- **No PDF reparse.** No parallel summary path that ignores the handoff.
+- Start only from tickets Part 1 marked ready via **all** of:
+  - queue flag: `part2_ready == true`
+  - DB field: `part2_handoff_json`
+  - documented contract: `PART2_HANDOFF.md` / `validate_part2_handoff`
+- Required payload: `ticket_id` + synthesizer `work_streams[].key_aspects`
+  (+ metadata). See `handoff_consume.assert_part1_routing_ready` and
+  `run_response_for_ticket` → `load_ready_part2_handoff`.
+- **Generators must not re-ingest the raw PDF as primary input**
+  (`generate_department_draft` rejects `pdf_path` / `markdown_text` kwargs;
+  synthesizer payload strips PDF fields).
 - Per active department: **generator** writes `draft_content`, then **evaluators**
   score **readability**, **relevance**, and **compliance** (§5).
 - Generator–evaluator loop with `MAX_SECTION_ITERATIONS=2` (KPI: avg < 2).
