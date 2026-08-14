@@ -28,6 +28,10 @@ from data.pipelines.rfp_response.compliance_rules import (
     MIN_SETUP_BUSINESS_DAYS,
     OFFER_VALIDITY_PHRASE,
 )
+from data.pipelines.rfp_response.kb_grounding import (
+    format_kb_section,
+    lookup_department_knowledge,
+)
 
 _FORBIDDEN_GENERATOR_KWARGS: Final[frozenset[str]] = frozenset(
     {
@@ -92,6 +96,8 @@ class DraftResult:
     used_feedback: list[str] = field(default_factory=list)
     generator_agent: str = ""
     part1_summary_used: bool = True
+    kb_grounded: bool = False
+    kb_sources: list[str] = field(default_factory=list)
 
 
 def _client(metadata: dict[str, Any]) -> str:
@@ -220,6 +226,9 @@ class DepartmentGeneratorAgent(ABC):
             "",
         ]
         lines.extend(self.build_pricing_proposal_section(summary, client=client, location=location))
+        extra_q = " ".join(summary.key_aspects[:3])
+        kb_snips = lookup_department_knowledge(self.department_id, extra_query=extra_q)
+        lines.extend(format_kb_section(kb_snips))
         if summary.open_questions:
             lines.append("## Open questions (do not invent answers)")
             lines.extend(f"- {q}" for q in summary.open_questions)
@@ -240,6 +249,8 @@ class DepartmentGeneratorAgent(ABC):
             used_feedback=fb,
             generator_agent=self.agent_name,
             part1_summary_used=True,
+            kb_grounded=bool(kb_snips),
+            kb_sources=[s.source_document for s in kb_snips],
         )
 
     @abstractmethod

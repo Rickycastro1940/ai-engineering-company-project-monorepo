@@ -22,6 +22,10 @@ compliance guidelines, §6 Part 2 deliverable).
   (`work_streams[].key_aspects`) and writes that department's section of the
   **pricing proposal** (CONTEXT §2.1 remit). Then evaluators score
   readability, relevance, and compliance (§5).
+- Optional (not graded): generators may ground drafts in the existing
+  Brasaland knowledge base (`data.pipelines.rag.retrieve`, same source docs
+  as `POST /knowledge/query`) so policy/brand language is real. Disable with
+  `RFP_KB_GROUNDING=0`. Failures never block drafting.
 - Generator–evaluator loop with `MAX_SECTION_ITERATIONS=2` (KPI: avg < 2).
 - Persist on `RfpDepartmentSection`: `draft_content`, `evaluation_results_json`.
 - Ticket statuses: `drafting` → `under_evaluation` →

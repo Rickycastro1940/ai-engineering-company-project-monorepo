@@ -163,6 +163,7 @@ def generate_evaluate_sections_node(state: RfpResponseState) -> dict[str, Any]:
                     "key_aspects_count": len(summary.key_aspects),
                     "input": "part1_work_stream_key_aspects",
                     "part1_summary_used": True,
+                    "kb_grounded": loop_result.kb_grounded,
                 },
             }
         )

@@ -25,6 +25,7 @@ class SectionLoopResult:
     exhausted: bool
     history: list[dict[str, Any]] = field(default_factory=list)
     generator_agent: str = ""
+    kb_grounded: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -36,6 +37,7 @@ class SectionLoopResult:
             "exhausted": self.exhausted,
             "passed": self.evaluation.passed,
             "generator_agent": self.generator_agent,
+            "kb_grounded": self.kb_grounded,
             "history": list(self.history),
         }
 
@@ -89,6 +91,8 @@ def run_section_loop(
                 "iteration": iteration,
                 "generator_agent": agent.agent_name,
                 "part1_summary_used": draft.part1_summary_used,
+                "kb_grounded": draft.kb_grounded,
+                "kb_sources": list(draft.kb_sources),
                 "passed": evaluation.passed,
                 "feedback": list(evaluation.feedback),
                 "scores": {
@@ -108,6 +112,7 @@ def run_section_loop(
                 exhausted=False,
                 history=history,
                 generator_agent=agent.agent_name,
+                kb_grounded=draft.kb_grounded,
             )
         feedback = list(evaluation.feedback)
 
@@ -121,4 +126,5 @@ def run_section_loop(
         exhausted=True,
         history=history,
         generator_agent=agent.agent_name,
+        kb_grounded=draft.kb_grounded,
     )
