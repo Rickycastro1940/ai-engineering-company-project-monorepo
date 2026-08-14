@@ -172,19 +172,6 @@ def generate_response(ticket_id: str) -> dict[str, Any]:
     return payload
 
 
-@router.get("/tickets/{ticket_id}/part3-handoff")
-def get_part3_handoff(ticket_id: str) -> dict[str, Any]:
-    """Last drafts + EvaluationResult for Part 3 (includes needs_human_review)."""
-    ticket = get_ticket(ticket_id)
-    if ticket is None:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-    payload = ticket_to_dict(ticket)
-    handoff = payload.get("part3_handoff") or {}
-    if not handoff:
-        raise HTTPException(status_code=409, detail="Part 3 handoff not ready")
-    return handoff
-
-
 @router.get("/tickets/{ticket_id}")
 def get_rfp_ticket(ticket_id: str) -> dict[str, Any]:
     ticket = get_ticket(ticket_id)

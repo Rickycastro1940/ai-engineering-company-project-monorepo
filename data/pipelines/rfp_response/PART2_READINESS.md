@@ -32,9 +32,10 @@ compliance guidelines, §6 Part 2 deliverable).
   `EvaluationResult.feedback_for_generator`. Hitting the limit keeps the last
   draft + EvaluationResult, sets section/ticket to `needs_human_review`, and
   still includes the section in the Part 3 handoff (never discarded).
-- Persist on `RfpDepartmentSection`: `draft_content`, `evaluation_results_json`.
-- Ticket statuses: `drafting` → `under_evaluation` →
-  `waiting_for_approval` (all pass) or `needs_human_review` (exhausted).
+- Ticket statuses (same Part 1 ticket row in PostgreSQL): `intake_complete` →
+  `drafting` → `under_evaluation` → `waiting_for_approval` (all pass) or
+  `needs_human_review` (exhausted). Drafts and `evaluation_results` persist on
+  `RfpDepartmentSection`. No new API process — extend `services/rfp/`.
 
 ## §5 guidelines wired into compliance evaluator
 

@@ -59,6 +59,23 @@ class RfpResponseState(TypedDict, total=False):
     discarded: bool
 
 
+def _persist_ticket_progress(
+    ticket_id: str,
+    status: str,
+    section_results: list[dict[str, Any]] | None = None,
+) -> None:
+    """Best-effort Postgres write from the pipeline (existing SQLModel layer)."""
+    try:
+        from services.rfp.store import persist_part2_progress
+
+        persist_part2_progress(
+            ticket_id, status=status, section_results=section_results
+        )
+    except Exception:
+        # In-memory runs (no ticket row) must not fail generation.
+        return
+
+
 def _event(state: RfpResponseState, node: str, **payload: Any) -> list[dict[str, Any]]:
     trace = list(state.get("trace") or [])
     trace.append({"node": node, "payload": payload})
@@ -117,9 +134,11 @@ def load_handoff_node(state: RfpResponseState) -> dict[str, Any]:
 def set_drafting_node(state: RfpResponseState) -> dict[str, Any]:
     if state.get("error_message"):
         return {}
+    ticket_id = str(state.get("ticket_id") or "")
+    _persist_ticket_progress(ticket_id, STATUS_DRAFTING)
     return {
         "status": STATUS_DRAFTING,
-        "trace": _event(state, "set_drafting", status=STATUS_DRAFTING),
+        "trace": _event(state, "set_drafting", status=STATUS_DRAFTING, persisted=True),
     }
 
 
@@ -147,6 +166,7 @@ def generate_evaluate_sections_node(state: RfpResponseState) -> dict[str, Any]:
         if stream.get("department_id")
     ]
     ticket_id = str(state.get("ticket_id") or payload.get("ticket_id") or "")
+    _persist_ticket_progress(ticket_id, STATUS_UNDER_EVALUATION)
 
     def _run_stream(stream: dict[str, Any]) -> tuple[SectionLoopResult, str, int]:
         dept = stream.get("department_id") or ""
@@ -195,6 +215,9 @@ def generate_evaluate_sections_node(state: RfpResponseState) -> dict[str, Any]:
     iters = [r["iterations"] for r in results] or [0]
     avg = sum(iters) / len(iters)
     all_passed = bool(results) and all(r["passed"] for r in results)
+    _persist_ticket_progress(
+        ticket_id, STATUS_UNDER_EVALUATION, section_results=results
+    )
     return {
         "status": STATUS_UNDER_EVALUATION,
         "section_results": results,
@@ -222,6 +245,11 @@ def finalize_status_node(state: RfpResponseState) -> dict[str, Any]:
     part3 = build_part3_handoff(
         ticket_id=str(state.get("ticket_id") or ""),
         ticket_status=status,
+        section_results=sections,
+    )
+    _persist_ticket_progress(
+        str(state.get("ticket_id") or ""),
+        status,
         section_results=sections,
     )
     return {
