@@ -5,8 +5,13 @@ compliance guidelines, §6 Part 2 deliverable).
 
 ## Part 2 scope
 
-- Start from Part 1 handoff: `ticket_id` + `work_streams[].key_aspects`
-  (no PDF reparse; see `data/pipelines/rfp_intake/PART2_HANDOFF.md`).
+- **Build on Part 1** — do not rewrite classifier / routing.
+- Start only from tickets Part 1 marked ready:
+  - `status == intake_complete`
+  - `part2_ready == true` (queue flag)
+  - `part2_handoff_json` validated (`ticket_id` + `work_streams[].key_aspects`)
+- Input = synthesizer payload from that contract (see `handoff_consume.py`).
+- **No PDF reparse.** No parallel summary path that ignores the handoff.
 - Per active department: **generator** writes `draft_content`, then **evaluators**
   score **readability**, **relevance**, and **compliance** (§5).
 - Generator–evaluator loop with `MAX_SECTION_ITERATIONS=2` (KPI: avg < 2).

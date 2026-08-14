@@ -12,11 +12,17 @@ from langgraph.graph import END, START, StateGraph
 
 from data.pipelines.rfp_intake.constants import (
     STATUS_DRAFTING,
+    STATUS_INTAKE_COMPLETE,
     STATUS_NEEDS_HUMAN_REVIEW,
     STATUS_UNDER_EVALUATION,
     STATUS_WAITING_FOR_APPROVAL,
 )
 from data.pipelines.rfp_response.compliance_rules import MAX_SECTION_ITERATIONS
+from data.pipelines.rfp_response.handoff_consume import (
+    Part1HandoffNotReady,
+    assert_part1_routing_ready,
+    synthesizer_payload_from_handoff,
+)
 from data.pipelines.rfp_response.loop import SectionLoopResult, run_section_loop
 
 REQUIRED_RESPONSE_NODES: tuple[str, ...] = (
@@ -31,6 +37,9 @@ class RfpResponseState(TypedDict, total=False):
     ticket_id: str
     handoff: dict[str, Any]
     metadata: dict[str, Any]
+    synthesizer_payload: dict[str, Any]
+    part2_ready: bool
+    intake_status: str
     status: str
     section_results: list[dict[str, Any]]
     average_iterations: float
@@ -47,40 +56,47 @@ def _event(state: RfpResponseState, node: str, **payload: Any) -> list[dict[str,
 
 
 def load_handoff_node(state: RfpResponseState) -> dict[str, Any]:
-    """Load Part 2 contract by ticket_id (injected handoff or from caller)."""
+    """Validate Part 1 routing handoff (ticket_id + synthesizer key_aspects)."""
     handoff = dict(state.get("handoff") or {})
-    ticket_id = state.get("ticket_id") or handoff.get("ticket_id") or ""
-    if not ticket_id:
-        return {
-            "status": "failed",
-            "error_message": "missing_ticket_id",
-            "trace": _event(state, "load_handoff", error="missing_ticket_id"),
-        }
-    if not handoff.get("work_streams"):
+    ticket_id = (state.get("ticket_id") or handoff.get("ticket_id") or "").strip()
+    intake_status = str(
+        state.get("intake_status") or handoff.get("status") or STATUS_INTAKE_COMPLETE
+    )
+    part2_ready = state.get("part2_ready")
+    if part2_ready is None:
+        part2_ready = bool(handoff.get("part2_ready", True))
+
+    try:
+        contract = assert_part1_routing_ready(
+            ticket_id=ticket_id,
+            status=intake_status,
+            part2_ready=bool(part2_ready),
+            handoff=handoff or None,
+        )
+    except Part1HandoffNotReady as exc:
         return {
             "ticket_id": ticket_id,
             "status": "failed",
-            "error_message": "missing_work_streams",
-            "trace": _event(state, "load_handoff", error="missing_work_streams"),
+            "error_message": str(exc),
+            "trace": _event(state, "load_handoff", error=str(exc)),
         }
-    if handoff.get("reparse_pdf_required") is True:
-        return {
-            "ticket_id": ticket_id,
-            "status": "failed",
-            "error_message": "reparse_pdf_required_forbidden",
-            "trace": _event(state, "load_handoff", error="reparse_not_allowed"),
-        }
-    metadata = dict(handoff.get("metadata") or {})
+
+    payload = synthesizer_payload_from_handoff(contract)
     return {
         "ticket_id": ticket_id,
-        "handoff": handoff,
-        "metadata": metadata,
+        "handoff": contract,
+        "metadata": dict(payload.get("metadata") or {}),
+        "synthesizer_payload": payload,
+        "part2_ready": True,
+        "intake_status": STATUS_INTAKE_COMPLETE,
         "error_message": None,
         "trace": _event(
             state,
             "load_handoff",
             ticket_id=ticket_id,
-            work_streams=len(handoff.get("work_streams") or []),
+            work_streams=len(payload.get("work_streams") or []),
+            source="part1_handoff_contract",
+            reparse_pdf_required=False,
         ),
     }
 
@@ -97,8 +113,11 @@ def set_drafting_node(state: RfpResponseState) -> dict[str, Any]:
 def generate_evaluate_sections_node(state: RfpResponseState) -> dict[str, Any]:
     if state.get("error_message"):
         return {}
-    handoff = state.get("handoff") or {}
-    metadata = dict(state.get("metadata") or {})
+    # Prefer synthesizer payload extracted from Part 1 handoff (not a parallel summary)
+    payload = state.get("synthesizer_payload") or synthesizer_payload_from_handoff(
+        state.get("handoff") or {}
+    )
+    metadata = dict(payload.get("metadata") or state.get("metadata") or {})
     max_iter = int(state.get("max_iterations") or MAX_SECTION_ITERATIONS)
     results: list[dict[str, Any]] = []
     trace = list(state.get("trace") or [])
@@ -109,7 +128,7 @@ def generate_evaluate_sections_node(state: RfpResponseState) -> dict[str, Any]:
         }
     )
 
-    for stream in handoff.get("work_streams") or []:
+    for stream in payload.get("work_streams") or []:
         dept = stream.get("department_id") or ""
         if not dept:
             continue
@@ -129,6 +148,8 @@ def generate_evaluate_sections_node(state: RfpResponseState) -> dict[str, Any]:
                     "iterations": loop_result.iterations,
                     "passed": loop_result.evaluation.passed,
                     "exhausted": loop_result.exhausted,
+                    "key_aspects_count": len(stream.get("key_aspects") or []),
+                    "input": "part1_work_stream_key_aspects",
                 },
             }
         )
@@ -220,11 +241,15 @@ def invoke_rfp_response_graph(
     ticket_id: str,
     handoff: dict[str, Any],
     max_iterations: int = MAX_SECTION_ITERATIONS,
+    intake_status: str | None = None,
+    part2_ready: bool | None = None,
 ) -> RfpResponseState:
     graph = get_compiled_rfp_response_graph()
     initial: RfpResponseState = {
         "ticket_id": ticket_id,
         "handoff": handoff,
+        "intake_status": intake_status or str(handoff.get("status") or ""),
+        "part2_ready": True if part2_ready is None else bool(part2_ready),
         "trace": [],
         "section_results": [],
         "max_iterations": max_iterations,

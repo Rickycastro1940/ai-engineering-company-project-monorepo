@@ -1,9 +1,11 @@
 """RFP response generation pipeline (Milestone 9 Part 2).
 
-Consumes Part 1 handoff (ticket_id + work_streams.key_aspects) — does not
-re-parse the PDF. Each active department drafts a section, then readability /
-relevance / compliance evaluators run in a generator–evaluator loop
-(CONTEXT §5 guidelines, §3 iteration KPI).
+Builds on Part 1 classification + routing — does not rewrite intake.
+Sole input: Part 1 routing handoff for tickets with
+``status=intake_complete`` + ``part2_ready`` + validated
+``ticket_id`` + synthesizer ``work_streams[].key_aspects``.
+
+Never re-parses the PDF. Never invents a parallel summary path.
 """
 
 from __future__ import annotations
@@ -18,17 +20,26 @@ from data.pipelines.rfp_response.graph import (
     get_compiled_rfp_response_graph,
     invoke_rfp_response_graph,
 )
+from data.pipelines.rfp_response.handoff_consume import (
+    Part1HandoffNotReady,
+    assert_part1_routing_ready,
+    synthesizer_payload_from_handoff,
+)
 from data.pipelines.rfp_response.loop import run_section_loop
 
 __all__ = [
     "MAX_SECTION_ITERATIONS",
+    "Part1HandoffNotReady",
     "REQUIRED_RESPONSE_NODES",
     "ResponsePipelineResult",
+    "assert_part1_routing_ready",
     "build_rfp_response_graph",
     "get_compiled_rfp_response_graph",
     "invoke_rfp_response_graph",
+    "run_response_for_ticket",
     "run_response_pipeline",
     "run_section_loop",
+    "synthesizer_payload_from_handoff",
 ]
 
 
@@ -59,12 +70,16 @@ def run_response_pipeline(
     ticket_id: str,
     handoff: dict[str, Any],
     max_iterations: int = MAX_SECTION_ITERATIONS,
+    intake_status: str | None = None,
+    part2_ready: bool | None = None,
 ) -> ResponsePipelineResult:
-    """Run Part 2 for one ticket from a Part 1 handoff contract."""
+    """Run Part 2 from an already-loaded Part 1 handoff contract."""
     final = invoke_rfp_response_graph(
         ticket_id=ticket_id,
         handoff=handoff,
         max_iterations=max_iterations,
+        intake_status=intake_status,
+        part2_ready=part2_ready,
     )
     return ResponsePipelineResult(
         ticket_id=str(final.get("ticket_id") or ticket_id),
@@ -74,4 +89,25 @@ def run_response_pipeline(
         all_passed=bool(final.get("all_passed")),
         error_message=final.get("error_message"),
         trace=list(final.get("trace") or []),
+    )
+
+
+def run_response_for_ticket(
+    ticket_id: str,
+    *,
+    max_iterations: int = MAX_SECTION_ITERATIONS,
+) -> ResponsePipelineResult:
+    """Canonical Part 2 entry: load Part 1 ready handoff from DB, then generate.
+
+    Requires ``intake_complete`` + ``part2_ready`` + validated handoff JSON.
+    """
+    from services.rfp.store import load_ready_part2_handoff
+
+    handoff, ticket_status, ready_flag = load_ready_part2_handoff(ticket_id)
+    return run_response_pipeline(
+        ticket_id=ticket_id,
+        handoff=handoff,
+        max_iterations=max_iterations,
+        intake_status=ticket_status,
+        part2_ready=ready_flag,
     )

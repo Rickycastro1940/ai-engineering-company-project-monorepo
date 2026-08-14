@@ -148,20 +148,19 @@ def get_part2_handoff(ticket_id: str) -> dict[str, Any]:
 
 @router.post("/tickets/{ticket_id}/generate-response")
 def generate_response(ticket_id: str) -> dict[str, Any]:
-    """Part 2: draft + evaluate department sections from Part 1 handoff (no PDF reparse)."""
-    from data.pipelines.rfp_response import run_response_pipeline
-    from services.rfp.store import load_part2_handoff, save_response_result
+    """Part 2: consume Part 1 ready handoff only (no PDF reparse / no parallel summary)."""
+    from data.pipelines.rfp_response import Part1HandoffNotReady, run_response_for_ticket
+    from services.rfp.store import save_response_result
 
     try:
-        handoff = load_part2_handoff(ticket_id)
+        result = run_response_for_ticket(ticket_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Ticket not found") from exc
-    except ValueError as exc:
+    except (ValueError, Part1HandoffNotReady) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
-    result = run_response_pipeline(ticket_id=ticket_id, handoff=handoff)
     if result.error_message:
-        raise HTTPException(status_code=400, detail=result.error_message)
+        raise HTTPException(status_code=409, detail=result.error_message)
     try:
         saved = save_response_result(ticket_id, result)
     except ValueError as exc:

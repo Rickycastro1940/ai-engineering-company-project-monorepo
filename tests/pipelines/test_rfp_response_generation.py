@@ -111,7 +111,12 @@ def test_pipeline_sunset_bay_all_sections_pass() -> None:
         source_pdf_path=str(SEEDS / "CONTEXT-brasaland-request-1.pdf"),
     )
     assert handoff is not None
-    result = run_response_pipeline(ticket_id="p2-sunset", handoff=handoff)
+    result = run_response_pipeline(
+        ticket_id="p2-sunset",
+        handoff=handoff,
+        intake_status=STATUS_INTAKE_COMPLETE,
+        part2_ready=True,
+    )
     assert result.error_message is None
     assert result.all_passed is True
     assert result.status == STATUS_WAITING_FOR_APPROVAL
@@ -134,7 +139,12 @@ def test_pipeline_andes_skips_training() -> None:
     handoff = route_intake_to_part2(
         ticket_id="p2-andes", intake_result=intake, source_pdf_path="x.pdf"
     )
-    result = run_response_pipeline(ticket_id="p2-andes", handoff=handoff)
+    result = run_response_pipeline(
+        ticket_id="p2-andes",
+        handoff=handoff,
+        intake_status=STATUS_INTAKE_COMPLETE,
+        part2_ready=True,
+    )
     assert result.all_passed is True
     assert "training" not in {r["department_id"] for r in result.section_results}
 

@@ -30,6 +30,7 @@ __all__ = [
     "list_part2_queue",
     "list_tickets",
     "load_part2_handoff",
+    "load_ready_part2_handoff",
     "reset_engine",
     "save_intake_result",
     "save_response_result",
@@ -139,6 +140,40 @@ def load_part2_handoff(ticket_id: str) -> dict[str, Any]:
     if contract.get("reparse_pdf_required") is True:
         raise ValueError("Handoff incorrectly requires PDF reparse")
     return contract
+
+
+def load_ready_part2_handoff(ticket_id: str) -> tuple[dict[str, Any], str, bool]:
+    """Load handoff only when Part 1 marked the ticket ready for Part 2.
+
+    Returns ``(handoff, ticket.status, ticket.part2_ready)``.
+    Raises ``ValueError`` when status/flag/contract are not Part-1-ready.
+    """
+    from data.pipelines.rfp_response.handoff_consume import (
+        Part1HandoffNotReady,
+        assert_part1_routing_ready,
+    )
+
+    ticket = get_ticket(ticket_id)
+    if ticket is None:
+        raise KeyError(ticket_id)
+
+    handoff: dict[str, Any] | None = None
+    if ticket.part2_handoff_json:
+        try:
+            handoff = json.loads(ticket.part2_handoff_json)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Corrupt part2_handoff_json for {ticket_id}") from exc
+
+    try:
+        contract = assert_part1_routing_ready(
+            ticket_id=ticket_id,
+            status=ticket.status,
+            part2_ready=bool(ticket.part2_ready),
+            handoff=handoff,
+        )
+    except Part1HandoffNotReady as exc:
+        raise ValueError(str(exc)) from exc
+    return contract, ticket.status, bool(ticket.part2_ready)
 
 
 def save_response_result(ticket_id: str, result: Any) -> RfpTicket:
