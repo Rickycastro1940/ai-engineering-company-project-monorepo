@@ -82,6 +82,7 @@ def test_collect_approvals_interrupts_then_enters_apply_approval() -> None:
     assert APPLY_APPROVAL_NODE in apply_src or "apply_approval" in apply_src
 
     assert "goto=APPLY_APPROVAL_NODE" in resume_src
+    assert "_applied_resume_update" in resume_src or "_apply_department_decision" in resume_src
     assert "prepare_resume(" in invoke_src
     assert "resume_command(" in invoke_src
     assert "graph.invoke(initial" in invoke_src
@@ -163,6 +164,56 @@ def test_department_interrupt_is_per_branch_and_skips_already_done() -> None:
     remaining = _interrupt_department_ids(after_ops)
     assert "operaciones" not in remaining
     assert remaining == {"marketing", "procurement"}
+    assert after_ops.get("status") != "done"
+
+
+def test_second_department_resume_persists_after_first_send_branch() -> None:
+    """Marketing-first (Send order) then operaciones must both land, approve or reject."""
+    kwargs = dict(
+        ticket_id="hitl-second-resume",
+        status=STATUS_WAITING_FOR_APPROVAL,
+        sections=ANDES_SECTIONS,
+        metadata={"client_name": "Andes Tech Solutions"},
+        departments_needed=["marketing", "operaciones", "procurement"],
+        requires_ceo_approval=False,
+        use_interrupt=True,
+        thread_id="hitl-second-resume-thread",
+    )
+    paused = invoke_rfp_approval_graph(**kwargs)
+    assert _interrupt_department_ids(paused) == {
+        "marketing",
+        "operaciones",
+        "procurement",
+    }
+    after_mkt = invoke_rfp_approval_graph(
+        **kwargs,
+        resume={
+            "department_id": "marketing",
+            "decision": "approved",
+            "approver": "Camila Ospina",
+        },
+    )
+    assert (after_mkt.get("approvals") or {}).get("marketing", {}).get(
+        "approval_status"
+    ) == "approved"
+    remaining = _interrupt_department_ids(after_mkt)
+    assert "marketing" not in remaining
+    assert remaining == {"operaciones", "procurement"}
+
+    after_ops = invoke_rfp_approval_graph(
+        **kwargs,
+        resume={
+            "department_id": "operaciones",
+            "decision": "rejected",
+            "approver": "Felipe Guerrero",
+        },
+    )
+    approvals = after_ops.get("approvals") or {}
+    assert approvals.get("marketing", {}).get("approval_status") == "approved"
+    assert approvals.get("operaciones", {}).get("approval_status") == "rejected"
+    remaining = _interrupt_department_ids(after_ops)
+    assert "operaciones" not in remaining
+    assert remaining == {"procurement"}
     assert after_ops.get("status") != "done"
 
 

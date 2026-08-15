@@ -149,6 +149,88 @@ def test_http_named_owners_approve_andes_without_ceo(client: TestClient) -> None
     assert all(r.approved_at for r in rows)
 
 
+def test_http_department_can_reject_after_sibling_approve(client: TestClient) -> None:
+    depts = ["marketing", "operaciones", "procurement"]
+    ticket_id = _seed_ticket(
+        departments=depts,
+        requires_ceo=False,
+        metadata={
+            "client_name": "Andes Tech Solutions",
+            "estimated_contract_value_usd": 20_000,
+        },
+        drafts=ANDES_DRAFTS,
+    )
+    started = client.post(f"/rfp/tickets/{ticket_id}/start-approval")
+    assert started.status_code == 200, started.text
+    approved = client.post(
+        f"/rfp/tickets/{ticket_id}/approvals",
+        json={
+            "department_id": "marketing",
+            "decision": "approved",
+            "approver": "Camila Ospina",
+        },
+    )
+    assert approved.status_code == 200, approved.text
+    rejected = client.post(
+        f"/rfp/tickets/{ticket_id}/approvals",
+        json={
+            "department_id": "operaciones",
+            "decision": "rejected",
+            "approver": "Felipe Guerrero",
+        },
+    )
+    assert rejected.status_code == 200, rejected.text
+    by_dept = {r.department_id: r.approval_status for r in list_sections(ticket_id)}
+    assert by_dept["marketing"] == "approved"
+    assert by_dept["operaciones"] == "rejected"
+    assert by_dept["procurement"] == "pending"
+    assert rejected.json()["status"] != STATUS_DONE
+
+
+def test_http_named_owners_approve_in_send_order(client: TestClient) -> None:
+    """Second (and third) department resumes must persist, not only the first Send branch."""
+    depts = ["marketing", "operaciones", "procurement"]
+    ticket_id = _seed_ticket(
+        departments=depts,
+        requires_ceo=False,
+        metadata={
+            "client_name": "Andes Tech Solutions",
+            "location": "Medellín",
+            "estimated_contract_value_usd": 20_000,
+        },
+        drafts=ANDES_DRAFTS,
+    )
+    started = client.post(f"/rfp/tickets/{ticket_id}/start-approval")
+    assert started.status_code == 200, started.text
+    owners = {
+        "marketing": "Camila Ospina",
+        "operaciones": "Felipe Guerrero",
+        "procurement": "Lucía Fernández",
+    }
+    last = None
+    for dept, owner in owners.items():
+        res = client.post(
+            f"/rfp/tickets/{ticket_id}/approvals",
+            json={
+                "department_id": dept,
+                "decision": "approved",
+                "approver": owner,
+            },
+        )
+        assert res.status_code == 200, res.text
+        last = res.json()
+        by_dept = {r.department_id: r.approval_status for r in list_sections(ticket_id)}
+        assert by_dept[dept] == "approved", by_dept
+    assert last is not None
+    assert last["status"] == STATUS_DONE
+    doc = client.get(f"/rfp/tickets/{ticket_id}/final-document")
+    assert doc.status_code == 200, doc.text
+    rows = list_sections(ticket_id)
+    assert {r.department_id: r.approval_status for r in rows} == {
+        dept: "approved" for dept in depts
+    }
+
+
 def test_http_rejects_invented_approver_title(client: TestClient) -> None:
     ticket_id = _seed_ticket(
         departments=["marketing"],

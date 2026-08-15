@@ -256,24 +256,41 @@ def prepare_resume(resume: Any, snapshot: Any | None = None) -> Any:
     return _one(resume if isinstance(resume, dict) else {"decision": resume})
 
 
+def _applied_resume_update(
+    snapshot: Any, decision: dict[str, Any]
+) -> dict[str, Any]:
+    """Persist a validated decision on the resume Command itself.
+
+    ``apply_approval`` can still run (idempotent). Sibling interrupts
+    otherwise skip that node and leave SQL/state as ``pending``.
+    """
+    values = dict(getattr(snapshot, "values", None) or {})
+    dept = str(decision.get("department_id") or "").strip()
+    if dept == CEO_DEPARTMENT_ID:
+        applied = _apply_ceo_decision(values, decision)
+    else:
+        applied = _apply_department_decision(values, decision)
+    return {**applied, "resume_decision": decision}
+
+
 def resume_command(graph: Any, config: dict[str, Any], resume: Any) -> Any:
     """Enter ``apply_approval`` on the existing checkpoint — never START.
 
     Pending interrupts are resumed by id so only that Send branch continues.
-    A single decision also ``goto=apply_approval`` so the write lands even
-    when sibling department interrupts are still open. A multi-id resume map
+    A single decision is persisted on ``Command.update`` (and SQL) here so
+    the write lands even when sibling department interrupts stay open and
+    ``apply_approval`` is skipped. ``goto=apply_approval`` remains so the
+    node can still run when LangGraph schedules it. A multi-id resume map
     lets each paused node ``Command(goto=apply_approval)`` itself.
     """
     if resume is None:
         return None
     if _is_interrupt_id_map(resume):
         return Command(resume=resume)
-    decision = dict(resume) if isinstance(resume, dict) else {"decision": resume}
     snapshot = graph.get_state(config)
+    decision = dict(resume) if isinstance(resume, dict) else {"decision": resume}
     mapping, _leftover = match_interrupt_resumes(snapshot, [decision])
-    update = {
-        "resume_decision": decision,
-    }
+    update = _applied_resume_update(snapshot, decision)
     if mapping:
         return Command(resume=mapping, goto=APPLY_APPROVAL_NODE, update=update)
     return Command(goto=APPLY_APPROVAL_NODE, update=update)
