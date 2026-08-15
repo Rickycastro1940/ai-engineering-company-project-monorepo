@@ -209,7 +209,7 @@ def reset_approval_checkpointer() -> None:
 def checkpointer_kind(saver: Any | None = None) -> str:
     obj = saver if saver is not None else _saver
     name = type(obj).__name__ if obj is not None else ""
-    if name == "MemorySaver":
+    if name in {"MemorySaver", "InMemorySaver"}:
         return "memory"
     if "Postgres" in name:
         return "postgres"

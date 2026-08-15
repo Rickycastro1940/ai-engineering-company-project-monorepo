@@ -69,7 +69,7 @@ def test_memory_saver_is_opt_in_local_only(monkeypatch: pytest.MonkeyPatch) -> N
     assert checkpoint_backend() == "memory"
     saver = get_approval_checkpointer()
     assert checkpointer_kind(saver) == "memory"
-    assert type(saver).__name__ == "MemorySaver"
+    assert type(saver).__name__ in {"MemorySaver", "InMemorySaver"}
 
 
 def test_graph_module_does_not_hardcode_memory_saver() -> None:
