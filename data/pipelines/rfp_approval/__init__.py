@@ -33,7 +33,9 @@ from data.pipelines.rfp_approval.graph import (
     enrich_interrupt_state,
     get_compiled_rfp_approval_graph,
     interrupt_payload,
+    interrupt_values,
     invoke_rfp_approval_graph,
+    match_interrupt_resumes,
 )
 from data.pipelines.rfp_approval.handoff import (
     Part2HandoffNotReady,
@@ -175,6 +177,13 @@ def run_approval_pipeline(
     )
     final = invoke_rfp_approval_graph(**invoke_kwargs, resume=resume)
     while queued:
+        if not interrupt_values(final):
+            break
+        mapping, leftover = match_interrupt_resumes(final, queued)
+        if mapping:
+            queued = leftover
+            final = invoke_rfp_approval_graph(**invoke_kwargs, resume=mapping)
+            continue
         payload = interrupt_payload(final)
         if payload is None:
             break

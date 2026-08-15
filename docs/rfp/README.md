@@ -15,7 +15,7 @@ Curriculum PDFs: [`rfp-requests/brasaland/`](../../rfp-requests/brasaland/).
 
 **§7 arbitration** is a dedicated graph node with fixed trigger ids (`cost-vs-feasibility`, `setup-sla-breach`, `ceo-threshold`) — not LLM consensus.
 
-**Part 3 HITL:** `collect_approvals` calls LangGraph `interrupt()` before a department section is marked approved; resume is the named owner's decision.
+**Part 3 HITL:** each pending department is a parallel `Send` branch; `interrupt()` pauses only that branch. Already-decided departments are not sent and are not blocked.
 
 ## Layout
 

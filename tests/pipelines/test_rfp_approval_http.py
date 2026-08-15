@@ -99,12 +99,27 @@ def test_http_named_owners_approve_andes_without_ceo(client: TestClient) -> None
     assert all(r.approval_status == "pending" for r in list_sections(ticket_id))
 
     owners = {
-        "marketing": "Camila Ospina",
         "operaciones": "Felipe Guerrero",
+        "marketing": "Camila Ospina",
         "procurement": "Lucía Fernández",
     }
     last = None
+    first = client.post(
+        f"/rfp/tickets/{ticket_id}/approvals",
+        json={
+            "department_id": "operaciones",
+            "decision": "approved",
+            "approver": "Felipe Guerrero",
+        },
+    )
+    assert first.status_code == 200, first.text
+    by_dept = {r.department_id: r.approval_status for r in list_sections(ticket_id)}
+    assert by_dept["operaciones"] == "approved"
+    assert by_dept["marketing"] == "pending"
+    assert by_dept["procurement"] == "pending"
     for dept, owner in owners.items():
+        if dept == "operaciones":
+            continue
         res = client.post(
             f"/rfp/tickets/{ticket_id}/approvals",
             json={

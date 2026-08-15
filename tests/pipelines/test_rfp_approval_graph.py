@@ -52,6 +52,9 @@ def test_compiled_graph_registers_separate_nodes() -> None:
     for name in REQUIRED_APPROVAL_NODES:
         assert name in registered, name
     assert get_compiled_rfp_approval_graph() is not None
+    graph_src = (PIPELINE / "graph.py").read_text(encoding="utf-8")
+    assert "Send(" in graph_src
+    assert "fanout_department_approvals" in graph_src
 
 
 def test_cx_graph_has_no_rfp_approval_nodes() -> None:
