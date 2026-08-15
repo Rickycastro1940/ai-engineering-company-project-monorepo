@@ -5,6 +5,17 @@ when estimated annual value exceeds USD $50,000/year), the graph reaches
 the ultimate synthesizer and generates the CONTEXT §2.3 **FinalDocument**
 by consolidating the approved section drafts.
 
+## Ticket status (completion rules)
+
+| Condition | Ticket status | FinalDocument |
+| --------- | ------------- | ------------- |
+| Any active department approval still open | `waiting_for_approval` | Not available (`GET .../final-document` → 409) |
+| CEO required and Mariana not yet approved | `waiting_for_approval` | Not available |
+| FinalDocument stored after all required approvals | `done` | Accessible via `GET /rfp/tickets/{id}/final-document` and on `GET /rfp/tickets/{id}` |
+
+Persisting a FinalDocument through `persist_part3_progress` always sets the
+ticket to `done` — a stored document is never left on a still-waiting ticket.
+
 ## When completion runs
 
 ```
@@ -15,9 +26,9 @@ by consolidating the approved section drafts.
 
 | Condition | Result |
 | --------- | ------ |
-| Any active department still `pending` / `rejected` / `request_changes` | Blocked — no FinalDocument |
-| CEO required and Mariana not yet `approved` | Blocked |
-| Every required owner (and CEO if needed) `approved` | Consolidate → persist → ticket `done` |
+| Any active department still `pending` / `rejected` / `request_changes` | Blocked — status stays `waiting_for_approval`, no FinalDocument |
+| CEO required and Mariana not yet `approved` | Blocked — status stays `waiting_for_approval` |
+| Every required owner (and CEO if needed) `approved` | Consolidate → store FinalDocument → status `done` |
 
 Rejected or change-requested drafts are **not** included in the body.
 Only sections whose status is `approved` are consolidated.
@@ -31,15 +42,13 @@ Only sections whose status is `approved` are consolidated.
 | `total_estimated_value` | Intake metadata (`estimated_contract_value_usd`) — never invented |
 | `generated_at` | UTC timestamp at synthesis |
 
-Markdown is also stored for the backoffice (`GET /rfp/tickets/{id}/final-document`).
-
 ## Code
 
 | Piece | Location |
 | ----- | -------- |
 | Gate + consolidate | `data/pipelines/rfp_approval/synthesizer.py` |
 | Graph node | `synthesizer_node` in `graph.py` |
-| Persist | `persist_part3_progress` → `RfpFinalDocument` |
-| HTTP | `GET /rfp/tickets/{ticket_id}/final-document` |
+| Persist (`waiting_for_approval` / `done`) | `persist_part3_progress` → `RfpFinalDocument` |
+| HTTP (accessible only when `done`) | `GET /rfp/tickets/{ticket_id}/final-document` |
 
 Helpers: `synthesizer_ready`, `consolidate_approved_sections`, `build_final_document`.

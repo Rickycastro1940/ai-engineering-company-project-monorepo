@@ -10,7 +10,12 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
 
 from data.pipelines.rfp_intake import IntakeResult, run_intake_from_bytes
-from data.pipelines.rfp_intake.constants import P1_TERMINAL, STATUS_ANALYZING, STATUS_FAILED
+from data.pipelines.rfp_intake.constants import (
+    P1_TERMINAL,
+    STATUS_ANALYZING,
+    STATUS_DONE,
+    STATUS_FAILED,
+)
 from services.rfp.store import (
     create_analyzing_ticket,
     get_ticket,
@@ -227,12 +232,21 @@ def post_approval(ticket_id: str, body: dict[str, Any]) -> dict[str, Any]:
 
 @router.get("/tickets/{ticket_id}/final-document")
 def get_ticket_final_document(ticket_id: str) -> dict[str, Any]:
+    """Return the FinalDocument only after completion (ticket status ``done``)."""
     from services.rfp.store import get_final_document
 
     ticket = get_ticket(ticket_id)
     if ticket is None:
         raise HTTPException(status_code=404, detail="Ticket not found")
-    doc = get_final_document(ticket_id)
+    if ticket.status != STATUS_DONE:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Final document is not available while approvals are pending "
+                "(ticket status must be done)"
+            ),
+        )
+    doc = get_final_document(ticket_id, require_done=True)
     if not doc:
         raise HTTPException(
             status_code=409,

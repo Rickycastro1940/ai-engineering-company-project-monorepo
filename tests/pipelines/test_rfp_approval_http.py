@@ -97,6 +97,13 @@ def test_http_named_owners_approve_andes_without_ceo(client: TestClient) -> None
     body = started.json()
     assert body["status"] == STATUS_WAITING_FOR_APPROVAL
     assert all(r.approval_status == "pending" for r in list_sections(ticket_id))
+    # While approvals are pending the FinalDocument is not accessible.
+    blocked = client.get(f"/rfp/tickets/{ticket_id}/final-document")
+    assert blocked.status_code == 409
+    assert client.get(f"/rfp/tickets/{ticket_id}").json().get("final_document") in (
+        {},
+        None,
+    )
 
     owners = {
         "operaciones": "Felipe Guerrero",
@@ -141,6 +148,10 @@ def test_http_named_owners_approve_andes_without_ceo(client: TestClient) -> None
     stored = get_final_document(ticket_id)
     assert stored is not None
     assert stored["markdown"]
+    # Ticket GET also exposes the document once status is done.
+    detail = client.get(f"/rfp/tickets/{ticket_id}").json()
+    assert detail["status"] == STATUS_DONE
+    assert detail.get("final_document", {}).get("markdown")
     rows = list_sections(ticket_id)
     assert {r.department_id: r.approval_status for r in rows} == {
         dept: "approved" for dept in depts
@@ -184,7 +195,9 @@ def test_http_department_can_reject_after_sibling_approve(client: TestClient) ->
     assert by_dept["marketing"] == "approved"
     assert by_dept["operaciones"] == "rejected"
     assert by_dept["procurement"] == "pending"
+    assert rejected.json()["status"] == STATUS_WAITING_FOR_APPROVAL
     assert rejected.json()["status"] != STATUS_DONE
+    assert client.get(f"/rfp/tickets/{ticket_id}/final-document").status_code == 409
 
 
 def test_http_named_owners_approve_in_send_order(client: TestClient) -> None:

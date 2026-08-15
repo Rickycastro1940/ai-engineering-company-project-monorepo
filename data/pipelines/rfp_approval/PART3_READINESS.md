@@ -25,13 +25,14 @@ Source: CONTEXT-company.md Milestone 9 (§2.1 owners, §2.3 FinalDocument,
     between departments; exceeding it sets `needs_human_review`.
   - Every graph node appends `agent`, `input`, `output`, and `timestamp`
     to state `trace` for auditability.
-- **FinalDocument / completion** (CONTEXT §2.3): once every active
-  department owner has approved (and Mariana Restrepo when the $50k
-  threshold applies), the `synthesizer` node consolidates the *approved*
-  section drafts into one FinalDocument (`ticket_id`, `sections`,
-  `total_estimated_value`, `generated_at`) and sets the ticket to `done`.
-  See [`COMPLETION.md`](./COMPLETION.md). Rejected / pending /
-  `request_changes` drafts are not included.
+- **FinalDocument / completion** (CONTEXT §2.3): while any department
+  approval is pending, ticket status is `waiting_for_approval` and the
+  FinalDocument is not accessible. Once every active department owner has
+  approved (and Mariana Restrepo when the $50k threshold applies), the
+  `synthesizer` consolidates approved drafts, stores the FinalDocument
+  (`ticket_id`, `sections`, `total_estimated_value`, `generated_at`), sets
+  status to `done`, and exposes `GET /rfp/tickets/{id}/final-document`.
+  See [`COMPLETION.md`](./COMPLETION.md).
 - Same HTTP process: extend `services/rfp/` (no second API).
   Pipeline: `data/pipelines/rfp_approval/`.
 - **HITL interruption point:** `collect_approvals` is fanned out with

@@ -393,9 +393,20 @@ def list_part3_queue(*, limit: int = 50) -> list[dict[str, Any]]:
         return out
 
 
-def get_final_document(ticket_id: str) -> dict[str, Any] | None:
+def get_final_document(
+    ticket_id: str, *, require_done: bool = False
+) -> dict[str, Any] | None:
+    """Return the stored FinalDocument, or None if missing.
+
+    When ``require_done`` is True, the document is accessible only if the
+    ticket status is ``done`` (completion rule).
+    """
     init_db()
     with Session(get_engine()) as session:
+        if require_done:
+            ticket = session.get(RfpTicket, ticket_id)
+            if ticket is None or ticket.status != STATUS_DONE:
+                return None
         row = session.get(RfpFinalDocument, ticket_id)
         if row is None:
             return None
@@ -427,9 +438,20 @@ def persist_part3_progress(
     synthesizer_blocked: bool | None = None,
     approval_iterations: dict[str, int] | None = None,
 ) -> bool:
-    """Write Part 3 approvals / FinalDocument onto the same Part 1 ticket."""
+    """Write Part 3 approvals / FinalDocument onto the same Part 1 ticket.
+
+    Status rules (completion):
+    - While any department approval is still open, callers pass
+      ``waiting_for_approval``.
+    - Storing a FinalDocument always sets the ticket to ``done`` so the
+      document becomes accessible via ``GET .../final-document``.
+    """
     if not (ticket_id or "").strip():
         return False
+    # Completing with a FinalDocument forces ``done`` — never leave a
+    # stored document on a still-waiting ticket.
+    if final_document:
+        status = STATUS_DONE
     if status is not None and status not in PART3_ALLOWED_STATUSES:
         return False
     init_db()
@@ -787,7 +809,12 @@ def ticket_to_dict(ticket: RfpTicket) -> dict[str, Any]:
         "part3_status_history": meta.get("part3_status_history") or [],
         "part3_arbitration": meta.get("part3_arbitration") or [],
         "ceo_approval": meta.get("ceo_approval") or {},
-        "final_document": get_final_document(ticket.ticket_id) or meta.get("final_document") or {},
+        # FinalDocument is accessible on the ticket only after status is done.
+        "final_document": (
+            get_final_document(ticket.ticket_id, require_done=True) or {}
+            if ticket.status == STATUS_DONE
+            else {}
+        ),
         "synthesizer_blocked": bool(meta.get("synthesizer_blocked")),
         "ask_whom": ask_whom,
         "open_questions": handoff.get("open_questions") or meta.get("open_questions", []),
