@@ -37,7 +37,7 @@
         }
         .nav a:hover, .nav a.active { color: var(--accent); font-weight: 600; }
         .nav .brand { color: var(--text); font-weight: 700; margin-right: 0.5rem; }
-        .container { max-width: 720px; margin: 0 auto; padding: 2rem; }
+        .container { max-width: 880px; margin: 0 auto; padding: 2rem; }
         h1 { font-size: 1.75rem; margin: 0 0 0.35rem; }
         .lede { color: var(--muted); margin: 0 0 1.75rem; line-height: 1.5; }
         .panel {
@@ -91,6 +91,29 @@
             color: var(--text);
             border: 1px solid var(--border);
         }
+        button.danger { background: var(--danger); }
+        button.danger:hover { background: #b91c1c; }
+        .panel + .panel { margin-top: 1rem; }
+        #status { margin-top: 1rem; }
+        .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.75rem; background: #e5e7eb; }
+        .badge.pending { background: #fef3c7; color: #92400e; }
+        .badge.approved { background: #d1fae5; color: #065f46; }
+        .badge.rejected { background: #fee2e2; color: #991b1b; }
+        .badge.request_changes { background: #e0e7ff; color: #3730a3; }
+        .dept-card { border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-top: 0.75rem; }
+        .dept-card h3 { margin: 0 0 0.35rem; font-size: 1.05rem; }
+        .dept-card pre {
+            white-space: pre-wrap;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.75rem;
+            font-size: 0.8rem;
+            max-height: 160px;
+            overflow: auto;
+        }
+        .row { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: flex-end; }
+        .row > * { flex: 1; min-width: 180px; }
         #status {
             margin-top: 1.25rem;
             padding: 0.9rem 1rem;
@@ -120,8 +143,10 @@
         <h1>RFP Intake</h1>
         <p class="lede">
             Upload a vendor RFP for Brasaland intake &amp; routing (Part 1).
-            Files are accepted for conversion and readability checks — keep USD/COP
-            amounts exactly as written; do not invent allergen guarantees.
+            After drafts are ready, each active department logs approve or reject
+            here — Camila Ospina, Felipe Guerrero, Lucía Fernández, Jake Morrison
+            (named owners from <code>CONTEXT-company.md</code> §2.1). Mariana Restrepo
+            (CEO) only when estimated annual value exceeds USD $50,000.
         </p>
 
         <form class="panel" id="rfp-form">
@@ -145,21 +170,84 @@
             <p class="meta">
                 Posts to <code>POST /rfp/tickets</code> then polls <code>GET /rfp/tickets/{id}</code>
                 until <code>intake_complete</code> or <code>discarded</code>.
+                Department sign-off uses <code>POST /rfp/tickets/{id}/start-approval</code>
+                and <code>POST /rfp/tickets/{id}/approvals</code>.
                 Sample PDFs: <code>rfp-requests/brasaland/</code>.
             </p>
         </form>
+
+        <form class="panel" id="load-form" style="margin-top: 1rem;">
+            <div class="row">
+                <div>
+                    <label for="ticket-id">Open existing ticket</label>
+                    <input type="text" id="ticket-id" name="ticket_id" placeholder="ticket id from intake" autocomplete="off">
+                </div>
+                <div>
+                    <button type="submit" id="load-btn">Load ticket</button>
+                </div>
+            </div>
+        </form>
+
+        <div id="ticket-panel" class="panel" hidden>
+            <h2>Ticket</h2>
+            <p id="ticket-summary" class="meta" style="margin-top: 0;"></p>
+            <div class="actions" style="margin-top: 0.75rem;">
+                <button type="button" class="secondary" id="generate-btn">Generate response</button>
+                <button type="button" id="start-btn">Start approval</button>
+            </div>
+            <div id="dept-signoff"></div>
+            <div id="ceo-box" hidden>
+                <h3>CEO extra approval — Mariana Restrepo</h3>
+                <p class="meta">Required only above USD $50,000/year (CONTEXT §5 / §6).</p>
+                <p id="ceo-status" class="meta"></p>
+                <div class="actions">
+                    <button type="button" data-ceo="approved">CEO approve</button>
+                    <button type="button" class="danger" data-ceo="rejected">CEO reject</button>
+                </div>
+            </div>
+            <div id="final-panel" hidden>
+                <h3>Final document</h3>
+                <pre id="final-md"></pre>
+            </div>
+        </div>
     </div>
 
     <script>
+        const OWNERS = {
+            marketing: 'Camila Ospina',
+            operaciones: 'Felipe Guerrero',
+            procurement: 'Lucía Fernández',
+            training: 'Jake Morrison',
+            ceo: 'Mariana Restrepo',
+        };
         const form = document.getElementById('rfp-form');
         const fileInput = document.getElementById('file');
         const dropzone = document.getElementById('dropzone');
         const statusEl = document.getElementById('status');
         const submitBtn = document.getElementById('submit-btn');
+        const ticketPanel = document.getElementById('ticket-panel');
+        const deptSignoff = document.getElementById('dept-signoff');
+        const ceoBox = document.getElementById('ceo-box');
+        const finalPanel = document.getElementById('final-panel');
+        const ticketIdInput = document.getElementById('ticket-id');
 
         function setStatus(kind, message) {
             statusEl.className = kind;
             statusEl.textContent = message;
+        }
+
+        function escapeHtml(value) {
+            return String(value || '').replace(/[&<>"']/g, (ch) => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+            }[ch]));
+        }
+
+        function currentTicketId() {
+            return ticketIdInput.value.trim();
+        }
+
+        function setTicketId(id) {
+            if (id) ticketIdInput.value = id;
         }
 
         function syncDropLabel() {
@@ -198,12 +286,17 @@
             statusEl.textContent = '';
         });
 
+        async function fetchTicket(id) {
+            const res = await fetch(`/rfp/tickets/${id}`);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Ticket not found');
+            return data;
+        }
+
         async function pollTicket(ticketId) {
             const terminal = new Set(['intake_complete', 'discarded', 'failed']);
             for (let i = 0; i < 60; i++) {
-                const res = await fetch(`/rfp/tickets/${ticketId}`);
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.detail || 'Poll failed');
+                const data = await fetchTicket(ticketId);
                 if (terminal.has(data.status)) return data;
                 setStatus('info', `Analyzing… (${data.status}) ticket ${ticketId}`);
                 await new Promise((r) => setTimeout(r, 500));
@@ -254,6 +347,94 @@
             return lines.join('\n');
         }
 
+        function renderTicket(data) {
+            setTicketId(data.ticket_id);
+            ticketPanel.hidden = false;
+            const depts = (data.departments_needed || []).join(', ');
+            document.getElementById('ticket-summary').textContent =
+                `status: ${data.status} · departments: ${depts || '—'}` +
+                (data.requires_ceo_approval ? ' · CEO (Mariana Restrepo) required' : '');
+            const waiting = data.status === 'waiting_for_approval';
+            const done = data.status === 'done';
+            const canSign = !done && (waiting || data.part3_ready || data.status === 'needs_human_review');
+            document.getElementById('generate-btn').disabled = !(data.part2_ready || data.status === 'intake_complete') || waiting || done || data.part3_ready;
+            document.getElementById('start-btn').disabled = done || !canSign;
+            ceoBox.hidden = !data.requires_ceo_approval;
+            const ceo = data.ceo_approval || {};
+            document.getElementById('ceo-status').textContent = ceo.approval_status
+                ? `CEO status: ${ceo.approval_status}`
+                : 'CEO status: pending (after department owners sign off)';
+            ceoBox.querySelectorAll('button[data-ceo]').forEach((btn) => {
+                btn.disabled = done || (ceo.approval_status && ceo.approval_status !== 'pending');
+            });
+            deptSignoff.innerHTML = '';
+            (data.department_sections || []).forEach((section) => {
+                const dept = section.department_id;
+                const owner = section.owner || section.contact || OWNERS[dept] || '';
+                const status = section.approval_status || 'pending';
+                const pending = status === 'pending' || !section.approval_status;
+                const aspects = (section.key_aspects || []).map((a) => `· ${a}`).join('\n');
+                const wrap = document.createElement('div');
+                wrap.className = 'dept-card';
+                wrap.innerHTML = `
+                    <h3>${escapeHtml(dept)} <span class="badge ${escapeHtml(status)}">${escapeHtml(status)}</span></h3>
+                    <p class="meta" style="margin-top: 0;">Owner / approver: <strong>${escapeHtml(owner)}</strong></p>
+                    <pre>${escapeHtml(section.draft_content || aspects || '(no draft yet)')}</pre>
+                    <div class="actions">
+                        <button type="button" data-dept="${escapeHtml(dept)}" data-owner="${escapeHtml(owner)}" data-decision="approved" ${pending && canSign ? '' : 'disabled'}>Approve</button>
+                        <button type="button" class="danger" data-dept="${escapeHtml(dept)}" data-owner="${escapeHtml(owner)}" data-decision="rejected" ${pending && canSign ? '' : 'disabled'}>Reject</button>
+                        <button type="button" class="secondary" data-dept="${escapeHtml(dept)}" data-owner="${escapeHtml(owner)}" data-decision="request_changes" ${pending && canSign ? '' : 'disabled'}>Request changes</button>
+                    </div>
+                `;
+                deptSignoff.appendChild(wrap);
+            });
+            const doc = data.final_document || {};
+            if (doc.markdown) {
+                finalPanel.hidden = false;
+                document.getElementById('final-md').textContent = doc.markdown;
+            } else {
+                finalPanel.hidden = true;
+                document.getElementById('final-md').textContent = '';
+            }
+        }
+
+        async function showTicket(data, filename) {
+            renderTicket(data);
+            if (filename) setStatus(data.status === 'discarded' || data.status === 'failed' ? 'err' : 'ok', formatTicket(data, filename));
+        }
+
+        async function postJson(url, payload) {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: payload ? { 'Content-Type': 'application/json' } : undefined,
+                body: payload ? JSON.stringify(payload) : undefined,
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.detail || `Request failed (${res.status})`);
+            return data;
+        }
+
+        async function startApproval(id) {
+            const data = await postJson(`/rfp/tickets/${id}/start-approval`);
+            renderTicket(data);
+            return data;
+        }
+
+        async function postApproval({ department_id, decision, approver }) {
+            const id = currentTicketId();
+            try {
+                return await postJson(`/rfp/tickets/${id}/approvals`, {
+                    department_id, decision, approver,
+                });
+            } catch (err) {
+                if (!String(err.message || '').includes('approval_not_paused')) throw err;
+                await startApproval(id);
+                return postJson(`/rfp/tickets/${id}/approvals`, {
+                    department_id, decision, approver,
+                });
+            }
+        }
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const file = fileInput.files && fileInput.files[0];
@@ -281,14 +462,100 @@
                 if (data.status === 'analyzing' || !data.terminal) {
                     final = await pollTicket(ticketId);
                 }
-                const kind = final.status === 'discarded' || final.status === 'failed' ? 'err' : 'ok';
-                setStatus(kind, formatTicket(final, file.name));
+                await showTicket(final, file.name);
             } catch (err) {
                 setStatus('err', err.message || String(err));
             } finally {
                 submitBtn.disabled = false;
             }
         });
+
+        document.getElementById('load-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = currentTicketId();
+            if (!id) {
+                setStatus('err', 'Enter a ticket id.');
+                return;
+            }
+            try {
+                setStatus('info', 'Loading ticket…');
+                const data = await fetchTicket(id);
+                renderTicket(data);
+                setStatus('ok', `Loaded ${data.ticket_id} (${data.status})`);
+            } catch (err) {
+                setStatus('err', err.message || String(err));
+            }
+        });
+
+        document.getElementById('generate-btn').addEventListener('click', async () => {
+            const id = currentTicketId();
+            try {
+                setStatus('info', 'Generating department drafts…');
+                const data = await postJson(`/rfp/tickets/${id}/generate-response`);
+                renderTicket(data);
+                setStatus('ok', `status: ${data.status} · drafts ready for named-owner sign-off`);
+            } catch (err) {
+                setStatus('err', err.message || String(err));
+            }
+        });
+
+        document.getElementById('start-btn').addEventListener('click', async () => {
+            try {
+                setStatus('info', 'Starting approval graph…');
+                const data = await startApproval(currentTicketId());
+                const pending = (data.part3_pipeline && data.part3_pipeline.pending_approvals) || [];
+                setStatus('ok', pending.length
+                    ? `waiting_for_approval · pending: ${pending.map((p) => p.department_id).join(', ')}`
+                    : `status: ${data.status}`);
+            } catch (err) {
+                setStatus('err', err.message || String(err));
+            }
+        });
+
+        deptSignoff.addEventListener('click', async (e) => {
+            const btn = e.target.closest('button[data-dept]');
+            if (!btn || btn.disabled) return;
+            try {
+                setStatus('info', `${btn.dataset.decision} as ${btn.dataset.owner}…`);
+                const data = await postApproval({
+                    department_id: btn.dataset.dept,
+                    decision: btn.dataset.decision,
+                    approver: btn.dataset.owner,
+                });
+                renderTicket(data);
+                setStatus('ok', `${btn.dataset.dept}: ${btn.dataset.decision} · status ${data.status}`);
+            } catch (err) {
+                setStatus('err', err.message || String(err));
+            }
+        });
+
+        ceoBox.addEventListener('click', async (e) => {
+            const btn = e.target.closest('button[data-ceo]');
+            if (!btn || btn.disabled) return;
+            try {
+                setStatus('info', `CEO ${btn.dataset.ceo}…`);
+                const data = await postApproval({
+                    department_id: 'ceo',
+                    decision: btn.dataset.ceo,
+                    approver: 'Mariana Restrepo',
+                });
+                renderTicket(data);
+                setStatus('ok', `status: ${data.status}`);
+            } catch (err) {
+                setStatus('err', err.message || String(err));
+            }
+        });
+
+        const params = new URLSearchParams(window.location.search);
+        const fromQuery = params.get('ticket') || params.get('ticket_id');
+        if (fromQuery) {
+            setTicketId(fromQuery);
+            fetchTicket(fromQuery).then((data) => {
+                renderTicket(data);
+                setStatus('ok', `Loaded ${data.ticket_id} (${data.status})`);
+            }).catch((err) => setStatus('err', err.message || String(err)));
+        }
     </script>
 </body>
 </html>
+

@@ -262,6 +262,11 @@ def test_part3_queue_and_ui_page_exist(client: TestClient) -> None:
     assert "Camila Ospina" in html
     assert "Mariana Restrepo" in html
     assert "/rfp/tickets/" in html
+    ticket_ui = REPO / "uis" / "backoffice" / "rfp-upload.html"
+    ticket_html = ticket_ui.read_text(encoding="utf-8")
+    assert 'data-decision="approved"' in ticket_html
+    assert 'data-decision="rejected"' in ticket_html
+    assert "/approvals" in ticket_html
     queue = client.get("/rfp/part3/queue")
     assert queue.status_code == 200
     assert "queue" in queue.json()

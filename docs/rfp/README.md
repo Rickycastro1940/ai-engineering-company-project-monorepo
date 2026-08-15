@@ -25,7 +25,7 @@ Curriculum PDFs: [`rfp-requests/brasaland/`](../../rfp-requests/brasaland/).
 | Pipeline (Part 2) | `data/pipelines/rfp_response/` |
 | Pipeline (Part 3) | `data/pipelines/rfp_approval/` |
 | HTTP (thin) | `services/rfp/` on `services.agent.app` (same process as agent) |
-| Upload UI | `uis/backoffice/rfp-upload.html` |
+| Upload / ticket UI | `uis/backoffice/rfp-upload.html` (per-department approve / reject on the same ticket) |
 | Approval UI | `uis/backoffice/rfp-approvals.html` |
 | CLI | `scripts/rfp_intake_smoke.py` · `scripts/rfp_response_smoke.py` · `scripts/rfp_approval_smoke.py` |
 | Stored uploads | `data/raw/rfp/<ticket_id>/` |

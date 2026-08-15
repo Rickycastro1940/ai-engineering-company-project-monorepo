@@ -47,6 +47,9 @@ def test_backoffice_rfp_upload_page_is_served(ui_client: TestClient) -> None:
     assert "intake_complete" in body
     assert "discarded" in body
     assert "analyzing" in body
+    assert "Approve" in body
+    assert "Reject" in body
+    assert "/approvals" in body
 
 
 @pytest.mark.parametrize(
