@@ -53,7 +53,10 @@ from data.pipelines.rfp_approval.handoff import (
     Part2HandoffNotReady,
     assert_part2_ready_for_approval,
 )
-from data.pipelines.rfp_approval.synthesizer import build_final_document
+from data.pipelines.rfp_approval.synthesizer import (
+    build_final_document,
+    consolidate_approved_sections,
+)
 
 __all__ = [
     "APPLY_APPROVAL_NODE",
@@ -69,6 +72,7 @@ __all__ = [
     "assert_part2_ready_for_approval",
     "approval_thread_id",
     "build_final_document",
+    "consolidate_approved_sections",
     "build_rfp_approval_graph",
     "checkpoint_backend",
     "conflict_surface_agent",

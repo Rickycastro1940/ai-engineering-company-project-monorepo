@@ -952,20 +952,28 @@ def ceo_gate_node(state: RfpApprovalState) -> Any:
 
 
 def synthesizer_node(state: RfpApprovalState) -> dict[str, Any]:
+    """Completion: after every required approval, consolidate approved sections."""
     if state.get("error_message"):
         return {"status": "failed"}
     approvals = state.get("approvals") or {}
+    needed = list(state.get("departments_needed") or [])
     dept_status = {
         dept: str((approvals.get(dept) or {}).get("approval_status") or "pending")
-        for dept in (state.get("departments_needed") or [])
+        for dept in needed
     }
     ceo_status = str((state.get("ceo_approval") or {}).get("approval_status") or "pending")
     changes = [
         dept for dept, status in dept_status.items() if status == "request_changes"
     ]
+    synth_input = {
+        "departments_needed": needed,
+        "department_approvals": dept_status,
+        "requires_ceo_approval": bool(state.get("requires_ceo_approval")),
+        "ceo_approval_status": ceo_status if state.get("requires_ceo_approval") else None,
+    }
     ready, blocker = synthesizer_ready(
         department_approvals=dept_status,
-        departments_needed=list(state.get("departments_needed") or []),
+        departments_needed=needed,
         requires_ceo=bool(state.get("requires_ceo_approval")),
         ceo_approval_status=ceo_status if state.get("requires_ceo_approval") else None,
         request_changes=changes,
@@ -976,27 +984,22 @@ def synthesizer_node(state: RfpApprovalState) -> dict[str, Any]:
             "synthesizer_blocked": True,
             "block_reason": blocker,
             "final_document": {},
-            "trace": _event(state, "synthesizer", blocked=True, reason=blocker),
+            "trace": _event(
+                state,
+                "synthesizer",
+                input=synth_input,
+                output={"blocked": True, "reason": blocker},
+                blocked=True,
+                reason=blocker,
+            ),
         }
 
-    sections = []
-    for row in state.get("sections") or []:
-        dept = row.get("department_id")
-        merged = dict(row)
-        if dept in approvals:
-            merged.update(approvals[dept])
-        sections.append(merged)
-    approval_rows = [
-        approvals[d]
-        for d in (state.get("departments_needed") or [])
-        if d in approvals
-    ]
     document = build_final_document(
         ticket_id=str(state.get("ticket_id") or ""),
-        sections=sections,
+        sections=list(state.get("sections") or []),
         metadata=dict(state.get("metadata") or {}),
-        departments_needed=list(state.get("departments_needed") or []),
-        approvals=approval_rows,
+        departments_needed=needed,
+        approvals=approvals,
         ceo_approval=state.get("ceo_approval") if state.get("requires_ceo_approval") else None,
     )
     _persist(
@@ -1014,8 +1017,19 @@ def synthesizer_node(state: RfpApprovalState) -> dict[str, Any]:
         "trace": _event(
             state,
             "synthesizer",
+            input=synth_input,
+            output={
+                "ticket_id": document["ticket_id"],
+                "section_ids": [s["department_id"] for s in document.get("sections") or []],
+                "total_estimated_value": document.get("total_estimated_value"),
+                "generated_at": document.get("generated_at"),
+                "completion": "consolidated_approved_sections",
+            },
             ticket_id=document["ticket_id"],
             total_estimated_value=document.get("total_estimated_value"),
+            consolidated_departments=[
+                s["department_id"] for s in document.get("sections") or []
+            ],
         ),
     }
 

@@ -1,8 +1,9 @@
 """Part 3 ultimate synthesizer — FinalDocument (CONTEXT §2.3).
 
-Blocked until every active department owner has approved independently, and
-until Mariana Restrepo (CEO) has approved when the $50k USD/year threshold
-applies. Does not invent commercial figures absent from intake metadata.
+**Completion:** once every active department owner has approved (and Mariana
+Restrepo when the $50k USD/year threshold applies), this module consolidates
+the *approved* section drafts into one FinalDocument. It does not invent
+commercial figures absent from intake metadata.
 """
 
 from __future__ import annotations
@@ -57,22 +58,91 @@ def synthesizer_ready(
     return True, ""
 
 
+def consolidate_approved_sections(
+    *,
+    sections: list[dict[str, Any]],
+    departments_needed: list[str],
+    approvals: dict[str, dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """Merge Part 2 drafts with approval rows; keep only ``approved`` sections.
+
+    Completion consolidates approved department sections — rejected /
+    pending / request_changes drafts are excluded from the FinalDocument body.
+    """
+    by_dept = {
+        str(row.get("department_id") or ""): dict(row)
+        for row in sections
+        if row.get("department_id")
+    }
+    approval_map = {
+        str(dept): dict(payload)
+        for dept, payload in dict(approvals or {}).items()
+        if dept
+    }
+    consolidated: list[dict[str, Any]] = []
+    for dept in departments_needed:
+        row = dict(by_dept.get(dept) or {"department_id": dept})
+        if dept in approval_map:
+            row.update(approval_map[dept])
+        status = str(row.get("approval_status") or "pending")
+        if status != "approved":
+            continue
+        label = CONTEXT_DEPARTMENT_LABELS.get(dept, dept)
+        consolidated.append(
+            {
+                "department_id": dept,
+                "label": label,
+                "owner": row.get("owner") or row.get("approver"),
+                "approver": row.get("approver"),
+                "approval_status": "approved",
+                "approved_at": row.get("approved_at"),
+                "draft_content": str(row.get("draft_content") or "").strip(),
+            }
+        )
+    return consolidated
+
+
 def build_final_document(
     *,
     ticket_id: str,
     sections: list[dict[str, Any]],
     metadata: dict[str, Any] | None = None,
     departments_needed: list[str] | None = None,
-    approvals: list[dict[str, Any]] | None = None,
+    approvals: list[dict[str, Any]] | dict[str, dict[str, Any]] | None = None,
     ceo_approval: dict[str, Any] | None = None,
     generated_at: str | None = None,
 ) -> dict[str, Any]:
-    """Assemble CONTEXT §2.3 FinalDocument: ticket_id, sections, total, generated_at."""
+    """Assemble CONTEXT §2.3 FinalDocument from approved sections only.
+
+    Fields: ``ticket_id``, ``sections``, ``total_estimated_value``, ``generated_at``.
+    """
     meta = dict(metadata or {})
-    needed = list(departments_needed or [s.get("department_id") for s in sections if s.get("department_id")])
+    needed = list(
+        departments_needed
+        or [s.get("department_id") for s in sections if s.get("department_id")]
+    )
     stamp = generated_at or _now()
     total = _total_estimated_value(meta)
-    body_sections: list[dict[str, Any]] = []
+
+    if isinstance(approvals, dict):
+        approval_map = dict(approvals)
+        approval_rows = [
+            approval_map[d] for d in needed if d in approval_map
+        ]
+    else:
+        approval_rows = list(approvals or [])
+        approval_map = {
+            str(row.get("department_id")): dict(row)
+            for row in approval_rows
+            if row.get("department_id")
+        }
+
+    body_sections = consolidate_approved_sections(
+        sections=sections,
+        departments_needed=needed,
+        approvals=approval_map,
+    )
+
     markdown_parts: list[str] = [
         "# Brasaland pricing proposal",
         "",
@@ -91,14 +161,16 @@ def build_final_document(
         "",
         "## Sign-off",
     ]
-    for row in approvals or []:
+    for row in approval_rows:
+        if str(row.get("approval_status") or "") != "approved":
+            continue
         markdown_parts.append(
             f"- `{row.get('department_id')}` — {row.get('approver')} "
             f"({row.get('approval_status')}"
             + (f" at {row.get('approved_at')}" if row.get("approved_at") else "")
             + ")"
         )
-    if ceo_approval:
+    if ceo_approval and str(ceo_approval.get("approval_status") or "") == "approved":
         markdown_parts.append(
             f"- `{CEO_DEPARTMENT_ID}` — {ceo_approval.get('approver') or CEO_NAME} "
             f"({ceo_approval.get('approval_status')}"
@@ -111,23 +183,10 @@ def build_final_document(
         )
     markdown_parts.append("")
 
-    by_dept = {str(s.get("department_id")): s for s in sections}
-    for dept in needed:
-        row = by_dept.get(dept) or {}
-        label = CONTEXT_DEPARTMENT_LABELS.get(dept, dept)
-        draft = str(row.get("draft_content") or "").strip()
-        body_sections.append(
-            {
-                "department_id": dept,
-                "label": label,
-                "owner": row.get("owner") or row.get("approver"),
-                "approval_status": row.get("approval_status"),
-                "draft_content": draft,
-            }
-        )
-        markdown_parts.append(f"## {label}")
+    for row in body_sections:
+        markdown_parts.append(f"## {row['label']}")
         markdown_parts.append("")
-        markdown_parts.append(draft or "_(no draft)_")
+        markdown_parts.append(row.get("draft_content") or "_(no draft)_")
         markdown_parts.append("")
 
     if total is not None:
@@ -152,4 +211,5 @@ def build_final_document(
         "location": meta.get("location"),
         "offer_validity": CONTEXT_OFFER_VALIDITY_PHRASE,
         "brand_pillars": list(CONTEXT_BRAND_PILLARS),
+        "completion": "consolidated_approved_sections",
     }

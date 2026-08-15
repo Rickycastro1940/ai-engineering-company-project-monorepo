@@ -86,13 +86,64 @@ def test_andes_all_owners_approve_produces_final_document() -> None:
     assert "sections" in doc
     assert doc["total_estimated_value"] == 20_000
     assert doc.get("generated_at")
+    assert doc.get("completion") == "consolidated_approved_sections"
     assert "Andes Tech" in doc["markdown"]
     assert "30 days from issuance" in doc["markdown"]
     assert "consistent quality" in doc["markdown"]
+    # Consolidated body is the approved department drafts only.
     ids = [s["department_id"] for s in doc["sections"]]
     assert ids == depts
+    assert all(s.get("approval_status") == "approved" for s in doc["sections"])
+    assert "Setup in 12 business days" in doc["markdown"]
+    assert "USD $20" in doc["markdown"]
     assert "training" not in ids
     assert "Mariana Restrepo" not in doc["markdown"]
+    synth = [e for e in result.trace if e.get("node") == "synthesizer"]
+    assert synth
+    assert synth[-1].get("output", {}).get("completion") == (
+        "consolidated_approved_sections"
+    )
+
+
+def test_consolidate_approved_sections_excludes_non_approved() -> None:
+    from data.pipelines.rfp_approval.synthesizer import (
+        build_final_document,
+        consolidate_approved_sections,
+    )
+
+    approvals = {
+        "marketing": {
+            "department_id": "marketing",
+            "approval_status": "approved",
+            "approver": "Camila Ospina",
+        },
+        "operaciones": {
+            "department_id": "operaciones",
+            "approval_status": "rejected",
+            "approver": "Felipe Guerrero",
+        },
+        "procurement": {
+            "department_id": "procurement",
+            "approval_status": "pending",
+        },
+    }
+    consolidated = consolidate_approved_sections(
+        sections=SECTIONS,
+        departments_needed=["marketing", "operaciones", "procurement"],
+        approvals=approvals,
+    )
+    assert [s["department_id"] for s in consolidated] == ["marketing"]
+    doc = build_final_document(
+        ticket_id="partial",
+        sections=SECTIONS,
+        departments_needed=["marketing", "operaciones", "procurement"],
+        approvals=approvals,
+        metadata={"estimated_contract_value_usd": 20_000},
+    )
+    assert [s["department_id"] for s in doc["sections"]] == ["marketing"]
+    assert "operaciones" not in [s["department_id"] for s in doc["sections"]]
+    assert "## Restaurant Operations" not in doc["markdown"]
+    assert "Brand terms" in doc["markdown"] or "30 days" in doc["markdown"]
 
 
 def test_sunset_bay_blocks_until_ceo_mariana_approves() -> None:

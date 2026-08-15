@@ -11,5 +11,7 @@ Static HTML served by `services.agent.app` (and reporting).
 
 Upload posts to `POST /rfp/tickets` and polls `GET /rfp/tickets/{id}`.
 Department owners sign off with `POST /rfp/tickets/{id}/start-approval` and
-`POST /rfp/tickets/{id}/approvals`.
+`POST /rfp/tickets/{id}/approvals`. After every required owner (and CEO if
+needed) approves, the ticket becomes `done` and
+`GET /rfp/tickets/{id}/final-document` returns the consolidated FinalDocument.
 Sample files: `rfp-requests/brasaland/*.pdf`.

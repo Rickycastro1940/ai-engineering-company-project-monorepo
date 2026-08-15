@@ -17,6 +17,8 @@ Curriculum PDFs: [`rfp-requests/brasaland/`](../../rfp-requests/brasaland/).
 
 **Part 3 HITL:** each pending department is a parallel `Send` branch; `interrupt()` pauses only that branch. Already-decided departments are not sent and are not blocked. A human decision is validated (`approve` / `reject` / `request_changes` and the named owner) then resumes that branch into `apply_approval` on the existing checkpoint — it does not restart from `load_handoff`.
 
+**Completion:** once every active department has approved (and CEO when required), the synthesizer consolidates the approved section drafts into a CONTEXT §2.3 FinalDocument (`ticket_id`, `sections`, `total_estimated_value`, `generated_at`) and the ticket becomes `done`. Details: [`data/pipelines/rfp_approval/COMPLETION.md`](../../data/pipelines/rfp_approval/COMPLETION.md).
+
 ## Layout
 
 | Piece | Location |
