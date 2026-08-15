@@ -7,6 +7,8 @@ Source: CONTEXT-company.md Milestone 9 (§2.1 owners, §2.3 FinalDocument,
 
 - **Build on Part 2** — same ticket; last drafts + `EvaluationResult`.
   Do not re-parse the PDF. Do not rewrite classifier / generators.
+  Exhausted Part 2 sections enter HITL as `approval_status=pending`
+  (ticket may be `needs_human_review`); do not skip interrupts for them.
 - **Human-in-the-loop:** each *active* department is signed off by the
   named owner in §2.1 (Camila Ospina, Felipe Guerrero, Lucía Fernández,
   Jake Morrison). No invented VP / Legal / Finance ladder.

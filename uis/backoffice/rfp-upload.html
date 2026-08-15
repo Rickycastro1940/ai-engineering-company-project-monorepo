@@ -357,7 +357,12 @@
             const waiting = data.status === 'waiting_for_approval';
             const done = data.status === 'done';
             const canSign = !done && (waiting || data.part3_ready || data.status === 'needs_human_review');
-            document.getElementById('generate-btn').disabled = !(data.part2_ready || data.status === 'intake_complete') || waiting || done || data.part3_ready;
+            document.getElementById('generate-btn').disabled = !(
+                data.part2_ready
+                || data.status === 'intake_complete'
+                || data.status === 'drafting'
+                || data.status === 'under_evaluation'
+            ) || waiting || done || data.part3_ready;
             document.getElementById('start-btn').disabled = done || !canSign;
             ceoBox.hidden = !data.requires_ceo_approval;
             const ceo = data.ceo_approval || {};
@@ -372,7 +377,8 @@
                 const dept = section.department_id;
                 const owner = section.owner || section.contact || OWNERS[dept] || '';
                 const status = section.approval_status || 'pending';
-                const pending = status === 'pending' || !section.approval_status;
+                // Part 2 may leave ticket needs_human_review; section HITL is still pending.
+                const pending = status === 'pending' || status === 'needs_human_review' || !section.approval_status;
                 const aspects = (section.key_aspects || []).map((a) => `· ${a}`).join('\n');
                 const wrap = document.createElement('div');
                 wrap.className = 'dept-card';
@@ -493,7 +499,13 @@
                 setStatus('info', 'Generating department drafts…');
                 const data = await postJson(`/rfp/tickets/${id}/generate-response`);
                 renderTicket(data);
-                setStatus('ok', `status: ${data.status} · drafts ready for named-owner sign-off`);
+                if (data.status === 'needs_human_review') {
+                    setStatus('ok', `status: needs_human_review · drafts handed to Part 3 for named-owner review (iteration limit)`);
+                } else if (data.status === 'waiting_for_approval') {
+                    setStatus('ok', `status: waiting_for_approval · drafts ready for named-owner sign-off`);
+                } else {
+                    setStatus('ok', `status: ${data.status}`);
+                }
             } catch (err) {
                 setStatus('err', err.message || String(err));
             }

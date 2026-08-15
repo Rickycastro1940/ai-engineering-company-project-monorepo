@@ -13,6 +13,7 @@ from data.pipelines.rfp_intake import IntakeResult, run_intake_from_bytes
 from data.pipelines.rfp_intake.constants import (
     P1_TERMINAL,
     STATUS_ANALYZING,
+    STATUS_DISCARDED,
     STATUS_DONE,
     STATUS_FAILED,
 )
@@ -242,8 +243,8 @@ def get_ticket_final_document(ticket_id: str) -> dict[str, Any]:
         raise HTTPException(
             status_code=409,
             detail=(
-                "Final document is not available while approvals are pending "
-                "(ticket status must be done)"
+                f"Final document is not available while ticket status is "
+                f"{ticket.status!r} (requires status={STATUS_DONE!r})"
             ),
         )
     doc = get_final_document(ticket_id, require_done=True)
@@ -269,5 +270,12 @@ def get_rfp_ticket(ticket_id: str) -> dict[str, Any]:
     if ticket is None:
         raise HTTPException(status_code=404, detail="Ticket not found")
     payload = ticket_to_dict(ticket)
-    payload["terminal"] = ticket.status in P1_TERMINAL
+    # ``terminal`` = Part 1 intake finished (upload poll). Not the full pipeline.
+    payload["part1_terminal"] = ticket.status in P1_TERMINAL
+    payload["terminal"] = payload["part1_terminal"]
+    payload["pipeline_complete"] = ticket.status in {
+        STATUS_DONE,
+        STATUS_DISCARDED,
+        STATUS_FAILED,
+    }
     return payload

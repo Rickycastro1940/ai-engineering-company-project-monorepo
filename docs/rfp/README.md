@@ -23,6 +23,12 @@ active department has approved (and CEO when required), the synthesizer stores
 the consolidated FinalDocument, sets status to `done`, and the document is
 accessible. Details: [`data/pipelines/rfp_approval/COMPLETION.md`](../../data/pipelines/rfp_approval/COMPLETION.md).
 
+**Cross-part continuity:** same `ticket_id` / `departments_needed` / metadata.
+`GET /tickets/{id}` exposes `terminal` (= Part 1 intake finished) and
+`pipeline_complete` (`done` / `discarded` / `failed`). Exhausted Part 2 drafts
+keep section `approval_status=pending` for Part 3 HITL. Mid-Part-2 tickets
+(`drafting` / `under_evaluation`) can resume generate without a status jump.
+
 ## Layout
 
 | Piece | Location |

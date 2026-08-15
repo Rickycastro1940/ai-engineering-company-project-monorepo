@@ -65,6 +65,7 @@ from data.pipelines.rfp_approval.conflicts import conflict_surface_agent
 from data.pipelines.rfp_approval.handoff import (
     Part2HandoffNotReady,
     assert_part2_ready_for_approval,
+    normalize_section_approval_status,
 )
 from data.pipelines.rfp_approval.synthesizer import (
     build_final_document,
@@ -443,15 +444,19 @@ def load_handoff_node(state: RfpApprovalState) -> dict[str, Any]:
     )
     approvals = dict(state.get("approvals") or {})
     for dept in needed:
-        approvals.setdefault(
-            dept,
-            {
-                "department_id": dept,
-                "approval_status": "pending",
-                "approver": None,
-                "approved_at": None,
-            },
-        )
+        current = dict(approvals.get(dept) or {})
+        normalized = normalize_section_approval_status(current.get("approval_status"))
+        approvals[dept] = {
+            "department_id": dept,
+            "approval_status": normalized,
+            "approver": current.get("approver"),
+            "approved_at": current.get("approved_at"),
+        }
+    # Align section rows with normalized approvals (no status jump / data loss).
+    for section in sections:
+        dept = str(section.get("department_id") or "")
+        if dept in approvals:
+            section["approval_status"] = approvals[dept]["approval_status"]
     iterations = dict(state.get("approval_iterations") or {})
     max_iters = int(
         state.get("max_approval_iterations") or MAX_DEPARTMENT_APPROVAL_ITERATIONS

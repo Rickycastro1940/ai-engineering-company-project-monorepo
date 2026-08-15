@@ -211,17 +211,22 @@ def _upsert_section_drafts(
         if row is None:
             row = RfpDepartmentSection(ticket_id=ticket_id, department_id=dept)
             session.add(row)
-        if section.get("draft_content"):
+        if "draft_content" in section:
             row.draft_content = section.get("draft_content") or ""
         if section.get("evaluation_results") is not None:
             row.evaluation_results_json = json.dumps(
                 section.get("evaluation_results") or {},
                 ensure_ascii=False,
             )
+        # CONTEXT §2.3: section approval_status is pending|approved|rejected.
+        # Exhausted Part 2 drafts still need named-owner HITL → pending (never
+        # ticket-level needs_human_review, which would skip Part 3 interrupts).
         if section.get("passed"):
             row.approval_status = row.approval_status or "pending"
         elif section.get("exhausted") or section.get("section_status") == STATUS_NEEDS_HUMAN_REVIEW:
-            row.approval_status = STATUS_NEEDS_HUMAN_REVIEW
+            # Ticket may be needs_human_review; section stays pending for Part 3 HITL.
+            if row.approval_status not in {"approved", "rejected", "request_changes"}:
+                row.approval_status = "pending"
         row.updated_at = _now()
 
 
@@ -288,6 +293,7 @@ def _section_public(row: RfpDepartmentSection) -> dict[str, Any]:
         except json.JSONDecodeError:
             return default
 
+    from data.pipelines.rfp_approval.handoff import normalize_section_approval_status
     from data.pipelines.rfp_intake.constants import DEPARTMENT_OWNERS
 
     return {
@@ -296,7 +302,7 @@ def _section_public(row: RfpDepartmentSection) -> dict[str, Any]:
         "key_aspects": _loads(row.key_aspects_json, []),
         "draft_content": row.draft_content or "",
         "evaluation_results": _loads(row.evaluation_results_json, {}),
-        "approval_status": row.approval_status or "pending",
+        "approval_status": normalize_section_approval_status(row.approval_status),
         "approver": row.approver,
         "approved_at": row.approved_at,
     }
@@ -305,7 +311,10 @@ def _section_public(row: RfpDepartmentSection) -> dict[str, Any]:
 def load_part3_ticket_state(ticket_id: str) -> dict[str, Any]:
     """Load Part 2 drafts + current approvals for the Part 3 graph (no PDF)."""
     from data.pipelines.rfp_approval.approvers import requires_ceo_approval
-    from data.pipelines.rfp_approval.handoff import assert_part2_ready_for_approval
+    from data.pipelines.rfp_approval.handoff import (
+        assert_part2_ready_for_approval,
+        normalize_section_approval_status,
+    )
 
     ticket = get_ticket(ticket_id)
     if ticket is None:
@@ -331,7 +340,9 @@ def load_part3_ticket_state(ticket_id: str) -> dict[str, Any]:
     approvals = {
         row["department_id"]: {
             "department_id": row["department_id"],
-            "approval_status": row.get("approval_status") or "pending",
+            "approval_status": normalize_section_approval_status(
+                row.get("approval_status")
+            ),
             "approver": row.get("approver"),
             "approved_at": row.get("approved_at"),
         }
@@ -748,6 +759,7 @@ def ticket_to_dict(ticket: RfpTicket) -> dict[str, Any]:
         except json.JSONDecodeError:
             return default
 
+    from data.pipelines.rfp_approval.handoff import normalize_section_approval_status
     from data.pipelines.rfp_intake.constants import DEPARTMENT_OWNERS
     from data.pipelines.rfp_intake.orchestration import build_final_department_results
 
@@ -763,7 +775,7 @@ def ticket_to_dict(ticket: RfpTicket) -> dict[str, Any]:
             "key_aspects": _loads(row.key_aspects_json, []),
             "draft_content": row.draft_content,
             "evaluation_results": _loads(row.evaluation_results_json, {}),
-            "approval_status": row.approval_status,
+            "approval_status": normalize_section_approval_status(row.approval_status),
             "approver": row.approver,
             "approved_at": row.approved_at,
         }

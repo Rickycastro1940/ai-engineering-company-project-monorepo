@@ -52,6 +52,7 @@ from data.pipelines.rfp_approval.graph import (
 from data.pipelines.rfp_approval.handoff import (
     Part2HandoffNotReady,
     assert_part2_ready_for_approval,
+    normalize_section_approval_status,
 )
 from data.pipelines.rfp_approval.synthesizer import (
     build_final_document,
@@ -71,6 +72,7 @@ __all__ = [
     "apply_fixed_arbitration",
     "assert_part2_ready_for_approval",
     "approval_thread_id",
+    "normalize_section_approval_status",
     "build_final_document",
     "consolidate_approved_sections",
     "build_rfp_approval_graph",

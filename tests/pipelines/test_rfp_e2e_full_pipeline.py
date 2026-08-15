@@ -112,7 +112,8 @@ def test_e2e_andes_intake_generation_approval_completion(client: TestClient) -> 
     for row in sections:
         assert row.get("draft_content"), row
         assert row.get("evaluation_results"), row
-        assert row.get("approval_status") in {None, "pending", STATUS_NEEDS_HUMAN_REVIEW}
+        # CONTEXT §2.3 — never store ticket needs_human_review on section rows.
+        assert row.get("approval_status") in {None, "pending"}
     # Same ticket metadata / departments after generation
     assert expected["client_substr"] in (body.get("metadata") or {}).get("client_name", "")
     assert set(body["departments_needed"]) == set(expected["departments"])
@@ -171,6 +172,7 @@ def test_e2e_andes_intake_generation_approval_completion(client: TestClient) -> 
     detail = client.get(f"/rfp/tickets/{ticket_id}").json()
     assert detail["ticket_id"] == ticket_id
     assert detail["status"] == STATUS_DONE
+    assert detail.get("pipeline_complete") is True
     assert detail.get("final_document", {}).get("markdown")
     assert set(detail["departments_needed"]) == set(expected["departments"])
     assert expected["client_substr"] in (detail.get("metadata") or {}).get(

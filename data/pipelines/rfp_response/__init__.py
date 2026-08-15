@@ -28,6 +28,7 @@ from data.pipelines.rfp_response.agents import (
     run_generator_agent,
 )
 from data.pipelines.rfp_response.handoff_consume import (
+    PART2_ENTRY_STATUSES,
     PRIMARY_GENERATOR_INPUT,
     Part1HandoffNotReady,
     assert_part1_routing_ready,
@@ -46,6 +47,7 @@ __all__ = [
     "EvaluationResult",
     "GENERATOR_AGENTS",
     "MAX_SECTION_ITERATIONS",
+    "PART2_ENTRY_STATUSES",
     "PRIMARY_GENERATOR_INPUT",
     "Part1DepartmentSummary",
     "Part1HandoffNotReady",
@@ -127,7 +129,8 @@ def run_response_for_ticket(
 ) -> ResponsePipelineResult:
     """Canonical Part 2 entry: load Part 1 ready handoff from DB, then generate.
 
-    Requires ``intake_complete`` + ``part2_ready`` + validated handoff JSON.
+    Requires ``part2_ready`` + validated handoff JSON, and ticket status in
+    ``intake_complete`` / ``drafting`` / ``under_evaluation`` (resume after crash).
     """
     from services.rfp.store import load_ready_part2_handoff
 
