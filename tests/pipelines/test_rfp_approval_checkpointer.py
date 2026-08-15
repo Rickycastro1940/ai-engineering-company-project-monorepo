@@ -7,14 +7,21 @@ from pathlib import Path
 import pytest
 
 from data.pipelines.rfp_approval.checkpointer import (
+    approval_thread_id,
     checkpoint_backend,
     checkpointer_kind,
+    ensure_rfp_thread_id,
+    ephemeral_rfp_thread_id,
     get_approval_checkpointer,
     postgres_conninfo,
     reset_approval_checkpointer,
+    rfp_checkpoint_thread_id,
     sqlite_checkpoint_path,
 )
-from data.pipelines.rfp_approval.graph import invoke_rfp_approval_graph
+from data.pipelines.rfp_approval.graph import (
+    get_compiled_rfp_approval_graph,
+    invoke_rfp_approval_graph,
+)
 from data.pipelines.rfp_intake.constants import STATUS_WAITING_FOR_APPROVAL
 
 REPO = Path(__file__).resolve().parents[2]
@@ -27,6 +34,96 @@ def _isolate_checkpointer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
     reset_approval_checkpointer()
     yield
     reset_approval_checkpointer()
+
+
+def test_thread_id_is_namespaced_by_ticket_and_optional_department() -> None:
+    assert approval_thread_id("abc123") == "RFP-abc123"
+    assert rfp_checkpoint_thread_id("abc123") == "RFP-abc123"
+    assert rfp_checkpoint_thread_id("abc123", department_id="marketing") == (
+        "RFP-abc123:marketing"
+    )
+    assert approval_thread_id("abc123", department_id="operaciones") == (
+        "RFP-abc123:operaciones"
+    )
+    # Already-prefixed ticket_id does not double-prefix.
+    assert approval_thread_id("RFP-abc123") == "RFP-abc123"
+    ephemeral = ephemeral_rfp_thread_id("abc123")
+    assert ephemeral.startswith("RFP-abc123:run-")
+    assert ensure_rfp_thread_id(None, "abc123") == "RFP-abc123"
+    assert ensure_rfp_thread_id("hitl-sqlite-thread", "abc123") == (
+        "RFP-abc123:hitl-sqlite-thread"
+    )
+    assert ensure_rfp_thread_id("RFP-abc123", "abc123") == "RFP-abc123"
+    assert ensure_rfp_thread_id("RFP-other:x", "abc123").startswith("RFP-abc123:")
+
+
+def test_concurrent_tickets_do_not_share_checkpoint_identity() -> None:
+    """Two tickets pause independently; approving one must not clear the other."""
+    sections = [
+        {
+            "department_id": "marketing",
+            "draft_content": "## Brand terms\nOffer validity period: 30 days.\n",
+        }
+    ]
+    a = "ticket-concurrent-a"
+    b = "ticket-concurrent-b"
+    assert approval_thread_id(a) != approval_thread_id(b)
+    assert approval_thread_id(a) == "RFP-ticket-concurrent-a"
+    assert approval_thread_id(b) == "RFP-ticket-concurrent-b"
+
+    kwargs_a = dict(
+        ticket_id=a,
+        status=STATUS_WAITING_FOR_APPROVAL,
+        sections=sections,
+        metadata={"client_name": "Andes Tech Solutions"},
+        departments_needed=["marketing"],
+        requires_ceo_approval=False,
+        use_interrupt=True,
+        thread_id=approval_thread_id(a),
+    )
+    kwargs_b = dict(
+        ticket_id=b,
+        status=STATUS_WAITING_FOR_APPROVAL,
+        sections=sections,
+        metadata={"client_name": "Andes Tech Solutions"},
+        departments_needed=["marketing"],
+        requires_ceo_approval=False,
+        use_interrupt=True,
+        thread_id=approval_thread_id(b),
+    )
+    paused_a = invoke_rfp_approval_graph(**kwargs_a)
+    paused_b = invoke_rfp_approval_graph(**kwargs_b)
+    assert paused_a.get("__interrupt__")
+    assert paused_b.get("__interrupt__")
+
+    done_a = invoke_rfp_approval_graph(
+        **kwargs_a,
+        resume={
+            "department_id": "marketing",
+            "decision": "approved",
+            "approver": "Camila Ospina",
+        },
+    )
+    assert done_a.get("status") == "done"
+
+    graph = get_compiled_rfp_approval_graph()
+    still_b = graph.get_state(
+        {"configurable": {"thread_id": approval_thread_id(b)}}
+    )
+    assert still_b.interrupts or still_b.next, (
+        "ticket B checkpoint must remain paused after ticket A completes"
+    )
+    done_b = invoke_rfp_approval_graph(
+        **kwargs_b,
+        resume={
+            "department_id": "marketing",
+            "decision": "approved",
+            "approver": "Camila Ospina",
+        },
+    )
+    assert done_b.get("status") == "done"
+    assert done_a.get("final_document", {}).get("ticket_id") == a
+    assert done_b.get("final_document", {}).get("ticket_id") == b
 
 
 def test_default_backend_is_sqlite_file_not_memory(

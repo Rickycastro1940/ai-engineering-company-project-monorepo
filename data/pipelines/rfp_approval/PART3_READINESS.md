@@ -56,3 +56,17 @@ LangGraph `interrupt()` needs a checkpointer. Do **not** use
 
 Install extras with `uv add langgraph-checkpoint-sqlite langgraph-checkpoint-postgres 'psycopg[binary,pool]'`.
 Override the SQLite file with `RFP_CHECKPOINT_SQLITE=/path/to/file.sqlite`.
+
+### Checkpointer identity (`thread_id`)
+
+Every graph run is namespaced by ticket so concurrent tickets never share a
+checkpoint:
+
+| Scope | `thread_id` |
+| ----- | ----------- |
+| Ticket (HTTP start-approval / resume) | `RFP-{ticket_id}` |
+| Department branch (if checkpointed alone) | `RFP-{ticket_id}:{department_id}` |
+| Ephemeral one-shot invoke | `RFP-{ticket_id}:run-{uuid}` |
+
+Helpers: `approval_thread_id`, `rfp_checkpoint_thread_id`, `ensure_rfp_thread_id`
+in `data/pipelines/rfp_approval/checkpointer.py`.

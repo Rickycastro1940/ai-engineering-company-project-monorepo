@@ -29,6 +29,10 @@ from data.pipelines.rfp_approval.checkpointer import (
     checkpoint_backend,
     get_approval_checkpointer,
     reset_approval_checkpointer,
+    approval_thread_id,
+    ensure_rfp_thread_id,
+    ephemeral_rfp_thread_id,
+    rfp_checkpoint_thread_id,
 )
 from data.pipelines.rfp_approval.conflicts import conflict_surface_agent
 from data.pipelines.rfp_approval.graph import (
@@ -36,7 +40,6 @@ from data.pipelines.rfp_approval.graph import (
     REQUIRED_APPROVAL_NODES,
     RESUME_NOT_PAUSED,
     RESUME_NOT_PAUSED_MESSAGE,
-    approval_thread_id,
     build_rfp_approval_graph,
     enrich_interrupt_state,
     get_compiled_rfp_approval_graph,
@@ -69,11 +72,14 @@ __all__ = [
     "build_rfp_approval_graph",
     "checkpoint_backend",
     "conflict_surface_agent",
+    "ensure_rfp_thread_id",
+    "ephemeral_rfp_thread_id",
     "get_approval_checkpointer",
     "get_compiled_rfp_approval_graph",
     "reset_approval_checkpointer",
     "invoke_rfp_approval_graph",
     "requires_ceo_approval",
+    "rfp_checkpoint_thread_id",
     "run_approval_for_ticket",
     "run_approval_pipeline",
     "signoffs_for_ticket",
@@ -170,11 +176,14 @@ def run_approval_pipeline(
     ``queued_decisions`` are applied only as ``Command(resume=)`` payloads after
     the graph has paused — they never skip the interruption point.
     """
-    from uuid import uuid4
-
     queued = list(queued_decisions or [])
-    tid = thread_id or (
-        ticket_id if resume is not None else f"{ticket_id}:{uuid4().hex}"
+    tid = ensure_rfp_thread_id(
+        thread_id,
+        ticket_id,
+    ) if thread_id else (
+        approval_thread_id(ticket_id)
+        if resume is not None
+        else ephemeral_rfp_thread_id(ticket_id)
     )
     invoke_kwargs: dict[str, Any] = dict(
         ticket_id=ticket_id,

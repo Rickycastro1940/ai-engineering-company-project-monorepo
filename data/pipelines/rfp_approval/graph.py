@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import operator
 from typing import Annotated, Any, TypedDict
-from uuid import uuid4
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, Send
@@ -55,6 +54,12 @@ from data.pipelines.rfp_approval.guardrails import (
     bump_department_iterations,
     iteration_limit_error,
     merge_iteration_counts,
+)
+from data.pipelines.rfp_approval.checkpointer import (
+    approval_thread_id,
+    ensure_rfp_thread_id,
+    ephemeral_rfp_thread_id,
+    rfp_checkpoint_thread_id,
 )
 from data.pipelines.rfp_approval.conflicts import conflict_surface_agent
 from data.pipelines.rfp_approval.handoff import (
@@ -340,11 +345,6 @@ def resume_command(graph: Any, config: dict[str, Any], resume: Any) -> Any:
     if mapping:
         return Command(resume=mapping, goto=APPLY_APPROVAL_NODE, update=update)
     return Command(goto=APPLY_APPROVAL_NODE, update=update)
-
-
-def approval_thread_id(ticket_id: str) -> str:
-    """Stable LangGraph thread for HTTP start-approval + resume."""
-    return f"{ticket_id}:approval"
 
 
 def enrich_interrupt_state(final: dict[str, Any]) -> dict[str, Any]:
@@ -1144,20 +1144,23 @@ def _approval_invoke_config(
     resume: Any,
     use_interrupt: bool,
     thread_id: str | None,
+    department_id: str | None = None,
 ) -> dict[str, Any]:
-    """Always pass ``thread_id`` — durable checkpointers require it.
+    """Always pass a ticket-namespaced ``thread_id``.
 
-    HITL interrupt/resume uses a stable id so ``Command(resume=)`` can
-    continue the same thread. Fresh pipeline runs use a unique thread so
-    a second start on the same ticket_id does not resume a checkpoint.
-    HTTP uses :func:`approval_thread_id`.
+    Identity is ``RFP-{ticket_id}`` (HTTP start/resume) or
+    ``RFP-{ticket_id}:{department}`` when a branch is checkpointed alone.
+    Concurrent tickets never share a checkpoint. Fresh non-HTTP runs use
+    ``RFP-{ticket_id}:run-{uuid}``.
     """
     if thread_id:
-        tid = thread_id
+        tid = ensure_rfp_thread_id(thread_id, ticket_id)
+    elif department_id:
+        tid = rfp_checkpoint_thread_id(ticket_id, department_id=department_id)
     elif resume is not None:
-        tid = ticket_id
+        tid = approval_thread_id(ticket_id)
     else:
-        tid = f"{ticket_id}:{uuid4().hex}"
+        tid = ephemeral_rfp_thread_id(ticket_id)
     return {"configurable": {"thread_id": tid}}
 
 

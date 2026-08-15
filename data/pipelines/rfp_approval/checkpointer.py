@@ -9,20 +9,31 @@ CONTEXT-company.md requires human-in-the-loop pause/resume. LangGraph
 
 Never default to an in-memory checkpointer outside local development.
 Never use SQLite ``:memory:`` — that is also in-memory.
+
+Checkpointer identity (``thread_id``) is always namespaced by ticket so
+concurrent tickets never share a checkpoint::
+
+    RFP-{ticket_id}
+    RFP-{ticket_id}:{department_id}   # when a branch is checkpointed alone
 """
 
 from __future__ import annotations
 
 import os
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
+from uuid import uuid4
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_SQLITE_PATH = (
     REPO_ROOT / "data" / "process" / "rfp-intake" / "rfp-approval-checkpoints.sqlite"
 )
+
+RFP_THREAD_PREFIX = "RFP"
+_TICKET_TOKEN = re.compile(r"[^A-Za-z0-9._-]+")
 
 _saver: Any = None
 _saver_key: str | None = None
@@ -37,6 +48,70 @@ def _truthy(name: str) -> bool:
 def allow_memory_checkpointer() -> bool:
     """In-memory checkpointer is opt-in local development only."""
     return _truthy("RFP_CHECKPOINT_MEMORY")
+
+
+def _clean_thread_token(value: str) -> str:
+    cleaned = _TICKET_TOKEN.sub("-", str(value or "").strip())
+    cleaned = cleaned.strip("-._")
+    if not cleaned:
+        raise ValueError("ticket_id is required for checkpoint thread identity")
+    return cleaned
+
+
+def rfp_checkpoint_thread_id(
+    ticket_id: str,
+    *,
+    department_id: str | None = None,
+) -> str:
+    """Namespace every graph run by ticket (and department when branched).
+
+    Examples:
+      - ``RFP-abc123``
+      - ``RFP-abc123:marketing``
+    """
+    ticket = _clean_thread_token(ticket_id)
+    # Strip a leading RFP- if callers pass an already-namespaced id as ticket_id.
+    if ticket.upper().startswith(f"{RFP_THREAD_PREFIX}-"):
+        ticket = ticket[len(RFP_THREAD_PREFIX) + 1 :]
+        ticket = _clean_thread_token(ticket)
+    base = f"{RFP_THREAD_PREFIX}-{ticket}"
+    if department_id:
+        dept = _clean_thread_token(department_id)
+        return f"{base}:{dept}"
+    return base
+
+
+def approval_thread_id(
+    ticket_id: str, *, department_id: str | None = None
+) -> str:
+    """Stable LangGraph thread for HTTP start-approval + resume."""
+    return rfp_checkpoint_thread_id(ticket_id, department_id=department_id)
+
+
+def ephemeral_rfp_thread_id(ticket_id: str) -> str:
+    """One-shot run id still namespaced by ticket (never shared across tickets)."""
+    return rfp_checkpoint_thread_id(ticket_id, department_id=f"run-{uuid4().hex}")
+
+
+def ensure_rfp_thread_id(thread_id: str | None, ticket_id: str) -> str:
+    """Force a thread_id under ``RFP-{ticket_id}`` so tickets cannot collide.
+
+    Explicit overrides (tests) are nested as ``RFP-{ticket}:{override}`` unless
+    they already start with ``RFP-{ticket}``.
+    """
+    ticket = _clean_thread_token(ticket_id)
+    if ticket.upper().startswith(f"{RFP_THREAD_PREFIX}-"):
+        ticket = _clean_thread_token(ticket[len(RFP_THREAD_PREFIX) + 1 :])
+    expected = f"{RFP_THREAD_PREFIX}-{ticket}"
+    raw = str(thread_id or "").strip()
+    if not raw:
+        return expected
+    if raw == expected or raw.startswith(f"{expected}:"):
+        return raw
+    # Already RFP- namespaced for a *different* ticket — still nest under ours.
+    if raw.upper().startswith(f"{RFP_THREAD_PREFIX}-"):
+        return f"{expected}:{_clean_thread_token(raw)}"
+    return f"{expected}:{_clean_thread_token(raw)}"
 
 
 def _sqlalchemy_url() -> str:
