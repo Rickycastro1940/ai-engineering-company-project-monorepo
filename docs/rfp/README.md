@@ -55,5 +55,7 @@ export RFP_INTAKE_SYNC=1 RFP_ALLOW_SQLITE=1
 uv run python scripts/rfp_intake_smoke.py
 uv run python scripts/rfp_response_smoke.py
 uv run python scripts/rfp_approval_smoke.py
+# End-to-end (intake → generation → approval → completion on one ticket):
+RFP_INTAKE_SYNC=1 RFP_ALLOW_SQLITE=1 uv run pytest tests/pipelines/test_rfp_e2e_full_pipeline.py -q
 uv run pytest tests/pipelines/test_rfp_*.py
 ```

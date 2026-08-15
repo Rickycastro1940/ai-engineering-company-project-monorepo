@@ -52,3 +52,22 @@ Only sections whose status is `approved` are consolidated.
 | HTTP (accessible only when `done`) | `GET /rfp/tickets/{ticket_id}/final-document` |
 
 Helpers: `synthesizer_ready`, `consolidate_approved_sections`, `build_final_document`.
+
+## End-to-end review
+
+Run at least one CONTEXT seed through all four parts on the **same ticket**:
+
+```bash
+RFP_INTAKE_SYNC=1 RFP_ALLOW_SQLITE=1 \
+  uv run pytest tests/pipelines/test_rfp_e2e_full_pipeline.py -q
+```
+
+| Seed | Path |
+| ---- | ---- |
+| Andes Tech (informal, no CEO) | intake → generate → start-approval → named-owner approvals → `done` + FinalDocument |
+| Sunset Bay (formal, CEO) | same, plus Mariana Restrepo before `done` |
+
+The Andes journey asserts one `ticket_id`, status transitions
+(`intake_complete` → … → `waiting_for_approval` → `done`), stable
+`departments_needed` / client metadata, and FinalDocument accessibility only
+after completion.
