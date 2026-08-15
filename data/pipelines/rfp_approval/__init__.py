@@ -27,11 +27,15 @@ from data.pipelines.rfp_approval.checkpointer import (
 )
 from data.pipelines.rfp_approval.conflicts import conflict_surface_agent
 from data.pipelines.rfp_approval.graph import (
+    APPLY_APPROVAL_NODE,
     REQUIRED_APPROVAL_NODES,
+    RESUME_NOT_PAUSED,
+    RESUME_NOT_PAUSED_MESSAGE,
     approval_thread_id,
     build_rfp_approval_graph,
     enrich_interrupt_state,
     get_compiled_rfp_approval_graph,
+    graph_is_paused,
     interrupt_payload,
     interrupt_values,
     invoke_rfp_approval_graph,
@@ -44,9 +48,11 @@ from data.pipelines.rfp_approval.handoff import (
 from data.pipelines.rfp_approval.synthesizer import build_final_document
 
 __all__ = [
+    "APPLY_APPROVAL_NODE",
     "CEO_NAME",
     "Part2HandoffNotReady",
     "REQUIRED_APPROVAL_NODES",
+    "RESUME_NOT_PAUSED",
     "UnknownApproverError",
     "ApprovalPipelineResult",
     "apply_fixed_arbitration",
@@ -192,10 +198,6 @@ def run_approval_pipeline(
     return _result_from_state(final, ticket_id)
 
 
-def _snapshot_is_paused(snapshot: Any) -> bool:
-    return bool(getattr(snapshot, "next", None))
-
-
 def run_approval_for_ticket(
     ticket_id: str,
     *,
@@ -209,7 +211,7 @@ def run_approval_for_ticket(
     tid = approval_thread_id(ticket_id)
     graph = get_compiled_rfp_approval_graph()
     snapshot = graph.get_state({"configurable": {"thread_id": tid}})
-    paused = _snapshot_is_paused(snapshot)
+    paused = graph_is_paused(snapshot)
 
     kwargs: dict[str, Any] = dict(
         ticket_id=ticket_id,
@@ -227,7 +229,15 @@ def run_approval_for_ticket(
 
     if resume is not None:
         if not paused:
-            run_approval_pipeline(**kwargs)
+            return ApprovalPipelineResult(
+                ticket_id=ticket_id,
+                status=str(payload.get("status") or STATUS_WAITING_FOR_APPROVAL),
+                approvals=dict(payload.get("approvals") or {}),
+                ceo_approval=dict(payload.get("ceo_approval") or {}),
+                error_message=RESUME_NOT_PAUSED,
+                block_reason=RESUME_NOT_PAUSED_MESSAGE,
+                paused=False,
+            )
         return run_approval_pipeline(**kwargs, resume=resume)
 
     if queued_decisions:

@@ -5,11 +5,13 @@ Not mixed into the CX support-agent graph or the Part 1/2 graphs.
 Flow:
   load_handoff → surface_conflicts → arbitration
   → Send(collect_approvals) per *pending* department (parallel branches)
-  → ceo_gate → synthesizer → END
+  → apply_approval (resume entry) → join_approvals → ceo_gate → synthesizer → END
 
 Each department branch calls ``interrupt()`` only if that section is still
 ``pending``. Departments already decided skip the pause and do not block
-sibling branches. Resume is matched by interrupt id + ``department_id``.
+sibling branches. A human decision resumes the matching interrupt and
+enters ``apply_approval`` on the existing checkpoint — it does not
+re-invoke from START / ``load_handoff``.
 """
 
 from __future__ import annotations
@@ -19,7 +21,7 @@ from typing import Annotated, Any, TypedDict
 from uuid import uuid4
 
 from langgraph.graph import END, START, StateGraph
-from langgraph.types import Send
+from langgraph.types import Command, Send
 
 from data.pipelines.rfp_intake.constants import (
     STATUS_DONE,
@@ -50,17 +52,22 @@ from data.pipelines.rfp_approval.synthesizer import (
     synthesizer_ready,
 )
 
+APPLY_APPROVAL_NODE = "apply_approval"
+
 REQUIRED_APPROVAL_NODES: tuple[str, ...] = (
     "load_handoff",
     "surface_conflicts",
     "arbitration",
     "collect_approvals",
+    APPLY_APPROVAL_NODE,
     "ceo_gate",
     "synthesizer",
 )
 
-CX_GRAPH_FORBIDDEN_RFP_APPROVAL_NODES: frozenset[str] = frozenset(
-    REQUIRED_APPROVAL_NODES
+RESUME_NOT_PAUSED = "approval_not_paused"
+RESUME_NOT_PAUSED_MESSAGE = (
+    "Resume is an entry into the paused approval graph, not a restart. "
+    "Start approval first."
 )
 
 
@@ -103,6 +110,7 @@ class RfpApprovalState(TypedDict, total=False):
     error_message: Annotated[str | None, merge_error]
     trace: Annotated[list[dict[str, Any]], operator.add]
     department_id: str
+    resume_decision: Annotated[dict[str, Any], last_value]
 
 
 def _event(state: RfpApprovalState, node: str, **payload: Any) -> list[dict[str, Any]]:
@@ -193,21 +201,52 @@ def _is_interrupt_id_map(resume: Any) -> bool:
     return True
 
 
-def resume_command(graph: Any, config: dict[str, Any], resume: Any) -> Any:
-    """Resume one department (or CEO) branch by interrupt id when possible."""
-    from langgraph.types import Command
+def graph_is_paused(snapshot: Any) -> bool:
+    """True when the thread is waiting at ``interrupt()`` (or has ``next`` tasks)."""
+    if interrupt_values(snapshot):
+        return True
+    return bool(getattr(snapshot, "next", None))
 
+
+def _goto_apply_approval(
+    *,
+    ticket_id: str,
+    decision: dict[str, Any],
+    extra: dict[str, Any] | None = None,
+) -> Command:
+    """Route a resumed interrupt into ``apply_approval`` (not START)."""
+    payload: dict[str, Any] = {
+        "ticket_id": ticket_id,
+        "department_id": str(decision.get("department_id") or ""),
+        "resume_decision": decision,
+        **(extra or {}),
+    }
+    return Command(goto=Send(APPLY_APPROVAL_NODE, payload))
+
+
+def resume_command(graph: Any, config: dict[str, Any], resume: Any) -> Any:
+    """Enter ``apply_approval`` on the existing checkpoint — never START.
+
+    Pending interrupts are resumed by id so only that Send branch continues.
+    ``collect_approvals`` / ``ceo_gate`` then ``Command(goto=apply_approval)``.
+    If interrupt ids cannot be matched, jump straight to ``apply_approval``.
+    """
     if resume is None:
         return None
     if _is_interrupt_id_map(resume):
         return Command(resume=resume)
+    decision = dict(resume) if isinstance(resume, dict) else {"decision": resume}
     snapshot = graph.get_state(config)
-    mapping, leftover = match_interrupt_resumes(
-        snapshot, [resume] if isinstance(resume, dict) else []
-    )
+    mapping, _leftover = match_interrupt_resumes(snapshot, [decision])
+    update = {
+        "resume_decision": decision,
+        "department_id": str(decision.get("department_id") or ""),
+    }
     if mapping:
+        # Unblock the paused node; it Command.goto's apply_approval itself.
+        # Do not also goto here — that would apply the same decision twice.
         return Command(resume=mapping)
-    return Command(resume=resume)
+    return Command(goto=APPLY_APPROVAL_NODE, update=update)
 
 
 def approval_thread_id(ticket_id: str) -> str:
@@ -408,7 +447,11 @@ def _apply_department_decision(
             "error_message": str(exc),
             "paused": True,
             "status": STATUS_WAITING_FOR_APPROVAL,
-            "trace": _event(state, "collect_approvals", error=str(exc)),
+            "trace": _event(
+                state,
+                "apply_approval",
+                error=str(exc),
+            ),
         }
     stamp = _now()
     record = {
@@ -428,7 +471,7 @@ def _apply_department_decision(
         "approvals": {dept: record},
         "trace": _event(
             state,
-            "collect_approvals",
+            "apply_approval",
             department_id=dept,
             decision=mapped,
             approver=approver,
@@ -449,7 +492,7 @@ def _apply_ceo_decision(
             "error_message": str(exc),
             "paused": True,
             "status": STATUS_WAITING_FOR_APPROVAL,
-            "trace": _event(state, "ceo_gate", error=str(exc)),
+            "trace": _event(state, "apply_approval", error=str(exc)),
         }
     stamp = _now()
     ceo = {
@@ -475,40 +518,50 @@ def _apply_ceo_decision(
         "error_message": None,
         "trace": _event(
             state,
-            "ceo_gate",
+            "apply_approval",
             decision=mapped,
             approver=approver,
         ),
     }
 
 
-def collect_approvals_node(state: RfpApprovalState) -> dict[str, Any]:
-    """One department branch. Interrupt only if this section is still pending."""
+def collect_approvals_node(state: RfpApprovalState) -> Any:
+    """One department branch. Interrupt only if this section is still pending.
+
+    After ``interrupt()`` returns, route into ``apply_approval`` — do not
+    persist the decision in this node, and do not fall through a static edge.
+    """
     if state.get("error_message"):
-        return {}
+        return Command(goto=END)
     dept = str(state.get("department_id") or "").strip()
     if not dept:
         pending = _pending_department_signoffs(state)
         if not pending:
-            return {
-                "pending_approvals": [],
-                "paused": False,
-                "trace": _event(state, "collect_approvals", pending=0),
-            }
+            return Command(
+                goto="join_approvals",
+                update={
+                    "pending_approvals": [],
+                    "paused": False,
+                    "trace": _event(state, "collect_approvals", pending=0),
+                },
+            )
         dept = str(pending[0]["department_id"])
 
     status = _dept_status(state, dept)
     if status != "pending":
         # Already decided — do not interrupt this branch or sibling branches.
-        return {
-            "trace": _event(
-                state,
-                "collect_approvals",
-                department_id=dept,
-                skipped=True,
-                status=status,
-            ),
-        }
+        return Command(
+            goto="join_approvals",
+            update={
+                "trace": _event(
+                    state,
+                    "collect_approvals",
+                    department_id=dept,
+                    skipped=True,
+                    status=status,
+                ),
+            },
+        )
 
     signoffs = {
         s.department_id: s
@@ -541,7 +594,7 @@ def collect_approvals_node(state: RfpApprovalState) -> dict[str, Any]:
     resumed.setdefault("department_id", dept)
     if not resumed.get("approver"):
         resumed["approver"] = approver
-    return _apply_department_decision(state, resumed)
+    return _goto_apply_approval(ticket_id=ticket_id, decision=resumed)
 
 
 def fanout_department_approvals(state: RfpApprovalState) -> list[Send] | str:
@@ -571,31 +624,52 @@ def fanout_department_approvals(state: RfpApprovalState) -> list[Send] | str:
     ]
 
 
-def ceo_gate_node(state: RfpApprovalState) -> dict[str, Any]:
+def ceo_gate_node(state: RfpApprovalState) -> Any:
+    """CEO interrupt, then ``Command(goto=apply_approval)`` — never apply here."""
     if state.get("error_message"):
-        return {}
+        return Command(goto=END)
     if not state.get("requires_ceo_approval"):
-        return {
-            "synthesizer_blocked": False,
-            "trace": _event(state, "ceo_gate", required=False),
-        }
+        return Command(
+            goto="synthesizer",
+            update={
+                "synthesizer_blocked": False,
+                "trace": _event(state, "ceo_gate", required=False),
+            },
+        )
 
     ceo = dict(state.get("ceo_approval") or {})
     status = str(ceo.get("approval_status") or "pending")
     if status == "approved":
-        return {
-            "synthesizer_blocked": False,
-            "paused": False,
-            "trace": _event(state, "ceo_gate", required=True, status="approved"),
-        }
+        return Command(
+            goto="synthesizer",
+            update={
+                "synthesizer_blocked": False,
+                "paused": False,
+                "trace": _event(state, "ceo_gate", required=True, status="approved"),
+            },
+        )
     if status == "rejected":
-        return {
-            "synthesizer_blocked": True,
-            "paused": False,
-            "status": STATUS_WAITING_FOR_APPROVAL,
-            "block_reason": f"CEO {CEO_NAME} rejected",
-            "trace": _event(state, "ceo_gate", required=True, status="rejected"),
-        }
+        return Command(
+            goto=END,
+            update={
+                "synthesizer_blocked": True,
+                "paused": False,
+                "status": STATUS_WAITING_FOR_APPROVAL,
+                "block_reason": f"CEO {CEO_NAME} rejected",
+                "trace": _event(state, "ceo_gate", required=True, status="rejected"),
+            },
+        )
+    if status != "pending":
+        return Command(
+            goto="synthesizer",
+            update={
+                "synthesizer_blocked": True,
+                "paused": False,
+                "status": STATUS_WAITING_FOR_APPROVAL,
+                "block_reason": f"CEO {CEO_NAME} {status}",
+                "trace": _event(state, "ceo_gate", required=True, status=status),
+            },
+        )
 
     pending = {
         "department_id": CEO_DEPARTMENT_ID,
@@ -621,7 +695,11 @@ def ceo_gate_node(state: RfpApprovalState) -> dict[str, Any]:
     )
     resumed.setdefault("department_id", CEO_DEPARTMENT_ID)
     resumed.setdefault("approver", CEO_NAME)
-    return _apply_ceo_decision(state, resumed)
+    return _goto_apply_approval(
+        ticket_id=ticket_id,
+        decision=resumed,
+        extra={"requires_ceo_approval": True},
+    )
 
 
 def synthesizer_node(state: RfpApprovalState) -> dict[str, Any]:
@@ -693,6 +771,25 @@ def synthesizer_node(state: RfpApprovalState) -> dict[str, Any]:
     }
 
 
+def apply_approval_node(state: RfpApprovalState) -> dict[str, Any]:
+    """Explicit resume entry: persist one named-owner (or CEO) decision."""
+    decision = dict(state.get("resume_decision") or {})
+    if not decision:
+        return {
+            "resume_decision": {},
+            "trace": _event(state, APPLY_APPROVAL_NODE, skipped=True),
+        }
+    dept = str(decision.get("department_id") or state.get("department_id") or "").strip()
+    if dept:
+        decision["department_id"] = dept
+    if dept == CEO_DEPARTMENT_ID:
+        out = _apply_ceo_decision(state, decision)
+    else:
+        out = _apply_department_decision(state, decision)
+    out["resume_decision"] = {}
+    return out
+
+
 def join_approvals_node(state: RfpApprovalState) -> dict[str, Any]:
     """Wait until every department branch has finished (done or still interrupted)."""
     pending = _pending_department_signoffs(state)
@@ -728,22 +825,13 @@ def _after_load(state: RfpApprovalState) -> str:
     return "surface_conflicts"
 
 
-def _after_ceo(state: RfpApprovalState) -> str:
-    if state.get("error_message") or state.get("paused"):
-        return "end"
-    if state.get("synthesizer_blocked") and (
-        str((state.get("ceo_approval") or {}).get("approval_status") or "") == "rejected"
-    ):
-        return "end"
-    return "synthesizer"
-
-
 def build_rfp_approval_graph(*, checkpointer: Any | None = None) -> Any:
     graph = StateGraph(RfpApprovalState)
     graph.add_node("load_handoff", load_handoff_node)
     graph.add_node("surface_conflicts", surface_conflicts_node)
     graph.add_node("arbitration", arbitration_node)
     graph.add_node("collect_approvals", collect_approvals_node)
+    graph.add_node(APPLY_APPROVAL_NODE, apply_approval_node)
     graph.add_node("join_approvals", join_approvals_node)
     graph.add_node("ceo_gate", ceo_gate_node)
     graph.add_node("synthesizer", synthesizer_node)
@@ -756,16 +844,13 @@ def build_rfp_approval_graph(*, checkpointer: Any | None = None) -> Any:
     )
     graph.add_edge("surface_conflicts", "arbitration")
     graph.add_conditional_edges("arbitration", fanout_department_approvals)
-    graph.add_edge("collect_approvals", "join_approvals")
+    # collect_approvals / ceo_gate route with Command.goto so resume cannot
+    # also fall through a static edge into synthesizer or join.
+    graph.add_edge(APPLY_APPROVAL_NODE, "join_approvals")
     graph.add_conditional_edges(
         "join_approvals",
         _after_join,
         {"ceo_gate": "ceo_gate", "end": END},
-    )
-    graph.add_conditional_edges(
-        "ceo_gate",
-        _after_ceo,
-        {"synthesizer": "synthesizer", "end": END},
     )
     graph.add_edge("synthesizer", END)
 
@@ -868,5 +953,19 @@ def invoke_rfp_approval_graph(
         thread_id=thread_id,
     )
     if resume is not None:
+        snapshot = graph.get_state(config)
+        if not graph_is_paused(snapshot):
+            return {
+                "ticket_id": ticket_id,
+                "status": status,
+                "error_message": RESUME_NOT_PAUSED,
+                "block_reason": RESUME_NOT_PAUSED_MESSAGE,
+                "paused": False,
+                "trace": [],
+                "approvals": dict(approvals or {}),
+                "ceo_approval": dict(ceo_approval or {}),
+                "final_document": {},
+                "pending_approvals": [],
+            }
         return graph.invoke(resume_command(graph, config, resume), config=config)
     return graph.invoke(initial, config=config)

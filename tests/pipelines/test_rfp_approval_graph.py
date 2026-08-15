@@ -12,7 +12,9 @@ from data.pipelines.rfp_approval import (
 )
 from data.pipelines.rfp_approval.conflicts import conflict_surface_agent
 from data.pipelines.rfp_approval.graph import (
+    APPLY_APPROVAL_NODE,
     arbitration_node,
+    apply_approval_node,
     ceo_gate_node,
     collect_approvals_node,
     load_handoff_node,
@@ -31,6 +33,7 @@ def test_required_nodes_include_arbitration_hitl_and_synthesizer() -> None:
         "surface_conflicts",
         "arbitration",
         "collect_approvals",
+        APPLY_APPROVAL_NODE,
         "ceo_gate",
         "synthesizer",
     )
@@ -39,6 +42,7 @@ def test_required_nodes_include_arbitration_hitl_and_synthesizer() -> None:
         surface_conflicts_node,
         arbitration_node,
         collect_approvals_node,
+        apply_approval_node,
         ceo_gate_node,
         synthesizer_node,
     )
@@ -55,6 +59,9 @@ def test_compiled_graph_registers_separate_nodes() -> None:
     graph_src = (PIPELINE / "graph.py").read_text(encoding="utf-8")
     assert "Send(" in graph_src
     assert "fanout_department_approvals" in graph_src
+    assert APPLY_APPROVAL_NODE in registered
+    assert "Command(" in graph_src
+    assert "goto=APPLY_APPROVAL_NODE" in graph_src or 'goto=Send(' in graph_src
 
 
 def test_cx_graph_has_no_rfp_approval_nodes() -> None:

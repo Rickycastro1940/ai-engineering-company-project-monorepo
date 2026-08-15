@@ -55,16 +55,37 @@ def _interrupt_department_ids(result: dict) -> set[str]:
     return ids
 
 
-def test_collect_approvals_interrupts_before_apply_decision() -> None:
+def test_collect_approvals_interrupts_then_enters_apply_approval() -> None:
     import inspect
 
-    from data.pipelines.rfp_approval.graph import collect_approvals_node
+    from data.pipelines.rfp_approval.graph import (
+        APPLY_APPROVAL_NODE,
+        apply_approval_node,
+        collect_approvals_node,
+        resume_command,
+    )
 
-    src = inspect.getsource(collect_approvals_node)
-    assert "_interrupt(" in src
-    assert src.index("_interrupt(") < src.index("_apply_department_decision")
-    assert 'status != "pending"' in src
-    assert src.index('status != "pending"') < src.index("_interrupt(")
+    collect_src = inspect.getsource(collect_approvals_node)
+    apply_src = inspect.getsource(apply_approval_node)
+    resume_src = inspect.getsource(resume_command)
+    invoke_src = inspect.getsource(invoke_rfp_approval_graph)
+
+    assert "_interrupt(" in collect_src
+    assert "_goto_apply_approval" in collect_src
+    assert collect_src.index("_interrupt(") < collect_src.index("_goto_apply_approval")
+    assert "_apply_department_decision" not in collect_src
+    assert 'status != "pending"' in collect_src
+    assert collect_src.index('status != "pending"') < collect_src.index("_interrupt(")
+
+    assert "_apply_department_decision" in apply_src
+    assert "_apply_ceo_decision" in apply_src
+    assert APPLY_APPROVAL_NODE in apply_src or "apply_approval" in apply_src
+
+    assert "goto=APPLY_APPROVAL_NODE" in resume_src
+    assert "resume_command(" in invoke_src
+    assert "graph.invoke(initial" in invoke_src
+    assert invoke_src.index("resume is not None") < invoke_src.index("resume_command(")
+    assert invoke_src.index("resume_command(") < invoke_src.index("graph.invoke(initial")
 
 
 def test_interrupt_pauses_then_resume_with_camila_approval() -> None:
@@ -142,3 +163,62 @@ def test_department_interrupt_is_per_branch_and_skips_already_done() -> None:
     assert "operaciones" not in remaining
     assert remaining == {"marketing", "procurement"}
     assert after_ops.get("status") != "done"
+
+
+def _trace_nodes(result: dict) -> list[str]:
+    return [str(event.get("node") or "") for event in (result.get("trace") or [])]
+
+
+def test_resume_enters_apply_approval_without_restarting_load_handoff() -> None:
+    kwargs = dict(
+        ticket_id="hitl-resume-entry",
+        status=STATUS_WAITING_FOR_APPROVAL,
+        sections=SECTIONS,
+        metadata={"client_name": "Andes Tech Solutions"},
+        departments_needed=["marketing"],
+        requires_ceo_approval=False,
+        use_interrupt=True,
+        thread_id="hitl-resume-entry-thread",
+    )
+    paused = invoke_rfp_approval_graph(**kwargs)
+    assert paused.get("__interrupt__")
+    assert _trace_nodes(paused).count("load_handoff") == 1
+    assert "apply_approval" not in _trace_nodes(paused)
+
+    resumed = invoke_rfp_approval_graph(
+        **kwargs,
+        resume={
+            "department_id": "marketing",
+            "decision": "approved",
+            "approver": "Camila Ospina",
+        },
+    )
+    nodes = _trace_nodes(resumed)
+    assert nodes.count("load_handoff") == 1
+    assert nodes.count("arbitration") == 1
+    assert "apply_approval" in nodes
+    apply_at = nodes.index("apply_approval")
+    assert "load_handoff" not in nodes[apply_at:]
+    assert resumed.get("status") == "done"
+
+
+def test_resume_without_pause_does_not_restart_the_flow() -> None:
+    result = invoke_rfp_approval_graph(
+        ticket_id="hitl-resume-not-paused",
+        status=STATUS_WAITING_FOR_APPROVAL,
+        sections=SECTIONS,
+        metadata={"client_name": "Andes Tech Solutions"},
+        departments_needed=["marketing"],
+        requires_ceo_approval=False,
+        use_interrupt=True,
+        thread_id="hitl-resume-not-paused-thread",
+        resume={
+            "department_id": "marketing",
+            "decision": "approved",
+            "approver": "Camila Ospina",
+        },
+    )
+    assert result.get("error_message") == "approval_not_paused"
+    assert result.get("status") != "done"
+    assert not result.get("final_document")
+    assert _trace_nodes(result).count("load_handoff") == 0
