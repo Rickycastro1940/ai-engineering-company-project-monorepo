@@ -36,6 +36,10 @@ class UnknownApproverError(ValueError):
     """Raised when a signer is not the CONTEXT-named owner (or CEO)."""
 
 
+class InvalidResumeDecisionError(ValueError):
+    """Human resume payload is not approve / reject / request_changes (or is incomplete)."""
+
+
 @dataclass(frozen=True)
 class Signoff:
     department_id: str
@@ -131,7 +135,34 @@ def normalize_decision(decision: str) -> str:
     }
     mapped = aliases.get(raw, raw)
     if mapped not in ALLOWED_DECISIONS:
-        raise ValueError(
-            f"Unknown decision {decision!r}; expected one of {sorted(ALLOWED_DECISIONS)}"
+        raise InvalidResumeDecisionError(
+            f"Unknown decision {decision!r}; expected approve, reject, or request_changes"
         )
     return mapped
+
+
+def validate_human_resume(payload: Any) -> dict[str, Any]:
+    """Canonicalize a human HITL response before it re-enters the graph.
+
+    Accepts ``approve`` / ``reject`` / ``request_changes`` (and aliases) plus
+    the CONTEXT-named owner. Does not persist and does not invoke the graph.
+    """
+    if not isinstance(payload, dict):
+        raise InvalidResumeDecisionError(
+            "Resume decision must include department_id, decision, and approver"
+        )
+    dept = str(payload.get("department_id") or "").strip()
+    if not dept:
+        raise InvalidResumeDecisionError(
+            "department_id is required to resume approval"
+        )
+    mapped = normalize_decision(str(payload.get("decision") or ""))
+    approver = assert_allowed_approver(dept, str(payload.get("approver") or ""))
+    out: dict[str, Any] = {
+        "department_id": dept,
+        "decision": mapped,
+        "approver": approver,
+    }
+    if payload.get("comment") is not None:
+        out["comment"] = payload.get("comment")
+    return out

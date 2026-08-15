@@ -172,6 +172,28 @@ def test_http_rejects_invented_approver_title(client: TestClient) -> None:
     assert detail["status"] != STATUS_DONE
 
 
+def test_http_invalid_decision_does_not_enter_graph(client: TestClient) -> None:
+    ticket_id = _seed_ticket(
+        departments=["marketing"],
+        requires_ceo=False,
+        metadata={"client_name": "Andes Tech Solutions"},
+        drafts={"marketing": ANDES_DRAFTS["marketing"]},
+    )
+    client.post(f"/rfp/tickets/{ticket_id}/start-approval")
+    res = client.post(
+        f"/rfp/tickets/{ticket_id}/approvals",
+        json={
+            "department_id": "marketing",
+            "decision": "maybe",
+            "approver": "Camila Ospina",
+        },
+    )
+    assert res.status_code == 409, res.text
+    assert "approve" in res.text.casefold() or "request_changes" in res.text.casefold()
+    rows = {r.department_id: r.approval_status for r in list_sections(ticket_id)}
+    assert rows["marketing"] == "pending"
+
+
 def test_http_approval_without_start_does_not_restart_graph(client: TestClient) -> None:
     ticket_id = _seed_ticket(
         departments=["marketing"],

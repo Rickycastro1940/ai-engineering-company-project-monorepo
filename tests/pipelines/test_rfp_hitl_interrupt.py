@@ -82,9 +82,10 @@ def test_collect_approvals_interrupts_then_enters_apply_approval() -> None:
     assert APPLY_APPROVAL_NODE in apply_src or "apply_approval" in apply_src
 
     assert "goto=APPLY_APPROVAL_NODE" in resume_src
+    assert "prepare_resume(" in invoke_src
     assert "resume_command(" in invoke_src
     assert "graph.invoke(initial" in invoke_src
-    assert invoke_src.index("resume is not None") < invoke_src.index("resume_command(")
+    assert invoke_src.index("prepare_resume(") < invoke_src.index("resume_command(")
     assert invoke_src.index("resume_command(") < invoke_src.index("graph.invoke(initial")
 
 
@@ -222,3 +223,93 @@ def test_resume_without_pause_does_not_restart_the_flow() -> None:
     assert result.get("status") != "done"
     assert not result.get("final_document")
     assert _trace_nodes(result).count("load_handoff") == 0
+
+
+def test_invalid_resume_decision_does_not_enter_the_graph() -> None:
+    kwargs = dict(
+        ticket_id="hitl-invalid-resume",
+        status=STATUS_WAITING_FOR_APPROVAL,
+        sections=SECTIONS,
+        metadata={"client_name": "Andes Tech Solutions"},
+        departments_needed=["marketing"],
+        requires_ceo_approval=False,
+        use_interrupt=True,
+        thread_id="hitl-invalid-resume-thread",
+    )
+    paused = invoke_rfp_approval_graph(**kwargs)
+    assert paused.get("__interrupt__")
+
+    rejected = invoke_rfp_approval_graph(
+        **kwargs,
+        resume={
+            "department_id": "marketing",
+            "decision": "maybe",
+            "approver": "Camila Ospina",
+        },
+    )
+    assert rejected.get("error_message")
+    assert "approve" in str(rejected.get("error_message") or "").casefold()
+    assert rejected.get("paused") is True
+    assert "apply_approval" not in _trace_nodes(rejected)
+    assert (rejected.get("approvals") or {}).get("marketing", {}).get(
+        "approval_status"
+    ) != "approved"
+
+    done = invoke_rfp_approval_graph(
+        **kwargs,
+        resume={
+            "department_id": "marketing",
+            "decision": "approve",
+            "approver": "Camila Ospina",
+        },
+    )
+    assert done.get("status") == "done"
+    assert done.get("approvals", {}).get("marketing", {}).get("approval_status") == "approved"
+
+
+def test_resume_reject_and_request_changes_are_valid_human_responses() -> None:
+    reject_kwargs = dict(
+        ticket_id="hitl-reject",
+        status=STATUS_WAITING_FOR_APPROVAL,
+        sections=SECTIONS,
+        metadata={"client_name": "Andes Tech Solutions"},
+        departments_needed=["marketing"],
+        requires_ceo_approval=False,
+        use_interrupt=True,
+        thread_id="hitl-reject-thread",
+    )
+    invoke_rfp_approval_graph(**reject_kwargs)
+    rejected = invoke_rfp_approval_graph(
+        **reject_kwargs,
+        resume={
+            "department_id": "marketing",
+            "decision": "reject",
+            "approver": "Camila Ospina",
+        },
+    )
+    assert rejected.get("status") != "done"
+    assert rejected.get("approvals", {}).get("marketing", {}).get("approval_status") == "rejected"
+    assert not (rejected.get("final_document") or {}).get("markdown")
+
+    change_kwargs = dict(
+        ticket_id="hitl-request-changes",
+        status=STATUS_WAITING_FOR_APPROVAL,
+        sections=SECTIONS,
+        metadata={"client_name": "Andes Tech Solutions"},
+        departments_needed=["marketing"],
+        requires_ceo_approval=False,
+        use_interrupt=True,
+        thread_id="hitl-request-changes-thread",
+    )
+    invoke_rfp_approval_graph(**change_kwargs)
+    changed = invoke_rfp_approval_graph(
+        **change_kwargs,
+        resume={
+            "department_id": "marketing",
+            "decision": "request changes",
+            "approver": "Camila Ospina",
+        },
+    )
+    assert changed.get("status") != "done"
+    assert changed.get("approvals", {}).get("marketing", {}).get("approval_status") == "request_changes"
+    assert not (changed.get("final_document") or {}).get("markdown")

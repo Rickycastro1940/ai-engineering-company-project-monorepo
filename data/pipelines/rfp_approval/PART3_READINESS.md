@@ -30,9 +30,11 @@ Source: CONTEXT-company.md Milestone 9 (§2.1 owners, §2.3 FinalDocument,
   `ceo_gate` interrupts for Mariana Restrepo the same way.
   Resume is an explicit graph entry: `Command(resume=)` unblocks the paused
   department (or CEO) branch, which `Command(goto=apply_approval)`s. The
-  graph does **not** `invoke(initial)` from `START` / `load_handoff`. If the
-  thread is not paused, resume returns `approval_not_paused` instead of
-  restarting Part 3.
+  human response is validated first (`approve` / `reject` /
+  `request_changes` plus the named owner) and never enters the graph if
+  invalid. The graph does **not** `invoke(initial)` from `START` /
+  `load_handoff`. If the thread is not paused, resume returns
+  `approval_not_paused` instead of restarting Part 3.
 
 ## Durable checkpointer (HITL pause/resume)
 

@@ -6,10 +6,12 @@ import pytest
 
 from data.pipelines.rfp_approval.approvers import (
     CEO_NAME,
+    InvalidResumeDecisionError,
     UnknownApproverError,
     assert_allowed_approver,
     requires_ceo_approval,
     signoffs_for_ticket,
+    validate_human_resume,
 )
 from data.pipelines.rfp_intake.context_rules import (
     CONTEXT_DEPARTMENT_OWNERS,
@@ -50,6 +52,53 @@ def test_unknown_and_invented_titles_are_rejected() -> None:
         assert_allowed_approver("operaciones", "Camila Ospina")
     assert assert_allowed_approver("marketing", "Camila Ospina") == "Camila Ospina"
     assert assert_allowed_approver("ceo", "Mariana Restrepo") == "Mariana Restrepo"
+
+
+def test_validate_human_resume_accepts_approve_reject_request_changes() -> None:
+    approved = validate_human_resume(
+        {
+            "department_id": "marketing",
+            "decision": "approve",
+            "approver": "Camila Ospina",
+        }
+    )
+    assert approved["decision"] == "approved"
+    assert approved["approver"] == "Camila Ospina"
+
+    rejected = validate_human_resume(
+        {
+            "department_id": "operaciones",
+            "decision": "reject",
+            "approver": "Felipe Guerrero",
+        }
+    )
+    assert rejected["decision"] == "rejected"
+
+    changes = validate_human_resume(
+        {
+            "department_id": "procurement",
+            "decision": "request changes",
+            "approver": "Lucía Fernández",
+        }
+    )
+    assert changes["decision"] == "request_changes"
+
+    with pytest.raises(InvalidResumeDecisionError, match="approve, reject, or request_changes"):
+        validate_human_resume(
+            {
+                "department_id": "marketing",
+                "decision": "maybe",
+                "approver": "Camila Ospina",
+            }
+        )
+    with pytest.raises(UnknownApproverError):
+        validate_human_resume(
+            {
+                "department_id": "marketing",
+                "decision": "approved",
+                "approver": "VP of Sales",
+            }
+        )
 
 
 def test_ceo_threshold_uses_context_50000() -> None:

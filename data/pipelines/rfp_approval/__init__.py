@@ -15,9 +15,11 @@ from typing import Any
 from data.pipelines.rfp_intake.constants import STATUS_WAITING_FOR_APPROVAL
 from data.pipelines.rfp_approval.approvers import (
     CEO_NAME,
+    InvalidResumeDecisionError,
     UnknownApproverError,
     requires_ceo_approval,
     signoffs_for_ticket,
+    validate_human_resume,
 )
 from data.pipelines.rfp_approval.arbitration import apply_fixed_arbitration
 from data.pipelines.rfp_approval.checkpointer import (
@@ -50,6 +52,7 @@ from data.pipelines.rfp_approval.synthesizer import build_final_document
 __all__ = [
     "APPLY_APPROVAL_NODE",
     "CEO_NAME",
+    "InvalidResumeDecisionError",
     "Part2HandoffNotReady",
     "REQUIRED_APPROVAL_NODES",
     "RESUME_NOT_PAUSED",
@@ -70,6 +73,7 @@ __all__ = [
     "run_approval_for_ticket",
     "run_approval_pipeline",
     "signoffs_for_ticket",
+    "validate_human_resume",
 ]
 
 

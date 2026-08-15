@@ -30,11 +30,13 @@ from data.pipelines.rfp_intake.constants import (
 from data.pipelines.rfp_approval.approvers import (
     CEO_DEPARTMENT_ID,
     CEO_NAME,
+    InvalidResumeDecisionError,
     UnknownApproverError,
     assert_allowed_approver,
     normalize_decision,
     requires_ceo_approval,
     signoffs_for_ticket,
+    validate_human_resume,
 )
 from data.pipelines.rfp_approval.arbitration import (
     RESOLUTION_ACTION_REQUEST_CHANGES,
@@ -222,6 +224,36 @@ def _goto_apply_approval(
         **(extra or {}),
     }
     return Command(goto=Send(APPLY_APPROVAL_NODE, payload))
+
+
+def _pending_resume_departments(snapshot: Any) -> set[str]:
+    return {
+        str(payload.get("department_id") or "")
+        for payload in interrupt_payloads(snapshot)
+        if payload.get("department_id")
+    }
+
+
+def prepare_resume(resume: Any, snapshot: Any | None = None) -> Any:
+    """Validate approve / reject / request_changes before Command(resume=).
+
+    Invalid payloads never reach ``graph.invoke``. Canonicalizes aliases
+    (``approve`` → ``approved``) and requires the CONTEXT-named owner.
+    """
+    waiting = _pending_resume_departments(snapshot) if snapshot is not None else set()
+
+    def _one(payload: Any) -> dict[str, Any]:
+        decision = validate_human_resume(payload)
+        dept = decision["department_id"]
+        if waiting and dept not in waiting:
+            raise InvalidResumeDecisionError(
+                f"{dept!r} is not waiting for a human decision"
+            )
+        return decision
+
+    if _is_interrupt_id_map(resume):
+        return {str(iid): _one(value) for iid, value in resume.items()}
+    return _one(resume if isinstance(resume, dict) else {"decision": resume})
 
 
 def resume_command(graph: Any, config: dict[str, Any], resume: Any) -> Any:
@@ -954,6 +986,20 @@ def invoke_rfp_approval_graph(
                 "error_message": RESUME_NOT_PAUSED,
                 "block_reason": RESUME_NOT_PAUSED_MESSAGE,
                 "paused": False,
+                "trace": [],
+                "approvals": dict(approvals or {}),
+                "ceo_approval": dict(ceo_approval or {}),
+                "final_document": {},
+                "pending_approvals": [],
+            }
+        try:
+            resume = prepare_resume(resume, snapshot)
+        except (UnknownApproverError, InvalidResumeDecisionError, ValueError) as exc:
+            return {
+                "ticket_id": ticket_id,
+                "status": STATUS_WAITING_FOR_APPROVAL,
+                "error_message": str(exc),
+                "paused": True,
                 "trace": [],
                 "approvals": dict(approvals or {}),
                 "ceo_approval": dict(ceo_approval or {}),
