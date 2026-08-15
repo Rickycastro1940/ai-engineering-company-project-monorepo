@@ -33,7 +33,7 @@ accessible. Details: [`data/pipelines/rfp_approval/COMPLETION.md`](../../data/pi
 | HTTP (thin) | `services/rfp/` on `services.agent.app` (same process as agent) |
 | Upload / ticket UI | `uis/backoffice/rfp-upload.html` (per-department approve / reject on the same ticket) |
 | Approval UI | `uis/backoffice/rfp-approvals.html` |
-| CLI | `scripts/rfp_intake_smoke.py` · `scripts/rfp_response_smoke.py` · `scripts/rfp_approval_smoke.py` |
+| CLI | `scripts/rfp_intake_smoke.py` · `scripts/rfp_response_smoke.py` · `scripts/rfp_approval_smoke.py` · `scripts/rfp_part3_e2e_simulated_approvals.py` |
 | Stored uploads | `data/raw/rfp/<ticket_id>/` |
 
 ## API
@@ -57,5 +57,8 @@ uv run python scripts/rfp_response_smoke.py
 uv run python scripts/rfp_approval_smoke.py
 # End-to-end (intake → generation → approval → completion on one ticket):
 RFP_INTAKE_SYNC=1 RFP_ALLOW_SQLITE=1 uv run pytest tests/pipelines/test_rfp_e2e_full_pipeline.py -q
+# Part 3 only — fixture + simulated programmatic approvals (no UI clicks):
+RFP_ALLOW_SQLITE=1 uv run python scripts/rfp_part3_e2e_simulated_approvals.py --mode sequential
+RFP_ALLOW_SQLITE=1 uv run pytest tests/pipelines/test_rfp_part3_simulated_approvals_e2e.py -q
 uv run pytest tests/pipelines/test_rfp_*.py
 ```

@@ -71,3 +71,27 @@ The Andes journey asserts one `ticket_id`, status transitions
 (`intake_complete` → … → `waiting_for_approval` → `done`), stable
 `departments_needed` / client metadata, and FinalDocument accessibility only
 after completion.
+
+## Reproducible Part 3 path (simulated approvals — no UI)
+
+Reviewers must not depend on irreproducible UI clicks alone. Ship path:
+
+| Piece | Location |
+| ----- | -------- |
+| Fixture (sections + simulated owner decisions) | `data/pipelines/rfp_approval/fixtures.py` |
+| Script (queued or sequential programmatic resume) | `scripts/rfp_part3_e2e_simulated_approvals.py` |
+| Integration tests | `tests/pipelines/test_rfp_part3_simulated_approvals_e2e.py` |
+
+```bash
+RFP_ALLOW_SQLITE=1 \
+  uv run python scripts/rfp_part3_e2e_simulated_approvals.py --mode sequential
+
+RFP_ALLOW_SQLITE=1 \
+  uv run python scripts/rfp_part3_e2e_simulated_approvals.py --scenario sunset --mode queued
+
+RFP_ALLOW_SQLITE=1 \
+  uv run pytest tests/pipelines/test_rfp_part3_simulated_approvals_e2e.py -q
+```
+
+Approvals are CONTEXT named owners via `queued_decisions` / `resume=`
+(LangGraph `Command(resume=)` equivalent), not browser clicks.
