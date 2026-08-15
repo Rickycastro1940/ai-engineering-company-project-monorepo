@@ -15,6 +15,8 @@ Curriculum PDFs: [`rfp-requests/brasaland/`](../../rfp-requests/brasaland/).
 
 **§7 arbitration** is a dedicated graph node with fixed trigger ids (`cost-vs-feasibility`, `setup-sla-breach`, `ceo-threshold`) — not LLM consensus.
 
+**Part 3 checkpointer:** Postgres when `DATABASE_URL` is PostgreSQL; SQLite *file* for local/pytest (`RFP_ALLOW_SQLITE=1`). In-memory (`MemorySaver` / `:memory:`) only with `RFP_CHECKPOINT_MEMORY=1`.
+
 ## Layout
 
 | Piece | Location |
@@ -43,6 +45,7 @@ Curriculum PDFs: [`rfp-requests/brasaland/`](../../rfp-requests/brasaland/).
 uv run uvicorn services.agent.app:app --reload --port 8000
 # open http://127.0.0.1:8000/rfp-upload.html and /rfp-approvals.html
 export RFP_INTAKE_SYNC=1 RFP_ALLOW_SQLITE=1
+# Optional: RFP_CHECKPOINT_SQLITE=/tmp/rfp-approval-checkpoints.sqlite
 uv run python scripts/rfp_intake_smoke.py
 uv run python scripts/rfp_response_smoke.py
 uv run python scripts/rfp_approval_smoke.py

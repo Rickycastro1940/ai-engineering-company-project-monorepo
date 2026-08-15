@@ -14,6 +14,7 @@ Flow:
 from __future__ import annotations
 
 from typing import Any, TypedDict
+from uuid import uuid4
 
 from langgraph.graph import END, START, StateGraph
 
@@ -609,19 +610,52 @@ def build_rfp_approval_graph(*, checkpointer: Any | None = None) -> Any:
 
 _COMPILED = None
 _COMPILED_INTERRUPT = None
+_COMPILED_KEY = None
 
 
 def get_compiled_rfp_approval_graph(*, use_interrupt: bool = False) -> Any:
-    global _COMPILED, _COMPILED_INTERRUPT
-    if use_interrupt:
-        if _COMPILED_INTERRUPT is None:
-            from langgraph.checkpoint.memory import MemorySaver
+    """Compile once per checkpointer backend.
 
-            _COMPILED_INTERRUPT = build_rfp_approval_graph(checkpointer=MemorySaver())
-        return _COMPILED_INTERRUPT
-    if _COMPILED is None:
-        _COMPILED = build_rfp_approval_graph()
-    return _COMPILED
+    Always attaches a durable checkpointer (SQLite file or Postgres).
+    ``MemorySaver`` is used only when ``RFP_CHECKPOINT_MEMORY=1``.
+    ``use_interrupt`` is kept for callers; HITL is a state flag, not a
+    separate graph topology.
+    """
+    from data.pipelines.rfp_approval.checkpointer import get_approval_checkpointer
+
+    global _COMPILED, _COMPILED_INTERRUPT, _COMPILED_KEY
+    saver = get_approval_checkpointer()
+    key = id(saver)
+    if _COMPILED is not None and _COMPILED_KEY == key:
+        return _COMPILED
+    compiled = build_rfp_approval_graph(checkpointer=saver)
+    _COMPILED = compiled
+    _COMPILED_INTERRUPT = compiled
+    _COMPILED_KEY = key
+    return compiled
+
+
+def _approval_invoke_config(
+    *,
+    ticket_id: str,
+    resume: Any,
+    use_interrupt: bool,
+    thread_id: str | None,
+) -> dict[str, Any]:
+    """Always pass ``thread_id`` — durable checkpointers require it.
+
+    HITL interrupt/resume uses a stable id so ``Command(resume=)`` can
+    continue the same thread. Fresh HTTP/pipeline runs use a unique
+    thread so a second start on the same ticket does not resume a
+    checkpoint instead of applying the latest DB state.
+    """
+    if thread_id:
+        tid = thread_id
+    elif resume is not None or use_interrupt:
+        tid = ticket_id
+    else:
+        tid = f"{ticket_id}:{uuid4().hex}"
+    return {"configurable": {"thread_id": tid}}
 
 
 def invoke_rfp_approval_graph(
@@ -658,9 +692,12 @@ def invoke_rfp_approval_graph(
         "arbitration": [],
         "pending_approvals": [],
     }
-    config = None
-    if use_interrupt:
-        config = {"configurable": {"thread_id": thread_id or ticket_id}}
+    config = _approval_invoke_config(
+        ticket_id=ticket_id,
+        resume=resume,
+        use_interrupt=use_interrupt,
+        thread_id=thread_id,
+    )
     if resume is not None:
         from langgraph.types import Command
 

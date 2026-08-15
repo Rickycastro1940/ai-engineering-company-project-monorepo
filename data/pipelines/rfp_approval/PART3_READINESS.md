@@ -23,3 +23,17 @@ Source: CONTEXT-company.md Milestone 9 (§2.1 owners, §2.3 FinalDocument,
   only after independent owner (and CEO, if required) approval.
 - Same HTTP process: extend `services/rfp/` (no second API).
   Pipeline: `data/pipelines/rfp_approval/`.
+
+## Durable checkpointer (HITL pause/resume)
+
+LangGraph `interrupt()` needs a checkpointer. Do **not** use
+`MemorySaver` or SQLite `:memory:` outside local development.
+
+| Environment | Backend |
+| ----------- | ------- |
+| `DATABASE_URL` PostgreSQL (Supabase / production) | `PostgresSaver` (`langgraph-checkpoint-postgres`) |
+| Local smoke / pytest (`RFP_ALLOW_SQLITE=1` or sqlite URL) | file-backed `SqliteSaver` (`langgraph-checkpoint-sqlite`) |
+| Local only, explicit `RFP_CHECKPOINT_MEMORY=1` | `MemorySaver` |
+
+Install extras with `uv add langgraph-checkpoint-sqlite langgraph-checkpoint-postgres 'psycopg[binary,pool]'`.
+Override the SQLite file with `RFP_CHECKPOINT_SQLITE=/path/to/file.sqlite`.

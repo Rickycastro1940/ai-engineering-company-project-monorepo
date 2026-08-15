@@ -2,8 +2,24 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+
+from data.pipelines.rfp_approval.checkpointer import reset_approval_checkpointer
 from data.pipelines.rfp_approval.graph import invoke_rfp_approval_graph
 from data.pipelines.rfp_intake.constants import STATUS_WAITING_FOR_APPROVAL
+
+
+@pytest.fixture(autouse=True)
+def _isolate_hitl_checkpointer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RFP_CHECKPOINT_SQLITE", str(tmp_path / "hitl.sqlite"))
+    monkeypatch.delenv("RFP_CHECKPOINT_MEMORY", raising=False)
+    reset_approval_checkpointer()
+    yield
+    reset_approval_checkpointer()
 
 SECTIONS = [
     {

@@ -20,6 +20,11 @@ from data.pipelines.rfp_approval.approvers import (
     signoffs_for_ticket,
 )
 from data.pipelines.rfp_approval.arbitration import apply_fixed_arbitration
+from data.pipelines.rfp_approval.checkpointer import (
+    checkpoint_backend,
+    get_approval_checkpointer,
+    reset_approval_checkpointer,
+)
 from data.pipelines.rfp_approval.conflicts import conflict_surface_agent
 from data.pipelines.rfp_approval.graph import (
     REQUIRED_APPROVAL_NODES,
@@ -43,8 +48,11 @@ __all__ = [
     "assert_part2_ready_for_approval",
     "build_final_document",
     "build_rfp_approval_graph",
+    "checkpoint_backend",
     "conflict_surface_agent",
+    "get_approval_checkpointer",
     "get_compiled_rfp_approval_graph",
+    "reset_approval_checkpointer",
     "invoke_rfp_approval_graph",
     "requires_ceo_approval",
     "run_approval_for_ticket",
