@@ -522,15 +522,15 @@ def record_approval_decision(
         assert_allowed_approver(department_id, approver)
     except UnknownApproverError:
         raise
-    queued = [
-        {
+    result = run_approval_for_ticket(
+        ticket_id,
+        resume={
             "department_id": department_id,
             "decision": decision,
             "approver": approver,
             "comment": comment,
-        }
-    ]
-    result = run_approval_for_ticket(ticket_id, queued_decisions=queued)
+        },
+    )
     if result.error_message:
         raise ValueError(result.error_message)
     saved = get_ticket(ticket_id)

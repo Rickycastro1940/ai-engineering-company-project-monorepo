@@ -29,6 +29,16 @@ SECTIONS = [
 ]
 
 
+def test_collect_approvals_interrupts_before_apply_decision() -> None:
+    import inspect
+
+    from data.pipelines.rfp_approval.graph import collect_approvals_node
+
+    src = inspect.getsource(collect_approvals_node)
+    assert "_interrupt(" in src
+    assert src.index("_interrupt(") < src.index("_apply_department_decision")
+
+
 def test_interrupt_pauses_then_resume_with_camila_approval() -> None:
     kwargs = dict(
         ticket_id="hitl-marketing",
@@ -43,6 +53,8 @@ def test_interrupt_pauses_then_resume_with_camila_approval() -> None:
     paused = invoke_rfp_approval_graph(**kwargs)
     interrupts = paused.get("__interrupt__") or []
     assert interrupts, f"expected interrupt payload, got keys={list(paused)}"
+    marketing = (paused.get("approvals") or {}).get("marketing") or {}
+    assert marketing.get("approval_status") != "approved"
     value = getattr(interrupts[0], "value", None) or interrupts[0]
     if isinstance(value, dict):
         pending = value.get("pending") or []

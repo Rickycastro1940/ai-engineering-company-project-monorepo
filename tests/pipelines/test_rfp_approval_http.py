@@ -34,6 +34,7 @@ UI_PAGE = REPO / "uis" / "backoffice" / "rfp-approvals.html"
 def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'part3.sqlite'}")
     monkeypatch.setenv("RFP_ALLOW_SQLITE", "1")
+    monkeypatch.setenv("RFP_CHECKPOINT_SQLITE", str(tmp_path / "part3-checkpoints.sqlite"))
     reset_engine()
     init_db()
     app = FastAPI()
@@ -95,6 +96,7 @@ def test_http_named_owners_approve_andes_without_ceo(client: TestClient) -> None
     assert started.status_code == 200, started.text
     body = started.json()
     assert body["status"] == STATUS_WAITING_FOR_APPROVAL
+    assert all(r.approval_status == "pending" for r in list_sections(ticket_id))
 
     owners = {
         "marketing": "Camila Ospina",

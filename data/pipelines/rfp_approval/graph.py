@@ -6,9 +6,9 @@ Flow:
   load_handoff → surface_conflicts → arbitration → collect_approvals
   → ceo_gate → synthesizer → END
 
-``collect_approvals`` / ``ceo_gate`` pause for human input (LangGraph
-``interrupt`` when ``use_interrupt`` is set; otherwise return
-``waiting_for_approval`` so HTTP can record the named owner and re-invoke).
+``collect_approvals`` / ``ceo_gate`` always ``interrupt()`` before a
+department section (or CEO gate) is marked approved. Resume supplies the
+named-owner decision. HTTP uses the same checkpoint thread.
 """
 
 from __future__ import annotations
@@ -105,6 +105,51 @@ def _interrupt(payload: dict[str, Any]) -> dict[str, Any]:
     return {"decision": resumed}
 
 
+def interrupt_values(result: Any) -> list[Any]:
+    """LangGraph interrupt objects from an invoke result or get_state snapshot."""
+    if isinstance(result, dict):
+        return list(result.get("__interrupt__") or [])
+    found: list[Any] = []
+    interrupts = getattr(result, "interrupts", None)
+    if interrupts:
+        found.extend(list(interrupts))
+    for task in getattr(result, "tasks", None) or ():
+        found.extend(list(getattr(task, "interrupts", None) or []))
+    return found
+
+
+def interrupt_payload(result: Any) -> dict[str, Any] | None:
+    items = interrupt_values(result)
+    if not items:
+        return None
+    first = items[0]
+    value = getattr(first, "value", None)
+    if value is None:
+        value = first
+    return value if isinstance(value, dict) else {"decision": value}
+
+
+def approval_thread_id(ticket_id: str) -> str:
+    """Stable LangGraph thread for HTTP start-approval + resume."""
+    return f"{ticket_id}:approval"
+
+
+def enrich_interrupt_state(final: dict[str, Any]) -> dict[str, Any]:
+    """Mark HITL pause on invoke results that stopped at ``interrupt()``."""
+    payload = interrupt_payload(final)
+    if payload is None:
+        return final
+    out = dict(final)
+    out["paused"] = True
+    out["status"] = str(out.get("status") or STATUS_WAITING_FOR_APPROVAL)
+    pending = payload.get("pending")
+    if pending:
+        out["pending_approvals"] = list(pending)
+    elif payload.get("department_id"):
+        out.setdefault("pending_approvals", [payload])
+    return out
+
+
 def _persist(ticket_id: str, **kwargs: Any) -> None:
     if not ticket_id:
         return
@@ -129,7 +174,7 @@ def _pending_department_signoffs(state: RfpApprovalState) -> list[dict[str, Any]
         needed, requires_ceo=False
     ):
         status = _dept_status(state, signoff.department_id)
-        if status != "approved":
+        if status == "pending":
             pending.append(
                 {
                     **signoff.to_dict(),
@@ -358,57 +403,40 @@ def _apply_ceo_decision(
 def collect_approvals_node(state: RfpApprovalState) -> dict[str, Any]:
     if state.get("error_message"):
         return {}
-    queued = list(state.get("queued_decisions") or [])
-    department_queued = [d for d in queued if d.get("department_id") != CEO_DEPARTMENT_ID]
-    ceo_queued = [d for d in queued if d.get("department_id") == CEO_DEPARTMENT_ID]
-    if department_queued:
-        first, rest = department_queued[0], department_queued[1:]
-        applied = _apply_department_decision(state, first)
-        applied["queued_decisions"] = rest + ceo_queued
-        return applied
-
     pending = _pending_department_signoffs(state)
-    extra: dict[str, Any] = {"queued_decisions": []}
-    if ceo_queued:
-        extra = _apply_ceo_decision(state, ceo_queued[0])
-        extra["queued_decisions"] = ceo_queued[1:]
-        # Merge CEO update into a copy of state for subsequent pending check.
-        state = {**state, **{k: v for k, v in extra.items() if k != "trace"}}
-
     if not pending:
-        extra.setdefault("pending_approvals", [])
-        extra.setdefault("paused", False)
-        extra["trace"] = extra.get("trace") or _event(
-            state, "collect_approvals", pending=0
-        )
-        return extra
+        return {
+            "pending_approvals": [],
+            "paused": False,
+            "queued_decisions": [],
+            "trace": _event(state, "collect_approvals", pending=0),
+        }
 
-    if state.get("use_interrupt"):
-        resumed = _interrupt(
-            {
-                "kind": "department_approval",
-                "ticket_id": state.get("ticket_id"),
-                "pending": pending,
-            }
-        )
-        applied = _apply_department_decision(state, resumed)
-        applied["queued_decisions"] = extra.get("queued_decisions") or []
-        if extra.get("ceo_approval"):
-            applied.setdefault("ceo_approval", extra["ceo_approval"])
-        return applied
-
-    return {
-        **extra,
-        "pending_approvals": pending,
-        "paused": True,
-        "status": STATUS_WAITING_FOR_APPROVAL,
-        "trace": _event(
-            state,
-            "collect_approvals",
-            pending=[p["department_id"] for p in pending],
-            hitl=True,
-        ),
-    }
+    # Interruption point: the section stays pending until a human resumes.
+    target = pending[0]
+    ticket_id = str(state.get("ticket_id") or "")
+    _persist(
+        ticket_id,
+        status=STATUS_WAITING_FOR_APPROVAL,
+        approvals=dict(state.get("approvals") or {}),
+    )
+    resumed = _interrupt(
+        {
+            "kind": "department_approval",
+            "ticket_id": ticket_id,
+            "department_id": target["department_id"],
+            "approver": target["approver"],
+            "pending": pending,
+        }
+    )
+    resumed.setdefault("department_id", target["department_id"])
+    if not resumed.get("approver"):
+        resumed["approver"] = target["approver"]
+    applied = _apply_department_decision(state, resumed)
+    merged = {**state, **applied}
+    applied["pending_approvals"] = _pending_department_signoffs(merged)
+    applied["queued_decisions"] = []
+    return applied
 
 
 def ceo_gate_node(state: RfpApprovalState) -> dict[str, Any]:
@@ -419,14 +447,6 @@ def ceo_gate_node(state: RfpApprovalState) -> dict[str, Any]:
             "synthesizer_blocked": False,
             "trace": _event(state, "ceo_gate", required=False),
         }
-
-    queued = list(state.get("queued_decisions") or [])
-    ceo_queued = [d for d in queued if d.get("department_id") == CEO_DEPARTMENT_ID]
-    if ceo_queued:
-        first, rest = ceo_queued[0], [d for d in queued if d is not first]
-        applied = _apply_ceo_decision(state, first)
-        applied["queued_decisions"] = rest
-        return applied
 
     ceo = dict(state.get("ceo_approval") or {})
     status = str(ceo.get("approval_status") or "pending")
@@ -451,27 +471,25 @@ def ceo_gate_node(state: RfpApprovalState) -> dict[str, Any]:
         "role": "ceo",
         "approval_status": "pending",
     }
-    if state.get("use_interrupt"):
-        resumed = _interrupt(
-            {
-                "kind": "ceo_approval",
-                "ticket_id": state.get("ticket_id"),
-                "pending": [pending],
-                "approver": CEO_NAME,
-            }
-        )
-        resumed.setdefault("department_id", CEO_DEPARTMENT_ID)
-        resumed.setdefault("approver", CEO_NAME)
-        return _apply_ceo_decision(state, resumed)
-
-    return {
-        "pending_approvals": list(state.get("pending_approvals") or []) + [pending],
-        "paused": True,
-        "synthesizer_blocked": True,
-        "status": STATUS_WAITING_FOR_APPROVAL,
-        "block_reason": f"CEO {CEO_NAME} approval pending",
-        "trace": _event(state, "ceo_gate", required=True, status="pending", hitl=True),
-    }
+    ticket_id = str(state.get("ticket_id") or "")
+    _persist(
+        ticket_id,
+        status=STATUS_WAITING_FOR_APPROVAL,
+        synthesizer_blocked=True,
+        ceo_approval=ceo or pending,
+    )
+    resumed = _interrupt(
+        {
+            "kind": "ceo_approval",
+            "ticket_id": ticket_id,
+            "department_id": CEO_DEPARTMENT_ID,
+            "pending": [pending],
+            "approver": CEO_NAME,
+        }
+    )
+    resumed.setdefault("department_id", CEO_DEPARTMENT_ID)
+    resumed.setdefault("approver", CEO_NAME)
+    return _apply_ceo_decision(state, resumed)
 
 
 def synthesizer_node(state: RfpApprovalState) -> dict[str, Any]:
@@ -645,13 +663,13 @@ def _approval_invoke_config(
     """Always pass ``thread_id`` — durable checkpointers require it.
 
     HITL interrupt/resume uses a stable id so ``Command(resume=)`` can
-    continue the same thread. Fresh HTTP/pipeline runs use a unique
-    thread so a second start on the same ticket does not resume a
-    checkpoint instead of applying the latest DB state.
+    continue the same thread. Fresh pipeline runs use a unique thread so
+    a second start on the same ticket_id does not resume a checkpoint.
+    HTTP uses :func:`approval_thread_id`.
     """
     if thread_id:
         tid = thread_id
-    elif resume is not None or use_interrupt:
+    elif resume is not None:
         tid = ticket_id
     else:
         tid = f"{ticket_id}:{uuid4().hex}"
@@ -670,7 +688,7 @@ def invoke_rfp_approval_graph(
     approvals: dict[str, dict[str, Any]] | None = None,
     ceo_approval: dict[str, Any] | None = None,
     queued_decisions: list[dict[str, Any]] | None = None,
-    use_interrupt: bool = False,
+    use_interrupt: bool = True,
     thread_id: str | None = None,
     resume: Any | None = None,
 ) -> RfpApprovalState:

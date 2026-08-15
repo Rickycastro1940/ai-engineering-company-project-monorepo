@@ -23,6 +23,10 @@ Source: CONTEXT-company.md Milestone 9 (§2.1 owners, §2.3 FinalDocument,
   only after independent owner (and CEO, if required) approval.
 - Same HTTP process: extend `services/rfp/` (no second API).
   Pipeline: `data/pipelines/rfp_approval/`.
+- **HITL interruption point:** `collect_approvals` calls LangGraph
+  `interrupt()` *before* a department section is marked `approved`
+  (same for `ceo_gate` / Mariana Restrepo). Resume supplies the named
+  owner’s decision. `queued_decisions` only resume after that pause.
 
 ## Durable checkpointer (HITL pause/resume)
 

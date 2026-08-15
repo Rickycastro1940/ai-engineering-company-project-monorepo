@@ -15,7 +15,7 @@ Curriculum PDFs: [`rfp-requests/brasaland/`](../../rfp-requests/brasaland/).
 
 **§7 arbitration** is a dedicated graph node with fixed trigger ids (`cost-vs-feasibility`, `setup-sla-breach`, `ceo-threshold`) — not LLM consensus.
 
-**Part 3 checkpointer:** Postgres when `DATABASE_URL` is PostgreSQL; SQLite *file* for local/pytest (`RFP_ALLOW_SQLITE=1`). In-memory (`MemorySaver` / `:memory:`) only with `RFP_CHECKPOINT_MEMORY=1`.
+**Part 3 HITL:** `collect_approvals` calls LangGraph `interrupt()` before a department section is marked approved; resume is the named owner's decision.
 
 ## Layout
 

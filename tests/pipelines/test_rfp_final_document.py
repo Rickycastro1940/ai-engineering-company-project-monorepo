@@ -2,13 +2,27 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+
 from data.pipelines.rfp_approval import run_approval_pipeline
 from data.pipelines.rfp_approval.approvers import DEPARTMENT_OWNERS
+from data.pipelines.rfp_approval.checkpointer import reset_approval_checkpointer
 from data.pipelines.rfp_approval.synthesizer import synthesizer_ready
 from data.pipelines.rfp_intake.constants import (
     STATUS_DONE,
     STATUS_WAITING_FOR_APPROVAL,
 )
+
+
+@pytest.fixture(autouse=True)
+def _isolate_checkpointer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("RFP_CHECKPOINT_SQLITE", str(tmp_path / "final-doc.sqlite"))
+    monkeypatch.delenv("RFP_CHECKPOINT_MEMORY", raising=False)
+    reset_approval_checkpointer()
+    yield
+    reset_approval_checkpointer()
 
 SECTIONS = [
     {
