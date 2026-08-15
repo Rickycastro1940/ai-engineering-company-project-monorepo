@@ -402,6 +402,7 @@ def _apply_department_decision(
             "status": STATUS_WAITING_FOR_APPROVAL,
             "trace": _event(state, "collect_approvals", error=str(exc)),
         }
+    stamp = _now()
     record = {
         "department_id": dept,
         "approval_status": mapped,
