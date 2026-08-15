@@ -73,9 +73,17 @@ def merge_approvals(
     return out
 
 
+def last_value(left: Any, right: Any) -> Any:
+    return right if right is not None else left
+
+
+def merge_error(left: str | None, right: str | None) -> str | None:
+    return right or left
+
+
 class RfpApprovalState(TypedDict, total=False):
     ticket_id: str
-    status: str
+    status: Annotated[str, last_value]
     metadata: dict[str, Any]
     departments_needed: list[str]
     sections: list[dict[str, Any]]
@@ -85,14 +93,14 @@ class RfpApprovalState(TypedDict, total=False):
     arbitration: list[dict[str, Any]]
     approvals: Annotated[dict[str, dict[str, Any]], merge_approvals]
     ceo_approval: dict[str, Any]
-    pending_approvals: list[dict[str, Any]]
+    pending_approvals: Annotated[list[dict[str, Any]], last_value]
     queued_decisions: list[dict[str, Any]]
     final_document: dict[str, Any]
     use_interrupt: bool
-    paused: bool
-    synthesizer_blocked: bool
-    block_reason: str
-    error_message: str | None
+    paused: Annotated[bool, last_value]
+    synthesizer_blocked: Annotated[bool, last_value]
+    block_reason: Annotated[str, last_value]
+    error_message: Annotated[str | None, merge_error]
     trace: Annotated[list[dict[str, Any]], operator.add]
     department_id: str
 
@@ -418,8 +426,6 @@ def _apply_department_decision(
     )
     return {
         "approvals": {dept: record},
-        "error_message": None,
-        "paused": False,
         "trace": _event(
             state,
             "collect_approvals",
@@ -687,6 +693,35 @@ def synthesizer_node(state: RfpApprovalState) -> dict[str, Any]:
     }
 
 
+def join_approvals_node(state: RfpApprovalState) -> dict[str, Any]:
+    """Wait until every department branch has finished (done or still interrupted)."""
+    pending = _pending_department_signoffs(state)
+    if pending:
+        return {
+            "status": STATUS_WAITING_FOR_APPROVAL,
+            "paused": True,
+            "pending_approvals": pending,
+            "trace": _event(
+                state,
+                "join_approvals",
+                pending=[p["department_id"] for p in pending],
+            ),
+        }
+    return {
+        "paused": False,
+        "pending_approvals": [],
+        "trace": _event(state, "join_approvals", pending=0),
+    }
+
+
+def _after_join(state: RfpApprovalState) -> str:
+    if state.get("error_message"):
+        return "end"
+    if _pending_department_signoffs(state):
+        return "end"
+    return "ceo_gate"
+
+
 def _after_load(state: RfpApprovalState) -> str:
     if state.get("error_message"):
         return "end"
@@ -709,6 +744,7 @@ def build_rfp_approval_graph(*, checkpointer: Any | None = None) -> Any:
     graph.add_node("surface_conflicts", surface_conflicts_node)
     graph.add_node("arbitration", arbitration_node)
     graph.add_node("collect_approvals", collect_approvals_node)
+    graph.add_node("join_approvals", join_approvals_node)
     graph.add_node("ceo_gate", ceo_gate_node)
     graph.add_node("synthesizer", synthesizer_node)
 
@@ -720,7 +756,12 @@ def build_rfp_approval_graph(*, checkpointer: Any | None = None) -> Any:
     )
     graph.add_edge("surface_conflicts", "arbitration")
     graph.add_conditional_edges("arbitration", fanout_department_approvals)
-    graph.add_edge("collect_approvals", "ceo_gate")
+    graph.add_edge("collect_approvals", "join_approvals")
+    graph.add_conditional_edges(
+        "join_approvals",
+        _after_join,
+        {"ceo_gate": "ceo_gate", "end": END},
+    )
     graph.add_conditional_edges(
         "ceo_gate",
         _after_ceo,
