@@ -109,7 +109,7 @@ class RfpApprovalState(TypedDict, total=False):
     block_reason: Annotated[str, last_value]
     error_message: Annotated[str | None, merge_error]
     trace: Annotated[list[dict[str, Any]], operator.add]
-    department_id: str
+    department_id: Annotated[str, last_value]
     resume_decision: Annotated[dict[str, Any], last_value]
 
 
@@ -228,8 +228,9 @@ def resume_command(graph: Any, config: dict[str, Any], resume: Any) -> Any:
     """Enter ``apply_approval`` on the existing checkpoint — never START.
 
     Pending interrupts are resumed by id so only that Send branch continues.
-    ``collect_approvals`` / ``ceo_gate`` then ``Command(goto=apply_approval)``.
-    If interrupt ids cannot be matched, jump straight to ``apply_approval``.
+    A single decision also ``goto=apply_approval`` so the write lands even
+    when sibling department interrupts are still open. A multi-id resume map
+    lets each paused node ``Command(goto=apply_approval)`` itself.
     """
     if resume is None:
         return None
@@ -240,12 +241,9 @@ def resume_command(graph: Any, config: dict[str, Any], resume: Any) -> Any:
     mapping, _leftover = match_interrupt_resumes(snapshot, [decision])
     update = {
         "resume_decision": decision,
-        "department_id": str(decision.get("department_id") or ""),
     }
     if mapping:
-        # Unblock the paused node; it Command.goto's apply_approval itself.
-        # Do not also goto here — that would apply the same decision twice.
-        return Command(resume=mapping)
+        return Command(resume=mapping, goto=APPLY_APPROVAL_NODE, update=update)
     return Command(goto=APPLY_APPROVAL_NODE, update=update)
 
 
@@ -570,11 +568,6 @@ def collect_approvals_node(state: RfpApprovalState) -> Any:
     target = signoffs.get(dept)
     approver = target.approver if target else ""
     ticket_id = str(state.get("ticket_id") or "")
-    _persist(
-        ticket_id,
-        status=STATUS_WAITING_FOR_APPROVAL,
-        approvals=dict(state.get("approvals") or {}),
-    )
     resumed = _interrupt(
         {
             "kind": "department_approval",
