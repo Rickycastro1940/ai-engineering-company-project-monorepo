@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RFP Approvals — Brasaland Backoffice</title>
+    <style>
+        :root {
+            --bg: #f9fafb;
+            --surface: #ffffff;
+            --text: #111827;
+            --muted: #4b5563;
+            --border: #e5e7eb;
+            --accent: #0f766e;
+            --accent-hover: #0d9488;
+            --danger: #dc2626;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+        }
+        .nav {
+            display: flex;
+            gap: 1.25rem;
+            align-items: center;
+            padding: 0.85rem 2rem;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+        }
+        .nav a { color: var(--muted); text-decoration: none; font-size: 0.9rem; }
+        .nav a:hover, .nav a.active { color: var(--accent); font-weight: 600; }
+        .nav .brand { color: var(--text); font-weight: 700; margin-right: 0.5rem; }
+        .container { max-width: 960px; margin: 0 auto; padding: 2rem; }
+        h1 { font-size: 1.75rem; margin: 0 0 0.35rem; }
+        .lede { color: var(--muted); margin: 0 0 1.75rem; line-height: 1.5; }
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            margin-bottom: 1rem;
+        }
+        label { display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 0.4rem; }
+        input[type="text"] {
+            width: 100%;
+            padding: 0.65rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font: inherit;
+        }
+        .row { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: flex-end; }
+        .row > * { flex: 1; min-width: 180px; }
+        button {
+            appearance: none;
+            border: none;
+            border-radius: 6px;
+            padding: 0.65rem 1.1rem;
+            font: inherit;
+            font-weight: 600;
+            cursor: pointer;
+            background: var(--accent);
+            color: #fff;
+        }
+        button:hover { background: var(--accent-hover); }
+        button.secondary { background: #fff; color: var(--text); border: 1px solid var(--border); }
+        button.danger { background: var(--danger); }
+        button:disabled { opacity: 0.55; cursor: not-allowed; }
+        .meta { font-size: 0.85rem; color: var(--muted); }
+        code { font-size: 0.85em; background: #f3f4f6; padding: 0.1em 0.35em; border-radius: 4px; }
+        pre {
+            white-space: pre-wrap;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.9rem;
+            font-size: 0.82rem;
+            max-height: 280px;
+            overflow: auto;
+        }
+        .status { margin: 0.75rem 0; padding: 0.75rem 1rem; border-radius: 6px; display: none; }
+        .status.ok { display: block; background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+        .status.err { display: block; background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+        .status.info { display: block; background: #eff6ff; color: #1e3a8a; border: 1px solid #bfdbfe; }
+        .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.75rem; background: #e5e7eb; }
+        .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem; }
+    </style>
+</head>
+<body>
+    <nav class="nav" aria-label="Backoffice">
+        <span class="brand">Brasaland</span>
+        <a href="/">KPIs</a>
+        <a href="/telemetry.html">Telemetry</a>
+        <a href="/rfp-upload.html">RFP Intake</a>
+        <a class="active" href="/rfp-approvals.html">RFP Approvals</a>
+    </nav>
+
+    <div class="container">
+        <h1>RFP Approvals (Part 3)</h1>
+        <p class="lede">
+            Each active department is signed off by its named owner from
+            <code>CONTEXT-company.md</code> §2.1 (Camila Ospina, Felipe Guerrero,
+            Lucía Fernández, Jake Morrison). Mariana Restrepo (CEO) is required
+            only when estimated annual value exceeds USD $50,000. No extra org ladder.
+        </p>
+
+        <form class="panel" id="load-form">
+            <div class="row">
+                <div>
+                    <label for="ticket-id">Ticket ID</label>
+                    <input type="text" id="ticket-id" name="ticket_id" placeholder="from Part 1 / Part 2" required>
+                </div>
+                <div>
+                    <button type="submit" id="load-btn">Load ticket</button>
+                    <button type="button" class="secondary" id="start-btn">Start approval</button>
+                </div>
+            </div>
+            <p class="meta">Uses <code>GET /rfp/tickets/{id}</code>, <code>POST /rfp/tickets/{id}/start-approval</code>, and <code>POST /rfp/tickets/{id}/approvals</code>.</p>
+            <div id="status" class="status" role="status"></div>
+        </form>
+
+        <div id="ticket-panel" class="panel" hidden>
+            <h2>Ticket</h2>
+            <p id="ticket-summary" class="meta"></p>
+            <div id="sections"></div>
+            <div id="ceo-box" hidden>
+                <h3>CEO extra approval — Mariana Restrepo</h3>
+                <p class="meta">Required only above USD $50,000/year (CONTEXT §5 / §6).</p>
+                <div class="actions">
+                    <button type="button" data-ceo="approved">CEO approve</button>
+                    <button type="button" class="danger" data-ceo="rejected">CEO reject</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="final-panel" class="panel" hidden>
+            <h2>Final document</h2>
+            <pre id="final-md"></pre>
+        </div>
+    </div>
+
+    <script>
+        const statusEl = document.getElementById('status');
+        const sectionsEl = document.getElementById('sections');
+        const ticketPanel = document.getElementById('ticket-panel');
+        const ceoBox = document.getElementById('ceo-box');
+        const finalPanel = document.getElementById('final-panel');
+
+        function setStatus(kind, message) {
+            statusEl.className = 'status ' + kind;
+            statusEl.textContent = message;
+        }
+
+        function ticketId() {
+            return document.getElementById('ticket-id').value.trim();
+        }
+
+        async function fetchTicket(id) {
+            const res = await fetch(`/rfp/tickets/${id}`);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Ticket not found');
+            return data;
+        }
+
+        function renderTicket(data) {
+            ticketPanel.hidden = false;
+            const depts = (data.departments_needed || []).join(', ');
+            document.getElementById('ticket-summary').textContent =
+                `status: ${data.status} · departments: ${depts}` +
+                (data.requires_ceo_approval ? ' · CEO (Mariana Restrepo) required' : '');
+            ceoBox.hidden = !data.requires_ceo_approval;
+            sectionsEl.innerHTML = '';
+            (data.department_sections || []).forEach((section) => {
+                const wrap = document.createElement('div');
+                wrap.className = 'panel';
+                wrap.style.boxShadow = 'none';
+                const owner = section.owner || section.contact || '';
+                wrap.innerHTML = `
+                    <h3>${section.department_id} <span class="badge">${section.approval_status || 'pending'}</span></h3>
+                    <p class="meta">Owner / approver: <strong>${owner}</strong></p>
+                    <pre>${(section.draft_content || '(no draft)').replace(/[<>]/g, '')}</pre>
+                    <div class="actions">
+                        <button type="button" data-dept="${section.department_id}" data-owner="${owner}" data-decision="approved">Approve</button>
+                        <button type="button" class="secondary" data-dept="${section.department_id}" data-owner="${owner}" data-decision="request_changes">Request changes</button>
+                        <button type="button" class="danger" data-dept="${section.department_id}" data-owner="${owner}" data-decision="rejected">Reject</button>
+                    </div>
+                `;
+                sectionsEl.appendChild(wrap);
+            });
+            const doc = data.final_document || {};
+            if (doc.markdown) {
+                finalPanel.hidden = false;
+                document.getElementById('final-md').textContent = doc.markdown;
+            } else {
+                finalPanel.hidden = true;
+                document.getElementById('final-md').textContent = '';
+            }
+        }
+
+        async function postApproval({ department_id, decision, approver }) {
+            const id = ticketId();
+            const res = await fetch(`/rfp/tickets/${id}/approvals`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ department_id, decision, approver }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.detail || `Approval failed (${res.status})`);
+            return data;
+        }
+
+        document.getElementById('load-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try {
+                setStatus('info', 'Loading…');
+                const data = await fetchTicket(ticketId());
+                renderTicket(data);
+                setStatus('ok', `Loaded ${data.ticket_id} (${data.status})`);
+            } catch (err) {
+                setStatus('err', err.message || String(err));
+            }
+        });
+
+        document.getElementById('start-btn').addEventListener('click', async () => {
+            try {
+                setStatus('info', 'Starting approval graph…');
+                const res = await fetch(`/rfp/tickets/${ticketId()}/start-approval`, { method: 'POST' });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.detail || 'start-approval failed');
+                renderTicket(data);
+                const pending = (data.part3_pipeline && data.part3_pipeline.pending_approvals) || [];
+                setStatus('ok', pending.length
+                    ? `waiting_for_approval · pending: ${pending.map((p) => p.department_id).join(', ')}`
+                    : `status: ${data.status}`);
+            } catch (err) {
+                setStatus('err', err.message || String(err));
+            }
+        });
+
+        sectionsEl.addEventListener('click', async (e) => {
+            const btn = e.target.closest('button[data-dept]');
+            if (!btn) return;
+            try {
+                setStatus('info', `${btn.dataset.decision} as ${btn.dataset.owner}…`);
+                const data = await postApproval({
+                    department_id: btn.dataset.dept,
+                    decision: btn.dataset.decision,
+                    approver: btn.dataset.owner,
+                });
+                renderTicket(data);
+                setStatus('ok', `status: ${data.status}`);
+            } catch (err) {
+                setStatus('err', err.message || String(err));
+            }
+        });
+
+        ceoBox.addEventListener('click', async (e) => {
+            const btn = e.target.closest('button[data-ceo]');
+            if (!btn) return;
+            try {
+                setStatus('info', `CEO ${btn.dataset.ceo}…`);
+                const data = await postApproval({
+                    department_id: 'ceo',
+                    decision: btn.dataset.ceo,
+                    approver: 'Mariana Restrepo',
+                });
+                renderTicket(data);
+                setStatus('ok', `status: ${data.status}`);
+            } catch (err) {
+                setStatus('err', err.message || String(err));
+            }
+        });
+    </script>
+</body>
+</html>

@@ -44,6 +44,7 @@ class RfpTicket(SQLModel, table=True):
     part2_ready: bool = Field(default=False, index=True)
     part2_routed_at: Optional[str] = None
     part2_handoff_json: Optional[str] = Field(default=None, sa_column=Column(Text))
+    part3_ready: bool = Field(default=False, index=True)
     created_at: str = Field(default_factory=_now)
     updated_at: str = Field(default_factory=_now)
 
@@ -68,3 +69,16 @@ class RfpDepartmentSection(SQLModel, table=True):
     approved_at: Optional[str] = None
     created_at: str = Field(default_factory=_now)
     updated_at: str = Field(default_factory=_now)
+
+
+class RfpFinalDocument(SQLModel, table=True):
+    """CONTEXT §2.3 FinalDocument — generated only after required sign-off."""
+
+    __tablename__ = "rfp_final_documents"
+
+    ticket_id: str = Field(primary_key=True, foreign_key="rfp_tickets.ticket_id")
+    sections_json: str = Field(default="[]", sa_column=Column(Text))
+    total_estimated_value: Optional[float] = None
+    generated_at: str = Field(default_factory=_now)
+    markdown: Optional[str] = Field(default=None, sa_column=Column(Text))
+    document_json: str = Field(default="{}", sa_column=Column(Text))
