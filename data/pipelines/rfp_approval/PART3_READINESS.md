@@ -17,7 +17,14 @@ Source: CONTEXT-company.md Milestone 9 (§2.1 owners, §2.3 FinalDocument,
   detectable contradictions in structured state. Trigger ids:
   `cost-vs-feasibility`, `setup-sla-breach`, `ceo-threshold`. Agents may
   surface a conflict (`conflict_surface_agent`); they must not resolve it
-  by free-form consensus.
+  by free-form consensus. The node uses the CONTEXT §7 fixed arbiter table
+  (named human / deterministic rule) — **not** LLM freestyle among agents.
+- **Guardrails / flow control:**
+  - `MAX_DEPARTMENT_APPROVAL_ITERATIONS` (default 2, same as Part 2
+    `MAX_SECTION_ITERATIONS`) caps any remaining `request_changes` loop
+    between departments; exceeding it sets `needs_human_review`.
+  - Every graph node appends `agent`, `input`, `output`, and `timestamp`
+    to state `trace` for auditability.
 - **FinalDocument** (CONTEXT §2.3): `ticket_id`, `sections`,
   `total_estimated_value`, `generated_at`. Ticket status becomes `done`
   only after independent owner (and CEO, if required) approval.

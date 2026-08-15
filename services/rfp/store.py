@@ -352,6 +352,10 @@ def load_part3_ticket_state(ticket_id: str) -> dict[str, Any]:
         "requires_ceo_approval": ceo_needed,
         "approvals": approvals,
         "ceo_approval": meta.get("ceo_approval") or {},
+        "approval_iterations": {
+            str(k): int(v)
+            for k, v in dict(meta.get("approval_iterations") or {}).items()
+        },
         "reparse_pdf_required": False,
     }
 
@@ -421,6 +425,7 @@ def persist_part3_progress(
     final_document: dict[str, Any] | None = None,
     requires_ceo_approval: bool | None = None,
     synthesizer_blocked: bool | None = None,
+    approval_iterations: dict[str, int] | None = None,
 ) -> bool:
     """Write Part 3 approvals / FinalDocument onto the same Part 1 ticket."""
     if not (ticket_id or "").strip():
@@ -454,6 +459,10 @@ def persist_part3_progress(
             meta["part3_arbitration"] = arbitration
         if synthesizer_blocked is not None:
             meta["synthesizer_blocked"] = synthesizer_blocked
+        if approval_iterations is not None:
+            meta["approval_iterations"] = {
+                str(k): int(v) for k, v in approval_iterations.items()
+            }
         if requires_ceo_approval is not None:
             ticket.requires_ceo_approval = bool(requires_ceo_approval)
         if conflicts is not None:

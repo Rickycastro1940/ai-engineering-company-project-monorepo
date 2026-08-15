@@ -22,6 +22,9 @@ from data.pipelines.rfp_approval.approvers import (
     validate_human_resume,
 )
 from data.pipelines.rfp_approval.arbitration import apply_fixed_arbitration
+from data.pipelines.rfp_approval.guardrails import (
+    MAX_DEPARTMENT_APPROVAL_ITERATIONS,
+)
 from data.pipelines.rfp_approval.checkpointer import (
     checkpoint_backend,
     get_approval_checkpointer,
@@ -53,6 +56,7 @@ __all__ = [
     "APPLY_APPROVAL_NODE",
     "CEO_NAME",
     "InvalidResumeDecisionError",
+    "MAX_DEPARTMENT_APPROVAL_ITERATIONS",
     "Part2HandoffNotReady",
     "REQUIRED_APPROVAL_NODES",
     "RESUME_NOT_PAUSED",
@@ -155,6 +159,7 @@ def run_approval_pipeline(
     requires_ceo_approval: bool = False,
     approvals: dict[str, dict[str, Any]] | None = None,
     ceo_approval: dict[str, Any] | None = None,
+    approval_iterations: dict[str, int] | None = None,
     queued_decisions: list[dict[str, Any]] | None = None,
     use_interrupt: bool = True,
     thread_id: str | None = None,
@@ -181,6 +186,7 @@ def run_approval_pipeline(
         requires_ceo_approval=requires_ceo_approval,
         approvals=approvals,
         ceo_approval=ceo_approval,
+        approval_iterations=approval_iterations,
         queued_decisions=None,
         use_interrupt=use_interrupt,
         thread_id=tid,
@@ -227,6 +233,7 @@ def run_approval_for_ticket(
         requires_ceo_approval=payload["requires_ceo_approval"],
         approvals=payload.get("approvals"),
         ceo_approval=payload.get("ceo_approval"),
+        approval_iterations=payload.get("approval_iterations"),
         thread_id=tid,
         use_interrupt=True,
     )

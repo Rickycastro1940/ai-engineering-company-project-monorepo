@@ -12,6 +12,11 @@ Each department branch calls ``interrupt()`` only if that section is still
 sibling branches. A human decision resumes the matching interrupt and
 enters ``apply_approval`` on the existing checkpoint — it does not
 re-invoke from START / ``load_handoff``.
+
+Guardrails (§ flow control):
+  - ``MAX_DEPARTMENT_APPROVAL_ITERATIONS`` caps request_changes loops
+  - ``arbitration`` is a dedicated node with CONTEXT §7 fixed arbiters (not LLM)
+  - every node appends agent / input / output / timestamp to ``trace``
 """
 
 from __future__ import annotations
@@ -25,6 +30,7 @@ from langgraph.types import Command, Send
 
 from data.pipelines.rfp_intake.constants import (
     STATUS_DONE,
+    STATUS_NEEDS_HUMAN_REVIEW,
     STATUS_WAITING_FOR_APPROVAL,
 )
 from data.pipelines.rfp_approval.approvers import (
@@ -43,6 +49,12 @@ from data.pipelines.rfp_approval.arbitration import (
     apply_fixed_arbitration,
     request_changes_departments,
     synthesizer_blocked_by_arbitration,
+)
+from data.pipelines.rfp_approval.guardrails import (
+    MAX_DEPARTMENT_APPROVAL_ITERATIONS,
+    bump_department_iterations,
+    iteration_limit_error,
+    merge_iteration_counts,
 )
 from data.pipelines.rfp_approval.conflicts import conflict_surface_agent
 from data.pipelines.rfp_approval.handoff import (
@@ -65,6 +77,18 @@ REQUIRED_APPROVAL_NODES: tuple[str, ...] = (
     "ceo_gate",
     "synthesizer",
 )
+
+# Named agent (or deterministic role) recorded on every trace event.
+NODE_AGENTS: dict[str, str] = {
+    "load_handoff": "part2_handoff_loader",
+    "surface_conflicts": "conflict_surface_agent",
+    "arbitration": "fixed_arbitration",  # CONTEXT §7 table — never an LLM
+    "collect_approvals": "department_hitl",
+    APPLY_APPROVAL_NODE: "apply_approval",
+    "join_approvals": "join_approvals",
+    "ceo_gate": "ceo_hitl",
+    "synthesizer": "final_document_synthesizer",
+}
 
 RESUME_NOT_PAUSED = "approval_not_paused"
 RESUME_NOT_PAUSED_MESSAGE = (
@@ -113,16 +137,38 @@ class RfpApprovalState(TypedDict, total=False):
     trace: Annotated[list[dict[str, Any]], operator.add]
     department_id: Annotated[str, last_value]
     resume_decision: Annotated[dict[str, Any], last_value]
-
-
-def _event(state: RfpApprovalState, node: str, **payload: Any) -> list[dict[str, Any]]:
-    return [{"node": node, "payload": payload}]
+    approval_iterations: Annotated[dict[str, int], merge_iteration_counts]
+    max_approval_iterations: int
 
 
 def _now() -> str:
     from datetime import UTC, datetime
 
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _event(
+    state: RfpApprovalState,
+    node: str,
+    *,
+    agent: str | None = None,
+    input: Any = None,
+    output: Any = None,
+    **payload: Any,
+) -> list[dict[str, Any]]:
+    """Append one trace row: agent, input, output, timestamp (plus payload)."""
+    resolved_agent = agent or NODE_AGENTS.get(node, node)
+    resolved_output = output if output is not None else (payload or {})
+    return [
+        {
+            "node": node,
+            "agent": resolved_agent,
+            "input": input,
+            "output": resolved_output,
+            "timestamp": _now(),
+            "payload": payload,
+        }
+    ]
 
 
 def _interrupt(payload: dict[str, Any]) -> dict[str, Any]:
@@ -357,6 +403,11 @@ def _pending_department_signoffs(state: RfpApprovalState) -> list[dict[str, Any]
 
 def load_handoff_node(state: RfpApprovalState) -> dict[str, Any]:
     ticket_id = str(state.get("ticket_id") or "").strip()
+    load_input = {
+        "ticket_id": ticket_id,
+        "status": state.get("status"),
+        "section_count": len(state.get("sections") or []),
+    }
     try:
         contract = assert_part2_ready_for_approval(
             ticket_id=ticket_id,
@@ -368,7 +419,13 @@ def load_handoff_node(state: RfpApprovalState) -> dict[str, Any]:
         return {
             "status": "failed",
             "error_message": str(exc),
-            "trace": _event(state, "load_handoff", error=str(exc)),
+            "trace": _event(
+                state,
+                "load_handoff",
+                input=load_input,
+                output={"error": str(exc)},
+                error=str(exc),
+            ),
         }
 
     sections = list(contract["sections"])
@@ -395,12 +452,24 @@ def load_handoff_node(state: RfpApprovalState) -> dict[str, Any]:
                 "approved_at": None,
             },
         )
+    iterations = dict(state.get("approval_iterations") or {})
+    max_iters = int(
+        state.get("max_approval_iterations") or MAX_DEPARTMENT_APPROVAL_ITERATIONS
+    )
     _persist(
         ticket_id,
         status=STATUS_WAITING_FOR_APPROVAL,
         approvals=approvals,
         requires_ceo_approval=ceo_needed,
+        approval_iterations=iterations,
     )
+    out = {
+        "ticket_id": ticket_id,
+        "departments": needed,
+        "requires_ceo_approval": ceo_needed,
+        "reparse_pdf_required": False,
+        "max_approval_iterations": max_iters,
+    }
     return {
         "ticket_id": ticket_id,
         "status": STATUS_WAITING_FOR_APPROVAL,
@@ -408,11 +477,15 @@ def load_handoff_node(state: RfpApprovalState) -> dict[str, Any]:
         "departments_needed": needed,
         "requires_ceo_approval": ceo_needed,
         "approvals": approvals,
+        "approval_iterations": iterations,
+        "max_approval_iterations": max_iters,
         "paused": False,
         "error_message": None,
         "trace": _event(
             state,
             "load_handoff",
+            input=load_input,
+            output=out,
             ticket_id=ticket_id,
             departments=needed,
             requires_ceo_approval=ceo_needed,
@@ -424,19 +497,29 @@ def load_handoff_node(state: RfpApprovalState) -> dict[str, Any]:
 def surface_conflicts_node(state: RfpApprovalState) -> dict[str, Any]:
     if state.get("error_message"):
         return {}
+    sections = list(state.get("sections") or [])
+    metadata = dict(state.get("metadata") or {})
+    surface_input = {
+        "departments": [s.get("department_id") for s in sections],
+        "requires_ceo_approval": bool(state.get("requires_ceo_approval")),
+    }
     conflicts = conflict_surface_agent(
-        sections=list(state.get("sections") or []),
-        metadata=dict(state.get("metadata") or {}),
+        sections=sections,
+        metadata=metadata,
         requires_ceo_flag=bool(state.get("requires_ceo_approval")),
         ceo_approval=state.get("ceo_approval"),
     )
+    trigger_ids = [c.get("trigger_id") for c in conflicts]
     return {
         "conflicts": conflicts,
         "trace": _event(
             state,
             "surface_conflicts",
-            trigger_ids=[c.get("trigger_id") for c in conflicts],
             agent="conflict_surface_agent",
+            input=surface_input,
+            output={"trigger_ids": trigger_ids, "conflict_count": len(conflicts)},
+            trigger_ids=trigger_ids,
+            agent_name="conflict_surface_agent",
             resolved=False,
         ),
     }
@@ -446,9 +529,27 @@ def arbitration_node(state: RfpApprovalState) -> dict[str, Any]:
     """Dedicated graph node: CONTEXT §7 table, not LLM consensus."""
     if state.get("error_message"):
         return {}
-    resolutions = apply_fixed_arbitration(list(state.get("conflicts") or []))
+    conflicts = list(state.get("conflicts") or [])
+    arb_input = {
+        "trigger_ids": [c.get("trigger_id") for c in conflicts],
+        "mode": "fixed_arbiter_table",
+    }
+    resolutions = apply_fixed_arbitration(conflicts)
+    # Hard guard: arbitration never marks itself as LLM-resolved.
+    for row in resolutions:
+        row["llm_resolved"] = False
     approvals = dict(state.get("approvals") or {})
-    for dept in request_changes_departments(resolutions):
+    forced = request_changes_departments(resolutions)
+    iterations = dict(state.get("approval_iterations") or {})
+    limit = int(
+        state.get("max_approval_iterations") or MAX_DEPARTMENT_APPROVAL_ITERATIONS
+    )
+    exceeded: list[str] = []
+    if forced:
+        iterations, exceeded = bump_department_iterations(
+            iterations, forced, limit=limit
+        )
+    for dept in forced:
         current = dict(approvals.get(dept) or {"department_id": dept})
         if current.get("approval_status") != "approved":
             current["approval_status"] = RESOLUTION_ACTION_REQUEST_CHANGES
@@ -458,20 +559,69 @@ def arbitration_node(state: RfpApprovalState) -> dict[str, Any]:
     blocked = synthesizer_blocked_by_arbitration(
         resolutions, ceo_approval_status=ceo_status
     )
+    if exceeded:
+        message = iteration_limit_error(exceeded)
+        _persist(
+            str(state.get("ticket_id") or ""),
+            status=STATUS_NEEDS_HUMAN_REVIEW,
+            approvals=approvals,
+            arbitration=resolutions,
+            conflicts=conflicts,
+            approval_iterations=iterations,
+            synthesizer_blocked=True,
+        )
+        return {
+            "arbitration": resolutions,
+            "approvals": approvals,
+            "approval_iterations": iterations,
+            "synthesizer_blocked": True,
+            "status": STATUS_NEEDS_HUMAN_REVIEW,
+            "error_message": message,
+            "block_reason": message,
+            "paused": False,
+            "trace": _event(
+                state,
+                "arbitration",
+                agent="fixed_arbitration",
+                input=arb_input,
+                output={
+                    "trigger_ids": [r.get("trigger_id") for r in resolutions],
+                    "arbiters": [r.get("arbiter") for r in resolutions],
+                    "llm_resolved": False,
+                    "exceeded_departments": exceeded,
+                    "approval_iterations": iterations,
+                },
+                trigger_ids=[r.get("trigger_id") for r in resolutions],
+                arbiters=[r.get("arbiter") for r in resolutions],
+                llm_resolved=False,
+                exceeded=exceeded,
+            ),
+        }
     _persist(
         str(state.get("ticket_id") or ""),
         status=STATUS_WAITING_FOR_APPROVAL,
         approvals=approvals,
         arbitration=resolutions,
-        conflicts=list(state.get("conflicts") or []),
+        conflicts=conflicts,
+        approval_iterations=iterations,
     )
     return {
         "arbitration": resolutions,
         "approvals": approvals,
+        "approval_iterations": iterations,
         "synthesizer_blocked": blocked,
         "trace": _event(
             state,
             "arbitration",
+            agent="fixed_arbitration",
+            input=arb_input,
+            output={
+                "trigger_ids": [r.get("trigger_id") for r in resolutions],
+                "arbiters": [r.get("arbiter") for r in resolutions],
+                "llm_resolved": False,
+                "request_changes_departments": forced,
+                "approval_iterations": iterations,
+            },
             trigger_ids=[r.get("trigger_id") for r in resolutions],
             arbiters=[r.get("arbiter") for r in resolutions],
             llm_resolved=False,
@@ -497,10 +647,63 @@ def _apply_department_decision(
             "trace": _event(
                 state,
                 "apply_approval",
+                input={"department_id": dept, "decision": decision.get("decision")},
+                output={"error": str(exc)},
                 error=str(exc),
             ),
         }
     stamp = _now()
+    iterations = dict(state.get("approval_iterations") or {})
+    limit = int(
+        state.get("max_approval_iterations") or MAX_DEPARTMENT_APPROVAL_ITERATIONS
+    )
+    if mapped == RESOLUTION_ACTION_REQUEST_CHANGES:
+        iterations, exceeded = bump_department_iterations(
+            iterations, [dept], limit=limit
+        )
+        if exceeded:
+            message = iteration_limit_error(exceeded)
+            record = {
+                "department_id": dept,
+                "approval_status": mapped,
+                "approver": approver,
+                "approved_at": None,
+                "decided_at": stamp,
+                "comment": decision.get("comment"),
+            }
+            _persist(
+                str(state.get("ticket_id") or ""),
+                status=STATUS_NEEDS_HUMAN_REVIEW,
+                approvals={dept: record},
+                approval_iterations=iterations,
+                synthesizer_blocked=True,
+            )
+            return {
+                "approvals": {dept: record},
+                "approval_iterations": iterations,
+                "status": STATUS_NEEDS_HUMAN_REVIEW,
+                "error_message": message,
+                "block_reason": message,
+                "paused": False,
+                "trace": _event(
+                    state,
+                    "apply_approval",
+                    input={
+                        "department_id": dept,
+                        "decision": mapped,
+                        "approver": approver,
+                    },
+                    output={
+                        "exceeded": True,
+                        "approval_iterations": iterations,
+                        "error": message,
+                    },
+                    department_id=dept,
+                    decision=mapped,
+                    approver=approver,
+                    exceeded=True,
+                ),
+            }
     record = {
         "department_id": dept,
         "approval_status": mapped,
@@ -513,12 +716,16 @@ def _apply_department_decision(
         str(state.get("ticket_id") or ""),
         status=STATUS_WAITING_FOR_APPROVAL,
         approvals={dept: record},
+        approval_iterations=iterations,
     )
     return {
         "approvals": {dept: record},
+        "approval_iterations": iterations,
         "trace": _event(
             state,
             "apply_approval",
+            input={"department_id": dept, "decision": mapped, "approver": approver},
+            output={"approval_status": mapped, "approver": approver},
             department_id=dept,
             decision=mapped,
             approver=approver,
@@ -646,7 +853,7 @@ def fanout_department_approvals(state: RfpApprovalState) -> list[Send] | str:
     so their completed work is not paused by another department's interrupt.
     """
     if state.get("error_message"):
-        return "end"
+        return END
     pending = _pending_department_signoffs(state)
     if not pending:
         return "ceo_gate"
@@ -965,22 +1172,37 @@ def invoke_rfp_approval_graph(
     requires_ceo_approval: bool = False,
     approvals: dict[str, dict[str, Any]] | None = None,
     ceo_approval: dict[str, Any] | None = None,
+    approval_iterations: dict[str, int] | None = None,
+    max_approval_iterations: int | None = None,
     queued_decisions: list[dict[str, Any]] | None = None,
     use_interrupt: bool = True,
     thread_id: str | None = None,
     resume: Any | None = None,
 ) -> RfpApprovalState:
     graph = get_compiled_rfp_approval_graph(use_interrupt=use_interrupt)
+    meta = dict(metadata or {})
+    seeded_iters = dict(approval_iterations or {})
+    if not seeded_iters and isinstance(meta.get("approval_iterations"), dict):
+        seeded_iters = {
+            str(k): int(v) for k, v in meta.get("approval_iterations", {}).items()
+        }
+    max_iters = int(
+        max_approval_iterations
+        if max_approval_iterations is not None
+        else MAX_DEPARTMENT_APPROVAL_ITERATIONS
+    )
     initial: RfpApprovalState = {
         "ticket_id": ticket_id,
         "status": status,
         "sections": list(sections or []),
-        "metadata": dict(metadata or {}),
+        "metadata": meta,
         "departments_needed": list(departments_needed or []),
         "part3_handoff": dict(part3_handoff or {}),
         "requires_ceo_approval": requires_ceo_approval,
         "approvals": dict(approvals or {}),
         "ceo_approval": dict(ceo_approval or {}),
+        "approval_iterations": seeded_iters,
+        "max_approval_iterations": max_iters,
         "queued_decisions": list(queued_decisions or []),
         "use_interrupt": use_interrupt,
         "trace": [],
