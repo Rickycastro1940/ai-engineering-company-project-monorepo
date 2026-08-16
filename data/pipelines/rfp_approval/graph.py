@@ -80,6 +80,7 @@ REQUIRED_APPROVAL_NODES: tuple[str, ...] = (
     "arbitration",
     "collect_approvals",
     APPLY_APPROVAL_NODE,
+    "join_approvals",
     "ceo_gate",
     "synthesizer",
 )
@@ -162,14 +163,19 @@ def _event(
     output: Any = None,
     **payload: Any,
 ) -> list[dict[str, Any]]:
-    """Append one trace row: agent, input, output, timestamp (plus payload)."""
+    """Append one trace row: agent, input, output, timestamp (plus payload).
+
+    Every node execution must record all four fields. ``input`` / ``output``
+    default to empty dicts (or payload-as-output) so callers cannot omit them.
+    """
     resolved_agent = agent or NODE_AGENTS.get(node, node)
+    resolved_input = {} if input is None else input
     resolved_output = output if output is not None else (payload or {})
     return [
         {
             "node": node,
             "agent": resolved_agent,
-            "input": input,
+            "input": resolved_input,
             "output": resolved_output,
             "timestamp": _now(),
             "payload": payload,
@@ -267,6 +273,7 @@ def _goto_apply_approval(
     ticket_id: str,
     decision: dict[str, Any],
     extra: dict[str, Any] | None = None,
+    update: dict[str, Any] | None = None,
 ) -> Command:
     """Route a resumed interrupt into ``apply_approval`` (not START)."""
     payload: dict[str, Any] = {
@@ -275,7 +282,8 @@ def _goto_apply_approval(
         "resume_decision": decision,
         **(extra or {}),
     }
-    return Command(goto=Send(APPLY_APPROVAL_NODE, payload))
+    # ``update`` merges into parent state (e.g. collect_approvals / ceo_gate trace).
+    return Command(goto=Send(APPLY_APPROVAL_NODE, payload), update=dict(update or {}))
 
 
 def _pending_resume_departments(snapshot: Any) -> set[str]:
@@ -751,7 +759,16 @@ def _apply_ceo_decision(
             "error_message": str(exc),
             "paused": True,
             "status": STATUS_WAITING_FOR_APPROVAL,
-            "trace": _event(state, "apply_approval", error=str(exc)),
+            "trace": _event(
+                state,
+                "apply_approval",
+                input={
+                    "department_id": CEO_DEPARTMENT_ID,
+                    "decision": decision.get("decision"),
+                },
+                output={"error": str(exc)},
+                error=str(exc),
+            ),
         }
     stamp = _now()
     ceo = {
@@ -778,6 +795,12 @@ def _apply_ceo_decision(
         "trace": _event(
             state,
             "apply_approval",
+            input={
+                "department_id": CEO_DEPARTMENT_ID,
+                "decision": mapped,
+                "approver": approver,
+            },
+            output={"approval_status": mapped, "approver": approver},
             decision=mapped,
             approver=approver,
         ),
@@ -801,7 +824,13 @@ def collect_approvals_node(state: RfpApprovalState) -> Any:
                 update={
                     "pending_approvals": [],
                     "paused": False,
-                    "trace": _event(state, "collect_approvals", pending=0),
+                    "trace": _event(
+                        state,
+                        "collect_approvals",
+                        input={"pending_departments": []},
+                        output={"pending": 0, "goto": "join_approvals"},
+                        pending=0,
+                    ),
                 },
             )
         dept = str(pending[0]["department_id"])
@@ -815,6 +844,8 @@ def collect_approvals_node(state: RfpApprovalState) -> Any:
                 "trace": _event(
                     state,
                     "collect_approvals",
+                    input={"department_id": dept, "approval_status": status},
+                    output={"skipped": True, "status": status, "goto": "join_approvals"},
                     department_id=dept,
                     skipped=True,
                     status=status,
@@ -848,7 +879,28 @@ def collect_approvals_node(state: RfpApprovalState) -> Any:
     resumed.setdefault("department_id", dept)
     if not resumed.get("approver"):
         resumed["approver"] = approver
-    return _goto_apply_approval(ticket_id=ticket_id, decision=resumed)
+    return _goto_apply_approval(
+        ticket_id=ticket_id,
+        decision=resumed,
+        update={
+            "trace": _event(
+                state,
+                "collect_approvals",
+                input={
+                    "department_id": dept,
+                    "approver": approver,
+                    "approval_status": "pending",
+                },
+                output={
+                    "resumed": True,
+                    "decision": resumed.get("decision"),
+                    "goto": APPLY_APPROVAL_NODE,
+                },
+                department_id=dept,
+                resumed=True,
+            ),
+        },
+    )
 
 
 def fanout_department_approvals(state: RfpApprovalState) -> list[Send] | str:
@@ -887,7 +939,13 @@ def ceo_gate_node(state: RfpApprovalState) -> Any:
             goto="synthesizer",
             update={
                 "synthesizer_blocked": False,
-                "trace": _event(state, "ceo_gate", required=False),
+                "trace": _event(
+                    state,
+                    "ceo_gate",
+                    input={"requires_ceo_approval": False},
+                    output={"required": False, "goto": "synthesizer"},
+                    required=False,
+                ),
             },
         )
 
@@ -899,7 +957,18 @@ def ceo_gate_node(state: RfpApprovalState) -> Any:
             update={
                 "synthesizer_blocked": False,
                 "paused": False,
-                "trace": _event(state, "ceo_gate", required=True, status="approved"),
+                "trace": _event(
+                    state,
+                    "ceo_gate",
+                    input={"requires_ceo_approval": True, "ceo_status": status},
+                    output={
+                        "required": True,
+                        "status": "approved",
+                        "goto": "synthesizer",
+                    },
+                    required=True,
+                    status="approved",
+                ),
             },
         )
     if status == "rejected":
@@ -910,7 +979,14 @@ def ceo_gate_node(state: RfpApprovalState) -> Any:
                 "paused": False,
                 "status": STATUS_WAITING_FOR_APPROVAL,
                 "block_reason": f"CEO {CEO_NAME} rejected",
-                "trace": _event(state, "ceo_gate", required=True, status="rejected"),
+                "trace": _event(
+                    state,
+                    "ceo_gate",
+                    input={"requires_ceo_approval": True, "ceo_status": status},
+                    output={"required": True, "status": "rejected", "goto": "end"},
+                    required=True,
+                    status="rejected",
+                ),
             },
         )
     if status != "pending":
@@ -921,7 +997,14 @@ def ceo_gate_node(state: RfpApprovalState) -> Any:
                 "paused": False,
                 "status": STATUS_WAITING_FOR_APPROVAL,
                 "block_reason": f"CEO {CEO_NAME} {status}",
-                "trace": _event(state, "ceo_gate", required=True, status=status),
+                "trace": _event(
+                    state,
+                    "ceo_gate",
+                    input={"requires_ceo_approval": True, "ceo_status": status},
+                    output={"required": True, "status": status, "goto": "synthesizer"},
+                    required=True,
+                    status=status,
+                ),
             },
         )
 
@@ -953,6 +1036,24 @@ def ceo_gate_node(state: RfpApprovalState) -> Any:
         ticket_id=ticket_id,
         decision=resumed,
         extra={"requires_ceo_approval": True},
+        update={
+            "trace": _event(
+                state,
+                "ceo_gate",
+                input={
+                    "requires_ceo_approval": True,
+                    "approver": CEO_NAME,
+                    "approval_status": "pending",
+                },
+                output={
+                    "resumed": True,
+                    "decision": resumed.get("decision"),
+                    "goto": APPLY_APPROVAL_NODE,
+                },
+                required=True,
+                resumed=True,
+            ),
+        },
     )
 
 
@@ -1045,7 +1146,13 @@ def apply_approval_node(state: RfpApprovalState) -> dict[str, Any]:
     if not decision:
         return {
             "resume_decision": {},
-            "trace": _event(state, APPLY_APPROVAL_NODE, skipped=True),
+            "trace": _event(
+                state,
+                APPLY_APPROVAL_NODE,
+                input={"resume_decision": {}},
+                output={"skipped": True},
+                skipped=True,
+            ),
         }
     dept = str(decision.get("department_id") or state.get("department_id") or "").strip()
     if dept:
@@ -1062,6 +1169,7 @@ def join_approvals_node(state: RfpApprovalState) -> dict[str, Any]:
     """Wait until every department branch has finished (done or still interrupted)."""
     pending = _pending_department_signoffs(state)
     if pending:
+        pending_ids = [p["department_id"] for p in pending]
         return {
             "status": STATUS_WAITING_FOR_APPROVAL,
             "paused": True,
@@ -1069,13 +1177,21 @@ def join_approvals_node(state: RfpApprovalState) -> dict[str, Any]:
             "trace": _event(
                 state,
                 "join_approvals",
-                pending=[p["department_id"] for p in pending],
+                input={"pending_count": len(pending)},
+                output={"pending": pending_ids},
+                pending=pending_ids,
             ),
         }
     return {
         "paused": False,
         "pending_approvals": [],
-        "trace": _event(state, "join_approvals", pending=0),
+        "trace": _event(
+            state,
+            "join_approvals",
+            input={"pending_count": 0},
+            output={"pending": 0, "complete": True},
+            pending=0,
+        ),
     }
 
 

@@ -34,6 +34,7 @@ def test_required_nodes_include_arbitration_hitl_and_synthesizer() -> None:
         "arbitration",
         "collect_approvals",
         APPLY_APPROVAL_NODE,
+        "join_approvals",
         "ceo_gate",
         "synthesizer",
     )
