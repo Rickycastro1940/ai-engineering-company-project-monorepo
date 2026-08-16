@@ -270,6 +270,10 @@ def test_approve_department_b_while_a_remains_interrupted_proves_parallel_send()
     snapshot = graph.get_state(config)
     assert graph_is_paused(snapshot)
     assert _paused_dept_ids(snapshot) == set(ANDES_DEPARTMENTS)
+    # First pause: no department has been applied yet.
+    assert "apply_approval" not in [
+        e.get("node") for e in (paused.get("trace") or [])
+    ]
 
     # Resume department B (operaciones) first — out of marketing-first Send order.
     after_b = invoke_rfp_approval_graph(
@@ -295,6 +299,20 @@ def test_approve_department_b_while_a_remains_interrupted_proves_parallel_send()
     assert "procurement" in remaining
     assert after_b.get("status") != STATUS_DONE
 
+    # Trace: apply_approval advanced only B — A's branch pause did not block B,
+    # and B's resume did not force-apply A.
+    apply_events = [
+        e for e in (after_b.get("trace") or []) if e.get("node") == "apply_approval"
+    ]
+    applied_depts = {
+        str((e.get("input") or {}).get("department_id") or e.get("department_id") or "")
+        for e in apply_events
+    }
+    applied_depts.discard("")
+    assert "operaciones" in applied_depts
+    assert "marketing" not in applied_depts
+    assert "procurement" not in applied_depts
+
     # Checkpoint still paused for siblings (A / procurement) — not a serial drain.
     snapshot_after = graph.get_state(config)
     assert graph_is_paused(snapshot_after)
@@ -305,8 +323,6 @@ def test_approve_department_b_while_a_remains_interrupted_proves_parallel_send()
     assert (values.get("approvals") or {}).get("marketing", {}).get(
         "approval_status"
     ) != "approved"
-    # Prefer invoke-result interrupt set; checkpoint may still list completed tasks
-    # until garbage-collected, so also require pending_approvals / sibling status.
     pending = {
         str(p.get("department_id"))
         for p in (after_b.get("pending_approvals") or [])
@@ -318,6 +334,34 @@ def test_approve_department_b_while_a_remains_interrupted_proves_parallel_send()
     else:
         assert remaining == {"marketing", "procurement"}
 
+    # Persist proof artifact for reviewers.
+    artifact = Path("/opt/cursor/artifacts/rfp_parallel_branch_b_while_a.json")
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_text(
+        json.dumps(
+            {
+                "claim": (
+                    "Pause is per-department Send branch: approve B while A remains interrupted"
+                ),
+                "department_a": "marketing",
+                "department_b": "operaciones",
+                "after_approve_b": {
+                    "status": after_b.get("status"),
+                    "approvals": {
+                        d: (after_b.get("approvals") or {}).get(d, {}).get(
+                            "approval_status"
+                        )
+                        for d in ANDES_DEPARTMENTS
+                    },
+                    "still_interrupted": sorted(remaining),
+                    "apply_approval_departments_in_trace": sorted(applied_depts),
+                    "graph_still_paused": graph_is_paused(snapshot_after),
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
 
 # ---------------------------------------------------------------------------
 # 5. Integration / E2E — fixtures + simulated resumes; Parts 1–3 seeded
