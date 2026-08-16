@@ -100,8 +100,14 @@ RFP_ALLOW_SQLITE=1 \
   uv run python scripts/rfp_part3_e2e_simulated_approvals.py --scenario sunset --mode queued
 
 RFP_ALLOW_SQLITE=1 \
-  uv run pytest tests/pipelines/test_rfp_part3_simulated_approvals_e2e.py -q
+  uv run pytest tests/pipelines/test_rfp_part3_simulated_approvals_e2e.py \
+    tests/pipelines/test_rfp_part3_interrupt_arbitration_e2e.py -q
 ```
 
 Approvals are CONTEXT named owners via `queued_decisions` / `resume=`
 (LangGraph `Command(resume=)` equivalent), not browser clicks.
+
+HITL coverage also includes: successful interrupt/resume, iteration-limit →
+`needs_human_review`, §7 arbitration on disagreement, and approve department B
+while A remains interrupted (parallel Send branches) — see
+`tests/pipelines/test_rfp_part3_interrupt_arbitration_e2e.py`.

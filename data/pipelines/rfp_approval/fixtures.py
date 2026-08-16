@@ -199,3 +199,106 @@ def sunset_pipeline_kwargs(
         "requires_ceo_approval": True,
         "queued_decisions": decisions,
     }
+
+
+# --- Disagreement seeds (CONTEXT §7) for arbitration / iteration-limit tests ---
+
+COST_DISAGREEMENT_SECTIONS: list[dict[str, Any]] = [
+    {
+        "department_id": "marketing",
+        "owner": DEPARTMENT_OWNERS["marketing"],
+        "draft_content": (
+            "## Brand terms\n"
+            "Offer validity period: 30 days from issuance.\n"
+            "Brasaland pillars: consistent quality, warm experience, speed of service.\n"
+        ),
+        "approval_status": "pending",
+    },
+    {
+        "department_id": "operaciones",
+        "owner": DEPARTMENT_OWNERS["operaciones"],
+        "draft_content": (
+            "## Setup times\n"
+            "Setup in 12 business days.\n"
+            "## Cost per event\n"
+            "USD $20 per cover.\n"
+        ),
+        "approval_status": "pending",
+    },
+    {
+        "department_id": "procurement",
+        "owner": DEPARTMENT_OWNERS["procurement"],
+        "draft_content": (
+            "## Estimated ingredient cost based on volume\n"
+            "USD $80 ingredient cost per cover.\n"
+        ),
+        "approval_status": "pending",
+    },
+]
+
+SETUP_SLA_BREACH_SECTIONS: list[dict[str, Any]] = [
+    {
+        "department_id": "marketing",
+        "owner": DEPARTMENT_OWNERS["marketing"],
+        "draft_content": (
+            "## Brand terms\n"
+            "Offer validity period: 30 days from issuance.\n"
+            "Setup in 3 business days so we can start immediately.\n"
+        ),
+        "approval_status": "pending",
+    },
+    {
+        "department_id": "operaciones",
+        "owner": DEPARTMENT_OWNERS["operaciones"],
+        "draft_content": (
+            "## Setup times\n"
+            "Setup in 12 business days.\n"
+            "## Cost per event\n"
+            "USD $40 per cover / COP $160000 per cover.\n"
+        ),
+        "approval_status": "pending",
+    },
+    {
+        "department_id": "procurement",
+        "owner": DEPARTMENT_OWNERS["procurement"],
+        "draft_content": (
+            "## Estimated ingredient cost based on volume\n"
+            "USD $25 ingredient cost per cover / COP $100000.\n"
+        ),
+        "approval_status": "pending",
+    },
+]
+
+
+def cost_disagreement_pipeline_kwargs(
+    *,
+    ticket_id: str = "rfp-part3-cost-disagreement",
+    approval_iterations: dict[str, int] | None = None,
+) -> dict[str, Any]:
+    """Andes-shaped ticket whose drafts trip ``cost-vs-feasibility`` (Camila)."""
+    return {
+        "ticket_id": ticket_id,
+        "status": STATUS_WAITING_FOR_APPROVAL,
+        "sections": deepcopy(COST_DISAGREEMENT_SECTIONS),
+        "metadata": andes_metadata(),
+        "departments_needed": list(ANDES_DEPARTMENTS),
+        "requires_ceo_approval": False,
+        "queued_decisions": [],
+        "approval_iterations": dict(approval_iterations or {}),
+    }
+
+
+def setup_sla_breach_pipeline_kwargs(
+    *,
+    ticket_id: str = "rfp-part3-setup-sla-breach",
+) -> dict[str, Any]:
+    """Drafts trip ``setup-sla-breach`` (Felipe Guerrero fixed arbiter)."""
+    return {
+        "ticket_id": ticket_id,
+        "status": STATUS_WAITING_FOR_APPROVAL,
+        "sections": deepcopy(SETUP_SLA_BREACH_SECTIONS),
+        "metadata": andes_metadata(),
+        "departments_needed": list(ANDES_DEPARTMENTS),
+        "requires_ceo_approval": False,
+        "queued_decisions": [],
+    }

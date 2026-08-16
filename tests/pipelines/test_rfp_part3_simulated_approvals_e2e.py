@@ -146,3 +146,40 @@ def test_script_rfp_part3_e2e_simulated_approvals_is_reproducible(
 
     ARTIFACT.parent.mkdir(parents=True, exist_ok=True)
     ARTIFACT.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def test_script_sunset_queued_simulated_approvals_includes_ceo(
+    tmp_path: Path,
+) -> None:
+    out = tmp_path / "sunset-queued.json"
+    env = {
+        **dict(**{k: v for k, v in __import__("os").environ.items()}),
+        "RFP_ALLOW_SQLITE": "1",
+        "RFP_CHECKPOINT_SQLITE": str(tmp_path / "sunset-ckpt.sqlite"),
+    }
+    env.pop("RFP_CHECKPOINT_MEMORY", None)
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--scenario",
+            "sunset",
+            "--mode",
+            "queued",
+            "--out",
+            str(out),
+        ],
+        cwd=str(REPO),
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stdout + "\n" + proc.stderr
+    payload = json.loads(out.read_text(encoding="utf-8"))
+    assert payload["ok"] is True
+    assert payload["scenario"] == "sunset"
+    assert payload["result"]["status"] == STATUS_DONE
+    assert "Mariana Restrepo" in (payload["result"].get("final_document") or {}).get(
+        "markdown", ""
+    )
