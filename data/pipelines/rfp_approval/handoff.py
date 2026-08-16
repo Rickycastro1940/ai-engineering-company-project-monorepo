@@ -58,14 +58,21 @@ def assert_part2_ready_for_approval(
         raise Part2HandoffNotReady(
             f"Ticket {ticket_id} has no Part 2 sections to approve"
         )
-    # Normalize section approval_status so Part 2 ticket statuses never block HITL.
+    # Normalize section approval_status so Part 2 ticket/loop statuses never block HITL.
     normalized: list[dict[str, Any]] = []
     for row in payload_sections:
         item = dict(row)
-        if "approval_status" in item or item.get("status") == STATUS_NEEDS_HUMAN_REVIEW:
-            item["approval_status"] = normalize_section_approval_status(
-                item.get("approval_status")
+        raw_approval = item.get("approval_status")
+        if raw_approval is None:
+            # part3_handoff uses ``status`` for Part 2 loop outcome — not CONTEXT
+            # DepartmentSection.approval_status. Map unknown/ticket statuses → pending.
+            loop_status = item.get("status")
+            raw_approval = (
+                loop_status
+                if loop_status in SECTION_APPROVAL_STATUSES
+                else "pending"
             )
+        item["approval_status"] = normalize_section_approval_status(raw_approval)
         normalized.append(item)
     return {
         "ticket_id": ticket_id,

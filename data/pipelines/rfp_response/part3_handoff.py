@@ -1,7 +1,8 @@
 """Part 3 handoff from Part 2 — last drafts + EvaluationResult, never discarded.
 
-Exhausted sections stay in this payload at ``needs_human_review`` so Part 3
-can still review them. Tickets are not discarded when the iteration limit hits.
+Exhausted sections stay in this payload. Ticket status may be
+``needs_human_review``, but each section carries ``approval_status=pending``
+so Part 3 HITL is not skipped (CONTEXT §2.3).
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ HANDOFF_SCHEMA_VERSION = "1.0"
 
 
 def section_status_for_loop(*, passed: bool, exhausted: bool) -> str:
+    """Part 2 loop outcome (not DepartmentSection.approval_status)."""
     if passed and not exhausted:
         return "pending"
     return STATUS_NEEDS_HUMAN_REVIEW
@@ -40,6 +42,9 @@ def build_part3_handoff(
             or ev.get("feedback")
             or []
         )
+        loop_status = row.get("section_status") or section_status_for_loop(
+            passed=passed, exhausted=exhausted
+        )
         sections.append(
             {
                 "department_id": row.get("department_id"),
@@ -48,8 +53,11 @@ def build_part3_handoff(
                 "draft_content": row.get("draft_content") or "",
                 "evaluation_results": ev,
                 "feedback_for_generator": feedback,
-                "status": row.get("section_status")
-                or section_status_for_loop(passed=passed, exhausted=exhausted),
+                # Part 2 loop outcome (may be needs_human_review when exhausted).
+                "status": loop_status,
+                "section_loop_status": loop_status,
+                # CONTEXT §2.3 HITL field — always pending at Part 3 entry.
+                "approval_status": "pending",
                 "iterations": row.get("iterations"),
                 "exhausted": exhausted,
                 "passed": passed,
@@ -72,6 +80,7 @@ def build_part3_handoff(
         "section_count": len(sections),
         "message": (
             "Part 2 complete. Part 3 reviews last drafts + EvaluationResult "
-            "for every section, including needs_human_review."
+            "for every section; section approval_status starts pending for "
+            "named-owner HITL (ticket may be needs_human_review)."
         ),
     }

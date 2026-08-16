@@ -353,7 +353,9 @@
             const depts = (data.departments_needed || []).join(', ');
             document.getElementById('ticket-summary').textContent =
                 `status: ${data.status} · departments: ${depts || '—'}` +
-                (data.requires_ceo_approval ? ' · CEO (Mariana Restrepo) required' : '');
+                (data.requires_ceo_approval ? ' · CEO (Mariana Restrepo) required' : '') +
+                (data.pipeline_complete ? ' · pipeline complete' : '') +
+                (data.part1_terminal && !data.pipeline_complete ? ' · Part 1 intake done' : '');
             const waiting = data.status === 'waiting_for_approval';
             const done = data.status === 'done';
             const canSign = !done && (waiting || data.part3_ready || data.status === 'needs_human_review');
@@ -503,6 +505,8 @@
                     setStatus('ok', `status: needs_human_review · drafts handed to Part 3 for named-owner review (iteration limit)`);
                 } else if (data.status === 'waiting_for_approval') {
                     setStatus('ok', `status: waiting_for_approval · drafts ready for named-owner sign-off`);
+                } else if (data.status === 'drafting' || data.status === 'under_evaluation') {
+                    setStatus('ok', `status: ${data.status} · Part 2 still in progress (resume with Generate again if needed)`);
                 } else {
                     setStatus('ok', `status: ${data.status}`);
                 }
@@ -515,6 +519,8 @@
             try {
                 setStatus('info', 'Starting approval graph…');
                 const data = await startApproval(currentTicketId());
+                // Re-render so panel status/buttons match waiting_for_approval (no stale Part 2 UI).
+                renderTicket(data);
                 const pending = (data.part3_pipeline && data.part3_pipeline.pending_approvals) || [];
                 setStatus('ok', pending.length
                     ? `waiting_for_approval · pending: ${pending.map((p) => p.department_id).join(', ')}`

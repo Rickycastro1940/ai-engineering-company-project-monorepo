@@ -251,7 +251,9 @@ def get_ticket_final_document(ticket_id: str) -> dict[str, Any]:
     if not doc:
         raise HTTPException(
             status_code=409,
-            detail="Final document is not available until required owners (and CEO if needed) approve",
+            detail=(
+                f"Ticket status is {STATUS_DONE!r} but no FinalDocument is stored yet"
+            ),
         )
     return doc
 
@@ -269,13 +271,5 @@ def get_rfp_ticket(ticket_id: str) -> dict[str, Any]:
     ticket = get_ticket(ticket_id)
     if ticket is None:
         raise HTTPException(status_code=404, detail="Ticket not found")
-    payload = ticket_to_dict(ticket)
-    # ``terminal`` = Part 1 intake finished (upload poll). Not the full pipeline.
-    payload["part1_terminal"] = ticket.status in P1_TERMINAL
-    payload["terminal"] = payload["part1_terminal"]
-    payload["pipeline_complete"] = ticket.status in {
-        STATUS_DONE,
-        STATUS_DISCARDED,
-        STATUS_FAILED,
-    }
-    return payload
+    # part1_terminal / pipeline_complete come from ticket_to_dict (all endpoints).
+    return ticket_to_dict(ticket)

@@ -9,10 +9,13 @@ from sqlalchemy import or_
 from sqlmodel import Session, select
 
 from data.pipelines.rfp_intake.constants import (
+    P1_TERMINAL,
     PART1_STATUSES,
     PART2_PLUS_STATUSES,
+    STATUS_DISCARDED,
     STATUS_DONE,
     STATUS_DRAFTING,
+    STATUS_FAILED,
     STATUS_INTAKE_COMPLETE,
     STATUS_NEEDS_HUMAN_REVIEW,
     STATUS_UNDER_EVALUATION,
@@ -846,4 +849,9 @@ def ticket_to_dict(ticket: RfpTicket) -> dict[str, Any]:
         "work_streams": handoff.get("work_streams", []),
         "created_at": ticket.created_at,
         "updated_at": ticket.updated_at,
+        # Same flags on every ticket payload (GET / POST) — avoid UI/API jumps.
+        "part1_terminal": ticket.status in P1_TERMINAL,
+        "terminal": ticket.status in P1_TERMINAL,
+        "pipeline_complete": ticket.status
+        in {STATUS_DONE, STATUS_DISCARDED, STATUS_FAILED},
     }
