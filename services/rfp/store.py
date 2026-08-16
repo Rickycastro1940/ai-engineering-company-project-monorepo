@@ -412,6 +412,8 @@ def get_final_document(
     When ``require_done`` is True, the document is accessible only if the
     ticket status is ``done`` (completion rule).
     """
+    from data.pipelines.rfp_approval.synthesizer import assert_final_document_context_shape
+
     init_db()
     with Session(get_engine()) as session:
         if require_done:
@@ -433,7 +435,18 @@ def get_final_document(
                 "generated_at": row.generated_at,
                 "markdown": row.markdown,
             }
-        return payload
+        # Always surface CONTEXT §2.3 fields even if older rows omitted them.
+        payload.setdefault("ticket_id", row.ticket_id)
+        payload.setdefault(
+            "sections", json.loads(row.sections_json or "[]") if row.sections_json else []
+        )
+        if "total_estimated_value" not in payload:
+            payload["total_estimated_value"] = row.total_estimated_value
+        payload.setdefault("generated_at", row.generated_at)
+        try:
+            return assert_final_document_context_shape(payload)
+        except ValueError:
+            return None
 
 
 def persist_part3_progress(

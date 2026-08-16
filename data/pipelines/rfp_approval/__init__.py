@@ -55,6 +55,8 @@ from data.pipelines.rfp_approval.handoff import (
     normalize_section_approval_status,
 )
 from data.pipelines.rfp_approval.synthesizer import (
+    FINAL_DOCUMENT_CONTEXT_FIELDS,
+    assert_final_document_context_shape,
     build_final_document,
     consolidate_approved_sections,
 )
@@ -71,10 +73,12 @@ __all__ = [
     "ApprovalPipelineResult",
     "apply_fixed_arbitration",
     "assert_part2_ready_for_approval",
+    "assert_final_document_context_shape",
     "approval_thread_id",
     "normalize_section_approval_status",
     "build_final_document",
     "consolidate_approved_sections",
+    "FINAL_DOCUMENT_CONTEXT_FIELDS",
     "build_rfp_approval_graph",
     "checkpoint_backend",
     "conflict_surface_agent",

@@ -38,9 +38,19 @@ Only sections whose status is `approved` are consolidated.
 | Field | Source |
 | ----- | ------ |
 | `ticket_id` | Same Part 1 ticket |
-| `sections` | Approved department drafts + labels / owners |
+| `sections` | Approved department drafts + labels / owners (§2.1 named owners only) |
 | `total_estimated_value` | Intake metadata (`estimated_contract_value_usd`) — never invented |
 | `generated_at` | UTC timestamp at synthesis |
+
+These four fields are required (`CONTEXT_FINAL_DOCUMENT_FIELDS` /
+`assert_final_document_context_shape`). Markdown and other helpers are extras
+for UI — they do not replace the CONTEXT schema.
+
+**Sign-off + arbitration (not generic):** department approvers are exactly
+Camila Ospina / Felipe Guerrero / Lucía Fernández / Jake Morrison; CEO extra
+approver is only Mariana Restrepo when value > $50k USD/year. §7 trigger ids
+are `cost-vs-feasibility`, `setup-sla-breach`, `ceo-threshold` with those
+fixed arbiters — see `context_rules.CONTEXT_ARBITRATION_RULES`.
 
 ## Code
 

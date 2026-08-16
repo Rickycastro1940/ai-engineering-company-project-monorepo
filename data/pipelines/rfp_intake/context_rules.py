@@ -309,6 +309,7 @@ CONTEXT_FORBIDDEN_EXTRA_APPROVERS: Final[frozenset[str]] = frozenset(
 )
 
 # CONTEXT §7 — conflict trigger ids and fixed (non-LLM) arbiters.
+# Arbiter names and resolution rules must match CONTEXT-company.md §7 verbatim intent.
 CONTEXT_ARBITRATION_TRIGGER_IDS: Final[tuple[str, ...]] = (
     "cost-vs-feasibility",
     "setup-sla-breach",
@@ -320,7 +321,9 @@ CONTEXT_ARBITRATION_RULES: Final[dict[str, dict[str, str]]] = {
         "arbiter": CONTEXT_TICKET_OWNER,  # Camila Ospina (Marketing; ticket owner)
         "arbiter_department_id": CONTEXT_TICKET_OWNER_DEPARTMENT,
         "action": "request_changes",
-        "resolution": "Raise price or reduce scope; force request_changes on the mismatched section(s)",
+        "resolution": (
+            "Raise price or reduce scope; force request_changes on the mismatched section(s)"
+        ),
     },
     "setup-sla-breach": {
         "arbiter": CONTEXT_DEPARTMENT_OWNERS["operaciones"],  # Felipe Guerrero
@@ -334,9 +337,19 @@ CONTEXT_ARBITRATION_RULES: Final[dict[str, dict[str, str]]] = {
         "arbiter": CONTEXT_CEO_NAME,  # Mariana Restrepo
         "arbiter_department_id": CONTEXT_CEO_DEPARTMENT_ID,
         "action": "block_synthesizer",
-        "resolution": "Block ultimate synthesizer until CEO approve; reject path if CEO rejects",
+        "resolution": (
+            "Block ultimate synthesizer until CEO approve; reject path if CEO rejects"
+        ),
     },
 }
+
+# CONTEXT §2.3 FinalDocument — required fields (markdown/extras are optional helpers).
+CONTEXT_FINAL_DOCUMENT_FIELDS: Final[tuple[str, ...]] = (
+    "ticket_id",
+    "sections",
+    "total_estimated_value",
+    "generated_at",
+)
 
 
 def read_context_company_md() -> str:

@@ -14,14 +14,33 @@ from typing import Any
 from data.pipelines.rfp_intake.context_rules import (
     CONTEXT_BRAND_PILLARS,
     CONTEXT_DEPARTMENT_LABELS,
+    CONTEXT_FINAL_DOCUMENT_FIELDS,
     CONTEXT_OFFER_VALIDITY_PHRASE,
 )
 from data.pipelines.rfp_approval.approvers import CEO_DEPARTMENT_ID, CEO_NAME
+
+FINAL_DOCUMENT_CONTEXT_FIELDS = CONTEXT_FINAL_DOCUMENT_FIELDS
 
 
 def _now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
+
+def assert_final_document_context_shape(document: dict[str, Any]) -> dict[str, Any]:
+    """Require CONTEXT §2.3 FinalDocument fields (reject generic/incomplete payloads)."""
+    missing = [f for f in FINAL_DOCUMENT_CONTEXT_FIELDS if f not in document]
+    if missing:
+        raise ValueError(
+            f"FinalDocument missing CONTEXT §2.3 fields: {missing}; "
+            f"required={list(FINAL_DOCUMENT_CONTEXT_FIELDS)}"
+        )
+    if not isinstance(document.get("sections"), list):
+        raise ValueError("FinalDocument.sections must be a list")
+    if not str(document.get("ticket_id") or "").strip():
+        raise ValueError("FinalDocument.ticket_id is required")
+    if not str(document.get("generated_at") or "").strip():
+        raise ValueError("FinalDocument.generated_at is required")
+    return document
 
 def _total_estimated_value(metadata: dict[str, Any]) -> float | None:
     value = metadata.get("estimated_contract_value_usd")
@@ -201,11 +220,12 @@ def build_final_document(
         )
 
     markdown = "\n".join(markdown_parts).strip() + "\n"
-    return {
+    document = {
         "ticket_id": ticket_id,
         "sections": body_sections,
         "total_estimated_value": total,
         "generated_at": stamp,
+        # Convenience / UI (not substitutes for the CONTEXT §2.3 fields above)
         "markdown": markdown,
         "client_name": meta.get("client_name"),
         "location": meta.get("location"),
@@ -213,3 +233,4 @@ def build_final_document(
         "brand_pillars": list(CONTEXT_BRAND_PILLARS),
         "completion": "consolidated_approved_sections",
     }
+    return assert_final_document_context_shape(document)
