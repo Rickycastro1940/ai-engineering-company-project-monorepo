@@ -5,12 +5,17 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from sqlalchemy import or_
 from sqlmodel import Session, select
 
 from data.pipelines.rfp_intake.constants import (
+    P1_TERMINAL,
     PART1_STATUSES,
     PART2_PLUS_STATUSES,
+    STATUS_DISCARDED,
+    STATUS_DONE,
     STATUS_DRAFTING,
+    STATUS_FAILED,
     STATUS_INTAKE_COMPLETE,
     STATUS_NEEDS_HUMAN_REVIEW,
     STATUS_UNDER_EVALUATION,
@@ -18,20 +23,26 @@ from data.pipelines.rfp_intake.constants import (
 )
 from data.pipelines.rfp_intake.routing import route_intake_to_part2, validate_part2_handoff
 from services.api.database import create_db_and_tables, get_engine, reset_engine
-from services.rfp.models import RfpDepartmentSection, RfpTicket, _now
+from services.rfp.models import RfpDepartmentSection, RfpFinalDocument, RfpTicket, _now
 
 # Re-export for tests
 __all__ = [
     "RfpDepartmentSection",
+    "RfpFinalDocument",
     "RfpTicket",
     "create_analyzing_ticket",
+    "get_final_document",
     "get_ticket",
     "init_db",
     "list_part2_queue",
+    "list_part3_queue",
     "list_tickets",
     "load_part2_handoff",
+    "load_part3_ticket_state",
     "load_ready_part2_handoff",
     "persist_part2_progress",
+    "persist_part3_progress",
+    "record_approval_decision",
     "reset_engine",
     "save_intake_result",
     "save_response_result",
@@ -44,6 +55,13 @@ PART2_ALLOWED_STATUSES = frozenset(
         STATUS_UNDER_EVALUATION,
         STATUS_NEEDS_HUMAN_REVIEW,
         STATUS_WAITING_FOR_APPROVAL,
+    }
+)
+PART3_ALLOWED_STATUSES = frozenset(
+    {
+        STATUS_NEEDS_HUMAN_REVIEW,
+        STATUS_WAITING_FOR_APPROVAL,
+        STATUS_DONE,
     }
 )
 
@@ -196,17 +214,22 @@ def _upsert_section_drafts(
         if row is None:
             row = RfpDepartmentSection(ticket_id=ticket_id, department_id=dept)
             session.add(row)
-        if section.get("draft_content"):
+        if "draft_content" in section:
             row.draft_content = section.get("draft_content") or ""
         if section.get("evaluation_results") is not None:
             row.evaluation_results_json = json.dumps(
                 section.get("evaluation_results") or {},
                 ensure_ascii=False,
             )
+        # CONTEXT §2.3: section approval_status is pending|approved|rejected.
+        # Exhausted Part 2 drafts still need named-owner HITL → pending (never
+        # ticket-level needs_human_review, which would skip Part 3 interrupts).
         if section.get("passed"):
             row.approval_status = row.approval_status or "pending"
         elif section.get("exhausted") or section.get("section_status") == STATUS_NEEDS_HUMAN_REVIEW:
-            row.approval_status = STATUS_NEEDS_HUMAN_REVIEW
+            # Ticket may be needs_human_review; section stays pending for Part 3 HITL.
+            if row.approval_status not in {"approved", "rejected", "request_changes"}:
+                row.approval_status = "pending"
         row.updated_at = _now()
 
 
@@ -264,6 +287,311 @@ def persist_part2_progress(
         session.add(ticket)
         session.commit()
         return True
+
+
+def _section_public(row: RfpDepartmentSection) -> dict[str, Any]:
+    def _loads(raw: str | None, default: Any) -> Any:
+        try:
+            return json.loads(raw or "")
+        except json.JSONDecodeError:
+            return default
+
+    from data.pipelines.rfp_approval.handoff import normalize_section_approval_status
+    from data.pipelines.rfp_intake.constants import DEPARTMENT_OWNERS
+
+    return {
+        "department_id": row.department_id,
+        "owner": DEPARTMENT_OWNERS.get(row.department_id, row.department_id),
+        "key_aspects": _loads(row.key_aspects_json, []),
+        "draft_content": row.draft_content or "",
+        "evaluation_results": _loads(row.evaluation_results_json, {}),
+        "approval_status": normalize_section_approval_status(row.approval_status),
+        "approver": row.approver,
+        "approved_at": row.approved_at,
+    }
+
+
+def load_part3_ticket_state(ticket_id: str) -> dict[str, Any]:
+    """Load Part 2 drafts + current approvals for the Part 3 graph (no PDF)."""
+    from data.pipelines.rfp_approval.approvers import requires_ceo_approval
+    from data.pipelines.rfp_approval.handoff import (
+        assert_part2_ready_for_approval,
+        normalize_section_approval_status,
+    )
+
+    ticket = get_ticket(ticket_id)
+    if ticket is None:
+        raise KeyError(ticket_id)
+    meta: dict[str, Any]
+    try:
+        meta = json.loads(ticket.metadata_json or "{}")
+    except json.JSONDecodeError:
+        meta = {}
+    if not isinstance(meta, dict):
+        meta = {}
+    sections = [_section_public(row) for row in list_sections(ticket_id)]
+    try:
+        depts = json.loads(ticket.departments_needed_json or "[]")
+    except json.JSONDecodeError:
+        depts = []
+    assert_part2_ready_for_approval(
+        ticket_id=ticket_id,
+        status=ticket.status,
+        sections=sections,
+        part3_handoff=meta.get("part3_handoff") or {},
+    )
+    approvals = {
+        row["department_id"]: {
+            "department_id": row["department_id"],
+            "approval_status": normalize_section_approval_status(
+                row.get("approval_status")
+            ),
+            "approver": row.get("approver"),
+            "approved_at": row.get("approved_at"),
+        }
+        for row in sections
+        if row.get("department_id")
+    }
+    ceo_needed = requires_ceo_approval(
+        requires_ceo_flag=bool(ticket.requires_ceo_approval),
+        metadata=meta,
+    )
+    return {
+        "ticket_id": ticket_id,
+        "status": ticket.status,
+        "sections": sections,
+        "metadata": meta,
+        "departments_needed": list(depts),
+        "part3_handoff": meta.get("part3_handoff") or {},
+        "requires_ceo_approval": ceo_needed,
+        "approvals": approvals,
+        "ceo_approval": meta.get("ceo_approval") or {},
+        "approval_iterations": {
+            str(k): int(v)
+            for k, v in dict(meta.get("approval_iterations") or {}).items()
+        },
+        "reparse_pdf_required": False,
+    }
+
+
+def list_part3_queue(*, limit: int = 50) -> list[dict[str, Any]]:
+    """Tickets waiting on department (or CEO) sign-off."""
+    init_db()
+    with Session(get_engine()) as session:
+        rows = session.exec(
+            select(RfpTicket)
+            .where(
+                or_(
+                    RfpTicket.status == STATUS_WAITING_FOR_APPROVAL,
+                    RfpTicket.status == STATUS_NEEDS_HUMAN_REVIEW,
+                )
+            )
+            .order_by(RfpTicket.updated_at.desc())
+            .limit(limit)
+        ).all()
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            try:
+                depts = json.loads(row.departments_needed_json or "[]")
+            except json.JSONDecodeError:
+                depts = []
+            out.append(
+                {
+                    "ticket_id": row.ticket_id,
+                    "status": row.status,
+                    "part3_ready": bool(row.part3_ready),
+                    "departments_needed": depts,
+                    "requires_ceo_approval": row.requires_ceo_approval,
+                }
+            )
+        return out
+
+
+def get_final_document(
+    ticket_id: str, *, require_done: bool = False
+) -> dict[str, Any] | None:
+    """Return the stored FinalDocument, or None if missing.
+
+    When ``require_done`` is True, the document is accessible only if the
+    ticket status is ``done`` (completion rule).
+    """
+    from data.pipelines.rfp_approval.synthesizer import assert_final_document_context_shape
+
+    init_db()
+    with Session(get_engine()) as session:
+        if require_done:
+            ticket = session.get(RfpTicket, ticket_id)
+            if ticket is None or ticket.status != STATUS_DONE:
+                return None
+        row = session.get(RfpFinalDocument, ticket_id)
+        if row is None:
+            return None
+        try:
+            payload = json.loads(row.document_json or "{}")
+        except json.JSONDecodeError:
+            payload = {}
+        if not payload:
+            payload = {
+                "ticket_id": row.ticket_id,
+                "sections": json.loads(row.sections_json or "[]"),
+                "total_estimated_value": row.total_estimated_value,
+                "generated_at": row.generated_at,
+                "markdown": row.markdown,
+            }
+        # Always surface CONTEXT §2.3 fields even if older rows omitted them.
+        payload.setdefault("ticket_id", row.ticket_id)
+        payload.setdefault(
+            "sections", json.loads(row.sections_json or "[]") if row.sections_json else []
+        )
+        if "total_estimated_value" not in payload:
+            payload["total_estimated_value"] = row.total_estimated_value
+        payload.setdefault("generated_at", row.generated_at)
+        try:
+            return assert_final_document_context_shape(payload)
+        except ValueError:
+            return None
+
+
+def persist_part3_progress(
+    ticket_id: str,
+    *,
+    status: str | None = None,
+    approvals: dict[str, dict[str, Any]] | None = None,
+    ceo_approval: dict[str, Any] | None = None,
+    arbitration: list[dict[str, Any]] | None = None,
+    conflicts: list[dict[str, Any]] | None = None,
+    final_document: dict[str, Any] | None = None,
+    requires_ceo_approval: bool | None = None,
+    synthesizer_blocked: bool | None = None,
+    approval_iterations: dict[str, int] | None = None,
+) -> bool:
+    """Write Part 3 approvals / FinalDocument onto the same Part 1 ticket.
+
+    Status rules (completion):
+    - While any department approval is still open, callers pass
+      ``waiting_for_approval``.
+    - Storing a FinalDocument always sets the ticket to ``done`` so the
+      document becomes accessible via ``GET .../final-document``.
+    """
+    if not (ticket_id or "").strip():
+        return False
+    # Completing with a FinalDocument forces ``done`` — never leave a
+    # stored document on a still-waiting ticket.
+    if final_document:
+        status = STATUS_DONE
+    if status is not None and status not in PART3_ALLOWED_STATUSES:
+        return False
+    init_db()
+    with Session(get_engine()) as session:
+        ticket = session.get(RfpTicket, ticket_id)
+        if ticket is None:
+            return False
+        if ticket.status not in {
+            STATUS_NEEDS_HUMAN_REVIEW,
+            STATUS_WAITING_FOR_APPROVAL,
+            STATUS_DONE,
+        }:
+            return False
+        try:
+            meta = json.loads(ticket.metadata_json or "{}")
+        except json.JSONDecodeError:
+            meta = {}
+        if not isinstance(meta, dict):
+            meta = {}
+        history = list(meta.get("part3_status_history") or [])
+        if status and (not history or history[-1] != status):
+            history.append(status)
+            meta["part3_status_history"] = history
+        if ceo_approval is not None:
+            meta["ceo_approval"] = ceo_approval
+        if arbitration is not None:
+            meta["part3_arbitration"] = arbitration
+        if synthesizer_blocked is not None:
+            meta["synthesizer_blocked"] = synthesizer_blocked
+        if approval_iterations is not None:
+            meta["approval_iterations"] = {
+                str(k): int(v) for k, v in approval_iterations.items()
+            }
+        if requires_ceo_approval is not None:
+            ticket.requires_ceo_approval = bool(requires_ceo_approval)
+        if conflicts is not None:
+            ticket.conflicts_json = json.dumps(conflicts, ensure_ascii=False)
+        if status:
+            ticket.status = status
+        ticket.part3_ready = True
+        ticket.updated_at = _now()
+        if approvals:
+            for dept, payload in approvals.items():
+                row = session.exec(
+                    select(RfpDepartmentSection).where(
+                        RfpDepartmentSection.ticket_id == ticket_id,
+                        RfpDepartmentSection.department_id == dept,
+                    )
+                ).first()
+                if row is None:
+                    continue
+                row.approval_status = payload.get("approval_status") or row.approval_status
+                if payload.get("approver"):
+                    row.approver = payload.get("approver")
+                row.approved_at = payload.get("approved_at")
+                row.updated_at = _now()
+                session.add(row)
+        if final_document:
+            meta["final_document"] = {
+                "ticket_id": final_document.get("ticket_id"),
+                "total_estimated_value": final_document.get("total_estimated_value"),
+                "generated_at": final_document.get("generated_at"),
+            }
+            existing = session.get(RfpFinalDocument, ticket_id)
+            if existing is None:
+                existing = RfpFinalDocument(ticket_id=ticket_id)
+                session.add(existing)
+            existing.sections_json = json.dumps(
+                final_document.get("sections") or [], ensure_ascii=False
+            )
+            existing.total_estimated_value = final_document.get("total_estimated_value")
+            existing.generated_at = str(final_document.get("generated_at") or _now())
+            existing.markdown = final_document.get("markdown")
+            existing.document_json = json.dumps(final_document, ensure_ascii=False)
+        ticket.metadata_json = json.dumps(meta, ensure_ascii=False)
+        session.add(ticket)
+        session.commit()
+        return True
+
+
+def record_approval_decision(
+    ticket_id: str,
+    *,
+    department_id: str,
+    decision: str,
+    approver: str,
+    comment: str | None = None,
+) -> dict[str, Any]:
+    """Persist one named-owner (or CEO) decision, then continue the Part 3 graph."""
+    from data.pipelines.rfp_approval import run_approval_for_ticket
+    from data.pipelines.rfp_approval.approvers import (
+        UnknownApproverError,
+        validate_human_resume,
+    )
+
+    try:
+        resume = validate_human_resume(
+            {
+                "department_id": department_id,
+                "decision": decision,
+                "approver": approver,
+                "comment": comment,
+            }
+        )
+    except UnknownApproverError:
+        raise
+    result = run_approval_for_ticket(ticket_id, resume=resume)
+    if result.error_message:
+        raise ValueError(result.error_message)
+    saved = get_ticket(ticket_id)
+    payload = ticket_to_dict(saved) if saved else {}
+    payload["part3_pipeline"] = result.to_dict()
+    return payload
 
 
 def save_response_result(ticket_id: str, result: Any) -> RfpTicket:
@@ -344,6 +672,7 @@ def save_response_result(ticket_id: str, result: Any) -> RfpTicket:
             result.get("part3_handoff") if isinstance(result, dict) else None
         ) or {}
         ticket.metadata_json = json.dumps(meta, ensure_ascii=False)
+        ticket.part3_ready = True
         # Exhausted tickets stay in the flow for Part 3 — never discarded
         if status == STATUS_NEEDS_HUMAN_REVIEW:
             ticket.discard_reason = None
@@ -446,6 +775,7 @@ def ticket_to_dict(ticket: RfpTicket) -> dict[str, Any]:
         except json.JSONDecodeError:
             return default
 
+    from data.pipelines.rfp_approval.handoff import normalize_section_approval_status
     from data.pipelines.rfp_intake.constants import DEPARTMENT_OWNERS
     from data.pipelines.rfp_intake.orchestration import build_final_department_results
 
@@ -461,7 +791,9 @@ def ticket_to_dict(ticket: RfpTicket) -> dict[str, Any]:
             "key_aspects": _loads(row.key_aspects_json, []),
             "draft_content": row.draft_content,
             "evaluation_results": _loads(row.evaluation_results_json, {}),
-            "approval_status": row.approval_status,
+            "approval_status": normalize_section_approval_status(row.approval_status),
+            "approver": row.approver,
+            "approved_at": row.approved_at,
         }
         for row in sections_rows
     ]
@@ -501,9 +833,25 @@ def ticket_to_dict(ticket: RfpTicket) -> dict[str, Any]:
         "part2_response": meta.get("part2_response"),
         "part2_status_history": meta.get("part2_status_history") or [],
         "part3_handoff": meta.get("part3_handoff") or {},
+        "part3_ready": bool(ticket.part3_ready),
+        "part3_status_history": meta.get("part3_status_history") or [],
+        "part3_arbitration": meta.get("part3_arbitration") or [],
+        "ceo_approval": meta.get("ceo_approval") or {},
+        # FinalDocument is accessible on the ticket only after status is done.
+        "final_document": (
+            get_final_document(ticket.ticket_id, require_done=True) or {}
+            if ticket.status == STATUS_DONE
+            else {}
+        ),
+        "synthesizer_blocked": bool(meta.get("synthesizer_blocked")),
         "ask_whom": ask_whom,
         "open_questions": handoff.get("open_questions") or meta.get("open_questions", []),
         "work_streams": handoff.get("work_streams", []),
         "created_at": ticket.created_at,
         "updated_at": ticket.updated_at,
+        # Same flags on every ticket payload (GET / POST) — avoid UI/API jumps.
+        "part1_terminal": ticket.status in P1_TERMINAL,
+        "terminal": ticket.status in P1_TERMINAL,
+        "pipeline_complete": ticket.status
+        in {STATUS_DONE, STATUS_DISCARDED, STATUS_FAILED},
     }

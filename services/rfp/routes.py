@@ -10,7 +10,13 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
 
 from data.pipelines.rfp_intake import IntakeResult, run_intake_from_bytes
-from data.pipelines.rfp_intake.constants import P1_TERMINAL, STATUS_ANALYZING, STATUS_FAILED
+from data.pipelines.rfp_intake.constants import (
+    P1_TERMINAL,
+    STATUS_ANALYZING,
+    STATUS_DISCARDED,
+    STATUS_DONE,
+    STATUS_FAILED,
+)
 from services.rfp.store import (
     create_analyzing_ticket,
     get_ticket,
@@ -172,11 +178,98 @@ def generate_response(ticket_id: str) -> dict[str, Any]:
     return payload
 
 
+@router.post("/tickets/{ticket_id}/start-approval")
+def start_approval(ticket_id: str) -> dict[str, Any]:
+    """Part 3: pause for named-owner (and CEO if required) sign-off."""
+    from data.pipelines.rfp_approval import Part2HandoffNotReady, run_approval_for_ticket
+
+    try:
+        result = run_approval_for_ticket(ticket_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Ticket not found") from exc
+    except (ValueError, Part2HandoffNotReady) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    if result.error_message:
+        raise HTTPException(status_code=409, detail=result.error_message)
+    saved = get_ticket(ticket_id)
+    if saved is None:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    payload = ticket_to_dict(saved)
+    payload["part3_pipeline"] = result.to_dict()
+    return payload
+
+
+@router.post("/tickets/{ticket_id}/approvals")
+def post_approval(ticket_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    """Record one CONTEXT owner (or CEO) decision on the same ticket."""
+    from data.pipelines.rfp_approval.approvers import UnknownApproverError
+    from services.rfp.store import record_approval_decision
+
+    department_id = str(body.get("department_id") or "").strip()
+    decision = str(body.get("decision") or body.get("approval_status") or "").strip()
+    approver = str(body.get("approver") or "").strip()
+    comment = body.get("comment")
+    if not department_id or not decision or not approver:
+        raise HTTPException(
+            status_code=400,
+            detail="department_id, decision, and approver are required",
+        )
+    try:
+        return record_approval_decision(
+            ticket_id,
+            department_id=department_id,
+            decision=decision,
+            approver=approver,
+            comment=str(comment) if comment is not None else None,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Ticket not found") from exc
+    except UnknownApproverError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get("/tickets/{ticket_id}/final-document")
+def get_ticket_final_document(ticket_id: str) -> dict[str, Any]:
+    """Return the FinalDocument only after completion (ticket status ``done``)."""
+    from services.rfp.store import get_final_document
+
+    ticket = get_ticket(ticket_id)
+    if ticket is None:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    if ticket.status != STATUS_DONE:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Final document is not available while ticket status is "
+                f"{ticket.status!r} (requires status={STATUS_DONE!r})"
+            ),
+        )
+    doc = get_final_document(ticket_id, require_done=True)
+    if not doc:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Ticket status is {STATUS_DONE!r} but no FinalDocument is stored yet"
+            ),
+        )
+    return doc
+
+
+@router.get("/part3/queue")
+def part3_queue(limit: int = 50) -> dict[str, Any]:
+    from services.rfp.store import list_part3_queue
+
+    items = list_part3_queue(limit=limit)
+    return {"queue": items, "count": len(items)}
+
+
 @router.get("/tickets/{ticket_id}")
 def get_rfp_ticket(ticket_id: str) -> dict[str, Any]:
     ticket = get_ticket(ticket_id)
     if ticket is None:
         raise HTTPException(status_code=404, detail="Ticket not found")
-    payload = ticket_to_dict(ticket)
-    payload["terminal"] = ticket.status in P1_TERMINAL
-    return payload
+    # part1_terminal / pipeline_complete come from ticket_to_dict (all endpoints).
+    return ticket_to_dict(ticket)

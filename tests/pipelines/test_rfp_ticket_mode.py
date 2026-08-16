@@ -40,6 +40,23 @@ def test_backoffice_ui_exists_with_upload_and_poll() -> None:
     assert "analyzing" in src
 
 
+def test_backoffice_ticket_ui_lets_each_department_log_approval_or_rejection() -> None:
+    page = BACKOFFICE / "rfp-upload.html"
+    src = page.read_text(encoding="utf-8")
+    assert "department_sections" in src
+    assert 'data-decision="approved"' in src
+    assert 'data-decision="rejected"' in src
+    assert "/approvals" in src
+    assert "start-approval" in src
+    assert "Camila Ospina" in src
+    assert "Felipe Guerrero" in src
+    assert "Lucía Fernández" in src
+    assert "Jake Morrison" in src
+    assert "Mariana Restrepo" in src
+    assert "Approve" in src
+    assert "Reject" in src
+
+
 def test_agent_app_serves_backoffice_rfp_page() -> None:
     app_src = (REPO / "services" / "agent" / "app.py").read_text(encoding="utf-8")
     assert "uis" in app_src and "backoffice" in app_src

@@ -1,0 +1,79 @@
+# Part 3 readiness — CONTEXT-company.md (read before coding)
+
+Source: CONTEXT-company.md Milestone 9 (§2.1 owners, §2.3 FinalDocument,
+§5 CEO threshold, §6 Part 3 deliverable, §7 conflict triggers).
+
+## Part 3 scope
+
+- **Build on Part 2** — same ticket; last drafts + `EvaluationResult`.
+  Do not re-parse the PDF. Do not rewrite classifier / generators.
+  Exhausted Part 2 sections enter HITL as `approval_status=pending`
+  (ticket may be `needs_human_review`); do not skip interrupts for them.
+- **Human-in-the-loop:** each *active* department is signed off by the
+  named owner in §2.1 (Camila Ospina, Felipe Guerrero, Lucía Fernández,
+  Jake Morrison). No invented VP / Legal / Finance ladder.
+- **Extra approver:** Mariana Restrepo (CEO) only when estimated annual
+  value exceeds $50,000 USD/year. Block the synthesizer until she
+  `approve`s; reject path if she rejects.
+- **Arbitration** is a dedicated graph node (`arbitration`) driven by
+  detectable contradictions in structured state. Trigger ids:
+  `cost-vs-feasibility`, `setup-sla-breach`, `ceo-threshold`. Agents may
+  surface a conflict (`conflict_surface_agent`); they must not resolve it
+  by free-form consensus. The node uses the CONTEXT §7 fixed arbiter table
+  (named human / deterministic rule) — **not** LLM freestyle among agents.
+- **Guardrails / flow control:**
+  - `MAX_DEPARTMENT_APPROVAL_ITERATIONS` (default 2, same as Part 2
+    `MAX_SECTION_ITERATIONS`) caps any remaining `request_changes` loop
+    between departments; exceeding it sets `needs_human_review`.
+  - Every graph node appends `agent`, `input`, `output`, and `timestamp`
+    to state `trace` for auditability.
+- **FinalDocument / completion** (CONTEXT §2.3): while any department
+  approval is pending, ticket status is `waiting_for_approval` and the
+  FinalDocument is not accessible. Once every active department owner has
+  approved (and Mariana Restrepo when the $50k threshold applies), the
+  `synthesizer` consolidates approved drafts, stores the FinalDocument
+  (`ticket_id`, `sections`, `total_estimated_value`, `generated_at`), sets
+  status to `done`, and exposes `GET /rfp/tickets/{id}/final-document`.
+  See [`COMPLETION.md`](./COMPLETION.md).
+- Same HTTP process: extend `services/rfp/` (no second API).
+  Pipeline: `data/pipelines/rfp_approval/`.
+- **HITL interruption point:** `collect_approvals` is fanned out with
+  LangGraph `Send` — one branch per *pending* department. `interrupt()`
+  pauses only that branch before the section is marked `approved`.
+  Departments already decided are not sent and are not blocked.
+  `ceo_gate` interrupts for Mariana Restrepo the same way.
+  Resume is an explicit graph entry: `Command(resume=)` unblocks the paused
+  department (or CEO) branch, which `Command(goto=apply_approval)`s. The
+  human response is validated first (`approve` / `reject` /
+  `request_changes` plus the named owner) and never enters the graph if
+  invalid. The graph does **not** `invoke(initial)` from `START` /
+  `load_handoff`. If the thread is not paused, resume returns
+  `approval_not_paused` instead of restarting Part 3.
+
+## Durable checkpointer (HITL pause/resume)
+
+LangGraph `interrupt()` needs a checkpointer. Do **not** use
+`MemorySaver` or SQLite `:memory:` outside local development.
+
+| Environment | Backend |
+| ----------- | ------- |
+| `DATABASE_URL` PostgreSQL (Supabase / production) | `PostgresSaver` (`langgraph-checkpoint-postgres`) |
+| Local smoke / pytest (`RFP_ALLOW_SQLITE=1` or sqlite URL) | file-backed `SqliteSaver` (`langgraph-checkpoint-sqlite`) |
+| Local only, explicit `RFP_CHECKPOINT_MEMORY=1` | `MemorySaver` |
+
+Install extras with `uv add langgraph-checkpoint-sqlite langgraph-checkpoint-postgres 'psycopg[binary,pool]'`.
+Override the SQLite file with `RFP_CHECKPOINT_SQLITE=/path/to/file.sqlite`.
+
+### Checkpointer identity (`thread_id`)
+
+Every graph run is namespaced by ticket so concurrent tickets never share a
+checkpoint:
+
+| Scope | `thread_id` |
+| ----- | ----------- |
+| Ticket (HTTP start-approval / resume) | `RFP-{ticket_id}` |
+| Department branch (if checkpointed alone) | `RFP-{ticket_id}:{department_id}` |
+| Ephemeral one-shot invoke | `RFP-{ticket_id}:run-{uuid}` |
+
+Helpers: `approval_thread_id`, `rfp_checkpoint_thread_id`, `ensure_rfp_thread_id`
+in `data/pipelines/rfp_approval/checkpointer.py`.

@@ -22,7 +22,11 @@ from __future__ import annotations
 
 from typing import Any, Final
 
-from data.pipelines.rfp_intake.constants import STATUS_INTAKE_COMPLETE
+from data.pipelines.rfp_intake.constants import (
+    STATUS_DRAFTING,
+    STATUS_INTAKE_COMPLETE,
+    STATUS_UNDER_EVALUATION,
+)
 from data.pipelines.rfp_intake.routing import validate_part2_handoff
 
 # Fields that may appear on the handoff for audit only — never primary generator input
@@ -33,6 +37,15 @@ _NON_PRIMARY_FIELDS: Final[frozenset[str]] = frozenset(
         "markdown_text",
         "pdf_path",
         "raw_pdf",
+    }
+)
+
+# Fresh Part 1 handoff, or mid-Part-2 resume after a crash (no status jump / data loss).
+PART2_ENTRY_STATUSES: Final[frozenset[str]] = frozenset(
+    {
+        STATUS_INTAKE_COMPLETE,
+        STATUS_DRAFTING,
+        STATUS_UNDER_EVALUATION,
     }
 )
 
@@ -57,9 +70,9 @@ def assert_part1_routing_ready(
     if not tid:
         raise Part1HandoffNotReady("Part 2 requires ticket_id from Part 1")
 
-    if status != STATUS_INTAKE_COMPLETE:
+    if status not in PART2_ENTRY_STATUSES:
         raise Part1HandoffNotReady(
-            f"Part 2 requires status={STATUS_INTAKE_COMPLETE!r}; got {status!r}"
+            f"Part 2 requires status in {sorted(PART2_ENTRY_STATUSES)}; got {status!r}"
         )
     if not part2_ready:
         raise Part1HandoffNotReady(

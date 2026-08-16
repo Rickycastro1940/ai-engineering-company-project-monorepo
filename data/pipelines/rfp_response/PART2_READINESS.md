@@ -10,6 +10,8 @@ compliance guidelines, §6 Part 2 deliverable).
   - queue flag: `part2_ready == true`
   - DB field: `part2_handoff_json`
   - documented contract: `PART2_HANDOFF.md` / `validate_part2_handoff`
+  - ticket status in `intake_complete` **or** mid-flight resume
+    (`drafting` / `under_evaluation`) so a crash does not strand the ticket
 - Required payload: `ticket_id` + synthesizer `work_streams[].key_aspects`
   (+ metadata). See `handoff_consume.assert_part1_routing_ready` and
   `run_response_for_ticket` → `load_ready_part2_handoff`.
@@ -35,8 +37,10 @@ compliance guidelines, §6 Part 2 deliverable).
 - Generator–evaluator loop with `MAX_SECTION_ITERATIONS=2` (KPI: avg < 2).
   Failed sections return to **the same** department generator with
   `EvaluationResult.feedback_for_generator`. Hitting the limit keeps the last
-  draft + EvaluationResult, sets section/ticket to `needs_human_review`, and
-  still includes the section in the Part 3 handoff (never discarded).
+  draft + EvaluationResult, sets **ticket** status to `needs_human_review`,
+  keeps section `approval_status=pending` for Part 3 HITL (CONTEXT §2.3 —
+  never store ticket status on the section field), and still includes the
+  section in the Part 3 handoff (never discarded).
 - Ticket statuses (same Part 1 ticket row in PostgreSQL): `intake_complete` →
   `drafting` → `under_evaluation` → `waiting_for_approval` (all pass) or
   `needs_human_review` (exhausted). Drafts and `evaluation_results` persist on

@@ -65,6 +65,12 @@ def reset_engine() -> None:
     global _engine, _engine_url
     _engine = None
     _engine_url = None
+    try:
+        from data.pipelines.rfp_approval.checkpointer import reset_approval_checkpointer
+
+        reset_approval_checkpointer()
+    except Exception:
+        pass
 
 
 def get_db() -> Iterator[Session]:

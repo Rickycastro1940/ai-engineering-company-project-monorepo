@@ -278,6 +278,79 @@ CONTEXT_FORBIDDEN_COMPETITORS: Final[tuple[str, ...]] = (
 CONTEXT_TICKET_OWNER: Final[str] = "Camila Ospina"
 CONTEXT_TICKET_OWNER_DEPARTMENT: Final[str] = "marketing"
 
+# --- CONTEXT §6 / §7 — Part 3 sign-off (do not invent extra hierarchy) ---
+# Sign-off is the named owner of each *active* department (§2.1). The only extra
+# approver CONTEXT names is Mariana Restrepo (CEO) when value > $50,000 USD/year.
+CONTEXT_CEO_DEPARTMENT_ID: Final[str] = "ceo"
+CONTEXT_APPROVAL_DECISIONS: Final[tuple[str, ...]] = (
+    "approved",
+    "rejected",
+    "request_changes",
+)
+CONTEXT_APPROVAL_PENDING: Final[str] = "pending"
+
+# Roles that must NEVER be required (no invented org ladder).
+CONTEXT_FORBIDDEN_EXTRA_APPROVERS: Final[frozenset[str]] = frozenset(
+    {
+        "vp of sales",
+        "vice president",
+        "legal",
+        "general counsel",
+        "cfo",
+        "finance",
+        "coo",
+        "board",
+        "board of directors",
+        "sales director",
+        "head of sales",
+        "cto",
+        "hr",
+    }
+)
+
+# CONTEXT §7 — conflict trigger ids and fixed (non-LLM) arbiters.
+# Arbiter names and resolution rules must match CONTEXT-company.md §7 verbatim intent.
+CONTEXT_ARBITRATION_TRIGGER_IDS: Final[tuple[str, ...]] = (
+    "cost-vs-feasibility",
+    "setup-sla-breach",
+    "ceo-threshold",
+)
+
+CONTEXT_ARBITRATION_RULES: Final[dict[str, dict[str, str]]] = {
+    "cost-vs-feasibility": {
+        "arbiter": CONTEXT_TICKET_OWNER,  # Camila Ospina (Marketing; ticket owner)
+        "arbiter_department_id": CONTEXT_TICKET_OWNER_DEPARTMENT,
+        "action": "request_changes",
+        "resolution": (
+            "Raise price or reduce scope; force request_changes on the mismatched section(s)"
+        ),
+    },
+    "setup-sla-breach": {
+        "arbiter": CONTEXT_DEPARTMENT_OWNERS["operaciones"],  # Felipe Guerrero
+        "arbiter_department_id": "operaciones",
+        "escalation_arbiter": CONTEXT_TICKET_OWNER,  # Camila if other depts still embed it
+        "escalation_department_id": CONTEXT_TICKET_OWNER_DEPARTMENT,
+        "action": "request_changes",
+        "resolution": "Force request_changes until ≥10 business days everywhere",
+    },
+    "ceo-threshold": {
+        "arbiter": CONTEXT_CEO_NAME,  # Mariana Restrepo
+        "arbiter_department_id": CONTEXT_CEO_DEPARTMENT_ID,
+        "action": "block_synthesizer",
+        "resolution": (
+            "Block ultimate synthesizer until CEO approve; reject path if CEO rejects"
+        ),
+    },
+}
+
+# CONTEXT §2.3 FinalDocument — required fields (markdown/extras are optional helpers).
+CONTEXT_FINAL_DOCUMENT_FIELDS: Final[tuple[str, ...]] = (
+    "ticket_id",
+    "sections",
+    "total_estimated_value",
+    "generated_at",
+)
+
 
 def read_context_company_md() -> str:
     """Load CONTEXT-company.md from the repo root."""
@@ -380,3 +453,61 @@ def select_departments_from_content(text_cf: str, *, service_type: str | None = 
 
     order = ["marketing", "operaciones", "procurement", "training"]
     return [d for d in order if d in depts]
+
+
+def parse_context_arbitration_table(text: str | None = None) -> list[dict[str, str]]:
+    """Parse CONTEXT §7 markdown table (trigger id, when, arbiter, resolution)."""
+    source = text if text is not None else read_context_company_md()
+    start = source.find("## 7.")
+    if start == -1:
+        raise ValueError("CONTEXT-company.md is missing section 7 markers")
+    block = source[start:]
+    rows: list[dict[str, str]] = []
+    pattern = re.compile(
+        r"\|\s*`(?P<id>[a-z0-9\-]+)`\s*\|\s*(?P<when>[^|]+?)\s*\|\s*"
+        r"(?P<arbiter>[^|]+?)\s*\|\s*(?P<resolution>[^|]+?)\s*\|"
+    )
+    for match in pattern.finditer(block):
+        trigger_id = match.group("id").strip()
+        if trigger_id in {"trigger id", "Trigger id"}:
+            continue
+        rows.append(
+            {
+                "trigger_id": trigger_id,
+                "when": match.group("when").strip(),
+                "arbiter": match.group("arbiter").strip(),
+                "resolution": match.group("resolution").strip(),
+            }
+        )
+    return rows
+
+
+def required_signoffs(
+    departments_needed: list[str],
+    *,
+    requires_ceo_approval: bool,
+) -> list[dict[str, str]]:
+    """Named owner of each active department, plus CEO only when CONTEXT requires it.
+
+    Does not invent VP / Legal / Finance / multi-level ladders.
+    """
+    signoffs: list[dict[str, str]] = []
+    for dept_id in departments_needed:
+        if dept_id not in CONTEXT_DEPARTMENT_IDS:
+            continue
+        signoffs.append(
+            {
+                "department_id": dept_id,
+                "approver": CONTEXT_DEPARTMENT_OWNERS[dept_id],
+                "role": "department_owner",
+            }
+        )
+    if requires_ceo_approval:
+        signoffs.append(
+            {
+                "department_id": CONTEXT_CEO_DEPARTMENT_ID,
+                "approver": CONTEXT_CEO_NAME,
+                "role": "ceo",
+            }
+        )
+    return signoffs

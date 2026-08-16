@@ -19,6 +19,8 @@ EVALUATOR_UNIT = REPO / "tests" / "pipelines" / "test_rfp_evaluator_agent_unit.p
 COMPLIANCE_FAIL_UNIT = (
     REPO / "tests" / "pipelines" / "test_rfp_compliance_context_failure_unit.py"
 )
+APPROVAL_OWNERS_UNIT = REPO / "tests" / "pipelines" / "test_rfp_approval_owners_unit.py"
+ARBITRATION_UNIT = REPO / "tests" / "pipelines" / "test_rfp_arbitration_unit.py"
 
 
 def _test_function_names(path: Path) -> list[str]:
@@ -88,6 +90,25 @@ def test_compliance_failure_unit_is_one_context_rule_fixture() -> None:
     assert "TestClient" not in src
 
 
+def test_approval_owners_unit_covers_context_named_signoff() -> None:
+    assert APPROVAL_OWNERS_UNIT.is_file()
+    src = APPROVAL_OWNERS_UNIT.read_text(encoding="utf-8")
+    assert "Camila Ospina" in src
+    assert "Mariana Restrepo" in src
+    assert "UnknownApproverError" in src
+    assert "TestClient" not in src
+
+
+def test_arbitration_unit_wires_context_section_7_trigger_ids() -> None:
+    assert ARBITRATION_UNIT.is_file()
+    src = ARBITRATION_UNIT.read_text(encoding="utf-8")
+    assert "cost-vs-feasibility" in src
+    assert "setup-sla-breach" in src
+    assert "ceo-threshold" in src
+    assert "apply_fixed_arbitration" in src
+    assert "TestClient" not in src
+
+
 def test_unit_modules_are_not_http_integration_tests() -> None:
     """Unit modules must not spin up FastAPI / TestClient."""
     for path in (
@@ -96,6 +117,8 @@ def test_unit_modules_are_not_http_integration_tests() -> None:
         GENERATOR_UNIT,
         EVALUATOR_UNIT,
         COMPLIANCE_FAIL_UNIT,
+        APPROVAL_OWNERS_UNIT,
+        ARBITRATION_UNIT,
     ):
         src = path.read_text(encoding="utf-8")
         assert "TestClient" not in src
