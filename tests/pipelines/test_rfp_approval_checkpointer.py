@@ -126,6 +126,127 @@ def test_concurrent_tickets_do_not_share_checkpoint_identity() -> None:
     assert done_b.get("final_document", {}).get("ticket_id") == b
 
 
+def test_department_scoped_threads_and_concurrent_runs_do_not_collide(
+    tmp_path: Path,
+) -> None:
+    """``RFP-{ticket}`` and ``RFP-{ticket}:{department}`` are distinct; runs stay isolated."""
+    import json
+
+    ticket = "ns-ticket-1"
+    other = "ns-ticket-2"
+    tid_ticket = approval_thread_id(ticket)
+    tid_mkt = approval_thread_id(ticket, department_id="marketing")
+    tid_ops = approval_thread_id(ticket, department_id="operaciones")
+    tid_other = approval_thread_id(other)
+
+    assert tid_ticket == "RFP-ns-ticket-1"
+    assert tid_mkt == "RFP-ns-ticket-1:marketing"
+    assert tid_ops == "RFP-ns-ticket-1:operaciones"
+    assert tid_other == "RFP-ns-ticket-2"
+    assert len({tid_ticket, tid_mkt, tid_ops, tid_other}) == 4
+    assert tid_mkt.startswith(tid_ticket + ":")
+    assert tid_ops.startswith(tid_ticket + ":")
+    assert not tid_other.startswith(tid_ticket)
+
+    # Foreign / ephemeral overrides are nested under the ticket namespace.
+    assert ensure_rfp_thread_id("custom-run", ticket) == "RFP-ns-ticket-1:custom-run"
+    assert ensure_rfp_thread_id("RFP-ns-ticket-2:x", ticket).startswith(
+        "RFP-ns-ticket-1:"
+    )
+    eph_a = ephemeral_rfp_thread_id(ticket)
+    eph_b = ephemeral_rfp_thread_id(ticket)
+    assert eph_a != eph_b
+    assert eph_a.startswith("RFP-ns-ticket-1:run-")
+    assert eph_b.startswith("RFP-ns-ticket-1:run-")
+
+    sections = [
+        {
+            "department_id": "marketing",
+            "draft_content": "## Brand terms\nOffer validity period: 30 days.\n",
+        }
+    ]
+    # Concurrent department-scoped branches on the *same* ticket id namespace
+    # must not share one undifferentiated checkpoint key.
+    paused_mkt = invoke_rfp_approval_graph(
+        ticket_id=ticket,
+        status=STATUS_WAITING_FOR_APPROVAL,
+        sections=sections,
+        metadata={"client_name": "Andes Tech Solutions"},
+        departments_needed=["marketing"],
+        requires_ceo_approval=False,
+        use_interrupt=True,
+        thread_id=tid_mkt,
+    )
+    paused_ops = invoke_rfp_approval_graph(
+        ticket_id=ticket,
+        status=STATUS_WAITING_FOR_APPROVAL,
+        sections=[
+            {
+                "department_id": "operaciones",
+                "draft_content": "## Setup times\nSetup in 12 business days.\n",
+            }
+        ],
+        metadata={"client_name": "Andes Tech Solutions"},
+        departments_needed=["operaciones"],
+        requires_ceo_approval=False,
+        use_interrupt=True,
+        thread_id=tid_ops,
+    )
+    assert paused_mkt.get("__interrupt__")
+    assert paused_ops.get("__interrupt__")
+
+    done_mkt = invoke_rfp_approval_graph(
+        ticket_id=ticket,
+        status=STATUS_WAITING_FOR_APPROVAL,
+        sections=sections,
+        metadata={"client_name": "Andes Tech Solutions"},
+        departments_needed=["marketing"],
+        requires_ceo_approval=False,
+        use_interrupt=True,
+        thread_id=tid_mkt,
+        resume={
+            "department_id": "marketing",
+            "decision": "approved",
+            "approver": "Camila Ospina",
+        },
+    )
+    assert done_mkt.get("status") == "done"
+
+    graph = get_compiled_rfp_approval_graph()
+    ops_state = graph.get_state({"configurable": {"thread_id": tid_ops}})
+    assert ops_state.interrupts or ops_state.next, (
+        "operaciones department thread must stay paused after marketing thread completes"
+    )
+
+    artifact = Path("/opt/cursor/artifacts/rfp_thread_id_namespace.json")
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_text(
+        json.dumps(
+            {
+                "claim": (
+                    "thread_id is namespaced by ticket (and department if applicable); "
+                    "concurrent runs do not share checkpoints"
+                ),
+                "ids": {
+                    "ticket": tid_ticket,
+                    "marketing": tid_mkt,
+                    "operaciones": tid_ops,
+                    "other_ticket": tid_other,
+                    "ephemeral_a": eph_a,
+                    "ephemeral_b": eph_b,
+                },
+                "after_marketing_done": {
+                    "marketing_status": done_mkt.get("status"),
+                    "operaciones_thread_still_paused": bool(
+                        ops_state.interrupts or ops_state.next
+                    ),
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
 def test_default_backend_is_sqlite_file_not_memory(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
