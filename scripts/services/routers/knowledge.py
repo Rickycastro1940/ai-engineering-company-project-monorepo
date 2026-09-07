@@ -1,12 +1,13 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
 from data.pipelines.rag import query
 
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 
 
 class QueryRequest(BaseModel):
-    question: str
+    question: str = Field(min_length=1)
 
 
 class QueryResponse(BaseModel):
@@ -14,16 +15,12 @@ class QueryResponse(BaseModel):
 
 
 @router.post("/query", response_model=QueryResponse)
-async def query_knowledge_base(payload: QueryRequest):
-    """
-    Accepts a question, delegates to data.pipelines.rag.query(),
-    and returns only the model-generated answer string.
-    """
-    if not payload.question.strip():
-        raise HTTPException(status_code=400, detail="Question cannot be empty.")
-
+def query_knowledge_base(payload: QueryRequest) -> QueryResponse:
     try:
-        answer_text = query(payload.question)
+        answer_text = query(payload.question.strip())
         return QueryResponse(answer=answer_text)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to process query: {str(e)}")
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to process knowledge query: {error}",
+        ) from error

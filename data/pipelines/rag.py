@@ -1,50 +1,163 @@
+import logging
 import os
-from openai import OpenAI
+from collections.abc import Callable, Iterator
+
 from qdrant_client import QdrantClient
-from data.process.rag import embed, COLLECTION_NAME
 
-GENERATION_MODEL = "gpt-4o-mini"
-MIN_SCORE = 0.40  # Threshold to prevent hallucination
+from data.process.rag import COLLECTION_NAME, embed
+from shared.llm_config import GENERATION_MODEL_ID, generation_client
 
-client = OpenAI()
-qdrant_client = QdrantClient(host=os.getenv("QDRANT_HOST", "localhost"), port=6333)
+logger = logging.getLogger(__name__)
 
-def retrieve(query_str: str, k: int = 3, min_score: float = MIN_SCORE) -> list[dict]:
-    query_vector = embed(query_str)
-    search_results = qdrant_client.search(
+DEFAULT_K = 5
+MIN_SCORE = 0.68  # Calibrated for pplx-embed-v1-0.6b (valid matches often score ~0.68–0.85)
+
+qdrant_client = QdrantClient(
+    host=os.getenv("QDRANT_HOST", "localhost"),
+    port=int(os.getenv("QDRANT_PORT", 6333)),
+)
+
+SYSTEM_PROMPT = (
+    "You are a Brasaland sales representative helping the commercial team answer prospect and "
+    "client questions about our grilled-food restaurant chain in Colombia and Florida. "
+    "Answer from a salesperson's perspective — professional, helpful, and aligned with how "
+    "Brasaland presents itself to customers. "
+    "Use ONLY the retrieved context provided in the user message; do not rely on outside knowledge "
+    "or invent company facts, numbers, weights, or percentages. "
+    "Keep currency values (USD $, COP $) exactly as written — never convert. "
+    "Never claim zero allergen risk or 100% safety; follow the source wording. "
+    'If the retrieved context is insufficient, say exactly: "There is not enough information available."'
+)
+
+
+def retrieve(query: str, *, k: int = DEFAULT_K, min_score: float = MIN_SCORE) -> list[dict]:
+    """Embed the query, search Qdrant for top-k neighbors, and return surviving payloads.
+
+    Hits below ``min_score`` are dropped. Each returned dict is a plain payload copy
+    (source_document, section, text, etc.) plus a ``_score`` field — never raw SDK objects.
+    """
+    query_vector = embed(query)
+    search_results = qdrant_client.query_points(
         collection_name=COLLECTION_NAME,
-        query_vector=query_vector,
-        limit=k
+        query=query_vector,
+        limit=k,
+    ).points
+
+    surviving: list[dict] = []
+    for hit in search_results:
+        if hit.score >= min_score and hit.payload:
+            payload = dict(hit.payload)
+            payload["_score"] = hit.score
+            surviving.append(payload)
+
+    if os.getenv("RAG_DEBUG", "").lower() in {"1", "true", "yes"}:
+        for chunk in surviving:
+            logger.debug(
+                "rag retrieve hit: source=%s section=%s score=%.3f",
+                chunk.get("source_document"),
+                chunk.get("section"),
+                chunk.get("_score", 0.0),
+            )
+
+    return surviving
+
+
+NO_CONTEXT_ANSWER = "There is not enough information available to answer this question."
+
+
+def _chat_messages(question: str, history: list[dict] | None = None) -> list[dict] | None:
+    retrieved_chunks = retrieve(question, k=DEFAULT_K, min_score=MIN_SCORE)
+    if not retrieved_chunks:
+        return None
+
+    context = "\n\n".join(
+        [
+            f"--- {chunk.get('source_document', 'unknown')} / {chunk.get('section', '')} ---\n{chunk.get('text', '')}"
+            for chunk in retrieved_chunks
+        ]
     )
-    return [hit.payload for hit in search_results if hit.score >= min_score]
+    messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    for turn in history or []:
+        role = turn.get("role")
+        content = (turn.get("content") or "").strip()
+        if role in {"user", "assistant"} and content:
+            messages.append({"role": role, "content": content})
+    messages.append({"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"})
+    return messages
+
+
+def query_stream(
+    question: str,
+    *,
+    history: list[dict] | None = None,
+    should_cancel: Callable[[], bool] | None = None,
+    on_abort: Callable[[Callable[[], None]], None] | None = None,
+) -> Iterator[str]:
+    """Yield assistant text deltas (OpenAI ``delta.content``). Stops when ``should_cancel``.
+
+    On cancel, the HTTP stream is closed so the model stops generating. This is a
+    generation abort, not LangGraph ``interrupt()`` HITL.
+    """
+    if should_cancel and should_cancel():
+        return
+
+    messages = _chat_messages(question, history)
+    if messages is None:
+        yield NO_CONTEXT_ANSWER
+        return
+
+    stream = generation_client.chat.completions.create(
+        model=GENERATION_MODEL_ID,
+        messages=messages,
+        temperature=0.0,
+        stream=True,
+    )
+
+    def close_stream() -> None:
+        close = getattr(stream, "close", None)
+        if callable(close):
+            try:
+                close()
+            except Exception:
+                pass
+
+    if on_abort is not None:
+        on_abort(close_stream)
+
+    try:
+        for chunk in stream:
+            if should_cancel and should_cancel():
+                return
+            choices = getattr(chunk, "choices", None) or []
+            if not choices:
+                continue
+            delta = getattr(choices[0], "delta", None)
+            text = getattr(delta, "content", None) if delta is not None else None
+            if text:
+                yield text
+            if should_cancel and should_cancel():
+                return
+    finally:
+        close_stream()
+
 
 def query(question: str) -> str:
-    retrieved_chunks = retrieve(question)
-    
-    if not retrieved_chunks:
-        return "There is not enough information available to answer this question."
-    
-    context = "\n\n".join([f"--- {chunk['source_document']} ---\n{chunk['text']}" for chunk in retrieved_chunks])
-    
-    prompt = f"""
-    You are an expert sales and operational assistant for Brasaland. 
+    """Public RAG entry point: retrieve → prompt assembly → generation → answer string.
 
-    STRICT BUSINESS RULES:
-    1. Base your answer ONLY on the provided Context.
-    2. NEVER say 'zero risk' or '100% safe' for allergen questions. Follow the literal wording in the context.
-    3. Keep all currency values (USD $, COP $) EXACTLY as they appear in the source text. DO NOT convert currencies.
-    4. Do NOT invent or estimate any numerical values, weights, percentages, or quantities not present in the context.
-    5. If the context does not contain enough information, say: "There is not enough information available."
+    External consumers (API, UI, scripts) should call only this function — not ``retrieve()``
+    or ``embed()`` directly.
 
-    Context:
-    {context}
-
-    Question: {question}
+    Uses the dedicated generation model (``GENERATION_MODEL_ID`` via 4Geeks gateway), never the
+    embedding model. When ``retrieve()`` finds no chunks above ``min_score``, returns an honest
+    fallback without calling the LLM so company facts are never invented.
     """
-    
-    response = client.chat.completions.create(
-        model=GENERATION_MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.0
+    messages = _chat_messages(question)
+    if messages is None:
+        return NO_CONTEXT_ANSWER
+
+    response = generation_client.chat.completions.create(
+        model=GENERATION_MODEL_ID,
+        messages=messages,
+        temperature=0.0,
     )
-    return response.choices[0].message.content
+    return response.choices[0].message.content or "There is not enough information available."

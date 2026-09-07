@@ -1,0 +1,316 @@
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#organization",
+      "name": "Brasaland",
+      "description": "Grilled-food restaurant chain operating in Colombia and Florida (US). Sirloin, ribs, and chicken over the brasa, with house sauce and corn arepas. Brasa Points are valid at every location. Florida stays in USD $; Colombia stays in COP $.",
+      "url": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/images/brasaland-logo.svg"
+      },
+      "sameAs": [
+        "https://github.com/Rickycastro1940/ai-engineering-company-project-monorepo"
+      ],
+      "areaServed": [
+        {
+          "@type": "Country",
+          "name": "Colombia"
+        },
+        {
+          "@type": "AdministrativeArea",
+          "name": "Florida",
+          "containedInPlace": {
+            "@type": "Country",
+            "name": "United States"
+          }
+        }
+      ],
+      "hasMenu": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#menu"
+      },
+      "subOrganization": [
+        { "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#miami-downtown" },
+        { "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#bogota-norte" },
+        { "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#COL-01" },
+        { "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#COL-02" },
+        { "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#COL-03" },
+        { "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#COL-04" },
+        { "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#COL-05" },
+        { "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#COL-06" },
+        { "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#COL-07" },
+        { "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#COL-08" },
+        { "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#COL-09" },
+        { "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#COL-10" }
+      ]
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#website",
+      "name": "Brasaland",
+      "url": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/",
+      "inLanguage": ["en", "es"],
+      "publisher": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#organization"
+      }
+    },
+    {
+      "@type": "Menu",
+      "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#menu",
+      "name": "Brasaland guest menu",
+      "url": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/menu.html",
+      "hasMenuSection": [
+        {
+          "@type": "MenuSection",
+          "name": "From the grill",
+          "hasMenuItem": [
+            {
+              "@type": "MenuItem",
+              "name": "Grilled Sirloin",
+              "alternateName": "Lomo a la Brasa",
+              "description": "Beef sirloin over the brasa, with a marinade."
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Brasaland BBQ Ribs",
+              "description": "Grilled ribs with imported sauce."
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Classic Grilled Chicken",
+              "description": "Chicken cooked over the brasa."
+            }
+          ]
+        },
+        {
+          "@type": "MenuSection",
+          "name": "Salad, side, and sauce",
+          "hasMenuItem": [
+            {
+              "@type": "MenuItem",
+              "name": "Tropical Salad",
+              "description": "With cashew and feta."
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Corn Arepa",
+              "description": "Served with the grill."
+            },
+            {
+              "@type": "MenuItem",
+              "name": "House Sauce",
+              "description": "Brasaland house sauce."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "@type": ["Restaurant", "LocalBusiness", "FoodEstablishment"],
+      "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#miami-downtown",
+      "name": "Brasaland",
+      "branchCode": "miami-downtown",
+      "parentOrganization": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#organization"
+      },
+      "currenciesAccepted": "USD",
+      "hasMenu": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#menu"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressRegion": "Florida",
+        "addressCountry": "US"
+      }
+    },
+    {
+      "@type": ["Restaurant", "LocalBusiness", "FoodEstablishment"],
+      "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#bogota-norte",
+      "name": "Brasaland",
+      "branchCode": "bogota-norte",
+      "parentOrganization": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#organization"
+      },
+      "currenciesAccepted": "COP",
+      "hasMenu": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#menu"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CO"
+      }
+    },
+    {
+      "@type": ["Restaurant", "LocalBusiness", "FoodEstablishment"],
+      "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#COL-01",
+      "name": "Brasaland",
+      "branchCode": "COL-01",
+      "parentOrganization": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#organization"
+      },
+      "currenciesAccepted": "COP",
+      "hasMenu": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#menu"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CO"
+      }
+    },
+    {
+      "@type": ["Restaurant", "LocalBusiness", "FoodEstablishment"],
+      "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#COL-02",
+      "name": "Brasaland",
+      "branchCode": "COL-02",
+      "parentOrganization": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#organization"
+      },
+      "currenciesAccepted": "COP",
+      "hasMenu": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#menu"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CO"
+      }
+    },
+    {
+      "@type": ["Restaurant", "LocalBusiness", "FoodEstablishment"],
+      "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#COL-03",
+      "name": "Brasaland",
+      "branchCode": "COL-03",
+      "parentOrganization": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#organization"
+      },
+      "currenciesAccepted": "COP",
+      "hasMenu": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#menu"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CO"
+      }
+    },
+    {
+      "@type": ["Restaurant", "LocalBusiness", "FoodEstablishment"],
+      "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#COL-04",
+      "name": "Brasaland",
+      "branchCode": "COL-04",
+      "parentOrganization": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#organization"
+      },
+      "currenciesAccepted": "COP",
+      "hasMenu": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#menu"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CO"
+      }
+    },
+    {
+      "@type": ["Restaurant", "LocalBusiness", "FoodEstablishment"],
+      "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#COL-05",
+      "name": "Brasaland",
+      "branchCode": "COL-05",
+      "parentOrganization": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#organization"
+      },
+      "currenciesAccepted": "COP",
+      "hasMenu": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#menu"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CO"
+      }
+    },
+    {
+      "@type": ["Restaurant", "LocalBusiness", "FoodEstablishment"],
+      "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#COL-06",
+      "name": "Brasaland",
+      "branchCode": "COL-06",
+      "parentOrganization": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#organization"
+      },
+      "currenciesAccepted": "COP",
+      "hasMenu": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#menu"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CO"
+      }
+    },
+    {
+      "@type": ["Restaurant", "LocalBusiness", "FoodEstablishment"],
+      "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#COL-07",
+      "name": "Brasaland",
+      "branchCode": "COL-07",
+      "parentOrganization": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#organization"
+      },
+      "currenciesAccepted": "COP",
+      "hasMenu": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#menu"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CO"
+      }
+    },
+    {
+      "@type": ["Restaurant", "LocalBusiness", "FoodEstablishment"],
+      "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#COL-08",
+      "name": "Brasaland",
+      "branchCode": "COL-08",
+      "parentOrganization": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#organization"
+      },
+      "currenciesAccepted": "COP",
+      "hasMenu": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#menu"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CO"
+      }
+    },
+    {
+      "@type": ["Restaurant", "LocalBusiness", "FoodEstablishment"],
+      "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#COL-09",
+      "name": "Brasaland",
+      "branchCode": "COL-09",
+      "parentOrganization": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#organization"
+      },
+      "currenciesAccepted": "COP",
+      "hasMenu": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#menu"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CO"
+      }
+    },
+    {
+      "@type": ["Restaurant", "LocalBusiness", "FoodEstablishment"],
+      "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#COL-10",
+      "name": "Brasaland",
+      "branchCode": "COL-10",
+      "parentOrganization": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#organization"
+      },
+      "currenciesAccepted": "COP",
+      "hasMenu": {
+        "@id": "https://rickycastro1940.github.io/ai-engineering-company-project-monorepo/#menu"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CO"
+      }
+    }
+  ]
+}
