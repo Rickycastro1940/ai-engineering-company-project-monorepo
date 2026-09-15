@@ -1,0 +1,26 @@
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+const apiTarget = process.env.VITE_API_PROXY ?? "http://127.0.0.1:8000";
+
+// Internal app — separate from uis/website. Proxy API to FastAPI.
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 5174,
+    proxy: {
+      "/locations": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+      "/inventory": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+      "/api": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+    },
+  },
+});
