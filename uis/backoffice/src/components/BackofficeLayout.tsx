@@ -1,11 +1,17 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { useAuth } from "../auth/AuthProvider";
 import "./BackofficeLayout.css";
+import "../pages/AuthPages.css";
 
 const nav = [
   { to: "/accessible", label: "Accessible entry", end: true },
+  { to: "/account/profile", label: "Profile", end: true },
+  { to: "/account/change-password", label: "Change password", end: true },
 ];
 
 export function BackofficeLayout() {
+  const { user, logout } = useAuth();
+
   return (
     <div className="bo-shell">
       <aside className="bo-sidebar" aria-label="Backoffice navigation">
@@ -30,6 +36,12 @@ export function BackofficeLayout() {
             </NavLink>
           ))}
         </nav>
+        <div className="bo-session">
+          <p className="bo-session__email">{user?.name || user?.email}</p>
+          <button type="button" className="bo-session__logout" onClick={logout}>
+            Logout
+          </button>
+        </div>
         <p className="bo-sidebar__note">
           Separate from the public site in <code>uis/website</code>.
         </p>

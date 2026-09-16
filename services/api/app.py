@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from inventory import router as inventory_router
 from locations import router as locations_router
 from pydantic import BaseModel, Field
+from users import router as users_router
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 UI_ROOT = REPO_ROOT / "uis" / "web"
@@ -104,6 +105,7 @@ app.add_middleware(
 )
 app.include_router(locations_router)
 app.include_router(inventory_router)
+app.include_router(users_router)
 _register_analyze_routes(app, "anylayze")
 _register_analyze_routes(app, "analyze")
 

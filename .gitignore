@@ -8,6 +8,7 @@ conversation_log.csv
 conversation_log.csv.bak
 data/uploads/
 data/celery_dead_letters.sqlite3
+data/company_api.db
 **/__pycache__/
 .DS_Store
 **/node_modules/

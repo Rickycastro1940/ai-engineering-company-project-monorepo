@@ -17,6 +17,18 @@ export default defineConfig({
         target: apiTarget,
         changeOrigin: true,
       },
+      "/auth": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+      "/users": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+      "/profiles": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
       "/api": {
         target: apiTarget,
         changeOrigin: true,

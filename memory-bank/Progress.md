@@ -1,6 +1,6 @@
 # Progress — Brasaland Digital
 
-Verified **2026-09-15** on clone `Rickycastro1940/ai-engineering-company-project-monorepo`, branch `feature/agent-memory-bank`. Gaps below are scored against root [`CONTEXT.md`](../CONTEXT.md) department needs.
+Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project-monorepo`, branch `feature/auth-frontend`. Gaps below are scored against root [`CONTEXT.md`](../CONTEXT.md) department needs.
 
 ## Agent infrastructure (aligned to `CONTEXT.md`)
 
@@ -13,7 +13,7 @@ Verified **2026-09-15** on clone `Rickycastro1940/ai-engineering-company-project
 
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
-| Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` (`path_count=14` on `:8001`) |
+| Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
 | Technology: telemetry + pipeline to dashboards | **Partial** — `data/pipelines/` weekly location cost/waste; Celery async path |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Not done** as product UI; pipeline design targets cost/waste for Mariana + Felipe |
 | Procurement: supplier price history, consolidated spend | **Not done** (supplier docs may exist on other branches; not claimed here) |
@@ -30,8 +30,39 @@ Verified **2026-09-15** on clone `Rickycastro1940/ai-engineering-company-project
 | Incident analysis UI | `uis/web` |
 | Weekly cost/waste pipeline + Celery | `data/pipelines/`, `services/tasks.py`, Compose Redis/Flower/worker on this branch |
 | Public corporate website | `uis/website/` — Vite/React, route `/`, brand tokens + components from `CONTEXT.md`; screenshot `docs/screenshots/website-corporate-home.png` |
-| Internal backoffice | `uis/backoffice/` — Vite/React, route `/accessible`, sidebar layout; loads `GET /locations/overview` (14 / 8 Colombia / 6 Florida); screenshot `docs/screenshots/backoffice-accessible.png` |
-| Locations API | `services/api/locations.py` — 14 locations, Colombia 8 / Florida 6, COP+USD |
+| Internal backoffice | `uis/backoffice/` — JWT session; client layout guard (`ProtectedRoute` + `useRequireAuth`) on `/`, `/accessible`, `/account/profile`, `/account/change-password`; `/accessible` loads JWT-gated locations (14 / 8 Colombia / 6 Florida, COP+USD) plus inventory |
+| Locations API | `services/api/locations.py` — 14 locations, Colombia 8 / Florida 6, COP+USD; **Bearer JWT required** |
+
+## Latest auth-frontend evidence (`feature/auth-frontend`)
+
+Department served: **Technology** (JSON auth API restored onto the central FastAPI app) + **Operations/Executive** (staff backoffice is now session-gated).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+GET /locations/overview without token → 401
+POST /auth/login → 200 + user + access_token
+GET /locations/overview with Bearer → 200, 14 locations, COP+USD
+GET /inventory with Bearer → 200
+pytest tests/test_users_api.py → 17 passed
+cd uis/backoffice && npm run build → green
+GET /auth/me with Bearer → email + name/phone/address
+PUT /profiles/me anonymous → 401; with Bearer → 200 contact fields
+Browser /account/profile → GET /auth/me email + contact; save → PUT /profiles/me 200 “Profile updated.”
+/account/change-password still renders after profile save
+Client guard: no token → /login?next= for /, /accessible, /account/profile, /account/change-password
+Login stores auth_token in localStorage; /accessible loads locations+inventory with Bearer
+Logout removes auth_token and lands on /login
+Protected 401 → clearSessionAndRedirectToLogin()
+uis/website `/` (5173) loads corporate home with no login redirect
+GET /auth/me with invalid Bearer → 401
+E2E eval: register → token stored → /accessible; /account/profile email+name; PUT /profiles/me 200; logout /login no token; invalid JWT → GET /auth/me 401 → /login no token
+Website `/` no auth_token, no login links
+React 19.3.0 + react-dom in uis/backoffice and uis/website; vite-plugin-react; npm run build bundles createRoot/useState
+Live #root has __reactContainer$ on :5174/login and :5173/
+
+```
+
+JWT login/register for the staff console is **present**. Technology’s menus/sales/customers/suppliers nouns remain **missing**.
 
 ## Latest verify-brasaland-api evidence (`feature/agent-memory-bank`)
 

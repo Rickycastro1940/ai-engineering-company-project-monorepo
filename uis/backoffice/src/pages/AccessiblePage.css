@@ -163,6 +163,31 @@
   font-size: 0.85em;
 }
 
+.accessible__table-wrap {
+  overflow: auto;
+  max-height: 22rem;
+}
+
+.accessible__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.accessible__table th,
+.accessible__table td {
+  text-align: left;
+  padding: 0.45rem 0.35rem;
+  border-bottom: 1px solid var(--bo-panel-2);
+}
+
+.accessible__table th {
+  color: var(--bo-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 @media (min-width: 960px) {
   .accessible__dashboard {
     grid-template-columns: 1.2fr 1fr;

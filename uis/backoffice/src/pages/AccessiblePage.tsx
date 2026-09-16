@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import {
+  fetchInventory,
   fetchLocationsOverview,
+  type InventoryProduct,
   type LocationsOverview,
 } from "../lib/api";
 import "./AccessiblePage.css";
 
 export function AccessiblePage() {
   const [overview, setOverview] = useState<LocationsOverview | null>(null);
+  const [inventory, setInventory] = useState<InventoryProduct[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -17,17 +20,22 @@ export function AccessiblePage() {
       setLoading(true);
       setError(null);
       try {
-        const data = await fetchLocationsOverview();
+        const [locationData, inventoryData] = await Promise.all([
+          fetchLocationsOverview(),
+          fetchInventory(),
+        ]);
         if (!cancelled) {
-          setOverview(data);
+          setOverview(locationData);
+          setInventory(inventoryData);
         }
       } catch (err) {
         if (!cancelled) {
           setOverview(null);
+          setInventory(null);
           setError(
             err instanceof Error
               ? err.message
-              : "Unable to load company locations",
+              : "Unable to load protected operations data",
           );
         }
       } finally {
@@ -46,24 +54,25 @@ export function AccessiblePage() {
   return (
     <section className="accessible" aria-labelledby="accessible-title">
       <div className="accessible__welcome">
-        <p className="accessible__kicker">Welcome</p>
+        <p className="accessible__kicker">Protected view</p>
         <h2 id="accessible-title">Brasaland operations entry</h2>
         <p className="accessible__lead">
-          Internal entry view for Brasaland Digital. This screen surfaces the
-          company location footprint from <strong>CONTEXT.md</strong> via{" "}
-          <code>GET /locations/overview</code> — 14 company-owned restaurants
-          across Colombia and Florida, with COP and USD.
+          Staff console for Felipe Guerrero and Mariana Restrepo. After login,
+          this page loads <code>GET /locations/overview</code> (JWT required)
+          and <code>GET /inventory</code> with <code>Authorization: Bearer</code>{" "}
+          — 14 restaurants across Colombia and Florida, COP and USD.
         </p>
       </div>
 
-      <div className="accessible__dashboard" aria-label="Empty dashboard frame">
+      <div className="accessible__dashboard" aria-label="Authenticated operations dashboard">
         <div className="accessible__panel accessible__panel--span">
           <h3>Company footprint</h3>
-          {loading && <p className="accessible__status">Loading locations…</p>}
+          {loading && <p className="accessible__status">Loading protected location data…</p>}
           {error && (
             <p className="accessible__error" role="alert">
               {error}. Start the API with{" "}
-              <code>uvicorn api.app:app --reload</code> on port 8000.
+              <code>uvicorn api.app:app --reload</code> on port 8000 and sign in
+              again.
             </p>
           )}
           {overview && (
@@ -127,7 +136,37 @@ export function AccessiblePage() {
               ))}
             </ul>
           ) : (
-            <p className="accessible__status">Waiting for API data…</p>
+            <p className="accessible__status">Waiting for authenticated API data…</p>
+          )}
+        </div>
+
+        <div className="accessible__panel">
+          <h3>Kitchen inventory</h3>
+          {loading && <p className="accessible__status">Loading inventory…</p>}
+          {inventory && inventory.length === 0 && (
+            <p className="accessible__status">No products in products.csv yet.</p>
+          )}
+          {inventory && inventory.length > 0 && (
+            <div className="accessible__table-wrap">
+              <table className="accessible__table">
+                <thead>
+                  <tr>
+                    <th scope="col">Product</th>
+                    <th scope="col">Quantity</th>
+                    <th scope="col">Unit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inventory.map((product) => (
+                    <tr key={product.product_id}>
+                      <td>{product.name}</td>
+                      <td>{product.quantity}</td>
+                      <td>{product.unit}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 

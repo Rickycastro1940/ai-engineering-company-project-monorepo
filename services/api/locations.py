@@ -7,10 +7,15 @@ from __future__ import annotations
 
 from typing import Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
+from users import get_current_user
 
-router = APIRouter(prefix="/locations", tags=["locations"])
+router = APIRouter(
+    prefix="/locations",
+    tags=["locations"],
+    dependencies=[Depends(get_current_user)],
+)
 
 Country = Literal["Colombia", "United States"]
 Currency = Literal["COP", "USD"]
