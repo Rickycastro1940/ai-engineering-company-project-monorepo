@@ -124,6 +124,19 @@ curl "http://127.0.0.1:8000/inventory/alerts?threshold=20"
 
 Interactive docs: `http://127.0.0.1:8000/docs`
 
+## Auth endpoints (previous JSON delivery)
+
+SQLite user store: `data/company_api.db`. Set `JWT_SECRET_KEY` so tokens survive reloads.
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `POST` | `/auth/register` | Create user + JWT (`email`, `password` ≥ 8). First user is admin. |
+| `POST` | `/auth/login` | JSON login → `{ access_token, token_type }` |
+| `POST` | `/auth/token` | OAuth2 form login (`username` = email) |
+| `GET` | `/auth/me` | Current user (Bearer), including `name`/`phone`/`address` |
+| `PUT` | `/profiles/me` | Update own name and contact fields (Bearer) |
+| `GET`/`PUT`/`DELETE` | `/users/{id}` | Profile and password updates (self or admin) |
+
 ## Incident analysis endpoints
 
 The FastAPI app also includes:

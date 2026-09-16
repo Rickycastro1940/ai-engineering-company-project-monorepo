@@ -1,0 +1,60 @@
+:root {
+  /* Internal backoffice identity — slate ops console (distinct from public ember/grill site) */
+  --bo-bg: #0f172a;
+  --bo-panel: #1e293b;
+  --bo-panel-2: #334155;
+  --bo-border: #475569;
+  --bo-text: #e2e8f0;
+  --bo-muted: #94a3b8;
+  --bo-accent: #38bdf8;
+  --bo-ok: #4ade80;
+  --bo-warn: #fbbf24;
+  --bo-cop: #34d399;
+  --bo-usd: #60a5fa;
+
+  --font-ui: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --sidebar-w: 15rem;
+  --radius: 0.5rem;
+
+  color-scheme: dark;
+  font-family: var(--font-ui);
+  line-height: 1.5;
+  color: var(--bo-text);
+  background: var(--bo-bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font: inherit;
+}

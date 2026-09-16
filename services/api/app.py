@@ -8,10 +8,13 @@ from typing import Literal
 
 from analyzer import IncidentAnalyzer
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from inventory import router as inventory_router
+from locations import router as locations_router
 from pydantic import BaseModel, Field
+from users import router as users_router
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 UI_ROOT = REPO_ROOT / "uis" / "web"
@@ -87,8 +90,22 @@ def _register_analyze_routes(app: FastAPI, route_prefix: str) -> None:
             await file.close()
         return summary
 
-app = FastAPI(title="Company Incident File Analyzer", version="1.0.0")
+app = FastAPI(title="Brasaland Central API", version="1.0.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.include_router(locations_router)
 app.include_router(inventory_router)
+app.include_router(users_router)
 _register_analyze_routes(app, "anylayze")
 _register_analyze_routes(app, "analyze")
 
