@@ -1,6 +1,13 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
+import { FetchError, Spinner } from "../components/AsyncState";
 import { useAuth } from "../auth/AuthProvider";
-import { fetchCurrentUser, updateMyProfile } from "../lib/api";
+import {
+  SUPPORT_PROMPT,
+  fetchCurrentUser,
+  toUserFacingMessage,
+  updateMyProfile,
+} from "../lib/api";
 import "./AuthPages.css";
 
 export function ProfilePage() {
@@ -10,13 +17,22 @@ export function ProfilePage() {
   const [address, setAddress] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [loadStatus, setLoadStatus] = useState<"loading" | "success" | "error">("loading");
+  const [loadError, setLoadError] = useState("");
+  const [loadNonce, setLoadNonce] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const retryLoad = useCallback(() => {
+    setLoadNonce((value) => value + 1);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
+    let outcome: "success" | "error" = "error";
 
     async function load() {
-      setIsLoading(true);
+      setLoadStatus("loading");
+      setLoadError("");
       setError("");
       try {
         const profile = await fetchCurrentUser();
@@ -24,16 +40,19 @@ export function ProfilePage() {
           return;
         }
         setUser(profile);
-        setName(profile.name ?? "");
-        setPhone(profile.phone ?? "");
-        setAddress(profile.address ?? "");
+        setName(profile?.name ?? "");
+        setPhone(profile?.phone ?? "");
+        setAddress(profile?.address ?? "");
+        outcome = "success";
       } catch (requestError) {
         if (!cancelled) {
-          setError(requestError instanceof Error ? requestError.message : "Unable to load profile.");
+          setLoadError(
+            toUserFacingMessage(requestError, "Your profile could not be loaded right now."),
+          );
         }
       } finally {
         if (!cancelled) {
-          setIsLoading(false);
+          setLoadStatus(outcome);
         }
       }
     }
@@ -42,12 +61,13 @@ export function ProfilePage() {
     return () => {
       cancelled = true;
     };
-  }, [setUser]);
+  }, [setUser, loadNonce]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setMessage("");
+    setIsSaving(true);
     try {
       const updatedUser = await updateMyProfile({
         name: name.trim(),
@@ -55,19 +75,31 @@ export function ProfilePage() {
         address: address.trim(),
       });
       setUser(updatedUser);
-      setName(updatedUser.name ?? "");
-      setPhone(updatedUser.phone ?? "");
-      setAddress(updatedUser.address ?? "");
+      setName(updatedUser?.name ?? "");
+      setPhone(updatedUser?.phone ?? "");
+      setAddress(updatedUser?.address ?? "");
       setMessage("Profile updated.");
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to update profile.");
+      setError(toUserFacingMessage(requestError, "Your profile could not be saved."));
+    } finally {
+      setIsSaving(false);
     }
   }
 
-  if (isLoading && !user) {
+  if (loadStatus === "loading") {
     return (
       <section className="auth-card auth-card--embedded" aria-busy="true">
-        <p>Loading profile…</p>
+        <Spinner label="Loading profile…" />
+      </section>
+    );
+  }
+
+  if (loadStatus === "error") {
+    return (
+      <section className="auth-card auth-card--embedded">
+        <p className="auth-card__eyebrow">Account</p>
+        <h2>Profile</h2>
+        <FetchError message={loadError} onRetry={retryLoad} />
       </section>
     );
   }
@@ -83,14 +115,14 @@ export function ProfilePage() {
       <dl className="auth-meta">
         <div>
           <dt>Email</dt>
-          <dd>{user?.email}</dd>
+          <dd>{user?.email ?? "—"}</dd>
         </div>
         <div>
           <dt>Role</dt>
           <dd>{user?.is_admin ? "admin" : "staff"}</dd>
         </div>
       </dl>
-      <form className="auth-form" onSubmit={handleSubmit}>
+      <form className="auth-form" onSubmit={handleSubmit} aria-busy={isSaving}>
         <label>
           Name
           <input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" />
@@ -114,12 +146,28 @@ export function ProfilePage() {
           />
         </label>
         {error ? (
-          <p className="auth-form__error" role="alert">
-            {error}
-          </p>
+          <div className="auth-form__error" role="alert">
+            <p>{error}</p>
+            <p>
+              Use Save profile to try again, or go to{" "}
+              <Link to="/accessible">operations home</Link>.
+            </p>
+            <p className="auth-form__support">{SUPPORT_PROMPT}</p>
+          </div>
         ) : null}
         {message ? <p className="auth-form__success">{message}</p> : null}
-        <button type="submit">Save profile</button>
+        <button type="submit" disabled={isSaving}>
+          {isSaving ? (
+            <span className="async-state">
+              <span className="async-state__spinner" aria-hidden="true" />
+              Saving…
+            </span>
+          ) : error ? (
+            "Try again"
+          ) : (
+            "Save profile"
+          )}
+        </button>
       </form>
     </section>
   );

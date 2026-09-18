@@ -1,6 +1,7 @@
+import os
 import pandas as pd
 import pytest
-from data.pipelines.pipeline import aggregate_location_kpis
+from data.pipelines.pipeline import _supabase_client, aggregate_location_kpis
 
 def test_aggregate_location_kpis_computation():
     """Validates computed KPI values match hand-calculated inputs."""
@@ -54,6 +55,19 @@ def test_aggregate_location_kpis_empty_input():
     # Should return an empty DataFrame instead of crashing
     assert result_df.empty
 
+def test_aggregate_location_kpis_non_dict_payload():
+    """Non-dict payloads should not crash KPI aggregation."""
+    telemetry_df = pd.DataFrame(
+        {
+            "event_type": ["inbound_order_created"],
+            "event_payload": ["not-a-dict"],
+        }
+    )
+    locations_df = pd.DataFrame([{"id": "medellin-centro", "country": "CO", "currency": "COP"}])
+    result_df = aggregate_location_kpis.fn(telemetry_df, locations_df, "2026-07-08")
+    assert result_df.iloc[0]["total_purchase_cost"] == 0.0
+
+
 def test_aggregate_location_kpis_malformed_payload():
     """Defensive behaviour: Handles payloads missing the 'cost' key."""
     telemetry_data = {
@@ -73,3 +87,10 @@ def test_aggregate_location_kpis_malformed_payload():
     assert row["total_purchase_cost"] == 0.0
     assert row["total_waste_cost"] == 0.0
     assert row["waste_ratio"] == 0.0
+
+
+def test_missing_supabase_credentials_fail_clearly(monkeypatch):
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="SUPABASE_URL"):
+        _supabase_client()

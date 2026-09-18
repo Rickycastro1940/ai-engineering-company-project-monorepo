@@ -6,6 +6,7 @@ import time
 
 from services.celery_app import app
 from services.dead_letter import record_dead_letter
+from services.safe_errors import public_error_text
 
 logger = logging.getLogger(__name__)
 
@@ -52,12 +53,13 @@ def run_weekly_pipeline(self, start_date: str, end_date: str) -> dict:
         _execute_pipeline(start_date, end_date)
     except Exception as exc:
         duration_ms = (time.perf_counter() - started) * 1000
+        safe_error = public_error_text(str(exc), "pipeline is unavailable")
         _log_task_event(
             task_id=task_id,
             attempt=attempt,
             status="failure",
             duration_ms=duration_ms,
-            error=str(exc),
+            error=safe_error,
         )
         # Celery re-raises the original exception when retries are exhausted
         # (not always MaxRetriesExceededError), so check the attempt budget first.
@@ -65,14 +67,14 @@ def run_weekly_pipeline(self, start_date: str, end_date: str) -> dict:
             record_dead_letter(
                 task_id=task_id,
                 attempt=attempt,
-                error_message=str(exc),
+                error_message=safe_error,
             )
             _log_task_event(
                 task_id=task_id,
                 attempt=attempt,
                 status="failure_exhausted",
                 duration_ms=duration_ms,
-                error=str(exc),
+                error=safe_error,
             )
             raise
 

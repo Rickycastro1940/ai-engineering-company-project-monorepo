@@ -93,8 +93,11 @@ class AuthResponse(TokenResponse):
 
 
 def _connect() -> sqlite3.Connection:
-    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(DATABASE_PATH)
+    try:
+        DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        connection = sqlite3.connect(DATABASE_PATH)
+    except (OSError, sqlite3.Error) as error:
+        raise HTTPException(status_code=503, detail="User store is unavailable.") from error
     connection.row_factory = sqlite3.Row
     return connection
 

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
-import { updateUser } from "../lib/api";
+import { SUPPORT_PROMPT, toUserFacingMessage, updateUser } from "../lib/api";
 import "./AuthPages.css";
 
 export function ChangePasswordPage() {
@@ -9,6 +10,7 @@ export function ChangePasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -19,18 +21,21 @@ export function ChangePasswordPage() {
       setError("New password and confirmation must match.");
       return;
     }
-    if (!user) {
-      setError("Not authenticated.");
+    if (user?.id == null) {
+      setError("You are not signed in. Return to login and try again.");
       return;
     }
 
+    setIsSaving(true);
     try {
       await updateUser(user.id, { password: newPassword });
       setNewPassword("");
       setConfirmPassword("");
       setMessage("Password changed. Use the new password on the next login.");
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to change password.");
+      setError(toUserFacingMessage(requestError, "Your password could not be changed."));
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -66,12 +71,34 @@ export function ChangePasswordPage() {
           />
         </label>
         {error ? (
-          <p className="auth-form__error" role="alert">
-            {error}
-          </p>
+          <div className="auth-form__error" role="alert">
+            <p>{error}</p>
+            <p>
+              {user?.id == null ? (
+                <Link to="/login">Return to login</Link>
+              ) : (
+                <>
+                  Use the button below to try again, or go to{" "}
+                  <Link to="/accessible">operations home</Link>.
+                </>
+              )}
+            </p>
+            <p className="auth-form__support">{SUPPORT_PROMPT}</p>
+          </div>
         ) : null}
         {message ? <p className="auth-form__success">{message}</p> : null}
-        <button type="submit">Change password</button>
+        <button type="submit" disabled={isSaving}>
+          {isSaving ? (
+            <span className="async-state">
+              <span className="async-state__spinner" aria-hidden="true" />
+              Saving…
+            </span>
+          ) : error ? (
+            "Try again"
+          ) : (
+            "Change password"
+          )}
+        </button>
       </form>
     </section>
   );

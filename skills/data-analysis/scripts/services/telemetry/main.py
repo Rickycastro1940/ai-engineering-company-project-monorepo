@@ -15,6 +15,20 @@ from services.telemetry.analysis import (
 
 router = APIRouter()
 
+_STORAGE_ERRORS: tuple[type[BaseException], ...] = (OSError, TimeoutError, ConnectionError)
+try:
+    import httpx
+
+    _STORAGE_ERRORS = (*_STORAGE_ERRORS, httpx.HTTPError)
+except ImportError:
+    pass
+try:
+    from postgrest.exceptions import APIError as PostgrestAPIError
+
+    _STORAGE_ERRORS = (*_STORAGE_ERRORS, PostgrestAPIError)
+except ImportError:
+    pass
+
 # Initialize Supabase Client
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
@@ -51,20 +65,18 @@ def load_telemetry_from_supabase(start_date: str, end_date: str) -> pd.DataFrame
     Bounds are inclusive start, exclusive end in UTC.
     """
     try:
-        # SQL-level push down filtering for date windows
         response = supabase.table("telemetry_events") \
             .select("id", "timestamp", "event_type", "tags") \
             .gte("timestamp", start_date) \
             .lt("timestamp", end_date) \
             .execute()
-            
-        # Convert raw JSON array directly to Pandas DataFrame
-        return pd.DataFrame(response.data)
-    except Exception as e:
+    except _STORAGE_ERRORS as error:
         raise HTTPException(
-            status_code=500, 
-            detail=f"Failed to load operational data from Supabase: {str(e)}"
-        )
+            status_code=503,
+            detail="Telemetry store is unavailable.",
+        ) from error
+
+    return pd.DataFrame(response.data or [])
 
 
 @router.get("/telemetry/report", response_model=TelemetryReportResponse)

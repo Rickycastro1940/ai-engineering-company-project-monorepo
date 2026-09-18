@@ -8,27 +8,45 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 from prefect import flow, task
 from prefect.tasks import task_input_hash
+from services.safe_errors import ExternalServiceError, call_external, public_error_text
 
 env_path = Path(__file__).resolve().parent.parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
-url: str = os.environ.get("SUPABASE_URL")
-key: str = os.environ.get("SUPABASE_KEY")
-supabase: Client = create_client(url, key)
+def _supabase_client() -> Client:
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_KEY")
+    if not url or not key:
+        raise RuntimeError(
+            "Missing SUPABASE_URL or SUPABASE_KEY. Set them in .env before running the weekly pipeline."
+        )
+    try:
+        return create_client(url, key)
+    except ExternalServiceError:
+        raise
+    except Exception as error:
+        raise ExternalServiceError("reporting store") from error
+
 
 @task(retries=3, retry_delay_seconds=5)
 def extract_telemetry_events(start_date: str, end_date: str) -> pd.DataFrame:
-    response = supabase.table("telemetry_events").select("*").in_("event_type", [
-        "inbound_order_created", 
-        "stock_waste_registered", 
-        "stock_threshold_triggered", 
-        "ingredient_price_variance_detected"
-    ]).gte("created_at", start_date).lt("created_at", end_date).execute()
+    response = call_external(
+        "reporting store",
+        lambda: _supabase_client().table("telemetry_events").select("*").in_("event_type", [
+            "inbound_order_created",
+            "stock_waste_registered",
+            "stock_threshold_triggered",
+            "ingredient_price_variance_detected"
+        ]).gte("created_at", start_date).lt("created_at", end_date).execute(),
+    )
     return pd.DataFrame(response.data)
 
 @task(retries=3, retry_delay_seconds=5)
 def extract_domain_data() -> pd.DataFrame:
-    response = supabase.table("locations").select("id, country, currency").execute()
+    response = call_external(
+        "reporting store",
+        lambda: _supabase_client().table("locations").select("id, country, currency").execute(),
+    )
     return pd.DataFrame(response.data)
 
 @task(cache_key_fn=task_input_hash, cache_expiration=timedelta(days=1))
@@ -36,8 +54,21 @@ def aggregate_location_kpis(telemetry_df: pd.DataFrame, locations_df: pd.DataFra
     if telemetry_df.empty:
         return pd.DataFrame()
         
-    telemetry_df['location_id'] = telemetry_df['event_payload'].apply(lambda x: x.get('location_id'))
-    telemetry_df['cost'] = telemetry_df['event_payload'].apply(lambda x: float(x.get('cost', 0)))
+    def _location_id(payload: object) -> object:
+        if isinstance(payload, dict):
+            return payload.get("location_id")
+        return None
+
+    def _cost(payload: object) -> float:
+        if not isinstance(payload, dict):
+            return 0.0
+        try:
+            return float(payload.get("cost", 0) or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    telemetry_df["location_id"] = telemetry_df["event_payload"].apply(_location_id)
+    telemetry_df["cost"] = telemetry_df["event_payload"].apply(_cost)
     
     kpis = []
     grouped = telemetry_df.groupby('location_id')
@@ -78,7 +109,12 @@ def upsert_to_reporting_table(kpis_df: pd.DataFrame):
         print("No data to upsert.")
         return
     records = kpis_df.to_dict(orient="records")
-    supabase.table("weekly_location_performance").upsert(records, on_conflict="location_id,week_start").execute()
+    call_external(
+        "reporting store",
+        lambda: _supabase_client().table("weekly_location_performance").upsert(
+            records, on_conflict="location_id,week_start"
+        ).execute(),
+    )
     print(f"Successfully upserted {len(records)} records!")
 
 @flow(name="extract_brasaland_data_flow")
@@ -93,20 +129,37 @@ def transform_brasaland_kpis_flow(telemetry_data: pd.DataFrame, domain_data: pd.
 def load_brasaland_reporting_flow(kpis: pd.DataFrame):
     upsert_to_reporting_table(kpis)
 
+def _write_last_run(metadata: dict) -> None:
+    with open(Path(__file__).parent / "last_run.json", "w", encoding="utf-8") as handle:
+        json.dump(metadata, handle)
+
+
 @flow(name="brasaland_weekly_performance_pipeline", log_prints=True)
 def run_pipeline(start_date: str, end_date: str):
-    telemetry_data, domain_data = extract_brasaland_data_flow(start_date, end_date)
-    kpis = transform_brasaland_kpis_flow(telemetry_data, domain_data, start_date)
-    load_brasaland_reporting_flow(kpis)
+    try:
+        telemetry_data, domain_data = extract_brasaland_data_flow(start_date, end_date)
+        kpis = transform_brasaland_kpis_flow(telemetry_data, domain_data, start_date)
+        load_brasaland_reporting_flow(kpis)
+    except Exception as error:
+        _write_last_run(
+            {
+                "start_date": start_date,
+                "end_date": end_date,
+                "records_processed": 0,
+                "status": "Failure",
+                "error": public_error_text(str(error), "reporting store is unavailable"),
+            }
+        )
+        raise
 
-    metadata = {
-        "start_date": start_date,
-        "end_date": end_date,
-        "records_processed": len(telemetry_data),
-        "status": "Success"
-    }
-    with open(Path(__file__).parent / "last_run.json", "w") as f:
-        json.dump(metadata, f)
+    _write_last_run(
+        {
+            "start_date": start_date,
+            "end_date": end_date,
+            "records_processed": len(telemetry_data),
+            "status": "Success",
+        }
+    )
 
 if __name__ == "__main__":
     print("Executing pipeline directly...")

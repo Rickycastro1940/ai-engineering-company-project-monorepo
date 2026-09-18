@@ -84,7 +84,8 @@
   outline-offset: 1px;
 }
 
-.auth-form button {
+.auth-form button,
+.auth-card > button {
   margin-top: 0.25rem;
   border: 0;
   border-radius: 0.4rem;
@@ -98,6 +99,12 @@
 .auth-form button:disabled {
   opacity: 0.65;
   cursor: wait;
+}
+
+.auth-form button .async-state {
+  margin: 0;
+  color: inherit;
+  justify-content: center;
 }
 
 .auth-form__error {
@@ -121,8 +128,15 @@
   font-size: 0.9rem;
 }
 
-.auth-card__muted a {
+.auth-card__muted a,
+.auth-form__error a,
+.auth-form__support a {
   color: var(--bo-accent);
+}
+
+.auth-form__support {
+  color: var(--bo-muted);
+  font-size: 0.82rem;
 }
 
 .auth-meta {
