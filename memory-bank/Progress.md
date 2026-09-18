@@ -234,7 +234,7 @@ Intent over coverage: cases exist for who may sign in, who is admin, and whether
 
 ```text
 head -n 5 CONTEXT.md → # Welcome to Brasaland
-testing.md — AI-assisted missed cases + inventory bug (test_anonymous_cannot_read_kitchen_stock)
+TESTING.md — AI-assisted missed cases + inventory bug (test_anonymous_cannot_read_kitchen_stock)
 uv run pytest → 75 passed (staff-session decisions, not HTTP envelopes)
 uv run pytest --cov → above fail_under 70 on auth.py + users.py
 cd uis/backoffice && npx jest → 12 passed (optional; recognised if present)
