@@ -136,7 +136,7 @@ def _api_request(method: str, path: str, body: dict[str, Any] | None = None) -> 
         method=method,
     )
     try:
-        with urllib.request.urlopen(request) as response:
+        with urllib.request.urlopen(request, timeout=10) as response:
             raw = response.read().decode("utf-8")
             return json.loads(raw) if raw else {}
     except urllib.error.HTTPError as error:
@@ -146,7 +146,7 @@ def _api_request(method: str, path: str, body: dict[str, Any] | None = None) -> 
         except json.JSONDecodeError:
             parsed = {"detail": detail or error.reason}
         return {"error": True, "status_code": error.code, "detail": parsed}
-    except urllib.error.URLError as error:
+    except (urllib.error.URLError, TimeoutError, OSError) as error:
         return {
             "error": True,
             "status_code": 0,
@@ -235,7 +235,7 @@ def check_api_available() -> bool:
     try:
         urllib.request.urlopen(f"{API_BASE_URL}/inventory", timeout=3)
         return True
-    except urllib.error.URLError:
+    except (urllib.error.URLError, TimeoutError, OSError):
         return False
 
 
@@ -253,7 +253,11 @@ def main() -> int:
 
     _ensure_log_schema()
     session_id = str(uuid.uuid4())
-    client = OpenAI(api_key=GROQ_API_KEY, base_url="https://api.groq.com/openai/v1")
+    client = OpenAI(
+        api_key=GROQ_API_KEY,
+        base_url="https://api.groq.com/openai/v1",
+        timeout=30.0,
+    )
     messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
 
     print(f"Inventory Agent (session {session_id})")

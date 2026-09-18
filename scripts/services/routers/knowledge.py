@@ -1,6 +1,9 @@
+import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from data.pipelines.rag import query
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 
@@ -25,5 +28,6 @@ async def query_knowledge_base(payload: QueryRequest):
     try:
         answer_text = query(payload.question)
         return QueryResponse(answer=answer_text)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to process query: {str(e)}")
+    except Exception:
+        logger.exception("knowledge query failed")
+        raise HTTPException(status_code=500, detail="Failed to process knowledge query.")
