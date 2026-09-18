@@ -95,10 +95,15 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
   const isPublicAuthCall =
     PUBLIC_AUTH_PATHS.has(requestPath) || (requestPath === "/users" && method === "POST");
 
-  const response = await fetch(path, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      ...options,
+      headers,
+    });
+  } catch {
+    throw new ApiError("Unable to reach the Brasaland API. Confirm uvicorn is running on port 8000.");
+  }
 
   if (response.status === 401 && token && !isPublicAuthCall) {
     clearSessionAndRedirectToLogin();

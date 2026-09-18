@@ -84,7 +84,8 @@
   outline-offset: 1px;
 }
 
-.auth-form button {
+.auth-form button,
+.auth-card > button {
   margin-top: 0.25rem;
   border: 0;
   border-radius: 0.4rem;
