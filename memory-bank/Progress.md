@@ -183,6 +183,25 @@ uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py te
 cd uis/backoffice && npm run build → green
 ```
 
+## Latest EduTrack enrollments SQL audit (`cursor/edutrack-enrollments-audit-fa46`)
+
+Department served: **Training** only as an academy SQL exercise stored under `data/edutrack/` — this does **not** deliver Jake Morrison’s recipe catalogue or push to 14 kitchens. Brasaland product coverage is unchanged.
+
+Verified locally (DuckDB replay of `edutrack.sql` + `queries.sql`; no live Supabase project in this environment):
+
+```text
+python3 data/edutrack/run_audit.py
+SELECT * FROM enrollments LIMIT 5 → 5 rows (import check)
+Q1 Intro to Python → 5 rows (includes james.miller@test.com)
+Q3 instructor IS NULL → ids 10, 11 (UI/UX Fundamentals)
+Q6 INSERT id=18 Lucia Fernandes / Advanced Python → 1 row
+Q7 UPDATE instructor IS NULL → 2 rows → 'Pending assignment'
+Q8 DELETE LIKE '%@test.com' after matching SELECT → 2 rows; 16 enrollments remain
+Q11 HAVING COUNT(*) > 3 → Intro to Python 4
+Q12 SUM(monthly_fee_paid) → Programming 409.93, Data 179.97, Design 169.96, Marketing 59.98
+POST-AUDIT: enrollments=16 students=10 courses=7 null_instructors=0 test_emails=0
+```
+
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).
