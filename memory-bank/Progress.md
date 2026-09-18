@@ -219,11 +219,10 @@ Skill **passed** (criteria 1–4 + 6). Technology central API remains **incomple
 Department served: **Technology** (JWT register/login/token/me plus RBAC gaps the endpoint review found).
 
 ```text
-testing.md — agent review of users.py/auth.py vs tests/test_users_api.py
-uv run pytest → 74 passed
-uv run pytest --cov → auth.py 98% / users.py 94% / TOTAL 95% (fail_under 70)
-Missed cases added: inactive login, unknown email, wrong JWT secret, non-numeric sub,
-duplicate PUT email 409, new-password login, profile partial/blank, register second non-admin
+TESTING.md — tests assert session/role/password decisions, not HTTP envelopes
+Kitchen stock now requires a staff session (inventory router Depends(get_current_user))
+uv run pytest → 75 passed
+uv run pytest --cov → auth.py + users.py TOTAL 95% (fail_under 70)
 ```
 
 ## Planned next steps (order)

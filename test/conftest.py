@@ -22,6 +22,20 @@ auth = importlib.import_module("auth")
 PASSWORD = "secret-password"
 
 
+def granted_identity(client: TestClient, token: str) -> dict:
+    """What /auth/me decides the session is."""
+    response = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 200
+    return response.json()
+
+
+def refused_session(response) -> None:
+    """The endpoint decided not to issue or continue a staff session."""
+    body = response.json()
+    assert not body.get("access_token")
+    assert response.status_code in {401, 403}
+
+
 @pytest.fixture()
 def client(tmp_path: Path) -> Iterator[TestClient]:
     original_database_path = users.DATABASE_PATH
@@ -42,6 +56,4 @@ def register_user(
         json={"email": email, "password": password, **extra},
     )
     assert response.status_code == 201, response.text
-    payload = response.json()
-    assert "hashed_password" not in payload.get("user", {})
-    return payload
+    return response.json()

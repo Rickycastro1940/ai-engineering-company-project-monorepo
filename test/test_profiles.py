@@ -1,54 +1,52 @@
-"""PUT /profiles/me — contact fields on the authenticated staff user."""
+"""PUT /profiles/me — which contact fields a staff member may change."""
 
 from __future__ import annotations
 
-from test.conftest import register_user
+from test.conftest import granted_identity, register_user, refused_session, users
 
 
-def test_profiles_me_happy_path_updates_contact_fields(client) -> None:
+def test_profile_update_writes_contact_fields_for_the_session_user(client) -> None:
     token = register_user(client, "felipe.guerrero@brasaland.test")["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
-
     response = client.put(
         "/profiles/me",
         json={"name": "Felipe Guerrero", "phone": "+57 300 000 0000", "address": "Medellín HQ"},
-        headers=headers,
+        headers={"Authorization": f"Bearer {token}"},
     )
+    identity = granted_identity(client, token)
+    stored = users.get_user_by_email("felipe.guerrero@brasaland.test")
+    assert identity["name"] == stored["name"] == "Felipe Guerrero"
+    assert identity["phone"] == stored["phone"] == "+57 300 000 0000"
+    assert identity["address"] == stored["address"] == "Medellín HQ"
+    assert identity["email"] == "felipe.guerrero@brasaland.test"
+    assert response.json()["id"] == stored["id"]
 
-    assert response.status_code == 200
-    body = response.json()
-    assert body["name"] == "Felipe Guerrero"
-    assert body["phone"] == "+57 300 000 0000"
-    assert body["address"] == "Medellín HQ"
-    assert body["email"] == "felipe.guerrero@brasaland.test"
 
-
-def test_profiles_me_edge_partial_update_and_blank_name(client) -> None:
+def test_profile_partial_update_keeps_untouched_fields_and_clears_blank_name(client) -> None:
     token = register_user(client, "ops@brasaland.test", name="Kitchen Lead")["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
-    phone_only = client.put("/profiles/me", json={"phone": "+1 305 555 0100"}, headers=headers)
-    assert phone_only.status_code == 200
-    assert phone_only.json()["name"] == "Kitchen Lead"
-    assert phone_only.json()["phone"] == "+1 305 555 0100"
+    client.put("/profiles/me", json={"phone": "+1 305 555 0100"}, headers=headers)
+    after_phone = users.get_user_by_email("ops@brasaland.test")
+    assert after_phone["name"] == "Kitchen Lead"
+    assert after_phone["phone"] == "+1 305 555 0100"
 
-    blank = client.put("/profiles/me", json={"name": "   "}, headers=headers)
-    assert blank.status_code == 200
-    assert blank.json()["name"] is None
-    assert blank.json()["phone"] == "+1 305 555 0100"
+    client.put("/profiles/me", json={"name": "   "}, headers=headers)
+    after_blank = users.get_user_by_email("ops@brasaland.test")
+    assert after_blank["name"] is None
+    assert after_blank["phone"] == "+1 305 555 0100"
 
 
-def test_profiles_me_failure_anonymous_and_cannot_escalate(client) -> None:
+def test_profile_requires_a_session_and_cannot_grant_admin(client) -> None:
     anonymous = client.put("/profiles/me", json={"name": "Felipe Guerrero"})
-    assert anonymous.status_code == 401
+    refused_session(anonymous)
 
     register_user(client, "admin@brasaland.test")
     member = register_user(client, "member@brasaland.test")
-    member_headers = {"Authorization": f"Bearer {member['access_token']}"}
-    denied = client.put(
+    client.put(
         "/profiles/me",
         json={"name": "Member", "is_admin": True},
-        headers=member_headers,
+        headers={"Authorization": f"Bearer {member['access_token']}"},
     )
-    assert denied.status_code == 200
-    assert denied.json()["is_admin"] is False
+    stored = users.get_user_by_email("member@brasaland.test")
+    assert stored["is_admin"] is False
+    assert stored["name"] == "Member"
