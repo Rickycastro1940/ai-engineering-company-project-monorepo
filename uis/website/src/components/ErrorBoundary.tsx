@@ -1,4 +1,4 @@
-import { Component, type ErrorInfo, type ReactNode } from "react";
+import { Component, type ReactNode } from "react";
 
 type Props = { children: ReactNode };
 type State = { hasError: boolean };
@@ -11,8 +11,8 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo): void {
-    console.error("Website render error", error, info.componentStack);
+  componentDidCatch(): void {
+    console.error("Website render error");
   }
 
   render(): ReactNode {
@@ -21,10 +21,18 @@ export class ErrorBoundary extends Component<Props, State> {
         <main style={{ padding: "2rem", fontFamily: "system-ui, sans-serif" }}>
           <p>Brasaland</p>
           <h1>This page could not be shown</h1>
-          <p>Reload to try again. The public site does not require a login.</p>
-          <button type="button" onClick={() => window.location.reload()}>
-            Reload
-          </button>
+          <p>
+            Reload to try again, or return to the homepage. If this continues,
+            contact Brasaland Digital at Medellín headquarters.
+          </p>
+          <p>
+            <button type="button" onClick={() => window.location.reload()}>
+              Reload
+            </button>
+          </p>
+          <p>
+            <a href="/">Back to homepage</a>
+          </p>
         </main>
       );
     }

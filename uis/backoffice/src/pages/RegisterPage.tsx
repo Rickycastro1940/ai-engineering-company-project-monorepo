@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
-import { ApiError, createUserAccount, loginUser, storeToken } from "../lib/api";
+import { ApiError, SUPPORT_PROMPT, createUserAccount, loginUser, sanitizeFieldMessage, storeToken, toUserFacingMessage } from "../lib/api";
 import "./AuthPages.css";
 
 type FieldErrors = {
@@ -24,7 +24,7 @@ function buildValidationErrors(email: string, password: string): FieldErrors {
 function mapApiValidationErrors(details: unknown): FieldErrors {
   if (typeof details === "string") {
     if (details.toLowerCase().includes("email")) {
-      return { email: details };
+      return { email: sanitizeFieldMessage(details) };
     }
     return {};
   }
@@ -38,15 +38,15 @@ function mapApiValidationErrors(details: unknown): FieldErrors {
     }
     const loc = "loc" in item ? item.loc : undefined;
     const msg = "msg" in item ? item.msg : undefined;
-    const field = Array.isArray(loc) ? loc[loc.length - 1] : undefined;
+    const field = Array.isArray(loc) ? loc?.[loc.length - 1] : undefined;
     if (field === "email" && typeof msg === "string") {
-      errors.email = msg;
+      errors.email = sanitizeFieldMessage(msg);
     }
     if (field === "password" && typeof msg === "string") {
-      errors.password = msg;
+      errors.password = sanitizeFieldMessage(msg);
     }
     if (field === "name" && typeof msg === "string") {
-      errors.name = msg;
+      errors.name = sanitizeFieldMessage(msg);
     }
   }
   return errors;
@@ -72,20 +72,48 @@ export function RegisterPage() {
     }
     setIsSubmitting(true);
     try {
-      await createUserAccount({
-        email,
-        password,
-        name: name.trim() || undefined,
-      });
-      const authResponse = await loginUser(email, password);
-      storeToken(authResponse.access_token);
-      await signIn(authResponse);
-      navigate("/accessible", { replace: true });
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to register.");
-      if (requestError instanceof ApiError) {
-        setFieldErrors(mapApiValidationErrors(requestError.details));
+      try {
+        await createUserAccount({
+          email,
+          password,
+          name: name.trim() || undefined,
+        });
+      } catch (requestError) {
+        setError(toUserFacingMessage(requestError, "We could not create your account. Try again."));
+        if (requestError instanceof ApiError) {
+          setFieldErrors(mapApiValidationErrors(requestError.details));
+        }
+        return;
       }
+      let authResponse;
+      try {
+        authResponse = await loginUser(email, password);
+      } catch (requestError) {
+        setError(
+          toUserFacingMessage(
+            requestError,
+            "Your account was created, but sign-in did not finish. Try signing in.",
+          ),
+        );
+        return;
+      }
+      if (!authResponse?.access_token) {
+        setError("Your account was created, but sign-in did not finish. Try signing in.");
+        return;
+      }
+      storeToken(authResponse.access_token);
+      try {
+        await signIn(authResponse);
+      } catch (requestError) {
+        setError(
+          toUserFacingMessage(
+            requestError,
+            "Your account was created, but the session could not be loaded. Try signing in.",
+          ),
+        );
+        return;
+      }
+      navigate("/accessible", { replace: true });
     } finally {
       setIsSubmitting(false);
     }
@@ -139,12 +167,25 @@ export function RegisterPage() {
             ) : null}
           </label>
           {error ? (
-            <p className="auth-form__error" role="alert">
-              {error}
-            </p>
+            <div className="auth-form__error" role="alert">
+              <p>{error}</p>
+              <p>
+                You can also <Link to="/login">return to login</Link>.
+              </p>
+              <p className="auth-form__support">{SUPPORT_PROMPT}</p>
+            </div>
           ) : null}
           <button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Creating account…" : "Create account"}
+            {isSubmitting ? (
+              <span className="async-state">
+                <span className="async-state__spinner" aria-hidden="true" />
+                Creating account…
+              </span>
+            ) : error ? (
+              "Try again"
+            ) : (
+              "Create account"
+            )}
           </button>
         </form>
         <p className="auth-card__muted">

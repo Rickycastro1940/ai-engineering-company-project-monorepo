@@ -47,6 +47,12 @@
       border: none;
       cursor: pointer;
     }
+    button:disabled { opacity: 0.7; cursor: wait; }
+    .status { margin-top: 10px; color: #5b6878; display: flex; align-items: center; gap: 8px; }
+    .status.error { color: #b42318; flex-wrap: wrap; }
+    .spinner { width: 1rem; height: 1rem; border-radius: 50%; border: 2px solid #e8d9c8; border-top-color: #b84f2a; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    button.retry { width: auto; margin-top: 0; padding: 8px 12px; }
     .upload-zone {
       margin-top: 12px;
       border: 2px dashed #bfae93;
@@ -185,25 +191,25 @@
     };
 
     const renderSummary = (payload) => {
-      const metrics = payload.general_metrics || {};
+      const metrics = payload?.general_metrics ?? {};
       generalMetricsNode.innerHTML = '';
-      [['Total Processed', metrics.total_processed], ['Valid Records', metrics.valid_records], ['Invalid Records', metrics.invalid_records]].forEach(([label, value]) => {
+      [['Total Processed', metrics?.total_processed], ['Valid Records', metrics?.valid_records], ['Invalid Records', metrics?.invalid_records]].forEach(([label, value]) => {
         const card = document.createElement('div');
         card.className = 'metric-card';
-        card.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
+        card.innerHTML = `<div class="label">${label}</div><div class="value">${value ?? '—'}</div>`;
         generalMetricsNode.appendChild(card);
       });
 
       categoryBreakdownNode.innerHTML = '';
-      Object.entries(payload.category_breakdown || {}).sort((a, b) => a[0].localeCompare(b[0])).forEach(([category, count]) => {
+      Object.entries(payload?.category_breakdown || {}).sort((a, b) => a[0].localeCompare(b[0])).forEach(([category, count]) => {
         const row = document.createElement('tr');
         row.innerHTML = `<td>${category}</td><td>${count}</td>`;
         categoryBreakdownNode.appendChild(row);
       });
 
-      const index = payload.satisfaction_index || {};
+      const index = payload?.satisfaction_index || {};
       satisfactionMetricsNode.innerHTML = '';
-      [['Scored Cases', index.scored_cases], ['Average Score', Number(index.average_score || 0).toFixed(2)]].forEach(([label, value]) => {
+      [['Scored Cases', index?.scored_cases ?? '—'], ['Average Score', Number(index?.average_score || 0).toFixed(2)]].forEach(([label, value]) => {
         const card = document.createElement('div');
         card.className = 'metric-card';
         card.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
@@ -211,7 +217,7 @@
       });
 
       satisfactionBreakdownNode.innerHTML = '';
-      Object.entries(index.score_distribution || {}).forEach(([score, count]) => {
+      Object.entries(index?.score_distribution || {}).forEach(([score, count]) => {
         const row = document.createElement('tr');
         row.innerHTML = `<td>${score}</td><td>${count}</td>`;
         satisfactionBreakdownNode.appendChild(row);
@@ -247,8 +253,29 @@
       setSelectedFile(fileInput.files && fileInput.files.length ? fileInput.files[0] : null);
     });
 
+    function humanError() {
+      return 'We could not complete the analysis. Check the CSV path or file, then try again.';
+    }
+
+    function showError(node, message, onRetry) {
+      node.className = 'status error';
+      node.innerHTML = '';
+      const text = document.createElement('span');
+      text.textContent = message;
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'retry';
+      retry.textContent = 'Try again';
+      retry.addEventListener('click', onRetry);
+      const support = document.createElement('span');
+      support.textContent = ' If this continues, contact Brasaland Digital at Medellín headquarters.';
+      node.append(text, retry, support);
+    }
+
     runButton.addEventListener('click', async () => {
-      statusNode.textContent = 'Running analysis...';
+      statusNode.innerHTML = '<span class="spinner" aria-hidden="true"></span><span>Running analysis...</span>';
+      statusNode.className = 'status';
+      runButton.disabled = true;
       const payload = {
         input_file: document.getElementById('input').value,
         output_file: document.getElementById('output').value,
@@ -261,24 +288,29 @@
           body: JSON.stringify(payload),
         });
         if (!response.ok) {
-          const error = await response.json().catch(() => ({}));
-          throw new Error(error.detail || 'Analysis failed');
+          throw new Error('analysis-failed');
         }
         const summary = await response.json();
         renderSummary(summary);
-        downloadOutput(summary.output_file || payload.output_file);
+        downloadOutput(summary?.output_file || payload.output_file);
         statusNode.textContent = 'Analysis complete. CSV downloaded.';
+        statusNode.className = 'status';
       } catch (error) {
-        statusNode.textContent = String(error.message || error);
+        showError(statusNode, humanError(), () => runButton.click());
+      } finally {
+        runButton.disabled = false;
       }
     });
 
     uploadButton.addEventListener('click', async () => {
       if (!selectedFile) {
+        statusNode.className = 'status error';
         statusNode.textContent = 'Please select a CSV file first.';
         return;
       }
-      statusNode.textContent = 'Uploading and analyzing CSV...';
+      statusNode.className = 'status';
+      statusNode.innerHTML = '<span class="spinner" aria-hidden="true"></span><span>Uploading and analyzing CSV...</span>';
+      uploadButton.disabled = true;
       try {
         const formData = new FormData();
         formData.append('file', selectedFile);
@@ -290,15 +322,17 @@
           body: formData,
         });
         if (!response.ok) {
-          const error = await response.json().catch(() => ({}));
-          throw new Error(error.detail || 'Upload analysis failed');
+          throw new Error('upload-failed');
         }
         const summary = await response.json();
         renderSummary(summary);
-        downloadOutput(summary.output_file);
+        downloadOutput(summary?.output_file);
+        statusNode.className = 'status';
         statusNode.textContent = 'Upload analysis complete. CSV downloaded.';
       } catch (error) {
-        statusNode.textContent = String(error.message || error);
+        showError(statusNode, humanError(), () => uploadButton.click());
+      } finally {
+        uploadButton.disabled = false;
       }
     });
 

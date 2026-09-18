@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional
 from celery.result import AsyncResult
 
 from services.celery_app import app as celery_app
+from services.safe_errors import public_error_text
 
 # Checklist statuses: pending | started | success | failure
 _STATUS_MAP = {
@@ -33,7 +34,7 @@ def get_task_payload(task_id: str) -> Dict[str, Any]:
     if status == "success":
         result = async_result.result
     elif status == "failure":
-        result = {"error": str(async_result.result)}
+        result = {"error": public_error_text(str(async_result.result), "Task failed.")}
 
     return {
         "task_id": task_id,

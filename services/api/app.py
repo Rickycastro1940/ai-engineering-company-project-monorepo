@@ -37,17 +37,26 @@ def _resolve_repo_path(path_value: str) -> Path:
 
 def _run_analysis(input_path: Path, output_path: Path, engine: Engine) -> dict:
     if not input_path.exists():
-        raise HTTPException(status_code=404, detail=f"Input file not found: {input_path}")
+        raise HTTPException(status_code=404, detail="Input CSV was not found.")
     try:
         analyzer = IncidentAnalyzer.from_file(input_path, engine=engine)
-        analyzer.export_summary_to_csv(output_path)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Input CSV was not found.") from error
+    except (OSError, UnicodeDecodeError) as error:
+        raise HTTPException(status_code=400, detail="The input CSV could not be read.") from error
     except ValueError as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
+        raise HTTPException(status_code=400, detail="The input CSV is not valid incident data.") from error
+
+    try:
+        analyzer.export_summary_to_csv(output_path)
+    except OSError as error:
+        raise HTTPException(status_code=500, detail="Could not write the analysis results file.") from error
+
     summary = analyzer.build_summary()
     try:
         summary["output_file"] = str(output_path.relative_to(REPO_ROOT))
     except ValueError:
-        summary["output_file"] = str(output_path)
+        summary["output_file"] = output_path.name
     return summary
 
 def _register_analyze_routes(app: FastAPI, route_prefix: str) -> None:
@@ -65,33 +74,42 @@ def _register_analyze_routes(app: FastAPI, route_prefix: str) -> None:
     async def analyze_upload(file: UploadFile = File(...), output_file: str = Form(default="results.csv"), engine: Engine = Form(default="native")):
         if not file.filename or not file.filename.lower().endswith(".csv"):
             raise HTTPException(status_code=400, detail="Only CSV uploads are supported")
-        temp_dir = Path(tempfile.mkdtemp(prefix="incident-upload-", dir=UPLOAD_DIR))
+        try:
+            temp_dir = Path(tempfile.mkdtemp(prefix="incident-upload-", dir=UPLOAD_DIR))
+        except OSError as error:
+            raise HTTPException(status_code=500, detail="Could not store the upload.") from error
         input_path = temp_dir / file.filename
         output_path = _resolve_repo_path(output_file)
         try:
             with input_path.open("wb") as handle:
                 shutil.copyfileobj(file.file, handle)
-            _run_analysis(input_path, output_path, engine)
+        except OSError as error:
+            raise HTTPException(status_code=400, detail="The uploaded file could not be saved.") from error
         finally:
             await file.close()
+        _run_analysis(input_path, output_path, engine)
         return FileResponse(path=output_path, filename=output_path.name, media_type="text/csv")
 
     @app.post(f"/api/incidents/{route_prefix}/upload/summary")
     async def analyze_upload_summary(file: UploadFile = File(...), output_file: str = Form(default="results.csv"), engine: Engine = Form(default="native")):
         if not file.filename or not file.filename.lower().endswith(".csv"):
             raise HTTPException(status_code=400, detail="Only CSV uploads are supported")
-        temp_dir = Path(tempfile.mkdtemp(prefix="incident-upload-", dir=UPLOAD_DIR))
+        try:
+            temp_dir = Path(tempfile.mkdtemp(prefix="incident-upload-", dir=UPLOAD_DIR))
+        except OSError as error:
+            raise HTTPException(status_code=500, detail="Could not store the upload.") from error
         input_path = temp_dir / file.filename
         output_path = _resolve_repo_path(output_file)
         try:
             with input_path.open("wb") as handle:
                 shutil.copyfileobj(file.file, handle)
-            summary = _run_analysis(input_path, output_path, engine)
+        except OSError as error:
+            raise HTTPException(status_code=400, detail="The uploaded file could not be saved.") from error
         finally:
             await file.close()
-        return summary
+        return _run_analysis(input_path, output_path, engine)
 
-app = FastAPI(title="Brasaland Central API", version="1.0.0")
+app = FastAPI(title="Brasaland Central API", version="1.0.0", debug=False)
 register_error_handlers(app)
 app.add_middleware(
     CORSMiddleware,
@@ -115,7 +133,7 @@ _register_analyze_routes(app, "analyze")
 def export_results(output_file: str = "results.csv"):
     output_path = _resolve_repo_path(output_file)
     if not output_path.exists():
-        raise HTTPException(status_code=404, detail=f"Results file not found: {output_file}")
+        raise HTTPException(status_code=404, detail="Results file not found.")
     return FileResponse(path=output_path, filename=output_path.name, media_type="text/csv")
 
 if UI_ROOT.exists():

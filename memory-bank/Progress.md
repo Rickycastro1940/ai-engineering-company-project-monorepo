@@ -95,6 +95,94 @@ cd uis/website && npm run build → green
 Checklist: docs/error-handling-audit.md
 ```
 
+## Latest three-state fetch UI (`feature/error-handling-audit`)
+
+Department served: **Operations/Executive** (staff console must not go blank while locations/inventory load) + **Technology** (session and API failures need a retry path).
+
+```text
+cd uis/backoffice && npm run build → tsc -b && vite build green
+Browser :5174/login invalid credentials → alert + Sign in retry CTA; button showed Signing in…
+Register Creating account… then /accessible with 14 locations (COP+USD roster)
+/account/profile → email async-ui-0918@brasaland.test + Save profile form
+uis/website has no fetch (static corporate home)
+```
+
+## Latest user-facing error copy (`feature/error-handling-audit`)
+
+Department served: **Operations/Executive** (staff see plain-language failures with retry/home/support) + **Technology** (API errors are mapped, not dumped).
+
+```text
+cd uis/backoffice && npm run build → tsc -b && vite build green
+```
+
+## Latest FastAPI exception scope (`feature/error-handling-audit`)
+
+Department served: **Technology** (central API handlers catch I/O at the call site; programming errors still hit the generic 500 handler).
+
+```text
+uv run python -m pytest tests/test_error_handling.py tests/test_users_api.py -q → 24 passed
+```
+
+## Latest structured HTTP errors (`feature/error-handling-audit`)
+
+Department served: **Technology** (central API returns 400/404/422/500 as JSON, never Python tracebacks).
+
+```text
+uv run python -m pytest tests/test_error_handling.py tests/test_users_api.py -q → 24 passed
+Envelope: status, code, message, detail (422 detail remains field loc/msg/type)
+GET /inventory RuntimeError → 500 {"code":"internal_error","message":"Internal server error"} no traceback
+```
+
+## Latest secret-safe errors + external calls (`feature/error-handling-audit`)
+
+Department served: **Technology** (client JSON must not leak connection strings, keys, or host paths; LLM/Qdrant/Supabase calls must fail closed).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+GET http://127.0.0.1:8000/docs → 200
+locations=present
+menus=missing
+sales=missing
+customers=missing
+suppliers=missing
+inventory=present
+path_count=21
+uv run python -m pytest tests/test_error_handling.py tests/test_users_api.py -q → 27 passed
+error_body(500, postgres://… / sk- / /Users/) → generic Internal server error
+ExternalServiceError("language model") on GET /inventory → 503 language model is unavailable
+```
+
+Skill **passed** (criteria 1–4 + 6). Technology central API remains **incomplete** while menus/sales/customers/suppliers are `missing`.
+
+## Latest script file/CSV error handling (`feature/error-handling-audit`)
+
+Department served: **Technology** (CLI tools must fail closed) + **Operations** (incident CSV analysis for kitchens/locations).
+
+```text
+uv run python -m pytest tests/test_scripts_io.py tests/test_error_handling.py -q → 16 passed
+uv run python scripts/analyze.py scripts/does-not-exist.csv → STDERR + exit 1
+```
+
+## Latest log redaction (`feature/error-handling-audit`)
+
+Department served: **Technology** (no stack traces or host paths in operator consoles) + **Marketing** (public site ErrorBoundary).
+
+```text
+uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py -q → 16 passed
+cd uis/backoffice && npm run build → green
+cd uis/website && npm run build → green
+ErrorBoundary console.error no longer includes error or componentStack
+```
+
+## Latest finally / client-safe / script I/O closeout (`feature/error-handling-audit`)
+
+Department served: **Technology** (structured HTTP, no env names in 503s) + **Operations/Executive** (loading flags always clear; login session failure has retry).
+
+```text
+uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py tests/test_users_api.py -q → 33 passed
+cd uis/backoffice && npm run build → green
+```
+
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).

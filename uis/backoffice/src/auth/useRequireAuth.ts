@@ -9,18 +9,20 @@ import { useAuth } from "./AuthProvider";
  */
 export function useRequireAuth() {
   const location = useLocation();
-  const { isLoading, user } = useAuth();
+  const { isLoading, user, sessionError, retrySession } = useAuth();
   const token = getStoredToken();
   const next = `${location.pathname}${location.search}`;
   const loginPath = `/login?next=${encodeURIComponent(next)}`;
   const isMissingToken = !token;
-  const isInvalidToken = !isLoading && Boolean(token) && !user;
+  const isInvalidToken = !isLoading && Boolean(token) && !user && !sessionError;
   const shouldRedirectToLogin = isMissingToken || isInvalidToken;
 
   return {
     token,
     user,
     isLoading,
+    sessionError,
+    retrySession,
     isMissingToken,
     isInvalidToken,
     shouldRedirectToLogin,

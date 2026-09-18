@@ -32,9 +32,12 @@ class StockDelta(BaseModel):
 def _ensure_products_file() -> None:
     if PRODUCTS_FILE.exists():
         return
-    with PRODUCTS_FILE.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=FIELDNAMES)
-        writer.writeheader()
+    try:
+        with PRODUCTS_FILE.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=FIELDNAMES)
+            writer.writeheader()
+    except OSError as error:
+        raise HTTPException(status_code=500, detail="Unable to create inventory file") from error
 
 
 def load_products() -> List[ProductRow]:
@@ -56,8 +59,8 @@ def load_products() -> List[ProductRow]:
                     "unit": row["unit"],
                 }
             )
-        except (KeyError, TypeError, ValueError) as error:
-            logger.warning("Skipping invalid inventory row %s: %s", row, error)
+        except (KeyError, TypeError, ValueError):
+            logger.warning("Skipping invalid inventory row")
             continue
     return products
 

@@ -20,6 +20,8 @@ from typing import Any
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from services.safe_errors import ExternalServiceError, call_external, public_error_text
+
 load_dotenv()
 
 API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
@@ -108,7 +110,7 @@ def _ensure_log_schema() -> None:
     if backup.exists():
         backup.unlink()
     CONVERSATION_LOG.rename(backup)
-    print(f"Backed up old log to {backup}")
+    print("Backed up an old conversation log.", file=sys.stderr)
 
 
 def log_event(actor: str, message: str = "", tool_call: str = "") -> None:
@@ -144,13 +146,16 @@ def _api_request(method: str, path: str, body: dict[str, Any] | None = None) -> 
         try:
             parsed = json.loads(detail)
         except json.JSONDecodeError:
-            parsed = {"detail": detail or error.reason}
+            parsed = {"detail": public_error_text(detail or error.reason, "API request failed")}
+        else:
+            raw_detail = parsed.get("detail") if isinstance(parsed, dict) else parsed
+            parsed = public_error_text(str(raw_detail), "API request failed")
         return {"error": True, "status_code": error.code, "detail": parsed}
-    except (urllib.error.URLError, TimeoutError, OSError) as error:
+    except (urllib.error.URLError, TimeoutError, OSError):
         return {
             "error": True,
             "status_code": 0,
-            "detail": f"Could not reach API at {API_BASE_URL}: {error}",
+            "detail": "Could not reach the inventory API.",
         }
 
 
@@ -191,13 +196,19 @@ def _assistant_message_payload(message: Any) -> dict[str, Any]:
 
 def run_agent_turn(client: OpenAI, messages: list[dict[str, Any]]) -> str:
     while True:
-        response = client.chat.completions.create(
-            model=GROQ_MODEL,
-            messages=messages,
-            tools=TOOLS,
-            tool_choice="auto",
+        response = call_external(
+            "language model",
+            lambda: client.chat.completions.create(
+                model=GROQ_MODEL,
+                messages=messages,
+                tools=TOOLS,
+                tool_choice="auto",
+            ),
         )
-        message = response.choices[0].message
+        try:
+            message = response.choices[0].message
+        except (AttributeError, IndexError) as error:
+            raise ExternalServiceError("language model") from error
         messages.append(_assistant_message_payload(message))
 
         if not message.tool_calls:
@@ -253,15 +264,19 @@ def main() -> int:
 
     _ensure_log_schema()
     session_id = str(uuid.uuid4())
-    client = OpenAI(
-        api_key=GROQ_API_KEY,
-        base_url="https://api.groq.com/openai/v1",
-        timeout=30.0,
-    )
+    try:
+        client = OpenAI(
+            api_key=GROQ_API_KEY,
+            base_url="https://api.groq.com/openai/v1",
+            timeout=30.0,
+        )
+    except Exception:
+        print("language model is unavailable", file=sys.stderr)
+        log_event("system", message="language model is unavailable")
+        return 1
     messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
 
     print(f"Inventory Agent (session {session_id})")
-    print(f"API: {API_BASE_URL} | Model: {GROQ_MODEL}")
     print("Type your message and press Enter. Type 'exit' or 'quit' to end.\n")
     log_event("system", message=f"Session started at {API_BASE_URL}")
 
@@ -285,14 +300,19 @@ def main() -> int:
 
         try:
             response = run_agent_turn(client, messages)
-        except Exception as error:
+        except ExternalServiceError as error:
             print(f"Agent error: {error}", file=sys.stderr)
-            log_event("system", message=f"Agent error: {error}")
+            log_event("system", message=str(error))
+            continue
+        except Exception as error:
+            safe = public_error_text(str(error), "language model is unavailable")
+            print(f"Agent error: {safe}", file=sys.stderr)
+            log_event("system", message=safe)
             continue
 
         print(f"Agent: {response}\n")
 
-    print(f"Conversation appended to {CONVERSATION_LOG}")
+    print("Conversation log updated.")
     return 0
 
 

@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
-import { ApiError, loginUser, storeToken } from "../lib/api";
+import { FetchError, Spinner } from "../components/AsyncState";
+import { ApiError, SUPPORT_PROMPT, loginUser, sanitizeFieldMessage, storeToken, toUserFacingMessage } from "../lib/api";
 import "./AuthPages.css";
 
 type FieldErrors = {
@@ -20,12 +21,12 @@ function mapApiValidationErrors(details: unknown): FieldErrors {
     }
     const loc = "loc" in item ? item.loc : undefined;
     const msg = "msg" in item ? item.msg : undefined;
-    const field = Array.isArray(loc) ? loc[loc.length - 1] : undefined;
+    const field = Array.isArray(loc) ? loc?.[loc.length - 1] : undefined;
     if (field === "email" && typeof msg === "string") {
-      errors.email = msg;
+      errors.email = sanitizeFieldMessage(msg);
     }
     if (field === "password" && typeof msg === "string") {
-      errors.password = msg;
+      errors.password = sanitizeFieldMessage(msg);
     }
   }
   return errors;
@@ -34,7 +35,7 @@ function mapApiValidationErrors(details: unknown): FieldErrors {
 export function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { signIn, isAuthenticated, isLoading } = useAuth();
+  const { signIn, isAuthenticated, isLoading, sessionError, retrySession } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -42,7 +43,35 @@ export function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const nextPath = searchParams.get("next") || "/accessible";
 
-  if (!isLoading && isAuthenticated) {
+  if (isLoading) {
+    return (
+      <main className="auth-shell">
+        <section className="auth-card" aria-busy="true">
+          <Spinner label="Checking your session…" />
+        </section>
+      </main>
+    );
+  }
+
+  if (sessionError) {
+    return (
+      <main className="auth-shell">
+        <section className="auth-card">
+          <p className="auth-card__eyebrow">Brasaland Digital</p>
+          <h1>Could not verify session</h1>
+          <FetchError
+            message={sessionError}
+            onRetry={retrySession}
+            retryLabel="Retry session check"
+            homeTo="/register"
+            homeLabel="Create an account"
+          />
+        </section>
+      </main>
+    );
+  }
+
+  if (isAuthenticated) {
     return <Navigate to={nextPath} replace />;
   }
 
@@ -52,15 +81,33 @@ export function LoginPage() {
     setFieldErrors({});
     setIsSubmitting(true);
     try {
-      const authResponse = await loginUser(email, password);
-      storeToken(authResponse.access_token);
-      await signIn(authResponse);
-      navigate(nextPath, { replace: true });
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to sign in.");
-      if (requestError instanceof ApiError) {
-        setFieldErrors(mapApiValidationErrors(requestError.details));
+      let authResponse;
+      try {
+        authResponse = await loginUser(email, password);
+      } catch (requestError) {
+        setError(toUserFacingMessage(requestError, "We could not sign you in. Check your email and password."));
+        if (requestError instanceof ApiError) {
+          setFieldErrors(mapApiValidationErrors(requestError.details));
+        }
+        return;
       }
+      if (!authResponse?.access_token) {
+        setError("Sign-in did not return a session. Try again.");
+        return;
+      }
+      storeToken(authResponse.access_token);
+      try {
+        await signIn(authResponse);
+      } catch (requestError) {
+        setError(
+          toUserFacingMessage(
+            requestError,
+            "Signed in, but the session could not be loaded. Try again.",
+          ),
+        );
+        return;
+      }
+      navigate(nextPath, { replace: true });
     } finally {
       setIsSubmitting(false);
     }
@@ -104,12 +151,22 @@ export function LoginPage() {
             ) : null}
           </label>
           {error ? (
-            <p className="auth-form__error" role="alert">
-              {error}
-            </p>
+            <div className="auth-form__error" role="alert">
+              <p>{error}</p>
+              <p className="auth-form__support">{SUPPORT_PROMPT}</p>
+            </div>
           ) : null}
           <button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Signing in…" : "Sign in"}
+            {isSubmitting ? (
+              <span className="async-state">
+                <span className="async-state__spinner" aria-hidden="true" />
+                Signing in…
+              </span>
+            ) : error ? (
+              "Try again"
+            ) : (
+              "Sign in"
+            )}
           </button>
         </form>
         <p className="auth-card__muted">

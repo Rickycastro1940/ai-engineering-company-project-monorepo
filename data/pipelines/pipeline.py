@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 from prefect import flow, task
 from prefect.tasks import task_input_hash
+from services.safe_errors import ExternalServiceError, call_external, public_error_text
 
 env_path = Path(__file__).resolve().parent.parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
@@ -19,22 +20,33 @@ def _supabase_client() -> Client:
         raise RuntimeError(
             "Missing SUPABASE_URL or SUPABASE_KEY. Set them in .env before running the weekly pipeline."
         )
-    return create_client(url, key)
+    try:
+        return create_client(url, key)
+    except ExternalServiceError:
+        raise
+    except Exception as error:
+        raise ExternalServiceError("reporting store") from error
 
 
 @task(retries=3, retry_delay_seconds=5)
 def extract_telemetry_events(start_date: str, end_date: str) -> pd.DataFrame:
-    response = _supabase_client().table("telemetry_events").select("*").in_("event_type", [
-        "inbound_order_created", 
-        "stock_waste_registered", 
-        "stock_threshold_triggered", 
-        "ingredient_price_variance_detected"
-    ]).gte("created_at", start_date).lt("created_at", end_date).execute()
+    response = call_external(
+        "reporting store",
+        lambda: _supabase_client().table("telemetry_events").select("*").in_("event_type", [
+            "inbound_order_created",
+            "stock_waste_registered",
+            "stock_threshold_triggered",
+            "ingredient_price_variance_detected"
+        ]).gte("created_at", start_date).lt("created_at", end_date).execute(),
+    )
     return pd.DataFrame(response.data)
 
 @task(retries=3, retry_delay_seconds=5)
 def extract_domain_data() -> pd.DataFrame:
-    response = _supabase_client().table("locations").select("id, country, currency").execute()
+    response = call_external(
+        "reporting store",
+        lambda: _supabase_client().table("locations").select("id, country, currency").execute(),
+    )
     return pd.DataFrame(response.data)
 
 @task(cache_key_fn=task_input_hash, cache_expiration=timedelta(days=1))
@@ -97,9 +109,12 @@ def upsert_to_reporting_table(kpis_df: pd.DataFrame):
         print("No data to upsert.")
         return
     records = kpis_df.to_dict(orient="records")
-    _supabase_client().table("weekly_location_performance").upsert(
-        records, on_conflict="location_id,week_start"
-    ).execute()
+    call_external(
+        "reporting store",
+        lambda: _supabase_client().table("weekly_location_performance").upsert(
+            records, on_conflict="location_id,week_start"
+        ).execute(),
+    )
     print(f"Successfully upserted {len(records)} records!")
 
 @flow(name="extract_brasaland_data_flow")
@@ -132,7 +147,7 @@ def run_pipeline(start_date: str, end_date: str):
                 "end_date": end_date,
                 "records_processed": 0,
                 "status": "Failure",
-                "error": str(error),
+                "error": public_error_text(str(error), "reporting store is unavailable"),
             }
         )
         raise

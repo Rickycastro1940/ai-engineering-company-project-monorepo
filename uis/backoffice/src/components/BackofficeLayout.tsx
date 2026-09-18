@@ -37,7 +37,7 @@ export function BackofficeLayout() {
           ))}
         </nav>
         <div className="bo-session">
-          <p className="bo-session__email">{user?.name || user?.email}</p>
+          <p className="bo-session__email">{user?.name || user?.email || "Staff"}</p>
           <button type="button" className="bo-session__logout" onClick={logout}>
             Logout
           </button>

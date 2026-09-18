@@ -49,12 +49,104 @@ const PUBLIC_AUTH_PATHS = new Set(["/auth/login", "/auth/register", "/auth/token
 
 export class ApiError extends Error {
   details: unknown;
+  status: number | null;
 
-  constructor(message: string, details: unknown = null) {
+  constructor(message: string, details: unknown = null, status: number | null = null) {
     super(message);
     this.name = "ApiError";
     this.details = details;
+    this.status = status;
   }
+}
+
+export const SUPPORT_PROMPT =
+  "If this continues, contact Brasaland Digital at Medellín headquarters.";
+
+function looksTechnical(text: string): boolean {
+  const value = text.trim();
+  if (!value) {
+    return true;
+  }
+  const lower = value.toLowerCase();
+  return (
+    /unexpected token/i.test(value) ||
+    /internal server error/i.test(value) ||
+    /traceback|syntaxerror|typeerror|referenceerror|json\.parse/i.test(value) ||
+    /^error[:\s]/i.test(value) ||
+    /^error$/i.test(value) ||
+    /^<!doctype/i.test(value) ||
+    value.startsWith("{") ||
+    value.startsWith("[") ||
+    /\b(500|502|503|504)\b/.test(value) ||
+    /\/Users\/|\/home\/|\\\\/.test(value) ||
+    lower.includes("status code") ||
+    lower.includes("failed to fetch")
+  );
+}
+
+export function messageForHttpStatus(status: number | null): string {
+  if (status === null) {
+    return "We could not reach Brasaland Digital. Confirm the staff API is running, then try again.";
+  }
+  if (status === 400) {
+    return "That request could not be processed. Check what you entered and try again.";
+  }
+  if (status === 401) {
+    return "Email or password did not match, or your session expired. Sign in and try again.";
+  }
+  if (status === 403) {
+    return "You do not have access to this action.";
+  }
+  if (status === 404) {
+    return "We could not find that record.";
+  }
+  if (status === 409) {
+    return "An account with that email already exists. Sign in instead.";
+  }
+  if (status === 422) {
+    return "Please correct the highlighted fields and try again.";
+  }
+  if (status === 429) {
+    return "Too many attempts. Wait a moment and try again.";
+  }
+  if (status >= 500) {
+    return "Brasaland Digital is having trouble right now. Try again in a moment.";
+  }
+  return "Something went wrong. Try again, or contact Brasaland Digital if it continues.";
+}
+
+function friendlyFromDetails(details: unknown): string | null {
+  if (typeof details !== "string") {
+    return null;
+  }
+  if (looksTechnical(details) || details.length > 180) {
+    return null;
+  }
+  return details;
+}
+
+export function toUserFacingMessage(error: unknown, fallback?: string): string {
+  if (error instanceof ApiError) {
+    return friendlyFromDetails(error.details) ?? messageForHttpStatus(error.status);
+  }
+  if (error instanceof Error && !looksTechnical(error.message)) {
+    return error.message;
+  }
+  return fallback ?? messageForHttpStatus(null);
+}
+
+export function sanitizeFieldMessage(message: unknown): string {
+  if (typeof message === "string" && !looksTechnical(message)) {
+    return message;
+  }
+  return "Check this field and try again.";
+}
+
+function explainHttpFailure(status: number, details: unknown): string {
+  if (Array.isArray(details)) {
+    return messageForHttpStatus(422);
+  }
+  return friendlyFromDetails(details) ?? messageForHttpStatus(status);
 }
 
 export function getStoredToken(): string | null {
@@ -102,7 +194,7 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
       headers,
     });
   } catch {
-    throw new ApiError("Unable to reach the Brasaland API. Confirm uvicorn is running on port 8000.");
+    throw new ApiError(messageForHttpStatus(null), null, null);
   }
 
   if (response.status === 401 && token && !isPublicAuthCall) {
@@ -110,26 +202,34 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
   }
 
   if (!response.ok) {
-    let message = "The request failed.";
     let details: unknown = null;
+    let message = explainHttpFailure(response.status, null);
     try {
-      const body = (await response.json()) as { detail?: unknown };
+      const body = (await response.json()) as { detail?: unknown; message?: string };
       details = body.detail ?? null;
-      message = Array.isArray(details)
-        ? "Please correct the highlighted fields."
-        : typeof details === "string"
-          ? details
-          : message;
+      const announced = typeof body.message === "string" ? body.message : null;
+      message =
+        announced && announced.trim() && !looksTechnical(announced)
+          ? announced
+          : explainHttpFailure(response.status, details);
     } catch {
-      message = (await response.text()) || message;
+      try {
+        await response.text();
+      } catch {
+        /* body is unreadable; ignore raw text */
+      }
     }
-    throw new ApiError(message, details);
+    throw new ApiError(message, details, response.status);
   }
 
   if (response.status === 204) {
     return null as T;
   }
-  return response.json() as Promise<T>;
+  try {
+    return (await response.json()) as T;
+  } catch {
+    throw new ApiError(messageForHttpStatus(response.status), null, response.status);
+  }
 }
 
 export async function loginUser(email: string, password: string): Promise<AuthResponse> {

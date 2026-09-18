@@ -101,6 +101,12 @@
   cursor: wait;
 }
 
+.auth-form button .async-state {
+  margin: 0;
+  color: inherit;
+  justify-content: center;
+}
+
 .auth-form__error {
   color: #fca5a5;
   font-size: 0.9rem;
@@ -122,8 +128,15 @@
   font-size: 0.9rem;
 }
 
-.auth-card__muted a {
+.auth-card__muted a,
+.auth-form__error a,
+.auth-form__support a {
   color: var(--bo-accent);
+}
+
+.auth-form__support {
+  color: var(--bo-muted);
+  font-size: 0.82rem;
 }
 
 .auth-meta {
