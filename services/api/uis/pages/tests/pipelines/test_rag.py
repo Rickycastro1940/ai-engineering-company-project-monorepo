@@ -1,5 +1,10 @@
-# ✅ Correct import:
-from data.pipelines.rag import retrieve, query
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+pytest.importorskip("qdrant_client")
+
+from data.pipelines.rag import query, retrieve
 
 
 @patch("data.pipelines.rag.qdrant_client")

@@ -17,15 +17,15 @@ uv run pytest --cov
 `.coveragerc` measures `services/api/auth.py` and `services/api/users.py` and fails below **70%**.  
 `tests/pipelines/` is ignored by default (needs `supabase`/`prefect`).
 
-## Bugs found by these tests
+## AI-found bug (caught by this suite)
 
-### Kitchen stock was readable without a staff session
+**Finding:** kitchen stock (`GET /inventory`, and the other inventory routes) did not require a staff session.
 
-**What failed the business rule:** `GET /inventory` (and mutations) had no `get_current_user` dependency, while `/locations` and the backoffice always send a Bearer token. Anonymous callers could read kitchen stock.
+**How we found it:** reviewing `/auth/*` vs `/locations` showed locations use `Depends(get_current_user)`, while `services/api/inventory.py` did not. A generated case `test_anonymous_cannot_read_kitchen_stock` then proved an anonymous `GET /inventory` returned the product list instead of refusing a session.
 
-**Fix:** `services/api/inventory.py` now uses the same router-level `Depends(get_current_user)` as locations. Error-handling tests that hit inventory register a staff session first.
+**Fix:** inventory router now has `dependencies=[Depends(get_current_user)]`, same as locations. Staff can still list stock with a Bearer token.
 
-**Regression:** `test/test_users.py::test_anonymous_cannot_read_kitchen_stock`.
+**Regression test:** `test/test_users.py::test_anonymous_cannot_read_kitchen_stock`.
 
 ## What each `test/` module asserts
 

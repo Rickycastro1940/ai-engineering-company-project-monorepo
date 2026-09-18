@@ -14,3 +14,6 @@ def get_db():
         yield session
 
 def create_db_and_tables():
+    if not DATABASE_URL:
+        return
+    SQLModel.metadata.create_all(engine)

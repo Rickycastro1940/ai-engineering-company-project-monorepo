@@ -220,9 +220,10 @@ Department served: **Technology** (JWT register/login/token/me plus RBAC gaps th
 
 ```text
 TESTING.md — tests assert session/role/password decisions, not HTTP envelopes
-Kitchen stock now requires a staff session (inventory router Depends(get_current_user))
+AI-found bug: GET /inventory had no staff session; now Depends(get_current_user)
+uv run pytest --collect-only → 75 tests collected (no syntax errors)
 uv run pytest → 75 passed
-uv run pytest --cov → auth.py + users.py TOTAL 95% (fail_under 70)
+uv run pytest --cov → auth.py 98% / users.py 94% / TOTAL 95% (fail_under 70)
 ```
 
 ## Planned next steps (order)
