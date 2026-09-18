@@ -1,3 +1,10 @@
+import {
+  clearAuthToken,
+  extractAccessToken,
+  getAuthToken,
+  storeAuthToken,
+} from "../auth/authUtils";
+
 export type Location = {
   id: string;
   name: string;
@@ -44,7 +51,6 @@ export type AuthResponse = TokenResponse & {
   user: PublicUser;
 };
 
-const TOKEN_KEY = "auth_token";
 const PUBLIC_AUTH_PATHS = new Set(["/auth/login", "/auth/register", "/auth/token"]);
 
 export class ApiError extends Error {
@@ -150,15 +156,15 @@ function explainHttpFailure(status: number, details: unknown): string {
 }
 
 export function getStoredToken(): string | null {
-  return window.localStorage.getItem(TOKEN_KEY);
+  return getAuthToken();
 }
 
 export function storeToken(token: string): void {
-  window.localStorage.setItem(TOKEN_KEY, token);
+  storeAuthToken(extractAccessToken({ access_token: token }));
 }
 
 export function clearToken(): void {
-  window.localStorage.removeItem(TOKEN_KEY);
+  clearAuthToken();
 }
 
 /** Drop the JWT. Redirect to `/login` unless already on a public auth page. */

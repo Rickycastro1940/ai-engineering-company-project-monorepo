@@ -5,10 +5,11 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 logger = logging.getLogger("brasaland.inventory")
 from pydantic import BaseModel, Field
+from users import get_current_user
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PRODUCTS_FILE = REPO_ROOT / "products.csv"
@@ -16,7 +17,11 @@ FIELDNAMES = ["product_id", "name", "quantity", "unit"]
 
 ProductRow = Dict[str, Union[str, int]]
 
-router = APIRouter(prefix="/inventory", tags=["inventory"])
+router = APIRouter(
+    prefix="/inventory",
+    tags=["inventory"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 class ProductCreate(BaseModel):
