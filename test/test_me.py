@@ -33,6 +33,7 @@ def test_me_session_subject_is_the_user_id(client) -> None:
         auth.SECRET_KEY,
         algorithms=[auth.ALGORITHM],
     )["sub"]
+    # Staff sessions identify a user id, not an email, so /auth/me can reload the row.
     assert str(identity["id"]) == subject
     assert users.get_user_by_id(int(subject))["email"] == "ops@brasaland.test"
 

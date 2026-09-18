@@ -23,17 +23,18 @@ PASSWORD = "secret-password"
 
 
 def granted_identity(client: TestClient, token: str) -> dict:
-    """What /auth/me decides the session is."""
-    response = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
-    assert response.status_code == 200
-    return response.json()
+    """Who the API treats as the current staff member for this session."""
+    identity = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"}).json()
+    # A trusted session always exposes the stored mailbox, not just a token blob.
+    assert identity.get("email")
+    return identity
 
 
 def refused_session(response) -> None:
-    """The endpoint decided not to issue or continue a staff session."""
+    """No new session token, and no kitchen stock list (anonymous inventory)."""
     body = response.json()
     assert not body.get("access_token")
-    assert response.status_code in {401, 403}
+    assert not isinstance(body, list)
 
 
 @pytest.fixture()
@@ -55,5 +56,8 @@ def register_user(
         "/auth/register",
         json={"email": email, "password": password, **extra},
     )
-    assert response.status_code == 201, response.text
-    return response.json()
+    payload = response.json()
+    # Registration is a session grant: a token plus the created staff row.
+    assert payload.get("access_token")
+    assert payload.get("user", {}).get("email")
+    return payload

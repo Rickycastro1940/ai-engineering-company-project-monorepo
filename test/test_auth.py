@@ -32,5 +32,6 @@ def test_signing_secret_comes_from_the_environment_not_a_hardcoded_default() -> 
         assert auth._load_secret_key() == "brasaland-test-secret"
     with patch.dict("os.environ", {}, clear=True):
         generated = auth._load_secret_key()
+    # Reloads must not fall back to a known development placeholder.
     assert generated != "change-this-development-secret"
     assert len(generated) >= 32

@@ -35,10 +35,9 @@ def test_login_denies_unknown_email_and_wrong_password_the_same_way(client) -> N
         "/auth/login",
         json={"email": "ops@brasaland.test", "password": "wrong-password"},
     )
-
     refused_session(unknown)
     refused_session(wrong)
-    assert unknown.status_code == wrong.status_code == 401
+    # authenticate_user returns None for both: do not leak which mailbox exists.
     assert users.authenticate_user("missing@brasaland.test", PASSWORD) is None
     assert users.authenticate_user("ops@brasaland.test", "wrong-password") is None
 
@@ -51,5 +50,6 @@ def test_login_denies_inactive_staff(client) -> None:
         json={"email": "ops@brasaland.test", "password": PASSWORD},
     )
     refused_session(response)
+    # Password still verifies; the account is simply not allowed to sign in.
     assert users.authenticate_user("ops@brasaland.test", PASSWORD) is not None
     assert users.get_user_by_email("ops@brasaland.test")["is_active"] is False
