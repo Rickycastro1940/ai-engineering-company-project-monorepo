@@ -32,6 +32,7 @@ describe("isJwtFormat", () => {
   });
 
   test("failure: missing segments is not a staff JWT", () => {
+    expect(isJwtFormat("")).toBe(false);
     expect(isJwtFormat("only-one-part")).toBe(false);
   });
 });

@@ -23,6 +23,12 @@ npx jest --coverage
 `.coveragerc` measures `services/api/auth.py` and `services/api/users.py` and fails below **70%**.  
 `tests/pipelines/` is ignored by default (needs `supabase`/`prefect`).
 
+Last verified on this branch:
+
+- `uv run pytest` → 75 passed
+- `uv run pytest --cov` → auth.py 98%, users.py 94%, TOTAL 95%
+- `npx jest --coverage` (uis/backoffice) → 12 passed, authUtils.ts 100% statements (threshold 70)
+
 ## AI-assisted workflow
 
 Prompt used against `services/api/users.py` + `locations.py` vs `inventory.py`: *which staff routes require a session, and which cases does `tests/test_users_api.py` miss?*

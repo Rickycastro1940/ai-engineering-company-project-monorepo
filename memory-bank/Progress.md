@@ -226,6 +226,20 @@ uv run pytest → 75 passed
 uv run pytest --cov → auth.py 98% / users.py 94% / TOTAL 95% (fail_under 70)
 ```
 
+## Latest business-logic + Jest suite (`feature/error-handling-audit`)
+
+Department served: **Technology** (staff JWT decisions on the central API) + **Operations/Executive** (backoffice only stores a well-formed session token).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+tests assert session/role/password/stock access, not HTTP envelopes
+testing.md — AI-assisted missed cases + inventory bug caught by test_anonymous_cannot_read_kitchen_stock
+uv run pytest → 75 passed
+uv run pytest --cov → auth.py 98% / users.py 94% / TOTAL 95% (fail_under 70)
+cd uis/backoffice && npx jest --coverage → 12 passed, authUtils.ts 100%
+cd uis/backoffice && npm run build → tsc -b && vite build green
+```
+
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).
