@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import csv
+import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 from fastapi import APIRouter, HTTPException
+
+logger = logging.getLogger("brasaland.inventory")
 from pydantic import BaseModel, Field
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -54,7 +57,8 @@ def load_products() -> List[ProductRow]:
                 }
             )
         except (KeyError, TypeError, ValueError) as error:
-            raise HTTPException(status_code=500, detail="Invalid inventory data in products.csv") from error
+            logger.warning("Skipping invalid inventory row %s: %s", row, error)
+            continue
     return products
 
 

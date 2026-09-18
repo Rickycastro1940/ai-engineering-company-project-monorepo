@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from inventory import router as inventory_router
 from locations import router as locations_router
+from errors import register_error_handlers
 from pydantic import BaseModel, Field
 from users import router as users_router
 
@@ -91,6 +92,7 @@ def _register_analyze_routes(app: FastAPI, route_prefix: str) -> None:
         return summary
 
 app = FastAPI(title="Brasaland Central API", version="1.0.0")
+register_error_handlers(app)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
