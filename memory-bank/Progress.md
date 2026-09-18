@@ -84,6 +84,17 @@ GET /inventory → 200
 
 Skill **passed** (criteria 1–4 + 6). Technology central API is **not complete** while menus/sales/customers/suppliers remain `missing`.
 
+## Latest error-handling audit (`feature/error-handling-audit`)
+
+Department served: **Technology** (central API must fail safely) + **Operations/Executive** (staff see errors, not a blank console).
+
+```text
+pytest tests/test_error_handling.py tests/test_users_api.py -q → 19 passed
+cd uis/backoffice && npm run build → green
+cd uis/website && npm run build → green
+Checklist: docs/error-handling-audit.md
+```
+
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).
