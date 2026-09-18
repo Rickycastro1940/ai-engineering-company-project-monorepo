@@ -230,14 +230,14 @@ uv run pytest --cov → auth.py 98% / users.py 94% / TOTAL 95% (fail_under 70)
 
 Department served: **Technology** (staff JWT decisions on the central API) + **Operations/Executive** (backoffice only stores a well-formed session token).
 
+Intent over coverage: cases exist for who may sign in, who is admin, and whether kitchen stock is anonymous. 70% on auth/users is the floor; unused CRUD lines stay uncovered on purpose. Jest in `uis/backoffice` is optional extra.
+
 ```text
 head -n 5 CONTEXT.md → # Welcome to Brasaland
-tests assert session/role/password/stock access, not HTTP envelopes
-testing.md — AI-assisted missed cases + inventory bug caught by test_anonymous_cannot_read_kitchen_stock
-uv run pytest → 75 passed
-uv run pytest --cov → auth.py 98% / users.py 94% / TOTAL 95% (fail_under 70)
-cd uis/backoffice && npx jest --coverage → 12 passed, authUtils.ts 100%
-cd uis/backoffice && npm run build → tsc -b && vite build green
+testing.md — AI-assisted missed cases + inventory bug (test_anonymous_cannot_read_kitchen_stock)
+uv run pytest → 75 passed (staff-session decisions, not HTTP envelopes)
+uv run pytest --cov → above fail_under 70 on auth.py + users.py
+cd uis/backoffice && npx jest → 12 passed (optional; recognised if present)
 ```
 
 ## Planned next steps (order)

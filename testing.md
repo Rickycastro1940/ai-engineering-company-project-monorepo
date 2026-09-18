@@ -3,37 +3,45 @@
 **Company:** Brasaland (`CONTEXT.md`).  
 **Department served:** Technology (Nicolás Park) — JWT staff auth so Operations/Executive consoles can trust login, register, and location/stock reads.
 
-Tests assert **what the application decides** (who is admin, whether a session starts, whether a password still works), not HTTP envelope fields (`token_type`, `code`, `detail.loc`) or FastAPI/Pydantic internals.
+## What the suite is for
+
+Tests assert **staff-session decisions**, not HTTP envelopes (`token_type`, `code`, `detail.loc`) and not FastAPI/Pydantic internals.
+
+Each case exists because a kitchen or HQ operator would notice the wrong outcome:
+
+- Who gets the first admin account, and who stays a member.
+- Whether a known password starts a session (including mixed-case email).
+- Whether unknown mailbox, wrong password, or inactive staff all refuse a session — without leaking which mailbox exists.
+- Whether a token still names that person after expiry, a wrong secret, or deactivation.
+- Whether a member can self-promote or take another mailbox.
+- Whether anonymous callers can read kitchen stock.
+
+Coverage is a **floor, not a score**. `.coveragerc` fails below **70%** on `services/api/auth.py` and `services/api/users.py` so a hollow suite cannot ship. Lines left uncovered are unused CRUD helpers and error branches that do not change those decisions. We do not add cases only to raise the percentage.
+
+`tests/pipelines/` is ignored by default (needs `supabase`/`prefect`).
 
 ## How to run
 
 ```bash
-# Python (repo root)
+# Required: Python auth model (repo root)
 uv sync
 uv pip install -r requirements.txt
 uv run pytest
 uv run pytest --cov
 
-# TypeScript staff-console helpers
+# Optional extra: staff-console helpers (recognised if present and passing)
 cd uis/backoffice
 npm install
-npx jest --coverage
+npx jest
 ```
 
-`.coveragerc` measures `services/api/auth.py` and `services/api/users.py` and fails below **70%**.  
-`tests/pipelines/` is ignored by default (needs `supabase`/`prefect`).
-
-Last verified on this branch:
-
-- `uv run pytest` → 75 passed
-- `uv run pytest --cov` → auth.py 98%, users.py 94%, TOTAL 95%
-- `npx jest --coverage` (uis/backoffice) → 12 passed, authUtils.ts 100% statements (threshold 70)
+Last verified on this branch: `uv run pytest` green; `uv run pytest --cov` above the 70% floor; `npx jest` 12 passing (optional).
 
 ## AI-assisted workflow
 
 Prompt used against `services/api/users.py` + `locations.py` vs `inventory.py`: *which staff routes require a session, and which cases does `tests/test_users_api.py` miss?*
 
-That review produced the per-endpoint happy / edge / failure modules under `test/` (inactive login, mixed-case email, duplicate PUT email, blank profile name, JWT with the wrong secret) and the Jest cases for client token/password policy.
+That review produced the per-endpoint happy / edge / failure modules under `test/` (inactive login, mixed-case email, duplicate PUT email, blank profile name, JWT with the wrong secret). Those were gaps in **who may act**, not missing lines in a coverage report.
 
 ## AI-found bug (caught by this suite)
 
@@ -59,6 +67,8 @@ That review produced the per-endpoint happy / edge / failure modules under `test
 
 Comments in those files call out non-obvious rules (first user is admin, unknown email looks like a wrong password, profile cannot self-promote).
 
-Jest (`uis/backoffice/src/auth/authUtils.test.ts`) covers token store, JWT shape, email/password policy, and that empty matching strings are not a password change.
+## Optional: backoffice Jest
 
-**Not tested here:** OpenAPI schema shape, `token_type: bearer`, error JSON `code`/`detail` lists (covered in `tests/test_error_handling.py` as a separate error-envelope audit).
+Not required to pass the auth-API evaluation. Present so the staff console (`uis/backoffice/src/auth/authUtils.ts`) will not store a malformed JWT or accept an empty password confirmation. Run with `npx jest` from `uis/backoffice`. Coverage threshold there is also a 70% floor, not a 100% target.
+
+**Not tested in `test/`:** OpenAPI schema shape, `token_type: bearer`, error JSON `code`/`detail` lists (covered in `tests/test_error_handling.py` as a separate error-envelope audit).
