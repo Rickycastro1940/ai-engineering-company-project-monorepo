@@ -183,6 +183,37 @@ uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py te
 cd uis/backoffice && npm run build → green
 ```
 
+## Latest testing toolchain (`feature/error-handling-audit`)
+
+Department served: **Technology** (auth API on the central FastAPI app needs pytest for bullet-proof coverage of login/register/JWT).
+
+```text
+origin = Rickycastro1940/ai-engineering-company-project-monorepo (existing fork)
+uv add --dev pytest pytest-cov httpx
+pytest 8.4.2 / pytest-cov 7.1.0 / httpx 0.28.1
+uv run python -m pytest tests/test_users_api.py -q → 17 passed
+```
+
+Jest was not installed: the previous-milestone auth surface is Python/FastAPI (`services/api/auth.py`, `/auth/token`, `/auth/login`, `/auth/register`, `/auth/me`), not a TypeScript API.
+
+## Latest live API check (`feature/error-handling-audit`)
+
+Department served: **Technology** (central FastAPI `api.app:app` on `:8000`).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+uv run uvicorn api.app:app --reload --host 127.0.0.1 --port 8000 → Application startup complete
+GET /docs → 200
+locations=present menus=missing sales=missing customers=missing suppliers=missing inventory=present auth=present
+path_count=21
+GET /auth/me no token → 401
+POST /auth/register → 201 + access_token
+GET /auth/me Bearer → 200
+GET /locations/overview Bearer → 200, 14 locations, Colombia 8 / Florida 6, COP+USD
+```
+
+Skill **passed** (criteria 1–4 + 6). Technology central API remains **incomplete** while menus/sales/customers/suppliers are `missing`.
+
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).
