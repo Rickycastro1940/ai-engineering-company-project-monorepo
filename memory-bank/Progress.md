@@ -214,6 +214,18 @@ GET /locations/overview Bearer → 200, 14 locations, Colombia 8 / Florida 6, CO
 
 Skill **passed** (criteria 1–4 + 6). Technology central API remains **incomplete** while menus/sales/customers/suppliers are `missing`.
 
+## Latest AI-assisted auth edge cases (`feature/error-handling-audit`)
+
+Department served: **Technology** (JWT register/login/token/me plus RBAC gaps the endpoint review found).
+
+```text
+testing.md — agent review of users.py/auth.py vs tests/test_users_api.py
+uv run pytest → 74 passed
+uv run pytest --cov → auth.py 98% / users.py 94% / TOTAL 95% (fail_under 70)
+Missed cases added: inactive login, unknown email, wrong JWT secret, non-numeric sub,
+duplicate PUT email 409, new-password login, profile partial/blank, register second non-admin
+```
+
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).
