@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
+import { isValidPassword, passwordsMatch } from "../auth/authUtils";
 import { SUPPORT_PROMPT, toUserFacingMessage, updateUser } from "../lib/api";
 import "./AuthPages.css";
 
@@ -17,7 +18,11 @@ export function ChangePasswordPage() {
     setError("");
     setMessage("");
 
-    if (newPassword !== confirmPassword) {
+    if (!isValidPassword(newPassword)) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    if (!passwordsMatch(newPassword, confirmPassword)) {
       setError("New password and confirmation must match.");
       return;
     }

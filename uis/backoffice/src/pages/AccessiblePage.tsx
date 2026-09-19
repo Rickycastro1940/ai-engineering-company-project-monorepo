@@ -128,7 +128,7 @@ export function AccessiblePage() {
         <p className="accessible__lead">
           Staff console for Felipe Guerrero and Mariana Restrepo. After login,
           this page loads <code>GET /locations/overview</code> (JWT required)
-          and <code>GET /inventory</code> with <code>Authorization: Bearer</code>{" "}
+          and <code>GET /inventory/products</code> with <code>Authorization: Bearer</code>{" "}
           — 14 restaurants across Colombia and Florida, COP and USD.
         </p>
       </div>
@@ -221,23 +221,27 @@ export function AccessiblePage() {
             skeletonRows={5}
           >
             {stock.length === 0 ? (
-              <p className="accessible__status">No products in products.csv yet.</p>
+              <p className="accessible__status">No ingredients in kitchen inventory yet.</p>
             ) : (
               <div className="accessible__table-wrap">
                 <table className="accessible__table">
                   <thead>
                     <tr>
-                      <th scope="col">Product</th>
-                      <th scope="col">Quantity</th>
+                      <th scope="col">Ingredient</th>
+                      <th scope="col">SKU</th>
+                      <th scope="col">Stock</th>
                       <th scope="col">Unit</th>
+                      <th scope="col">Market</th>
                     </tr>
                   </thead>
                   <tbody>
                     {stock.map((product, index) => (
-                      <tr key={product?.product_id ?? `${product?.name ?? "item"}-${index}`}>
-                        <td>{product?.name ?? "Unnamed product"}</td>
-                        <td>{product?.quantity ?? "—"}</td>
+                      <tr key={product?.id ?? `${product?.sku ?? product?.name ?? "item"}-${index}`}>
+                        <td>{product?.name ?? "Unnamed ingredient"}</td>
+                        <td>{product?.sku ?? "—"}</td>
+                        <td>{product?.current_stock ?? "—"}</td>
                         <td>{product?.unit ?? "—"}</td>
+                        <td>{product?.country ?? "—"}</td>
                       </tr>
                     ))}
                   </tbody>

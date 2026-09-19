@@ -161,16 +161,16 @@ def _api_request(method: str, path: str, body: dict[str, Any] | None = None) -> 
 
 def execute_tool(name: str, arguments: dict[str, Any]) -> Any:
     if name == "list_inventory":
-        return _api_request("GET", "/inventory")
+        return _api_request("GET", "/agent/inventory")
     if name == "add_product":
-        return _api_request("POST", "/inventory", arguments)
+        return _api_request("POST", "/agent/inventory", arguments)
     if name == "update_stock":
         product_id = arguments["product_id"]
-        return _api_request("PATCH", f"/inventory/{product_id}", {"delta": arguments["delta"]})
+        return _api_request("PATCH", f"/agent/inventory/{product_id}", {"delta": arguments["delta"]})
     if name == "get_low_stock_alerts":
         threshold = arguments.get("threshold", 10)
         query = urllib.parse.urlencode({"threshold": threshold})
-        return _api_request("GET", f"/inventory/alerts?{query}")
+        return _api_request("GET", f"/agent/inventory/alerts?{query}")
     return {"error": True, "detail": f"Unknown tool: {name}"}
 
 
@@ -244,7 +244,7 @@ def run_agent_turn(client: OpenAI, messages: list[dict[str, Any]]) -> str:
 
 def check_api_available() -> bool:
     try:
-        urllib.request.urlopen(f"{API_BASE_URL}/inventory", timeout=3)
+        urllib.request.urlopen(f"{API_BASE_URL}/agent/inventory", timeout=3)
         return True
     except (urllib.error.URLError, TimeoutError, OSError):
         return False

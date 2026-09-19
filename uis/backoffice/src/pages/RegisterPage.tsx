@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
+import { isValidEmail, isValidPassword } from "../auth/authUtils";
 import { ApiError, SUPPORT_PROMPT, createUserAccount, loginUser, sanitizeFieldMessage, storeToken, toUserFacingMessage } from "../lib/api";
 import "./AuthPages.css";
 
@@ -12,10 +13,10 @@ type FieldErrors = {
 
 function buildValidationErrors(email: string, password: string): FieldErrors {
   const errors: FieldErrors = {};
-  if (!email.trim() || !email.includes("@")) {
+  if (!isValidEmail(email)) {
     errors.email = "A valid email is required.";
   }
-  if (password.length < 8) {
+  if (!isValidPassword(password)) {
     errors.password = "Password must be at least 8 characters.";
   }
   return errors;

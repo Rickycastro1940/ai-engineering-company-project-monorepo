@@ -13,7 +13,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
-| Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
+| Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` (SQLModel `Ingredient`/`IngredientEntry`/`IngredientExit` under `/inventory/products` and `/inventory/orders`; CSV Groq agent moved to `/agent/inventory`; TinyDB auth) |
 | Technology: telemetry + pipeline to dashboards | **Partial** — `data/pipelines/` weekly location cost/waste; Celery async path |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Not done** as product UI; pipeline design targets cost/waste for Mariana + Felipe |
 | Procurement: supplier price history, consolidated spend | **Not done** (supplier docs may exist on other branches; not claimed here) |
@@ -26,7 +26,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 
 | Area | Evidence |
 | --- | --- |
-| Inventory API + Groq agent | `services/api/inventory.py` (CSV-backed flat imports; no package-relative `.auth`), `agent.py` |
+| Inventory API + Groq agent | ORM computed stock: `services/routers/inventory.py`; CSV agent: `services/api/inventory.py` + `agent.py` under `/agent/inventory` |
 | Incident analysis UI | `uis/web` |
 | Weekly cost/waste pipeline + Celery | `data/pipelines/`, `services/tasks.py`, Compose Redis/Flower/worker on this branch |
 | Public corporate website | `uis/website/` — Vite/React, route `/`, brand tokens + components from `CONTEXT.md`; screenshot `docs/screenshots/website-corporate-home.png` |
@@ -181,6 +181,69 @@ Department served: **Technology** (structured HTTP, no env names in 503s) + **Op
 ```text
 uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py tests/test_users_api.py -q → 33 passed
 cd uis/backoffice && npm run build → green
+```
+
+## Latest testing toolchain (`feature/error-handling-audit`)
+
+Department served: **Technology** (auth API on the central FastAPI app needs pytest for bullet-proof coverage of login/register/JWT).
+
+```text
+origin = Rickycastro1940/ai-engineering-company-project-monorepo (existing fork)
+uv add --dev pytest pytest-cov httpx
+pytest 8.4.2 / pytest-cov 7.1.0 / httpx 0.28.1
+uv run python -m pytest tests/test_users_api.py -q → 17 passed
+```
+
+Jest was not installed: the previous-milestone auth surface is Python/FastAPI (`services/api/auth.py`, `/auth/token`, `/auth/login`, `/auth/register`, `/auth/me`), not a TypeScript API.
+
+## Latest live API check (`feature/error-handling-audit`)
+
+Department served: **Technology** (central FastAPI `api.app:app` on `:8000`).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+uv run uvicorn api.app:app --reload --host 127.0.0.1 --port 8000 → Application startup complete
+GET /docs → 200
+locations=present menus=missing sales=missing customers=missing suppliers=missing inventory=present auth=present
+path_count=21
+GET /auth/me no token → 401
+POST /auth/register → 201 + access_token
+GET /auth/me Bearer → 200
+GET /locations/overview Bearer → 200, 14 locations, Colombia 8 / Florida 6, COP+USD
+```
+
+Skill **passed** (criteria 1–4 + 6). Technology central API remains **incomplete** while menus/sales/customers/suppliers are `missing`.
+
+## Latest AI-assisted auth edge cases (`feature/error-handling-audit`)
+
+Department served: **Technology** (JWT register/login/token/me plus RBAC gaps the endpoint review found).
+
+```text
+TESTING.md — tests assert session/role/password decisions, not HTTP envelopes
+AI-found bug: GET /inventory/products requires staff session (Depends(get_current_user))
+CSV Groq agent no longer shares /inventory (moved to /agent/inventory)
+```
+
+## Latest business-logic + Jest suite (`feature/error-handling-audit`)
+
+Department served: **Technology** (staff JWT decisions on the central API) + **Operations/Executive** (backoffice only stores a well-formed session token).
+
+Intent over coverage: cases exist for who may sign in, who is admin, and whether kitchen stock is anonymous. 70% on auth/users is the floor; unused CRUD lines stay uncovered on purpose. Jest in `uis/backoffice` is optional extra.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+TESTING.md — AI-assisted missed cases + inventory bug (test_anonymous_cannot_read_kitchen_stock)
+```
+
+## Latest ORM inventory + CSV agent move (`feature/error-handling-audit`)
+
+Department served: **Operations** (computed kitchen stock) + **Technology** (dual TinyDB + SQLModel, `/inventory` router).
+
+```text
+testing.md at repo root — run commands, existing suites, happy/edge/failure per /auth /users /profiles /locations
+uv run pytest test/test_inventory_orm.py tests/test_error_handling.py tests/test_users_api.py
+CSV agent prefix /agent/inventory; ORM products/orders under /inventory
+.env is gitignored (never commit DATABASE_URL credentials)
 ```
 
 ## Planned next steps (order)

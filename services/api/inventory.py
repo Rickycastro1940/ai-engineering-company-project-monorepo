@@ -16,7 +16,7 @@ FIELDNAMES = ["product_id", "name", "quantity", "unit"]
 
 ProductRow = Dict[str, Union[str, int]]
 
-router = APIRouter(prefix="/inventory", tags=["inventory"])
+router = APIRouter(prefix="/agent/inventory", tags=["inventory-csv"])
 
 
 class ProductCreate(BaseModel):

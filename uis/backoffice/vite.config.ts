@@ -17,6 +17,10 @@ export default defineConfig({
         target: apiTarget,
         changeOrigin: true,
       },
+      "/agent": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
       "/auth": {
         target: apiTarget,
         changeOrigin: true,

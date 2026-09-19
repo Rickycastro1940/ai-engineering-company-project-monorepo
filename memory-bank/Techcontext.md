@@ -21,7 +21,7 @@
 | --- | --- | --- |
 | Language | Python **≥ 3.9** | `pyproject.toml` |
 | HTTP API | FastAPI + Uvicorn; root `api/app.py` loads `services/api/app.py` | `api/app.py`, `services/api/app.py` |
-| Inventory (ops/procurement slice) | `/inventory` router + Groq CLI agent (manual loop, no LangChain) | `services/api/inventory.py`, `agent.py` |
+| Inventory (ops/procurement slice) | `/inventory` SQLModel router (computed stock); Groq CSV agent under `/agent/inventory` | `services/routers/inventory.py`, `services/api/inventory.py`, `agent.py` |
 | Async / weekly report path | Celery + Redis + Flower; `run_weekly_pipeline` | `services/celery_app.py`, `services/tasks.py`, `docker-compose.yml` |
 | Telemetry → business report | Weekly location cost/waste pipeline (purchase, waste, stockout, price alerts) | `data/pipelines/PIPELINE_DESIGN.md` (audience: Mariana + Felipe) |
 | Frontends | Vite/React `uis/website` (public) + `uis/backoffice` (internal `/accessible`); static `uis/web` | `uis/website/`, `uis/backoffice/`, `uis/web/` |

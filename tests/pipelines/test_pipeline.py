@@ -1,6 +1,10 @@
 import os
 import pandas as pd
 import pytest
+
+pytest.importorskip("supabase")
+pytest.importorskip("prefect")
+
 from data.pipelines.pipeline import _supabase_client, aggregate_location_kpis
 
 def test_aggregate_location_kpis_computation():
