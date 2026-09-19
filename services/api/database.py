@@ -1,19 +1,15 @@
-import os
-from tinydb import TinyDB
-from sqlmodel import create_engine, Session, SQLModel
+"""Compatibility shim — dual-database setup lives in ``services/database.py``."""
 
-# TinyDB initialization
-db = TinyDB('data/auth.json')
+from services.database import AUTH_DB_PATH, DATABASE_URL, configure_engine, create_db_and_tables, db, engine, get_auth_db, get_db, get_engine
 
-# SQLModel initialization
-DATABASE_URL = os.environ.get("DATABASE_URL")
-engine = create_engine(DATABASE_URL)
-
-def get_db():
-    with Session(engine) as session:
-        yield session
-
-def create_db_and_tables():
-    if not DATABASE_URL:
-        return
-    SQLModel.metadata.create_all(engine)
+__all__ = [
+    "AUTH_DB_PATH",
+    "DATABASE_URL",
+    "configure_engine",
+    "create_db_and_tables",
+    "db",
+    "engine",
+    "get_auth_db",
+    "get_db",
+    "get_engine",
+]

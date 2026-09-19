@@ -1,4 +1,5 @@
 import {
+  authorizationHeader,
   clearAuthToken,
   extractAccessToken,
   getAuthToken,
@@ -186,7 +187,8 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
     headers.set("Content-Type", "application/json");
   }
   if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
+    const { Authorization } = authorizationHeader(token);
+    headers.set("Authorization", Authorization);
   }
 
   const method = (options.method ?? "GET").toUpperCase();
@@ -285,14 +287,17 @@ export async function updateUser(
 }
 
 export type InventoryProduct = {
-  product_id: number;
+  id: number;
   name: string;
-  quantity: number;
+  sku: string;
   unit: string;
+  category: string;
+  country: string;
+  current_stock: number;
 };
 
 export async function fetchInventory(): Promise<InventoryProduct[]> {
-  return apiRequest<InventoryProduct[]>("/inventory");
+  return apiRequest<InventoryProduct[]>("/inventory/products");
 }
 
 export async function fetchLocationsOverview(): Promise<LocationsOverview> {

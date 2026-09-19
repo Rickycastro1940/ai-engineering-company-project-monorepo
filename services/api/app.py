@@ -1,21 +1,28 @@
 from __future__ import annotations
 
+import os
 import shutil
 import tempfile
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
- 
 
 from analyzer import IncidentAnalyzer
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from inventory import router as inventory_router
+from inventory import router as inventory_csv_router
 from locations import router as locations_router
 from errors import register_error_handlers
 from pydantic import BaseModel, Field
-from users import router as users_router
+from sqlmodel import Session
+from users import ensure_seed_supervisor, router as users_router
+
+from services.database import get_engine
+from services.models import Ingredient, IngredientEntry, IngredientExit  # noqa: F401
+from services.routers import inventory_router
+from services.seed_inventory import seed_inventory
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 UI_ROOT = REPO_ROOT / "uis" / "web"
@@ -109,7 +116,26 @@ def _register_analyze_routes(app: FastAPI, route_prefix: str) -> None:
             await file.close()
         return _run_analysis(input_path, output_path, engine)
 
-app = FastAPI(title="Brasaland Central API", version="1.0.0", debug=False)
+def _bootstrap_inventory() -> None:
+    user_uuid = "1"
+    if os.getenv("PYTEST_CURRENT_TEST") is None:
+        user_uuid = str(ensure_seed_supervisor()["id"])
+    with Session(get_engine()) as session:
+        seed_inventory(session, user_uuid)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    from sqlmodel import SQLModel
+
+    from services.database import engine
+
+    SQLModel.metadata.create_all(engine)
+    _bootstrap_inventory()
+    yield
+
+
+app = FastAPI(title="Brasaland Central API", version="1.0.0", debug=False, lifespan=lifespan)
 register_error_handlers(app)
 app.add_middleware(
     CORSMiddleware,
@@ -124,7 +150,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(locations_router)
-app.include_router(inventory_router)
+app.include_router(inventory_router)  # dedicated ORM inventory router, prefix=/inventory
+app.include_router(inventory_csv_router)
 app.include_router(users_router)
 _register_analyze_routes(app, "anylayze")
 _register_analyze_routes(app, "analyze")

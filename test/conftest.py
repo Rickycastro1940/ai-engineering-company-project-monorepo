@@ -15,6 +15,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from api.app import app  # pylint: disable=wrong-import-position
+from services import database as dual_db  # pylint: disable=wrong-import-position
 
 users = importlib.import_module("users")
 auth = importlib.import_module("auth")
@@ -40,10 +41,16 @@ def refused_session(response) -> None:
 @pytest.fixture()
 def client(tmp_path: Path) -> Iterator[TestClient]:
     original_database_path = users.DATABASE_PATH
-    users.DATABASE_PATH = tmp_path / "company_api.db"
+    users.DATABASE_PATH = tmp_path / "auth.json"
+    original_auth_path = dual_db.AUTH_DB_PATH
+    dual_db.AUTH_DB_PATH = users.DATABASE_PATH
+    original_url = dual_db.DATABASE_URL
+    dual_db.configure_engine(f"sqlite:///{tmp_path / 'inventory.sqlite'}")
     with TestClient(app) as test_client:
         yield test_client
     users.DATABASE_PATH = original_database_path
+    dual_db.AUTH_DB_PATH = original_auth_path
+    dual_db.configure_engine(original_url)
 
 
 def register_user(
@@ -60,4 +67,5 @@ def register_user(
     # Registration is a session grant: a token plus the created staff row.
     assert payload.get("access_token")
     assert payload.get("user", {}).get("email")
+    assert "hashed_password" not in payload.get("user", {})
     return payload

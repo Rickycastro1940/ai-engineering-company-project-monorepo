@@ -13,7 +13,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
-| Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
+| Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` (SQLModel `Ingredient`/`IngredientEntry`/`IngredientExit` under `/inventory/products` and `/inventory/orders`; CSV Groq agent moved to `/agent/inventory`; TinyDB auth) |
 | Technology: telemetry + pipeline to dashboards | **Partial** — `data/pipelines/` weekly location cost/waste; Celery async path |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Not done** as product UI; pipeline design targets cost/waste for Mariana + Felipe |
 | Procurement: supplier price history, consolidated spend | **Not done** (supplier docs may exist on other branches; not claimed here) |
@@ -26,7 +26,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 
 | Area | Evidence |
 | --- | --- |
-| Inventory API + Groq agent | `services/api/inventory.py` (CSV-backed flat imports; no package-relative `.auth`), `agent.py` |
+| Inventory API + Groq agent | ORM computed stock: `services/routers/inventory.py`; CSV agent: `services/api/inventory.py` + `agent.py` under `/agent/inventory` |
 | Incident analysis UI | `uis/web` |
 | Weekly cost/waste pipeline + Celery | `data/pipelines/`, `services/tasks.py`, Compose Redis/Flower/worker on this branch |
 | Public corporate website | `uis/website/` — Vite/React, route `/`, brand tokens + components from `CONTEXT.md`; screenshot `docs/screenshots/website-corporate-home.png` |
@@ -220,10 +220,8 @@ Department served: **Technology** (JWT register/login/token/me plus RBAC gaps th
 
 ```text
 TESTING.md — tests assert session/role/password decisions, not HTTP envelopes
-AI-found bug: GET /inventory had no staff session; now Depends(get_current_user)
-uv run pytest --collect-only → 75 tests collected (no syntax errors)
-uv run pytest → 75 passed
-uv run pytest --cov → auth.py 98% / users.py 94% / TOTAL 95% (fail_under 70)
+AI-found bug: GET /inventory/products requires staff session (Depends(get_current_user))
+CSV Groq agent no longer shares /inventory (moved to /agent/inventory)
 ```
 
 ## Latest business-logic + Jest suite (`feature/error-handling-audit`)
@@ -235,9 +233,17 @@ Intent over coverage: cases exist for who may sign in, who is admin, and whether
 ```text
 head -n 5 CONTEXT.md → # Welcome to Brasaland
 TESTING.md — AI-assisted missed cases + inventory bug (test_anonymous_cannot_read_kitchen_stock)
-uv run pytest → 75 passed (staff-session decisions, not HTTP envelopes)
-uv run pytest --cov → above fail_under 70 on auth.py + users.py
-cd uis/backoffice && npx jest → 12 passed (optional; recognised if present)
+```
+
+## Latest ORM inventory + CSV agent move (`feature/error-handling-audit`)
+
+Department served: **Operations** (computed kitchen stock) + **Technology** (dual TinyDB + SQLModel, `/inventory` router).
+
+```text
+testing.md at repo root — run commands, existing suites, happy/edge/failure per /auth /users /profiles /locations
+uv run pytest test/test_inventory_orm.py tests/test_error_handling.py tests/test_users_api.py
+CSV agent prefix /agent/inventory; ORM products/orders under /inventory
+.env is gitignored (never commit DATABASE_URL credentials)
 ```
 
 ## Planned next steps (order)

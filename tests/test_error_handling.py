@@ -20,22 +20,6 @@ class InventoryErrorHandlingTests(unittest.TestCase):
     def setUp(self) -> None:
         self.client = TestClient(app)
 
-    def _staff_headers(self) -> dict[str, str]:
-        email = "error-handling@brasaland.test"
-        created = self.client.post(
-            "/auth/register",
-            json={"email": email, "password": "secret-password"},
-        )
-        if created.status_code == 201:
-            token = created.json()["access_token"]
-        else:
-            login = self.client.post(
-                "/auth/login",
-                json={"email": email, "password": "secret-password"},
-            )
-            token = login.json()["access_token"]
-        return {"Authorization": f"Bearer {token}"}
-
     def _assert_error_envelope(self, response, status_code: int, code: str) -> dict:
         body = response.json()
         self.assertEqual(response.status_code, status_code)
@@ -49,13 +33,13 @@ class InventoryErrorHandlingTests(unittest.TestCase):
         return body
 
     def test_missing_product_returns_404(self) -> None:
-        response = self.client.patch("/inventory/999999", json={"delta": 1}, headers=self._staff_headers())
+        response = self.client.patch("/agent/inventory/999999", json={"delta": 1})
         body = self._assert_error_envelope(response, 404, "not_found")
         self.assertIn("not found", str(body["detail"]).lower())
         self.assertIn("not found", body["message"].lower())
 
     def test_negative_alert_threshold_returns_400(self) -> None:
-        response = self.client.get("/inventory/alerts", params={"threshold": -1}, headers=self._staff_headers())
+        response = self.client.get("/agent/inventory/alerts", params={"threshold": -1})
         body = self._assert_error_envelope(response, 400, "bad_request")
         self.assertIn("threshold", str(body["detail"]).lower())
 
@@ -84,9 +68,8 @@ class InventoryErrorHandlingTests(unittest.TestCase):
 
     def test_unhandled_exception_is_structured_500_without_traceback(self) -> None:
         client = TestClient(app, raise_server_exceptions=False)
-        headers = self._staff_headers()
         with patch("inventory.load_products", side_effect=RuntimeError("secret boom /Users/hidden")):
-            response = client.get("/inventory", headers=headers)
+            response = client.get("/agent/inventory")
         body = self._assert_error_envelope(response, 500, "internal_error")
         self.assertEqual(body["message"], "Internal server error")
         self.assertEqual(body["detail"], "Internal server error")
@@ -125,12 +108,11 @@ class InventoryErrorHandlingTests(unittest.TestCase):
         from services.safe_errors import ExternalServiceError
 
         client = TestClient(app, raise_server_exceptions=False)
-        headers = self._staff_headers()
         with patch(
             "inventory.load_products",
             side_effect=ExternalServiceError("language model"),
         ):
-            response = client.get("/inventory", headers=headers)
+            response = client.get("/agent/inventory")
         body = self._assert_error_envelope(response, 503, "service_unavailable")
         self.assertEqual(body["message"], "language model is unavailable")
         serialized = json.dumps(body)

@@ -57,7 +57,7 @@ def test_short_password_does_not_create_a_user(client) -> None:
 
 def test_anonymous_cannot_read_kitchen_stock(client) -> None:
     # AI review: inventory had no session check while locations did.
-    refused_session(client.get("/inventory"))
+    refused_session(client.get("/inventory/products"))
     staff = register_user(client, "ops@brasaland.test")
-    stock = client.get("/inventory", headers={"Authorization": f"Bearer {staff['access_token']}"})
+    stock = client.get("/inventory/products", headers={"Authorization": f"Bearer {staff['access_token']}"})
     assert isinstance(stock.json(), list)

@@ -19,7 +19,7 @@ There is **no Next.js app** in this monorepo. Staff views live in this Vite SPA.
 
 Protected staff views (all of them): `/`, `/accessible`, `/account/profile`, `/account/change-password`, and any unmatched path (`*`). Public in this app: `/login`, `/register`.
 
-Unauthenticated or **invalid** sessions redirect to `/login?next=…`. Logout clears `localStorage` (`auth_token`) and returns to `/login`. `GET /locations` and `GET /locations/overview` require a Bearer token. The operations page also loads `GET /inventory` with that header.
+Unauthenticated or **invalid** sessions redirect to `/login?next=…`. Logout clears `localStorage` (`auth_token`) and returns to `/login`. `GET /locations` and `GET /locations/overview` require a Bearer token. The operations page also loads `GET /inventory/products` with that header.
 
 ## Authentication
 
@@ -46,6 +46,8 @@ cd uis/backoffice
 npm install
 npm run dev
 ```
+
+Auth utility tests (Jest): `npx jest --coverage` from `uis/backoffice` (`jest.config.ts`).
 
 Open `http://localhost:5174/login`. Vite proxies `/auth`, `/users`, `/profiles`, `/locations`, `/inventory`, and `/api` to `http://127.0.0.1:8000`.
 
