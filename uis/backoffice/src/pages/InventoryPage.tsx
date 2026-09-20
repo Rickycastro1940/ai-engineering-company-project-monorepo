@@ -5,10 +5,10 @@ import {
   fetchInventory,
   fetchInventoryAlerts,
   inventoryApiBaseUrl,
-  toUserFacingMessage,
+  inventoryErrorMessage,
   updateInventoryStock,
   type InventoryProduct,
-} from "../lib/api";
+} from "../lib/inventory";
 import "./AuthPages.css";
 import "./AccessiblePage.css";
 import "./InventoryPage.css";
@@ -74,7 +74,10 @@ export function InventoryPage() {
         if (!cancelled) {
           setProducts(null);
           setListError(
-            toUserFacingMessage(err, "Kitchen inventory could not be loaded. Try again in a moment."),
+            inventoryErrorMessage(
+              err,
+              "Kitchen inventory could not be loaded. Try again in a moment.",
+            ),
           );
         }
       } finally {
@@ -107,7 +110,10 @@ export function InventoryPage() {
         if (!cancelled) {
           setAlerts(null);
           setAlertError(
-            toUserFacingMessage(err, "Low-stock alerts could not be loaded. Try again in a moment."),
+            inventoryErrorMessage(
+              err,
+              "Low-stock alerts could not be loaded. Try again in a moment.",
+            ),
           );
         }
       } finally {
@@ -165,7 +171,7 @@ export function InventoryPage() {
       setFormSuccess(`${created.name} was added to kitchen inventory.`);
       refreshAll();
     } catch (err: unknown) {
-      setFormError(toUserFacingMessage(err, "That product could not be added. Try again."));
+      setFormError(inventoryErrorMessage(err, "That product could not be added. Try again."));
     } finally {
       setIsCreating(false);
     }
@@ -199,7 +205,7 @@ export function InventoryPage() {
       );
       refreshAll();
     } catch (err: unknown) {
-      setStockError(toUserFacingMessage(err, "Stock could not be updated. Try again."));
+      setStockError(inventoryErrorMessage(err, "Stock could not be updated. Try again."));
     } finally {
       setRowBusyId(null);
     }

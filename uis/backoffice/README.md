@@ -20,14 +20,14 @@ There is **no Next.js app** in this monorepo. Staff views live in this Vite SPA.
 
 Protected staff views (all of them): `/`, `/accessible`, `/inventory`, `/account/profile`, `/account/change-password`, and any unmatched path (`*`). Public in this app: `/login`, `/register`.
 
-Unauthenticated or **invalid** sessions redirect to `/login?next=…`. Logout clears `localStorage` (`auth_token`) and returns to `/login`. `GET /locations` and `GET /locations/overview` require a Bearer token. The operations page also loads `GET /inventory` with that header. Full kitchen inventory management lives at `/inventory` (`POST /inventory`, `PATCH /inventory/{id}`, `GET /inventory/alerts`).
+Unauthenticated or **invalid** sessions redirect to `/login?next=…`. Logout clears `localStorage` (`auth_token`) and returns to `/login`. `GET /locations` and `GET /locations/overview` require a Bearer token. The operations page also loads `GET /inventory` with that header. Full kitchen inventory management lives at `/inventory` (`POST /inventory`, `PATCH /inventory/{id}`, `GET /inventory/alerts`). All of those calls go through `src/lib/inventory.ts` — pages never call `fetch` for inventory. 4xx/5xx responses surface `message`/`detail` from the API body.
 
 ## Authentication
 
 Client-side JWT session (the usual Next.js layout-guard pattern, implemented here in Vite — **no middleware**, because the token is only in `localStorage`, not a cookie):
 
 1. After `POST /auth/login` returns `access_token`, store it in `localStorage` as `auth_token` and redirect to `/accessible`. Registration does the same after `POST /users` then `POST /auth/login`.
-2. On every protected `fetch`, read that key and set `Authorization: Bearer <token>` (`apiRequest` in `src/lib/api.ts`).
+2. On every protected `fetch`, read that key and set `Authorization: Bearer <token>` (`apiRequest` in `src/lib/api.ts`; kitchen inventory uses `src/lib/inventory.ts`).
 3. Protect routes with a **client layout guard** (`ProtectedRoute` + `useRequireAuth`). The hook reads `localStorage` and, when a token is present, `AuthProvider` validates it with `GET /auth/me`. Missing or invalid tokens redirect to `/login`.
 4. Logout removes `auth_token` from `localStorage` and redirects to `/login`.
 5. A **401** on a protected API call (including `GET /auth/me`) removes the token and redirects to `/login`. Failed login/register stay on the form.

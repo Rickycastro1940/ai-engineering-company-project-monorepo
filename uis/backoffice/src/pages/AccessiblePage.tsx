@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { AsyncPanel } from "../components/AsyncState";
+import { fetchLocationsOverview, toUserFacingMessage, type LocationsOverview } from "../lib/api";
 import {
   fetchInventory,
-  fetchLocationsOverview,
-  toUserFacingMessage,
+  inventoryErrorMessage,
   type InventoryProduct,
-  type LocationsOverview,
-} from "../lib/api";
+} from "../lib/inventory";
 import "./AccessiblePage.css";
 
 function emptyOverview(): LocationsOverview {
@@ -101,7 +100,10 @@ export function AccessiblePage() {
         if (!cancelled) {
           setInventory(null);
           setInventoryError(
-            toUserFacingMessage(err, "Kitchen inventory could not be loaded. Try again in a moment."),
+            inventoryErrorMessage(
+              err,
+              "Kitchen inventory could not be loaded. Try again in a moment.",
+            ),
           );
         }
       } finally {
