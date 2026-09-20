@@ -285,8 +285,56 @@ export type InventoryProduct = {
   unit: string;
 };
 
+export type InventoryProductCreate = {
+  name: string;
+  quantity: number;
+  unit: string;
+};
+
+/** Inventory calls go to the FastAPI service, not the Vite origin. */
+export function inventoryApiBaseUrl(): string {
+  const configured =
+    import.meta.env.NEXT_PUBLIC_INVENTORY_API_URL ??
+    import.meta.env.VITE_INVENTORY_API_URL ??
+    "";
+  return String(configured).trim().replace(/\/$/, "");
+}
+
+export function inventoryApiUrl(path: string): string {
+  const base = inventoryApiBaseUrl();
+  const suffix = path.startsWith("/") ? path : `/${path}`;
+  return base ? `${base}${suffix}` : suffix;
+}
+
 export async function fetchInventory(): Promise<InventoryProduct[]> {
-  return apiRequest<InventoryProduct[]>("/inventory");
+  return apiRequest<InventoryProduct[]>(inventoryApiUrl("/inventory"));
+}
+
+export async function createInventoryProduct(
+  payload: InventoryProductCreate,
+): Promise<InventoryProduct> {
+  return apiRequest<InventoryProduct>(inventoryApiUrl("/inventory"), {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateInventoryStock(
+  productId: number,
+  delta: number,
+): Promise<InventoryProduct> {
+  return apiRequest<InventoryProduct>(
+    inventoryApiUrl(`/inventory/${encodeURIComponent(String(productId))}`),
+    {
+      method: "PATCH",
+      body: JSON.stringify({ delta }),
+    },
+  );
+}
+
+export async function fetchInventoryAlerts(threshold = 10): Promise<InventoryProduct[]> {
+  const query = new URLSearchParams({ threshold: String(threshold) });
+  return apiRequest<InventoryProduct[]>(inventoryApiUrl(`/inventory/alerts?${query}`));
 }
 
 export async function fetchLocationsOverview(): Promise<LocationsOverview> {

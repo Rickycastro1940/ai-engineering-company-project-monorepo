@@ -1,0 +1,135 @@
+.inventory__api-hint {
+  margin-top: 0.85rem;
+  font-size: 0.82rem;
+  color: var(--bo-muted);
+}
+
+.inventory__api-hint code {
+  font-family: var(--font-mono);
+  color: var(--bo-accent);
+}
+
+.inventory__layout {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+.inventory__help {
+  color: var(--bo-muted);
+  font-size: 0.9rem;
+  margin-bottom: 0.9rem;
+}
+
+.inventory__help code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--bo-accent);
+}
+
+.inventory__form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.inventory__threshold {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: end;
+  margin-bottom: 0.9rem;
+}
+
+.inventory__threshold label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.88rem;
+  color: var(--bo-muted);
+}
+
+.inventory__threshold input,
+.inventory__delta input {
+  font: inherit;
+  color: var(--bo-text);
+  background: color-mix(in srgb, #000 28%, var(--bo-panel));
+  border: 1px solid var(--bo-border);
+  border-radius: 0.4rem;
+  padding: 0.5rem 0.65rem;
+  width: 7rem;
+}
+
+.inventory__secondary,
+.inventory__in,
+.inventory__out {
+  border: 1px solid var(--bo-border);
+  background: transparent;
+  color: var(--bo-text);
+  border-radius: 0.35rem;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  font: inherit;
+}
+
+.inventory__secondary:hover,
+.inventory__in:hover,
+.inventory__out:hover {
+  background: var(--bo-panel-2);
+}
+
+.inventory__in {
+  border-color: color-mix(in srgb, var(--bo-ok) 50%, var(--bo-border));
+  color: var(--bo-ok);
+}
+
+.inventory__out {
+  border-color: color-mix(in srgb, #fca5a5 50%, var(--bo-border));
+  color: #fca5a5;
+}
+
+.inventory__in:disabled,
+.inventory__out:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.inventory__table-wrap {
+  max-height: none;
+}
+
+.inventory__delta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: end;
+}
+
+.inventory__delta-label {
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.72rem;
+  color: var(--bo-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.inventory__row--alert td {
+  background: color-mix(in srgb, var(--bo-warn) 12%, transparent);
+}
+
+.inventory__pill {
+  display: inline-flex;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--bo-warn) 22%, transparent);
+  color: var(--bo-warn);
+}
+
+@media (min-width: 960px) {
+  .inventory__layout {
+    grid-template-columns: 1fr 1fr;
+  }
+}

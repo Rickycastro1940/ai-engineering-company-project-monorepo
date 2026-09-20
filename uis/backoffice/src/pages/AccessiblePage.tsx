@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { AsyncPanel } from "../components/AsyncState";
 import {
   fetchInventory,
@@ -213,6 +214,10 @@ export function AccessiblePage() {
 
         <div className="accessible__panel">
           <h3>Kitchen inventory</h3>
+          <p className="accessible__link-row">
+            <Link to="/inventory">Open inventory management</Link> to add products,
+            record incoming deliveries and kitchen usage, and review low-stock alerts.
+          </p>
           <AsyncPanel
             status={inventoryStatus}
             loadingLabel="Loading inventory…"

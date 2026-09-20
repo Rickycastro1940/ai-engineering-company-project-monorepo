@@ -11,15 +11,16 @@ Internal staff console for **Brasaland Digital** (see root [`CONTEXT.md`](../../
 | `/login` | Email + password form. Success stores JWT and opens `/accessible`. Failure stays on the form. | Public |
 | `/register` | Registration form. Success: `POST /users` (optional `name`) then `POST /auth/login`, store JWT, open `/accessible`. Failure shows field-level errors. | Public |
 | `/accessible` | Welcome dashboard — `GET /locations/overview` | Protected |
+| `/inventory` | Kitchen inventory — list/add products, incoming/outgoing stock, low-stock alerts | Protected |
 | `/account/profile` | Email plus name/phone/address from `GET /auth/me`; edit contact via `PUT /profiles/me` | Protected |
 | `/account/change-password` | Password update via `PUT /users/{id}` | Protected |
 | `/` | Redirects to `/accessible` | Protected |
 
 There is **no Next.js app** in this monorepo. Staff views live in this Vite SPA. `uis/website` (public milestone one) is a separate app and must not check a token or redirect to `/login`. `uis/web` is incident HTML, not a session console.
 
-Protected staff views (all of them): `/`, `/accessible`, `/account/profile`, `/account/change-password`, and any unmatched path (`*`). Public in this app: `/login`, `/register`.
+Protected staff views (all of them): `/`, `/accessible`, `/inventory`, `/account/profile`, `/account/change-password`, and any unmatched path (`*`). Public in this app: `/login`, `/register`.
 
-Unauthenticated or **invalid** sessions redirect to `/login?next=…`. Logout clears `localStorage` (`auth_token`) and returns to `/login`. `GET /locations` and `GET /locations/overview` require a Bearer token. The operations page also loads `GET /inventory` with that header.
+Unauthenticated or **invalid** sessions redirect to `/login?next=…`. Logout clears `localStorage` (`auth_token`) and returns to `/login`. `GET /locations` and `GET /locations/overview` require a Bearer token. The operations page also loads `GET /inventory` with that header. Full kitchen inventory management lives at `/inventory` (`POST /inventory`, `PATCH /inventory/{id}`, `GET /inventory/alerts`).
 
 ## Authentication
 
@@ -44,9 +45,11 @@ JWT_SECRET_KEY=brasaland-dev-secret uvicorn api.app:app --reload --host 127.0.0.
 # Terminal 2 — backoffice
 cd uis/backoffice
 npm install
+# Inventory API base (Vite loads .env.local; this is not a Next.js app)
+# NEXT_PUBLIC_INVENTORY_API_URL=http://localhost:8000
 npm run dev
 ```
 
-Open `http://localhost:5174/login`. Vite proxies `/auth`, `/users`, `/profiles`, `/locations`, `/inventory`, and `/api` to `http://127.0.0.1:8000`.
+Open `http://localhost:5174/login`. Vite proxies `/auth`, `/users`, `/profiles`, `/locations`, `/inventory`, and `/api` to `http://127.0.0.1:8000`. Kitchen inventory calls also use `NEXT_PUBLIC_INVENTORY_API_URL` when that file is present.
 
 Legacy static KPI/telemetry HTML (pre-Vite) is under `legacy/`.

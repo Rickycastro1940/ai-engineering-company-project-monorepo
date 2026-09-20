@@ -153,6 +153,15 @@
   color: var(--bo-muted);
 }
 
+.accessible__link-row {
+  color: var(--bo-muted);
+  margin-bottom: 0.75rem;
+}
+
+.accessible__link-row a {
+  color: var(--bo-accent);
+}
+
 .accessible__error {
   color: #fca5a5;
   font-size: 0.92rem;
