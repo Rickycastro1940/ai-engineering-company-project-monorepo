@@ -1,6 +1,6 @@
 # Progress — Brasaland Digital
 
-Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project-monorepo`, branch `feature/auth-frontend`. Gaps below are scored against root [`CONTEXT.md`](../CONTEXT.md) department needs.
+Verified **2026-09-20** on clone `Rickycastro1940/ai-engineering-company-project-monorepo`, branch `cursor/backoffice-inventory-cbbe`. Gaps below are scored against root [`CONTEXT.md`](../CONTEXT.md) department needs.
 
 ## Agent infrastructure (aligned to `CONTEXT.md`)
 
@@ -15,7 +15,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
 | Technology: telemetry + pipeline to dashboards | **Partial** — `data/pipelines/` weekly location cost/waste; Celery async path |
-| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Not done** as product UI; pipeline design targets cost/waste for Mariana + Felipe |
+| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — backoffice `/inventory` lists kitchen products, add/incoming/outgoing stock, and low-stock alerts (WhatsApp-order gap); sales dashboard / no-sales alerts / forecast ordering still not built |
 | Procurement: supplier price history, consolidated spend | **Not done** (supplier docs may exist on other branches; not claimed here) |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
 | People: HR portal / KPIs by country | **Not done** |
@@ -30,8 +30,29 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | Incident analysis UI | `uis/web` |
 | Weekly cost/waste pipeline + Celery | `data/pipelines/`, `services/tasks.py`, Compose Redis/Flower/worker on this branch |
 | Public corporate website | `uis/website/` — Vite/React, route `/`, brand tokens + components from `CONTEXT.md`; screenshot `docs/screenshots/website-corporate-home.png` |
-| Internal backoffice | `uis/backoffice/` — JWT session; client layout guard (`ProtectedRoute` + `useRequireAuth`) on `/`, `/accessible`, `/account/profile`, `/account/change-password`; `/accessible` loads JWT-gated locations (14 / 8 Colombia / 6 Florida, COP+USD) plus inventory |
+| Internal backoffice | `uis/backoffice/` — JWT session; client layout guard on `/`, `/accessible`, `/inventory`, `/account/profile`, `/account/change-password`; `/accessible` loads locations (14 / 8 Colombia / 6 Florida, COP+USD); `/inventory` manages kitchen stock via `NEXT_PUBLIC_INVENTORY_API_URL` |
 | Locations API | `services/api/locations.py` — 14 locations, Colombia 8 / Florida 6, COP+USD; **Bearer JWT required** |
+
+## Latest kitchen inventory UI (`cursor/backoffice-inventory-cbbe`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — on-hand ingredient stock instead of WhatsApp orders) + **Technology** (inventory router still present on the central API).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+GET http://127.0.0.1:8000/docs → 200
+locations=present
+menus=missing
+sales=missing
+customers=missing
+suppliers=missing
+inventory=present
+path_count=21
+GET /inventory → Tomatoes/Mozzarella/Napkins
+cd uis/backoffice && npm run build → tsc -b && vite build green
+Browser /inventory (JWT) → list + add Beef brisket/Grill salt + incoming Tomatoes/Beef brisket + outgoing Mozzarella/Grill salt + insufficient-stock Napkins
+```
+
+Skill **passed** (criteria 1–4 + 6). Technology central API remains **incomplete** while menus/sales/customers/suppliers are `missing`.
 
 ## Latest auth-frontend evidence (`feature/auth-frontend`)
 
