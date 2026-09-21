@@ -183,6 +183,31 @@ uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py te
 cd uis/backoffice && npm run build → green
 ```
 
+## Latest containerization evidence (`cursor/monorepo-containerization-c52e`)
+
+Department served: **Technology** (Nicolás Park — runnable local stack for the central API) + **Marketing** (Camila’s `uis/website`) + **Operations/Executive** (staff backoffice on Compose).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+docker --version → Docker version 29.1.3
+docker compose version → Docker Compose version v2.40.3
+docker compose up --build -d → api healthy :8000, website :5173, backoffice :5174, redis, worker, flower
+GET http://127.0.0.1:8000/docs → 200
+locations=present
+menus=missing
+sales=missing
+customers=missing
+suppliers=missing
+inventory=present
+path_count=21
+GET /locations/overview with JWT via Vite proxy :5174 → Brasaland 14 COP+USD, Colombia 8 / Florida 6
+Celery worker → Connected to redis://host.docker.internal:6379/0
+GET http://127.0.0.1:5173/ → 200
+GET http://127.0.0.1:5174/login → 200
+```
+
+Skill **passed** (criteria 1–4 + 6) against the Compose-hosted API. Technology central API remains **incomplete** while menus/sales/customers/suppliers are `missing`. `.env` is gitignored.
+
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).

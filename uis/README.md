@@ -9,6 +9,10 @@ The two main projects stored here are:
 
 Also present: **`web/`** — incident-analysis HTML tool (not the public marketing site).
 
+## Docker
+
+[`Dockerfile`](./Dockerfile) and [`.dockerignore`](./.dockerignore) live in this folder. Compose at the repo root builds two containers from the same file (`APP_DIR=website` → port 5173, `APP_DIR=backoffice` → port 5174). Create root `.env` before `docker compose up`.
+
 Organize `uis/` by **different concerns** — each subfolder covers a distinct area of the company (for example, public web vs internal operations) and includes its own technical and functional documentation.
 
 - **Main purpose**: to centralize in a single place all frontend applications that support the company's use cases.

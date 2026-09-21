@@ -1,5 +1,5 @@
-# Compatibility image: same API/worker contents as services/Dockerfile.
-# Prefer `docker compose build api` (dockerfile: services/Dockerfile).
+# Canonical backend image for Brasaland Digital (Technology central API + Celery worker).
+# Build from the monorepo root: docker compose build api
 
 FROM python:3.11-slim
 

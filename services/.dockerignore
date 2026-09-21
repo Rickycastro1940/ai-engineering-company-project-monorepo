@@ -1,0 +1,17 @@
+# Context for this ignore file is ./services when using `docker build -f Dockerfile .` there.
+# Compose builds the API from the repo root (see root .dockerignore).
+
+.git
+.gitignore
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+.venv
+.env
+.env.*
+*.md
+README.es.md
+data/uploads
+data/celery_dead_letters.sqlite3
+data/company_api.db

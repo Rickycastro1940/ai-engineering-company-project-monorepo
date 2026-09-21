@@ -28,6 +28,24 @@ This repository is the **starter template** for transversal projects. You will w
 5. **Start implementing** in the right folder — do not dump everything in the root.
 6. **Document** what you add: each new app, service, agent, or pipeline gets a subfolder + README.
 
+### Run with Docker Compose
+
+Requires Docker Engine + Compose CLI **v2** (`docker compose version`). Create a root `.env` first (copy [`.env.example`](./.env.example) — names such as `GROQ_API_KEY`, `JWT_SECRET_KEY`, `REDIS_URL`, `VITE_API_PROXY`).
+
+```bash
+cp .env.example .env   # if you do not already have .env
+docker compose up --build
+```
+
+| Service | URL |
+| --- | --- |
+| Central API (`services/Dockerfile`) | http://localhost:8000/docs |
+| Public website (`uis/Dockerfile` `APP_DIR=website`) | http://localhost:5173/ |
+| Staff backoffice (`uis/Dockerfile` `APP_DIR=backoffice`) | http://localhost:5174/login |
+| Flower (Celery) | http://localhost:5555 |
+
+Inside Compose, Redis is reached at `redis://host.docker.internal:6379/0` (published host port). On the host without Compose, keep `REDIS_URL=redis://localhost:6379/0`.
+
 ### Run locally (API + Agent)
 
 **Entry points:** [`api/app.py`](api/app.py) (FastAPI inventory API) and [`agent.py`](agent.py) (Groq CLI agent).

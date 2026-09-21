@@ -7,6 +7,16 @@ Each subfolder inside `services/` must correspond to **one specific service** (f
 - **Main purpose**: to centralize all the backend logic, APIs, and queue consumers that support the company's use cases.
 - **Recommendation**: document in this file (or in sub-READMEs) the services you add, their objective, the technology used, and how to run them.
 
+## Docker
+
+[`Dockerfile`](./Dockerfile) and [`.dockerignore`](./.dockerignore) live in this folder. Root `docker-compose.yml` builds the central FastAPI app (`uvicorn api.app:app`) and the Celery worker from this image. Create a root `.env` (`JWT_SECRET_KEY`, `REDIS_URL`, `GROQ_API_KEY`, …) **before** writing or starting Compose.
+
+```bash
+docker compose up --build api redis worker
+```
+
+API: http://localhost:8000/docs
+
 ## Celery (Message Queues and Async Tasks)
 
 - Config: `services/celery_app.py` — Redis via **`REDIS_URL`** as broker **and** result backend.
