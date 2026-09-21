@@ -293,6 +293,21 @@ Badges: Supplier delivery / Kitchen usage (no Product name, Order type, user_uui
 /inventory/orders/inbound: Ingredient + Delivery quantity
 ```
 
+## Latest acceptance evaluation (`cursor/backoffice-inventory-cbbe`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — live kitchen stock and ingredient orders instead of WhatsApp).
+
+```text
+src/pages no fetch(; inventory HTTP only in src/lib/inventory.ts with Authorization Bearer
+GET /inventory includes current_stock; products page Tomatoes 25 Healthy, Mozzarella 8 Low, Napkins 120 Overstock
+Inbound Tomatoes +1 → visible confirmation, form cleared
+Outbound Mozzarella current_stock 8 kg before submit; qty 999 client warning; POST 400 Insufficient stock visible
+Orders: Ingredient, Quantity, Supply movement, Recorded, Kitchen staff user_uuid; inbound/outbound row colors
+Unauth /inventory/products, /orders/inbound, /orders/outbound, /orders → /login?next=…
+cd uis/backoffice && npm run build → green
+/workspace/.venv/bin/python -m unittest tests.test_inventory_orders -v → 11 OK
+```
+
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).
