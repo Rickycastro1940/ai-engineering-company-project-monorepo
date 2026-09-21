@@ -6,6 +6,7 @@ import {
   listInventoryOrders,
   type InventoryOrder,
 } from "../lib/inventory";
+import { supplyMovementLabel } from "../lib/stockLevels";
 import "./AccessiblePage.css";
 import "./ProductsPage.css";
 import "./OrdersPage.css";
@@ -68,7 +69,7 @@ export function OrdersPage() {
           setError(
             inventoryErrorMessage(
               err,
-              "Ingredient order history could not be loaded. Try again in a moment.",
+              "Ingredient orders could not be loaded. Try again in a moment.",
             ),
           );
         }
@@ -90,33 +91,33 @@ export function OrdersPage() {
     <section className="accessible orders" aria-labelledby="orders-title">
       <div className="accessible__welcome">
         <p className="accessible__kicker">Restaurant Operations · Felipe Guerrero</p>
-        <h2 id="orders-title">Ingredient order history</h2>
+        <h2 id="orders-title">Ingredient orders</h2>
         <p className="accessible__lead">
-          Read-only movement log from <code>GET /inventory/orders</code> — product,
-          quantity, inbound vs outbound, creation date, and the staff{" "}
-          <code>user_uuid</code> who recorded it. This is the audit trail for
-          kitchen stock instead of WhatsApp ingredient orders across the 14
-          Brasaland locations. There are no edit or delete actions on this page.
+          Read-only log of supply orders for the 14 Brasaland kitchens — ingredient,
+          quantity, supplier delivery vs kitchen usage, when it was recorded, and
+          which kitchen staff recorded it. This replaces WhatsApp and phone
+          ingredient orders so Felipe Guerrero can see stockouts and overstock
+          across Colombia and Florida. There are no edit or delete actions here.
         </p>
         <p className="accessible__link-row">
-          <Link to="/inventory/orders/inbound">Record inbound</Link>
+          <Link to="/inventory/orders/inbound">Record a supplier delivery</Link>
           {" · "}
-          <Link to="/inventory/orders/outbound">Record outbound</Link>
+          <Link to="/inventory/orders/outbound">Record kitchen usage</Link>
           {" · "}
-          <Link to="/inventory/products">Kitchen products</Link>
+          <Link to="/inventory/products">Current stock</Link>
         </p>
       </div>
 
       <div className="accessible__panel">
-        <h3>All recorded orders</h3>
-        <ul className="products__legend" aria-label="Order type key">
+        <h3>Supply orders for all locations</h3>
+        <ul className="products__legend" aria-label="Supply movement key">
           <li>
-            <span className="orders__badge orders__badge--inbound">Inbound</span>
-            Supplier delivery into kitchen stock
+            <span className="orders__badge orders__badge--inbound">Supplier delivery</span>
+            Stock arriving from Lucía Fernández’s suppliers
           </li>
           <li>
-            <span className="orders__badge orders__badge--outbound">Outbound</span>
-            Kitchen usage leaving stock
+            <span className="orders__badge orders__badge--outbound">Kitchen usage</span>
+            Stock leaving a location kitchen
           </li>
         </ul>
         <AsyncPanel
@@ -128,21 +129,21 @@ export function OrdersPage() {
         >
           {rows.length === 0 ? (
             <p className="accessible__status">
-              No ingredient orders recorded yet. Use{" "}
-              <Link to="/inventory/orders/inbound">inbound</Link> or{" "}
-              <Link to="/inventory/orders/outbound">outbound</Link> to create the
-              first movement.
+              No ingredient orders recorded yet. Record a{" "}
+              <Link to="/inventory/orders/inbound">supplier delivery</Link> or{" "}
+              <Link to="/inventory/orders/outbound">kitchen usage</Link> to
+              start the audit trail.
             </p>
           ) : (
             <div className="accessible__table-wrap inventory__table-wrap">
               <table className="accessible__table orders__table">
                 <thead>
                   <tr>
-                    <th scope="col">Product name</th>
+                    <th scope="col">Ingredient</th>
                     <th scope="col">Quantity</th>
-                    <th scope="col">Order type</th>
-                    <th scope="col">Created</th>
-                    <th scope="col">user_uuid</th>
+                    <th scope="col">Supply movement</th>
+                    <th scope="col">Recorded</th>
+                    <th scope="col">Kitchen staff</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -156,14 +157,14 @@ export function OrdersPage() {
                         key={order.order_id ?? `${order.product_name}-${order.created_at}-${index}`}
                         className={`orders__row orders__row--${kind}`}
                       >
-                        <td>{order.product_name ?? "Unnamed product"}</td>
+                        <td>{order.product_name ?? "Unnamed ingredient"}</td>
                         <td className="orders__qty">{quantityLabel}</td>
                         <td>
                           <span className={`orders__badge orders__badge--${kind}`}>
                             <span className="orders__icon" aria-hidden="true">
                               {kind === "inbound" ? "↓" : kind === "outbound" ? "↑" : "•"}
                             </span>
-                            {kind === "other" ? order.order_type || "Unknown" : kind}
+                            {supplyMovementLabel(order.order_type)}
                           </span>
                         </td>
                         <td>{formatCreatedAt(order.created_at)}</td>

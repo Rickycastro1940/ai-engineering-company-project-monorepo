@@ -10,13 +10,13 @@ Internal staff console for **Brasaland Digital** (see root [`CONTEXT.md`](../../
 | --- | --- | --- |
 | `/login` | Email + password form. Success stores JWT and opens `/accessible`. Failure stays on the form. | Public |
 | `/register` | Registration form. Success: `POST /users` (optional `name`) then `POST /auth/login`, store JWT, open `/accessible`. Failure shows field-level errors. | Public |
-| `/accessible` | Welcome dashboard — `GET /locations/overview` | Protected |
-| `/inventory` | Kitchen inventory — list/add products, incoming/outgoing stock, low-stock alerts | Protected |
-| `/inventory/products` | Kitchen products catalogue from `GET /inventory`, stock-level indicators, inbound/outbound order links | Protected |
-| `/inventory/orders` | Read-only ingredient order history (`GET /inventory/orders`) | Protected |
-| `/inventory/orders/inbound` | Inbound ingredient order form (`POST /inventory/orders/inbound`); product chosen by name | Protected |
-| `/inventory/orders/outbound` | Outbound kitchen usage form (`POST /inventory/orders/outbound`); live current stock + insufficient-stock 400 | Protected |
-| `/inventory/orders/new` | Create inbound (supplier delivery) or outbound (kitchen usage) order for one product | Protected |
+| `/accessible` | Operations home — 14 locations (Colombia + Florida, COP/USD) and current kitchen stock | Protected |
+| `/inventory` | Kitchen stock — add ingredients, supplier delivery / kitchen usage, stockout alerts | Protected |
+| `/inventory/products` | Current kitchen stock with stockout/overstock bands and supply-order links | Protected |
+| `/inventory/orders` | Read-only ingredient orders (supplier delivery vs kitchen usage) | Protected |
+| `/inventory/orders/inbound` | Supplier delivery form; ingredient chosen by name | Protected |
+| `/inventory/orders/outbound` | Kitchen usage form; live current stock + stockout 400 | Protected |
+| `/inventory/orders/new` | Record a supplier delivery or kitchen usage for one ingredient | Protected |
 | `/account/profile` | Email plus name/phone/address from `GET /auth/me`; edit contact via `PUT /profiles/me` | Protected |
 | `/account/change-password` | Password update via `PUT /users/{id}` | Protected |
 | `/` | Redirects to `/accessible` | Protected |

@@ -44,6 +44,18 @@ export function stockLevelLabel(level: StockLevel): string {
   return "Healthy stock";
 }
 
+/** CONTEXT.md: locations place supply orders with suppliers; kitchens consume stock. */
+export function supplyMovementLabel(orderType: string | undefined): string {
+  if (orderType === "inbound") {
+    return "Supplier delivery";
+  }
+  if (orderType === "outbound") {
+    return "Kitchen usage";
+  }
+  const trimmed = orderType?.trim();
+  return trimmed || "Unknown movement";
+}
+
 export function inboundOrderPath(productId?: number): string {
   if (productId == null || !Number.isFinite(productId)) {
     return "/inventory/orders/inbound";

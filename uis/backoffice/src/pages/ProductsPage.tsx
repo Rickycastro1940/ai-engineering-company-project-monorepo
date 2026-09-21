@@ -49,7 +49,7 @@ export function ProductsPage() {
           setError(
             inventoryErrorMessage(
               err,
-              "Kitchen products could not be loaded. Try again in a moment.",
+              "Current kitchen stock could not be loaded. Try again in a moment.",
             ),
           );
         }
@@ -71,17 +71,17 @@ export function ProductsPage() {
     <section className="accessible products" aria-labelledby="products-title">
       <div className="accessible__welcome">
         <p className="accessible__kicker">Restaurant Operations · Felipe Guerrero</p>
-        <h2 id="products-title">Kitchen products</h2>
+        <h2 id="products-title">Current kitchen stock</h2>
         <p className="accessible__lead">
-          Every kitchen product from <code>GET /inventory</code> — name, unit, and
-          current on-hand stock — so the 14 Brasaland locations stop placing
-          ingredient orders on WhatsApp. Color bands flag stockouts and overstock
-          described in the company briefing.
+          Ingredients and supplies on hand at Brasaland kitchens — meat, vegetables,
+          packaging, cleaning products — so the 14 locations stop placing ingredient
+          orders on WhatsApp. Color bands flag the stockouts and overstock Felipe
+          Guerrero sees when locations order blind.
         </p>
       </div>
 
       <div className="accessible__panel">
-        <h3>On-hand kitchen catalogue</h3>
+        <h3>Ingredients on hand</h3>
         <ul className="products__legend" aria-label="Stock-level key">
           <li>
             <span className="products__dot products__dot--stockout" aria-hidden="true" />
@@ -102,27 +102,26 @@ export function ProductsPage() {
         </ul>
         <AsyncPanel
           status={status}
-          loadingLabel="Loading kitchen products…"
+          loadingLabel="Loading current kitchen stock…"
           error={error}
           onRetry={retry}
           skeletonRows={6}
         >
           {rows.length === 0 ? (
             <p className="accessible__status">
-              No kitchen products yet. Add items on{" "}
-              <Link to="/inventory">kitchen inventory</Link>.
+              No ingredients on the list yet. Add meat, produce, sauces, or
+              packaging on <Link to="/inventory">kitchen stock</Link>.
             </p>
           ) : (
             <div className="accessible__table-wrap inventory__table-wrap">
               <table className="accessible__table products__table">
                 <thead>
                   <tr>
-                    <th scope="col">Kitchen product</th>
-                    <th scope="col">Product ID</th>
-                    <th scope="col">On-hand stock</th>
+                    <th scope="col">Ingredient</th>
+                    <th scope="col">Current stock</th>
                     <th scope="col">Unit</th>
                     <th scope="col">Stock level</th>
-                    <th scope="col">Ingredient orders</th>
+                    <th scope="col">Supply orders</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -134,8 +133,7 @@ export function ProductsPage() {
                         key={id ?? `${product.name}-${index}`}
                         className={`products__row products__row--${level}`}
                       >
-                        <td>{product.name ?? "Unnamed product"}</td>
-                        <td>{id ?? "—"}</td>
+                        <td>{product.name ?? "Unnamed ingredient"}</td>
                         <td className="products__on-hand">
                           {product.quantity ?? "—"}
                         </td>
@@ -149,10 +147,10 @@ export function ProductsPage() {
                         <td>
                           <div className="products__orders">
                             <Link className="products__order products__order--in" to={inboundOrderPath(id)}>
-                              Create inbound order
+                              Record supplier delivery
                             </Link>
                             <Link className="products__order products__order--out" to={outboundOrderPath(id)}>
-                              Create outbound order
+                              Record kitchen usage
                             </Link>
                           </div>
                         </td>

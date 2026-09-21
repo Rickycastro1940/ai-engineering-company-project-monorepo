@@ -51,7 +51,7 @@ export function InboundOrderPage() {
         if (!cancelled) {
           setProducts([]);
           setLoadError(
-            inventoryErrorMessage(err, "Kitchen products could not be loaded for an inbound order."),
+            inventoryErrorMessage(err, "Ingredients could not be loaded for a supplier delivery."),
           );
         }
       } finally {
@@ -76,11 +76,11 @@ export function InboundOrderPage() {
     const selected = products.find((item) => item.product_id === selectedId);
 
     if (!selected) {
-      setFormError("Choose a kitchen product by name.");
+      setFormError("Choose an ingredient by name.");
       return;
     }
     if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
-      setFormError("Enter a positive whole number for the inbound delivery quantity.");
+      setFormError("Enter a positive whole number for the supplier delivery quantity.");
       return;
     }
 
@@ -93,10 +93,10 @@ export function InboundOrderPage() {
       setProductId("");
       setQuantity("");
       setFormSuccess(
-        `Inbound order recorded for ${result.product.name}: +${result.quantity} ${result.product.unit}. On-hand stock is now ${result.product.quantity} ${result.product.unit}.`,
+        `Supplier delivery recorded for ${result.product.name}: +${result.quantity} ${result.product.unit}. Current stock is now ${result.product.quantity} ${result.product.unit}.`,
       );
     } catch (err: unknown) {
-      setFormError(inventoryErrorMessage(err, "That inbound order could not be recorded."));
+      setFormError(inventoryErrorMessage(err, "That supplier delivery could not be recorded."));
     } finally {
       setIsSubmitting(false);
     }
@@ -106,37 +106,38 @@ export function InboundOrderPage() {
     <section className="accessible" aria-labelledby="inbound-title">
       <div className="accessible__welcome">
         <p className="accessible__kicker">Restaurant Operations · Felipe Guerrero</p>
-        <h2 id="inbound-title">Inbound ingredient order</h2>
+        <h2 id="inbound-title">Supplier delivery</h2>
         <p className="accessible__lead">
-          Record a supplier delivery into kitchen stock for the 14 Brasaland locations
-          — the replacement for WhatsApp inbound orders. Choose the product by name.{" "}
-          <Link to="/inventory/products">Back to kitchen products</Link>
+          Record a delivery from Brasaland’s suppliers into kitchen stock at one of
+          the 14 locations — the replacement for WhatsApp ingredient orders. Choose
+          the ingredient by name.{" "}
+          <Link to="/inventory/products">Back to current stock</Link>
           {" · "}
-          <Link to="/inventory/orders">Order history</Link>
+          <Link to="/inventory/orders">Ingredient orders</Link>
         </p>
       </div>
 
       <div className="accessible__panel auth-card--embedded">
-        {status === "loading" ? <Spinner label="Loading kitchen products…" /> : null}
+        {status === "loading" ? <Spinner label="Loading ingredients…" /> : null}
         {status === "error" ? (
           <FetchError
-            message={loadError || "Kitchen products could not be loaded."}
+            message={loadError || "Ingredients could not be loaded."}
             onRetry={retry}
             homeTo="/inventory/products"
-            homeLabel="Kitchen products"
+            homeLabel="Current stock"
           />
         ) : null}
         {status === "success" ? (
           <form className="auth-form" onSubmit={handleSubmit} noValidate>
             <label>
-              Kitchen product
+              Ingredient
               <select
                 name="product_id"
                 value={productId}
                 onChange={(event) => setProductId(event.target.value)}
                 required
               >
-                <option value="">Select a product</option>
+                <option value="">Select an ingredient</option>
                 {products.map((product) => (
                   <option key={product.product_id} value={String(product.product_id)}>
                     {product.name}
@@ -145,7 +146,7 @@ export function InboundOrderPage() {
               </select>
             </label>
             <label>
-              Inbound quantity
+              Delivery quantity
               <input
                 type="number"
                 min={1}
@@ -167,7 +168,7 @@ export function InboundOrderPage() {
               </p>
             ) : null}
             <button type="submit" disabled={isSubmitting || products.length === 0}>
-              {isSubmitting ? "Recording inbound order…" : "Submit inbound order"}
+              {isSubmitting ? "Recording supplier delivery…" : "Record supplier delivery"}
             </button>
           </form>
         ) : null}

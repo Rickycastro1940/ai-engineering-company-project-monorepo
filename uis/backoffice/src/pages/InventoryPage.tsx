@@ -77,7 +77,7 @@ export function InventoryPage() {
           setListError(
             inventoryErrorMessage(
               err,
-              "Kitchen inventory could not be loaded. Try again in a moment.",
+              "Kitchen stock could not be loaded. Try again in a moment.",
             ),
           );
         }
@@ -147,7 +147,7 @@ export function InventoryPage() {
     const parsedQuantity = Number.parseInt(quantity, 10);
 
     if (!trimmedName) {
-      setFormError("Enter a product name used in the kitchen.");
+      setFormError("Enter an ingredient name used in the kitchen.");
       return;
     }
     if (!trimmedUnit) {
@@ -155,7 +155,7 @@ export function InventoryPage() {
       return;
     }
     if (!Number.isFinite(parsedQuantity) || parsedQuantity < 0) {
-      setFormError("On-hand quantity must be zero or a positive whole number.");
+      setFormError("Current stock must be zero or a positive whole number.");
       return;
     }
 
@@ -169,10 +169,10 @@ export function InventoryPage() {
       setName("");
       setQuantity("0");
       setUnit("kg");
-      setFormSuccess(`${created.name} was added to kitchen inventory.`);
+      setFormSuccess(`${created.name} was added to kitchen stock.`);
       refreshAll();
     } catch (err: unknown) {
-      setFormError(inventoryErrorMessage(err, "That product could not be added. Try again."));
+      setFormError(inventoryErrorMessage(err, "That ingredient could not be added. Try again."));
     } finally {
       setIsCreating(false);
     }
@@ -195,8 +195,8 @@ export function InventoryPage() {
       const updated = await updateInventoryStock(product.product_id, delta);
       setStockMessage(
         direction === "in"
-          ? `Incoming delivery recorded for ${updated.name}. On hand: ${updated.quantity} ${updated.unit}.`
-          : `Kitchen usage recorded for ${updated.name}. On hand: ${updated.quantity} ${updated.unit}.`,
+          ? `Supplier delivery recorded for ${updated.name}. Current stock: ${updated.quantity} ${updated.unit}.`
+          : `Kitchen usage recorded for ${updated.name}. Current stock: ${updated.quantity} ${updated.unit}.`,
       );
       refreshAll();
     } catch (err: unknown) {
@@ -219,15 +219,14 @@ export function InventoryPage() {
     <section className="accessible inventory" aria-labelledby="inventory-title">
       <div className="accessible__welcome">
         <p className="accessible__kicker">Restaurant Operations · Felipe Guerrero</p>
-        <h2 id="inventory-title">Kitchen inventory</h2>
+        <h2 id="inventory-title">Kitchen stock</h2>
         <p className="accessible__lead">
-          Ingredient stock for Brasaland kitchens — the same product names, on-hand{" "}
-          <strong>quantity</strong>, and <strong>unit</strong> the central API stores in{" "}
-          <code>products.csv</code>. This view replaces WhatsApp and phone orders with
-          on-hand data so supervisors can see stockouts before they hit a location in
-          Colombia or Florida.{" "}
-          <Link to="/inventory/products">Open the kitchen products catalogue</Link> for
-          stock-level indicators and inbound/outbound ingredient orders.
+          Ingredient stock for Brasaland kitchens — meat, vegetables, sauces,
+          packaging, and cleaning products — so supervisors can see stockouts
+          before they hit a location in Colombia or Florida. This view replaces
+          WhatsApp and phone ingredient orders.{" "}
+          <Link to="/inventory/products">Open current stock</Link> for stockout
+          and overstock bands, then record a supplier delivery or kitchen usage.
         </p>
         <p className="inventory__api-hint">
           Inventory API: <code>{apiBase || "(same origin / Vite proxy)"}</code>
@@ -236,14 +235,14 @@ export function InventoryPage() {
 
       <div className="inventory__layout">
         <div className="accessible__panel">
-          <h3>Add kitchen product</h3>
+          <h3>Add an ingredient</h3>
           <p className="inventory__help">
-            Fields match <code>POST /inventory</code>: product name, on-hand quantity, and
-            unit (kg, boxes, liters).
+            Name the ingredient or supply, current stock, and unit (kg, boxes,
+            liters) used in the kitchen.
           </p>
           <form className="auth-form inventory__form" onSubmit={handleCreate}>
             <label>
-              Product name
+              Ingredient
               <input
                 name="name"
                 value={name}
@@ -254,7 +253,7 @@ export function InventoryPage() {
             </label>
             <div className="inventory__form-row">
               <label>
-                On-hand quantity
+                Current stock
                 <input
                   name="quantity"
                   type="number"
@@ -278,16 +277,16 @@ export function InventoryPage() {
             {formError ? <p className="auth-form__error">{formError}</p> : null}
             {formSuccess ? <p className="auth-form__success">{formSuccess}</p> : null}
             <button type="submit" disabled={isCreating}>
-              {isCreating ? "Adding product…" : "Add product"}
+              {isCreating ? "Adding ingredient…" : "Add ingredient"}
             </button>
           </form>
         </div>
 
         <div className="accessible__panel">
-          <h3>Low-stock alerts</h3>
+          <h3>Stockout alerts</h3>
           <p className="inventory__help">
-            Products below the alert threshold (<code>GET /inventory/alerts</code>).
-            Default threshold is 10 — the same rule the inventory agent uses.
+            Ingredients below the alert threshold — the same stockout signal
+            supervisors need when a location is about to run out.
           </p>
           <div className="inventory__threshold">
             <label>
@@ -313,7 +312,7 @@ export function InventoryPage() {
           >
             {lowStock.length === 0 ? (
               <p className="accessible__status">
-                No products are below {appliedThreshold} on hand.
+                No ingredients are below {appliedThreshold} on hand.
               </p>
             ) : (
               <ul className="accessible__list">
@@ -321,7 +320,7 @@ export function InventoryPage() {
                   <li key={product.product_id ?? `${product.name}-${index}`}>
                     <span className="accessible__loc-name">{product.name}</span>
                     <span className="accessible__loc-meta">
-                      {product.quantity} {product.unit} on hand · product_id {product.product_id}
+                      {product.quantity} {product.unit} current stock
                     </span>
                   </li>
                 ))}
@@ -331,24 +330,23 @@ export function InventoryPage() {
         </div>
 
         <div className="accessible__panel accessible__panel--span">
-          <h3>On-hand kitchen stock</h3>
+          <h3>Current kitchen stock</h3>
           <p className="inventory__help">
-            Incoming deliveries add stock; kitchen usage subtracts it (
-            <code>PATCH /inventory/{"{product_id}"}</code> with a <code>delta</code>). Quantity
-            cannot go below 0.
+            Supplier deliveries add stock; kitchen usage subtracts it. Current
+            stock cannot go below 0 — a stockout stops the line.
           </p>
           {stockMessage ? <p className="auth-form__success">{stockMessage}</p> : null}
           {stockError ? <p className="auth-form__error">{stockError}</p> : null}
           <AsyncPanel
             status={listStatus}
-            loadingLabel="Loading kitchen inventory…"
+            loadingLabel="Loading kitchen stock…"
             error={listError}
             onRetry={retryList}
             skeletonRows={6}
           >
             {stock.length === 0 ? (
               <p className="accessible__status">
-                No kitchen products yet. Add beef, produce, sauces, or packaging so
+                No ingredients yet. Add meat, produce, sauces, or packaging so
                 locations stop ordering blind.
               </p>
             ) : (
@@ -356,10 +354,10 @@ export function InventoryPage() {
                 <table className="accessible__table">
                   <thead>
                     <tr>
-                      <th scope="col">Product</th>
-                      <th scope="col">On-hand quantity</th>
+                      <th scope="col">Ingredient</th>
+                      <th scope="col">Current stock</th>
                       <th scope="col">Unit</th>
-                      <th scope="col">Incoming / outgoing</th>
+                      <th scope="col">Supplier delivery / kitchen usage</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -404,7 +402,7 @@ export function InventoryPage() {
                                 disabled={busy}
                                 onClick={() => void handleStockChange(product, "in")}
                               >
-                                Incoming
+                                Supplier delivery
                               </button>
                               <button
                                 type="button"
@@ -412,7 +410,7 @@ export function InventoryPage() {
                                 disabled={busy}
                                 onClick={() => void handleStockChange(product, "out")}
                               >
-                                Outgoing
+                                Kitchen usage
                               </button>
                             </div>
                           </td>

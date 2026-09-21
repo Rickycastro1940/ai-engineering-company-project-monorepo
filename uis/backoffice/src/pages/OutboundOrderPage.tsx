@@ -65,7 +65,7 @@ export function OutboundOrderPage() {
         if (!cancelled) {
           setProducts([]);
           setLoadError(
-            inventoryErrorMessage(err, "Kitchen products could not be loaded for an outbound order."),
+            inventoryErrorMessage(err, "Ingredients could not be loaded for kitchen usage."),
           );
         }
       } finally {
@@ -106,7 +106,7 @@ export function OutboundOrderPage() {
       } catch (err: unknown) {
         if (!cancelled) {
           setSelectedStock(null);
-          setStockError(inventoryErrorMessage(err, "Current stock could not be loaded for that product."));
+          setStockError(inventoryErrorMessage(err, "Current stock could not be loaded for that ingredient."));
         }
       } finally {
         if (!cancelled) {
@@ -137,7 +137,7 @@ export function OutboundOrderPage() {
 
     const selectedId = Number.parseInt(productId, 10);
     if (!selectedStock || !Number.isFinite(selectedId)) {
-      setFormError("Choose a kitchen product by name.");
+      setFormError("Choose an ingredient by name.");
       return;
     }
     if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
@@ -156,10 +156,10 @@ export function OutboundOrderPage() {
       setSelectedStock(result.product);
       setStockStatus("success");
       setFormSuccess(
-        `Outbound order recorded for ${result.product.name}: −${result.quantity} ${result.product.unit}. On-hand stock is now ${currentStockOf(result.product)} ${result.product.unit}.`,
+        `Kitchen usage recorded for ${result.product.name}: −${result.quantity} ${result.product.unit}. Current stock is now ${currentStockOf(result.product)} ${result.product.unit}.`,
       );
     } catch (err: unknown) {
-      const message = inventoryErrorMessage(err, "That outbound order could not be recorded.");
+      const message = inventoryErrorMessage(err, "That kitchen usage could not be recorded.");
       if (/insufficient stock/i.test(message) || /cannot reduce below 0/i.test(message)) {
         setQuantityError(message);
       } else {
@@ -174,31 +174,31 @@ export function OutboundOrderPage() {
     <section className="accessible" aria-labelledby="outbound-title">
       <div className="accessible__welcome">
         <p className="accessible__kicker">Restaurant Operations · Felipe Guerrero</p>
-        <h2 id="outbound-title">Outbound kitchen order</h2>
+        <h2 id="outbound-title">Kitchen usage</h2>
         <p className="accessible__lead">
-          Record kitchen usage leaving on-hand stock for a Brasaland location. Current
-          stock is loaded when you pick a product. The API rejects usage that would
-          go below 0.{" "}
-          <Link to="/inventory/products">Back to kitchen products</Link>
+          Record kitchen usage leaving current stock at a Brasaland location.
+          Current stock loads when you pick an ingredient. Usage that would cause
+          a stockout below 0 is rejected.{" "}
+          <Link to="/inventory/products">Back to current stock</Link>
           {" · "}
-          <Link to="/inventory/orders">Order history</Link>
+          <Link to="/inventory/orders">Ingredient orders</Link>
         </p>
       </div>
 
       <div className="accessible__panel auth-card--embedded">
-        {listStatus === "loading" ? <Spinner label="Loading kitchen products…" /> : null}
+        {listStatus === "loading" ? <Spinner label="Loading ingredients…" /> : null}
         {listStatus === "error" ? (
           <FetchError
-            message={loadError || "Kitchen products could not be loaded."}
+            message={loadError || "Ingredients could not be loaded."}
             onRetry={retryList}
             homeTo="/inventory/products"
-            homeLabel="Kitchen products"
+            homeLabel="Current stock"
           />
         ) : null}
         {listStatus === "success" ? (
           <form className="auth-form" onSubmit={handleSubmit} noValidate>
             <label>
-              Kitchen product
+              Ingredient
               <select
                 name="product_id"
                 value={productId}
@@ -210,7 +210,7 @@ export function OutboundOrderPage() {
                 }}
                 required
               >
-                <option value="">Select a product</option>
+                <option value="">Select an ingredient</option>
                 {products.map((product) => (
                   <option key={product.product_id} value={String(product.product_id)}>
                     {product.name}
@@ -222,7 +222,7 @@ export function OutboundOrderPage() {
             <p className="auth-meta outbound-stock" aria-live="polite">
               <span className="outbound-stock__label">Current stock</span>
               {stockStatus === "idle" ? (
-                <span className="outbound-stock__value">Select a product to load on-hand stock.</span>
+                <span className="outbound-stock__value">Select an ingredient to load current stock.</span>
               ) : null}
               {stockStatus === "loading" ? (
                 <span className="outbound-stock__value">Loading current stock…</span>
@@ -239,7 +239,7 @@ export function OutboundOrderPage() {
             </p>
 
             <label>
-              Outbound quantity
+              Kitchen usage quantity
               <input
                 type="number"
                 min={1}
@@ -254,9 +254,9 @@ export function OutboundOrderPage() {
               />
               {exceedsStock && onHand != null ? (
                 <span className="auth-form__warning">
-                  That quantity is higher than the displayed stock ({onHand}{" "}
-                  {selectedStock?.unit}). You can still submit — the API will reject
-                  usage that would go below 0.
+                  That quantity is higher than current stock ({onHand}{" "}
+                  {selectedStock?.unit}). You can still submit — a stockout below
+                  0 will be rejected.
                 </span>
               ) : null}
               {quantityError ? (
@@ -276,7 +276,7 @@ export function OutboundOrderPage() {
               </p>
             ) : null}
             <button type="submit" disabled={isSubmitting || products.length === 0}>
-              {isSubmitting ? "Recording outbound order…" : "Submit outbound order"}
+              {isSubmitting ? "Recording kitchen usage…" : "Record kitchen usage"}
             </button>
           </form>
         ) : null}
