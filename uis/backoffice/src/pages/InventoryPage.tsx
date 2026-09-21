@@ -188,12 +188,6 @@ export function InventoryPage() {
     }
 
     const delta = direction === "in" ? amount : -amount;
-    if (direction === "out" && product.quantity + delta < 0) {
-      setStockError(
-        `Insufficient stock for ${product.name}: cannot reduce below 0 (on hand: ${product.quantity}).`,
-      );
-      return;
-    }
 
     setRowBusyId(product.product_id);
     try {

@@ -30,7 +30,7 @@ Verified **2026-09-20** on clone `Rickycastro1940/ai-engineering-company-project
 | Incident analysis UI | `uis/web` |
 | Weekly cost/waste pipeline + Celery | `data/pipelines/`, `services/tasks.py`, Compose Redis/Flower/worker on this branch |
 | Public corporate website | `uis/website/` — Vite/React, route `/`, brand tokens + components from `CONTEXT.md`; screenshot `docs/screenshots/website-corporate-home.png` |
-| Internal backoffice | `uis/backoffice/` — JWT session; client layout guard on `/`, `/accessible`, `/inventory`, `/account/profile`, `/account/change-password`; `/accessible` loads locations (14 / 8 Colombia / 6 Florida, COP+USD); `/inventory` manages kitchen stock via `NEXT_PUBLIC_INVENTORY_API_URL` |
+| Internal backoffice | `uis/backoffice/` — JWT session; kitchen inventory HTTP only via `src/lib/inventory.ts` (Bearer from `localStorage`, 4xx/5xx `message`/`detail` surfaced); `/inventory` manages kitchen stock via `NEXT_PUBLIC_INVENTORY_API_URL` |
 | Locations API | `services/api/locations.py` — 14 locations, Colombia 8 / Florida 6, COP+USD; **Bearer JWT required** |
 
 ## Latest kitchen inventory UI (`cursor/backoffice-inventory-cbbe`)
@@ -53,6 +53,18 @@ Browser /inventory (JWT) → list + add Beef brisket/Grill salt + incoming Tomat
 ```
 
 Skill **passed** (criteria 1–4 + 6). Technology central API remains **incomplete** while menus/sales/customers/suppliers are `missing`.
+
+## Latest inventory API client (`cursor/backoffice-inventory-cbbe`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — kitchen stock UI talks only to the inventory client) + **Technology** (Bearer + structured 4xx/5xx bodies).
+
+```text
+src/pages has no fetch( — inventory HTTP only in src/lib/inventory.ts
+Authorization: Bearer from localStorage auth_token
+PATCH /inventory/3 delta=-999 → 400 message "Insufficient stock: cannot reduce below 0 (current: 120, delta: -999)"
+Browser /inventory Outgoing 999 Napkins → same API message shown; quantity stays 120
+cd uis/backoffice && npm run build → tsc -b && vite build green
+```
 
 ## Latest auth-frontend evidence (`feature/auth-frontend`)
 
