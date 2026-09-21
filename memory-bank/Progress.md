@@ -79,6 +79,19 @@ Create outbound order Mozzarella −1 → on-hand 7 kg
 /backoffice/inventory/products → /inventory/products
 ```
 
+## Latest inbound order form (`cursor/backoffice-inventory-cbbe`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — supplier inbound deliveries without WhatsApp) + **Technology** (`POST /inventory/orders/inbound` on the central API).
+
+```text
+POST /inventory/orders/inbound no JWT → 401
+python -m unittest tests.test_inventory_orders → OK (201 Tomatoes 25→28; 404 unknown product)
+cd uis/backoffice && npm run build → green
+Unauthenticated /inventory/orders/inbound → /login?next=/inventory/orders/inbound
+Selector lists Tomatoes, Mozzarella, Napkins by name
+Submit +2 Tomatoes → confirmation, form cleared, on-hand 27 kg
+```
+
 ## Latest auth-frontend evidence (`feature/auth-frontend`)
 
 Department served: **Technology** (JSON auth API restored onto the central FastAPI app) + **Operations/Executive** (staff backoffice is now session-gated).
