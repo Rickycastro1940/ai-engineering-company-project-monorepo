@@ -5,10 +5,12 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+
+from users import get_current_user
 
 logger = logging.getLogger("brasaland.inventory")
-from pydantic import BaseModel, Field
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PRODUCTS_FILE = REPO_ROOT / "products.csv"
@@ -27,6 +29,11 @@ class ProductCreate(BaseModel):
 
 class StockDelta(BaseModel):
     delta: int
+
+
+class InboundOrderCreate(BaseModel):
+    product_id: int = Field(ge=1)
+    quantity: int = Field(gt=0)
 
 
 def _ensure_products_file() -> None:
@@ -144,6 +151,19 @@ def add_product(body: ProductCreate) -> ProductRow:
 @router.get("/alerts")
 def low_stock_alerts(threshold: int = 10) -> List[ProductRow]:
     return get_alerts(threshold)
+
+
+@router.post("/orders/inbound", status_code=201)
+def create_inbound_order(
+    body: InboundOrderCreate,
+    _current_user: dict = Depends(get_current_user),
+) -> dict:
+    updated = apply_delta(body.product_id, body.quantity)
+    return {
+        "order_type": "inbound",
+        "quantity": body.quantity,
+        "product": updated,
+    }
 
 
 @router.patch("/{product_id}")

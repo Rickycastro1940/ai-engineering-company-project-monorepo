@@ -44,8 +44,11 @@ export function stockLevelLabel(level: StockLevel): string {
   return "Healthy stock";
 }
 
-export function inboundOrderPath(productId: number): string {
-  return `/inventory/orders/new?product_id=${encodeURIComponent(String(productId))}&direction=inbound`;
+export function inboundOrderPath(productId?: number): string {
+  if (productId == null || !Number.isFinite(productId)) {
+    return "/inventory/orders/inbound";
+  }
+  return `/inventory/orders/inbound?product_id=${encodeURIComponent(String(productId))}`;
 }
 
 export function outboundOrderPath(productId: number): string {

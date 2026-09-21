@@ -182,6 +182,22 @@ export async function updateInventoryStock(
   );
 }
 
+export type InboundOrderResult = {
+  order_type: "inbound";
+  quantity: number;
+  product: InventoryProduct;
+};
+
+export async function createInboundOrder(payload: {
+  product_id: number;
+  quantity: number;
+}): Promise<InboundOrderResult> {
+  return inventoryRequest<InboundOrderResult>("/inventory/orders/inbound", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function listInventoryAlerts(threshold = 10): Promise<InventoryProduct[]> {
   const query = new URLSearchParams({ threshold: String(threshold) });
   return inventoryRequest<InventoryProduct[]>(`/inventory/alerts?${query}`);

@@ -104,6 +104,7 @@ Inventory data is stored in [`products.csv`](../../products.csv) at the reposito
 | `POST` | `/inventory` | Add a product (`name`, `quantity`, `unit`) |
 | `PATCH` | `/inventory/{product_id}` | Update stock by `delta` (+ incoming, − outgoing) |
 | `GET` | `/inventory/alerts` | Products below threshold (default `10`) |
+| `POST` | `/inventory/orders/inbound` | Record a supplier inbound order (`product_id`, `quantity` > 0). JWT required. Adds that quantity to on-hand stock. |
 
 ### Examples
 
@@ -117,6 +118,11 @@ curl -X POST http://127.0.0.1:8000/inventory \
 curl -X PATCH http://127.0.0.1:8000/inventory/1 \
   -H "Content-Type: application/json" \
   -d '{"delta":5}'
+
+curl -X POST http://127.0.0.1:8000/inventory/orders/inbound \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"product_id":1,"quantity":5}'
 
 curl http://127.0.0.1:8000/inventory/alerts
 curl "http://127.0.0.1:8000/inventory/alerts?threshold=20"

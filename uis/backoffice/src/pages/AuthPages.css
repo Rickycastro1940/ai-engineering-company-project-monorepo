@@ -64,7 +64,8 @@
 }
 
 .auth-form input,
-.auth-form textarea {
+.auth-form textarea,
+.auth-form select {
   font: inherit;
   color: var(--bo-text);
   background: color-mix(in srgb, #000 28%, var(--bo-panel));
@@ -79,7 +80,8 @@
 }
 
 .auth-form input:focus,
-.auth-form textarea:focus {
+.auth-form textarea:focus,
+.auth-form select:focus {
   outline: 2px solid color-mix(in srgb, var(--bo-accent) 70%, white);
   outline-offset: 1px;
 }

@@ -7,6 +7,7 @@ const nav = [
   { to: "/accessible", label: "Accessible entry", end: true },
   { to: "/inventory", label: "Kitchen inventory", end: true },
   { to: "/inventory/products", label: "Kitchen products", end: true },
+  { to: "/inventory/orders/inbound", label: "Inbound order", end: true },
   { to: "/account/profile", label: "Profile", end: true },
   { to: "/account/change-password", label: "Change password", end: true },
 ];
