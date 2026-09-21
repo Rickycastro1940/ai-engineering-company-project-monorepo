@@ -15,7 +15,7 @@ Verified **2026-09-20** on clone `Rickycastro1940/ai-engineering-company-project
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
 | Technology: telemetry + pipeline to dashboards | **Partial** — `data/pipelines/` weekly location cost/waste; Celery async path |
-| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — backoffice `/inventory` lists kitchen products, add/incoming/outgoing stock, and low-stock alerts (WhatsApp-order gap); sales dashboard / no-sales alerts / forecast ordering still not built |
+| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — `/inventory/products` lists kitchen products with on-hand stock bands and inbound/outbound orders; sales dashboard / no-sales alerts / forecast ordering still not built |
 | Procurement: supplier price history, consolidated spend | **Not done** (supplier docs may exist on other branches; not claimed here) |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
 | People: HR portal / KPIs by country | **Not done** |
@@ -64,6 +64,19 @@ Authorization: Bearer from localStorage auth_token
 PATCH /inventory/3 delta=-999 → 400 message "Insufficient stock: cannot reduce below 0 (current: 120, delta: -999)"
 Browser /inventory Outgoing 999 Napkins → same API message shown; quantity stays 120
 cd uis/backoffice && npm run build → tsc -b && vite build green
+```
+
+## Latest kitchen products catalogue (`cursor/backoffice-inventory-cbbe`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — stockouts vs overstock visibility + inbound/outbound ingredient orders).
+
+```text
+GET /inventory/products Accept:text/html via Vite → 200 SPA (not FastAPI 404)
+GET /inventory Accept:application/json via Vite proxy → product list
+Headless Chrome /inventory/products → Tomatoes Healthy 25kg, Mozzarella Low 8kg, Napkins Overstock 120 boxes
+Create inbound order Tomatoes +2 → on-hand 27 kg
+Create outbound order Mozzarella −1 → on-hand 7 kg
+/backoffice/inventory/products → /inventory/products
 ```
 
 ## Latest auth-frontend evidence (`feature/auth-frontend`)

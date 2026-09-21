@@ -75,8 +75,8 @@ export function ProductsPage() {
         <p className="accessible__lead">
           Every kitchen product from <code>GET /inventory</code> — name, unit, and
           current on-hand stock — so the 14 Brasaland locations stop placing
-          ingredient orders on WhatsApp. Stock bands flag stockouts and overstock
-          from <code>CONTEXT.md</code>.
+          ingredient orders on WhatsApp. Color bands flag stockouts and overstock
+          described in the company briefing.
         </p>
       </div>
 
