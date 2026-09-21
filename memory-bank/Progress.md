@@ -92,6 +92,17 @@ Selector lists Tomatoes, Mozzarella, Napkins by name
 Submit +2 Tomatoes → confirmation, form cleared, on-hand 27 kg
 ```
 
+## Latest outbound order form (`cursor/backoffice-inventory-cbbe`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — kitchen usage vs stockouts) + **Technology** (`POST /inventory/orders/outbound`, `GET /inventory/{id}` current_stock).
+
+```text
+python -m unittest tests.test_inventory_orders → 8 OK (outbound 400 insufficient stock; GET /inventory/2 current_stock=8)
+Select Tomatoes → current stock 25 kg; switch Mozzarella → 8 kg
+Quantity 999 → client warning, then API 400 inline: Insufficient stock cannot reduce below 0 (current: 8, delta: -999)
+Outbound 1 kg Mozzarella → on-hand 7 kg
+```
+
 ## Latest auth-frontend evidence (`feature/auth-frontend`)
 
 Department served: **Technology** (JSON auth API restored onto the central FastAPI app) + **Operations/Executive** (staff backoffice is now session-gated).
