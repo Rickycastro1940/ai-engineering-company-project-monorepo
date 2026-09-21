@@ -4,7 +4,12 @@ import "./BackofficeLayout.css";
 import "../pages/AuthPages.css";
 
 const nav = [
-  { to: "/accessible", label: "Accessible entry", end: true },
+  { to: "/accessible", label: "Operations home", end: true },
+  { to: "/inventory", label: "Kitchen stock", end: true },
+  { to: "/inventory/products", label: "Ingredients", end: true },
+  { to: "/inventory/orders", label: "Ingredient orders", end: true },
+  { to: "/inventory/orders/inbound", label: "Supplier delivery", end: true },
+  { to: "/inventory/orders/outbound", label: "Kitchen usage", end: true },
   { to: "/account/profile", label: "Profile", end: true },
   { to: "/account/change-password", label: "Change password", end: true },
 ];
@@ -19,7 +24,7 @@ export function BackofficeLayout() {
           <span className="bo-sidebar__mark" aria-hidden="true" />
           <div>
             <p className="bo-sidebar__product">Brasaland Digital</p>
-            <p className="bo-sidebar__role">Internal backoffice</p>
+            <p className="bo-sidebar__role">Restaurant Operations</p>
           </div>
         </div>
         <nav className="bo-sidebar__nav">
@@ -48,8 +53,8 @@ export function BackofficeLayout() {
       </aside>
       <div className="bo-main">
         <header className="bo-topbar">
-          <p className="bo-topbar__eyebrow">Operations · Colombia &amp; Florida</p>
-          <h1 className="bo-topbar__title">Staff console</h1>
+          <p className="bo-topbar__eyebrow">Restaurant Operations · Colombia &amp; Florida</p>
+          <h1 className="bo-topbar__title">Felipe Guerrero · 14 locations</h1>
         </header>
         <div className="bo-content">
           <Outlet />

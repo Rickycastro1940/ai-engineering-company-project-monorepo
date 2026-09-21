@@ -278,17 +278,6 @@ export async function updateUser(
   });
 }
 
-export type InventoryProduct = {
-  product_id: number;
-  name: string;
-  quantity: number;
-  unit: string;
-};
-
-export async function fetchInventory(): Promise<InventoryProduct[]> {
-  return apiRequest<InventoryProduct[]>("/inventory");
-}
-
 export async function fetchLocationsOverview(): Promise<LocationsOverview> {
   return apiRequest<LocationsOverview>("/locations/overview");
 }

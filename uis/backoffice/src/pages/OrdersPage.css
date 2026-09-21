@@ -1,0 +1,51 @@
+.orders__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 999px;
+  border: 1px solid var(--bo-border);
+  padding: 0.2rem 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0.01em;
+}
+
+.orders__badge--inbound {
+  color: var(--bo-ok);
+  border-color: color-mix(in srgb, var(--bo-ok) 55%, var(--bo-border));
+  background: color-mix(in srgb, var(--bo-ok) 14%, transparent);
+}
+
+.orders__badge--outbound {
+  color: #fca5a5;
+  border-color: color-mix(in srgb, #fca5a5 55%, var(--bo-border));
+  background: color-mix(in srgb, #f87171 16%, transparent);
+}
+
+.orders__badge--other {
+  color: var(--bo-muted);
+}
+
+.orders__icon {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.orders__row--inbound td {
+  background: color-mix(in srgb, var(--bo-ok) 10%, transparent);
+}
+
+.orders__row--outbound td {
+  background: color-mix(in srgb, #f87171 12%, transparent);
+}
+
+.orders__qty,
+.orders__uuid {
+  font-family: var(--font-mono);
+}
+
+.orders__uuid {
+  font-size: 0.78rem;
+  word-break: break-all;
+}

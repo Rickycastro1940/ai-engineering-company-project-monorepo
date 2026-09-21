@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { AsyncPanel } from "../components/AsyncState";
+import { fetchLocationsOverview, toUserFacingMessage, type LocationsOverview } from "../lib/api";
 import {
   fetchInventory,
-  fetchLocationsOverview,
-  toUserFacingMessage,
+  inventoryErrorMessage,
   type InventoryProduct,
-  type LocationsOverview,
-} from "../lib/api";
+} from "../lib/inventory";
 import "./AccessiblePage.css";
 
 function emptyOverview(): LocationsOverview {
@@ -100,7 +100,10 @@ export function AccessiblePage() {
         if (!cancelled) {
           setInventory(null);
           setInventoryError(
-            toUserFacingMessage(err, "Kitchen inventory could not be loaded. Try again in a moment."),
+            inventoryErrorMessage(
+              err,
+              "Current kitchen stock could not be loaded. Try again in a moment.",
+            ),
           );
         }
       } finally {
@@ -123,13 +126,14 @@ export function AccessiblePage() {
   return (
     <section className="accessible" aria-labelledby="accessible-title">
       <div className="accessible__welcome">
-        <p className="accessible__kicker">Protected view</p>
+        <p className="accessible__kicker">Restaurant Operations · Felipe Guerrero</p>
         <h2 id="accessible-title">Brasaland operations entry</h2>
         <p className="accessible__lead">
-          Staff console for Felipe Guerrero and Mariana Restrepo. After login,
-          this page loads <code>GET /locations/overview</code> (JWT required)
-          and <code>GET /inventory</code> with <code>Authorization: Bearer</code>{" "}
-          — 14 restaurants across Colombia and Florida, COP and USD.
+          Restaurant Operations for Felipe Guerrero and Executive Direction for
+          Mariana Restrepo. After login, this page loads the 14 company-owned
+          restaurants across Colombia and Florida (COP and USD) plus current
+          kitchen stock — so headquarters is not waiting on WhatsApp ingredient
+          orders.
         </p>
       </div>
 
@@ -212,30 +216,38 @@ export function AccessiblePage() {
         </div>
 
         <div className="accessible__panel">
-          <h3>Kitchen inventory</h3>
+          <h3>Kitchen stock</h3>
+          <p className="accessible__link-row">
+            <Link to="/inventory">Manage kitchen stock</Link>
+            {" · "}
+            <Link to="/inventory/products">Ingredients</Link>
+            {" · "}
+            <Link to="/inventory/orders">Ingredient orders</Link> to review current
+            stock, stockouts, and supplier deliveries vs kitchen usage.
+          </p>
           <AsyncPanel
             status={inventoryStatus}
-            loadingLabel="Loading inventory…"
+            loadingLabel="Loading kitchen stock…"
             error={inventoryError}
             onRetry={retryInventory}
             skeletonRows={5}
           >
             {stock.length === 0 ? (
-              <p className="accessible__status">No products in products.csv yet.</p>
+              <p className="accessible__status">No ingredients on hand yet.</p>
             ) : (
               <div className="accessible__table-wrap">
                 <table className="accessible__table">
                   <thead>
                     <tr>
-                      <th scope="col">Product</th>
-                      <th scope="col">Quantity</th>
+                      <th scope="col">Ingredient</th>
+                      <th scope="col">Current stock</th>
                       <th scope="col">Unit</th>
                     </tr>
                   </thead>
                   <tbody>
                     {stock.map((product, index) => (
                       <tr key={product?.product_id ?? `${product?.name ?? "item"}-${index}`}>
-                        <td>{product?.name ?? "Unnamed product"}</td>
+                        <td>{product?.name ?? "Unnamed ingredient"}</td>
                         <td>{product?.quantity ?? "—"}</td>
                         <td>{product?.unit ?? "—"}</td>
                       </tr>

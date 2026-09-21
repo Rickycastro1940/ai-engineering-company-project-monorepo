@@ -117,10 +117,10 @@ export function LoginPage() {
     <main className="auth-shell">
       <section className="auth-card">
         <p className="auth-card__eyebrow">Brasaland Digital</p>
-        <h1>Staff login</h1>
+        <h1>Restaurant Operations login</h1>
         <p className="auth-card__lead">
-          Email and password. On success the JWT is stored in localStorage and you
-          enter the operations console.
+          Email and password for Brasaland Digital. On success you enter Restaurant
+          Operations for the 14 locations in Colombia and Florida.
         </p>
         <form onSubmit={handleSubmit} className="auth-form" noValidate>
           <label>

@@ -104,6 +104,10 @@ Inventory data is stored in [`products.csv`](../../products.csv) at the reposito
 | `POST` | `/inventory` | Add a product (`name`, `quantity`, `unit`) |
 | `PATCH` | `/inventory/{product_id}` | Update stock by `delta` (+ incoming, − outgoing) |
 | `GET` | `/inventory/alerts` | Products below threshold (default `10`) |
+| `GET` | `/inventory/orders` | List recorded inbound/outbound orders (newest first). JWT required. Read-only. |
+| `POST` | `/inventory/orders/inbound` | Record a supplier inbound order (`product_id`, `quantity` > 0). JWT required. Adds that quantity to on-hand stock. |
+| `POST` | `/inventory/orders/outbound` | Record kitchen usage (`product_id`, `quantity` > 0). JWT required. Subtracts on-hand stock; 400 if it would go below 0. |
+| `GET` | `/inventory/{product_id}` | One kitchen product, including `current_stock` |
 
 ### Examples
 
@@ -117,6 +121,13 @@ curl -X POST http://127.0.0.1:8000/inventory \
 curl -X PATCH http://127.0.0.1:8000/inventory/1 \
   -H "Content-Type: application/json" \
   -d '{"delta":5}'
+
+curl -X POST http://127.0.0.1:8000/inventory/orders/inbound \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"product_id":1,"quantity":5}'
+
+curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/inventory/orders
 
 curl http://127.0.0.1:8000/inventory/alerts
 curl "http://127.0.0.1:8000/inventory/alerts?threshold=20"

@@ -1,0 +1,121 @@
+.products__legend {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem 1.25rem;
+  color: var(--bo-muted);
+  font-size: 0.85rem;
+}
+
+.products__legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.products__dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.products__dot--stockout {
+  background: #f87171;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #f87171 25%, transparent);
+}
+
+.products__dot--low {
+  background: var(--bo-warn);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bo-warn) 25%, transparent);
+}
+
+.products__dot--healthy {
+  background: var(--bo-ok);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bo-ok) 25%, transparent);
+}
+
+.products__dot--overstock {
+  background: #a78bfa;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #a78bfa 25%, transparent);
+}
+
+.products__on-hand {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.products__level {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.products__level--stockout {
+  color: #fca5a5;
+}
+
+.products__level--low {
+  color: var(--bo-warn);
+}
+
+.products__level--healthy {
+  color: var(--bo-ok);
+}
+
+.products__level--overstock {
+  color: #c4b5fd;
+}
+
+.products__row--stockout td {
+  background: color-mix(in srgb, #f87171 12%, transparent);
+}
+
+.products__row--low td {
+  background: color-mix(in srgb, var(--bo-warn) 10%, transparent);
+}
+
+.products__row--overstock td {
+  background: color-mix(in srgb, #a78bfa 10%, transparent);
+}
+
+.products__orders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.products__order {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  border: 1px solid var(--bo-border);
+  border-radius: 0.35rem;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.products__order--in {
+  border-color: color-mix(in srgb, var(--bo-ok) 50%, var(--bo-border));
+  color: var(--bo-ok);
+}
+
+.products__order--out {
+  border-color: color-mix(in srgb, #fca5a5 50%, var(--bo-border));
+  color: #fca5a5;
+}
+
+.products__order:hover {
+  background: var(--bo-panel-2);
+}
+
+.inventory__table-wrap {
+  max-height: none;
+}

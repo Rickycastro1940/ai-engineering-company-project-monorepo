@@ -1,6 +1,6 @@
 # Progress — Brasaland Digital
 
-Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project-monorepo`, branch `feature/auth-frontend`. Gaps below are scored against root [`CONTEXT.md`](../CONTEXT.md) department needs.
+Verified **2026-09-20** on clone `Rickycastro1940/ai-engineering-company-project-monorepo`, branch `cursor/backoffice-inventory-cbbe`. Gaps below are scored against root [`CONTEXT.md`](../CONTEXT.md) department needs.
 
 ## Agent infrastructure (aligned to `CONTEXT.md`)
 
@@ -15,7 +15,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
 | Technology: telemetry + pipeline to dashboards | **Partial** — `data/pipelines/` weekly location cost/waste; Celery async path |
-| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Not done** as product UI; pipeline design targets cost/waste for Mariana + Felipe |
+| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — `/inventory/products` lists kitchen products with on-hand stock bands; inbound/outbound forms plus read-only `/inventory/orders` history; sales dashboard / no-sales alerts / forecast ordering still not built |
 | Procurement: supplier price history, consolidated spend | **Not done** (supplier docs may exist on other branches; not claimed here) |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
 | People: HR portal / KPIs by country | **Not done** |
@@ -30,8 +30,78 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | Incident analysis UI | `uis/web` |
 | Weekly cost/waste pipeline + Celery | `data/pipelines/`, `services/tasks.py`, Compose Redis/Flower/worker on this branch |
 | Public corporate website | `uis/website/` — Vite/React, route `/`, brand tokens + components from `CONTEXT.md`; screenshot `docs/screenshots/website-corporate-home.png` |
-| Internal backoffice | `uis/backoffice/` — JWT session; client layout guard (`ProtectedRoute` + `useRequireAuth`) on `/`, `/accessible`, `/account/profile`, `/account/change-password`; `/accessible` loads JWT-gated locations (14 / 8 Colombia / 6 Florida, COP+USD) plus inventory |
+| Internal backoffice | `uis/backoffice/` — JWT session; kitchen inventory HTTP only via `src/lib/inventory.ts` (Bearer from `localStorage`, 4xx/5xx `message`/`detail` surfaced); `/inventory` manages kitchen stock via `NEXT_PUBLIC_INVENTORY_API_URL` |
 | Locations API | `services/api/locations.py` — 14 locations, Colombia 8 / Florida 6, COP+USD; **Bearer JWT required** |
+
+## Latest kitchen inventory UI (`cursor/backoffice-inventory-cbbe`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — on-hand ingredient stock instead of WhatsApp orders) + **Technology** (inventory router still present on the central API).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+GET http://127.0.0.1:8000/docs → 200
+locations=present
+menus=missing
+sales=missing
+customers=missing
+suppliers=missing
+inventory=present
+path_count=21
+GET /inventory → Tomatoes/Mozzarella/Napkins
+cd uis/backoffice && npm run build → tsc -b && vite build green
+Browser /inventory (JWT) → list + add Beef brisket/Grill salt + incoming Tomatoes/Beef brisket + outgoing Mozzarella/Grill salt + insufficient-stock Napkins
+```
+
+Skill **passed** (criteria 1–4 + 6). Technology central API remains **incomplete** while menus/sales/customers/suppliers are `missing`.
+
+## Latest inventory API client (`cursor/backoffice-inventory-cbbe`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — kitchen stock UI talks only to the inventory client) + **Technology** (Bearer + structured 4xx/5xx bodies).
+
+```text
+src/pages has no fetch( — inventory HTTP only in src/lib/inventory.ts
+Authorization: Bearer from localStorage auth_token
+PATCH /inventory/3 delta=-999 → 400 message "Insufficient stock: cannot reduce below 0 (current: 120, delta: -999)"
+Browser /inventory Outgoing 999 Napkins → same API message shown; quantity stays 120
+cd uis/backoffice && npm run build → tsc -b && vite build green
+```
+
+## Latest kitchen products catalogue (`cursor/backoffice-inventory-cbbe`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — stockouts vs overstock visibility + inbound/outbound ingredient orders).
+
+```text
+GET /inventory/products Accept:text/html via Vite → 200 SPA (not FastAPI 404)
+GET /inventory Accept:application/json via Vite proxy → product list
+Headless Chrome /inventory/products → Tomatoes Healthy 25kg, Mozzarella Low 8kg, Napkins Overstock 120 boxes
+Create inbound order Tomatoes +2 → on-hand 27 kg
+Create outbound order Mozzarella −1 → on-hand 7 kg
+/backoffice/inventory/products → /inventory/products
+```
+
+## Latest inbound order form (`cursor/backoffice-inventory-cbbe`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — supplier inbound deliveries without WhatsApp) + **Technology** (`POST /inventory/orders/inbound` on the central API).
+
+```text
+POST /inventory/orders/inbound no JWT → 401
+python -m unittest tests.test_inventory_orders → OK (201 Tomatoes 25→28; 404 unknown product)
+cd uis/backoffice && npm run build → green
+Unauthenticated /inventory/orders/inbound → /login?next=/inventory/orders/inbound
+Selector lists Tomatoes, Mozzarella, Napkins by name
+Submit +2 Tomatoes → confirmation, form cleared, on-hand 27 kg
+```
+
+## Latest outbound order form (`cursor/backoffice-inventory-cbbe`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — kitchen usage vs stockouts) + **Technology** (`POST /inventory/orders/outbound`, `GET /inventory/{id}` current_stock).
+
+```text
+python -m unittest tests.test_inventory_orders → 8 OK (outbound 400 insufficient stock; GET /inventory/2 current_stock=8)
+Select Tomatoes → current stock 25 kg; switch Mozzarella → 8 kg
+Quantity 999 → client warning, then API 400 inline: Insufficient stock cannot reduce below 0 (current: 8, delta: -999)
+Outbound 1 kg Mozzarella → on-hand 7 kg
+```
 
 ## Latest auth-frontend evidence (`feature/auth-frontend`)
 
@@ -181,6 +251,61 @@ Department served: **Technology** (structured HTTP, no env names in 503s) + **Op
 ```text
 uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py tests/test_users_api.py -q → 33 passed
 cd uis/backoffice && npm run build → green
+```
+
+## Latest kitchen order history (`cursor/backoffice-inventory-cbbe`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — audit trail for ingredient movements instead of WhatsApp) + **Technology** (`GET /inventory/orders` on the inventory router).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+GET http://127.0.0.1:8000/docs → 200
+locations=present
+menus=missing
+sales=missing
+customers=missing
+suppliers=missing
+inventory=present
+path_count=24
+GET /inventory/orders no JWT → 401
+GET /inventory/orders with JWT empty → 200 []
+POST inbound Tomatoes +2 then outbound Mozzarella −1 → GET /inventory/orders newest-first with product_name, quantity, order_type, created_at, user_uuid
+/workspace/.venv/bin/python -m unittest tests.test_inventory_orders -v → 11 OK
+cd uis/backoffice && npm run build → tsc -b && vite build green
+Unauthenticated /inventory/orders → /login?next=/inventory/orders
+JWT /inventory/orders table: Mozzarella 1 kg outbound + Tomatoes 2 kg inbound, user_uuid, no edit/delete
+/backoffice/inventory/orders → /inventory/orders
+src/pages has no fetch( — listInventoryOrders in src/lib/inventory.ts
+```
+
+Skill **passed** (criteria 1–4 + 6). Technology central API remains **incomplete** while menus/sales/customers/suppliers are `missing`.
+
+## Latest CONTEXT.md vocabulary on kitchen stock UI (`cursor/backoffice-inventory-cbbe`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — ingredient orders, stockouts, overstock, 14 locations) + **Procurement** adjacency (supplier deliveries).
+
+```text
+cd uis/backoffice && npm run build → tsc -b && vite build green
+Nav: Operations home, Kitchen stock, Ingredients, Ingredient orders, Supplier delivery, Kitchen usage
+/inventory/orders headers: Ingredient, Quantity, Supply movement, Recorded, Kitchen staff
+Badges: Supplier delivery / Kitchen usage (no Product name, Order type, user_uuid, Inbound, Outbound, Staff console)
+/inventory/products: Current kitchen stock; Ingredient; Record supplier delivery / Record kitchen usage
+/inventory/orders/inbound: Ingredient + Delivery quantity
+```
+
+## Latest acceptance evaluation (`cursor/backoffice-inventory-cbbe`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — live kitchen stock and ingredient orders instead of WhatsApp).
+
+```text
+src/pages no fetch(; inventory HTTP only in src/lib/inventory.ts with Authorization Bearer
+GET /inventory includes current_stock; products page Tomatoes 25 Healthy, Mozzarella 8 Low, Napkins 120 Overstock
+Inbound Tomatoes +1 → visible confirmation, form cleared
+Outbound Mozzarella current_stock 8 kg before submit; qty 999 client warning; POST 400 Insufficient stock visible
+Orders: Ingredient, Quantity, Supply movement, Recorded, Kitchen staff user_uuid; inbound/outbound row colors
+Unauth /inventory/products, /orders/inbound, /orders/outbound, /orders → /login?next=…
+cd uis/backoffice && npm run build → green
+/workspace/.venv/bin/python -m unittest tests.test_inventory_orders -v → 11 OK
 ```
 
 ## Planned next steps (order)
