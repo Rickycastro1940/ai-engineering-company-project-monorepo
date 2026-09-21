@@ -12,13 +12,15 @@ Internal staff console for **Brasaland Digital** (see root [`CONTEXT.md`](../../
 | `/register` | Registration form. Success: `POST /users` (optional `name`) then `POST /auth/login`, store JWT, open `/accessible`. Failure shows field-level errors. | Public |
 | `/accessible` | Welcome dashboard — `GET /locations/overview` | Protected |
 | `/inventory` | Kitchen inventory — list/add products, incoming/outgoing stock, low-stock alerts | Protected |
+| `/inventory/products` | Kitchen products catalogue from `GET /inventory`, stock-level indicators, inbound/outbound order links | Protected |
+| `/inventory/orders/new` | Create inbound (supplier delivery) or outbound (kitchen usage) order for one product | Protected |
 | `/account/profile` | Email plus name/phone/address from `GET /auth/me`; edit contact via `PUT /profiles/me` | Protected |
 | `/account/change-password` | Password update via `PUT /users/{id}` | Protected |
 | `/` | Redirects to `/accessible` | Protected |
 
 There is **no Next.js app** in this monorepo. Staff views live in this Vite SPA. `uis/website` (public milestone one) is a separate app and must not check a token or redirect to `/login`. `uis/web` is incident HTML, not a session console.
 
-Protected staff views (all of them): `/`, `/accessible`, `/inventory`, `/account/profile`, `/account/change-password`, and any unmatched path (`*`). Public in this app: `/login`, `/register`.
+Protected staff views (all of them): `/`, `/accessible`, `/inventory`, `/inventory/products`, `/inventory/orders/new`, `/account/profile`, `/account/change-password`, and any unmatched path (`*`). Public in this app: `/login`, `/register`.
 
 Unauthenticated or **invalid** sessions redirect to `/login?next=…`. Logout clears `localStorage` (`auth_token`) and returns to `/login`. `GET /locations` and `GET /locations/overview` require a Bearer token. The operations page also loads `GET /inventory` with that header. Full kitchen inventory management lives at `/inventory` (`POST /inventory`, `PATCH /inventory/{id}`, `GET /inventory/alerts`). All of those calls go through `src/lib/inventory.ts` — pages never call `fetch` for inventory. 4xx/5xx responses surface `message`/`detail` from the API body.
 

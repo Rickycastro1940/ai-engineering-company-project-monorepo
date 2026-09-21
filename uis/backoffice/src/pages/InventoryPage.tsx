@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { AsyncPanel } from "../components/AsyncState";
 import {
   createInventoryProduct,
@@ -224,7 +225,9 @@ export function InventoryPage() {
           <strong>quantity</strong>, and <strong>unit</strong> the central API stores in{" "}
           <code>products.csv</code>. This view replaces WhatsApp and phone orders with
           on-hand data so supervisors can see stockouts before they hit a location in
-          Colombia or Florida.
+          Colombia or Florida.{" "}
+          <Link to="/inventory/products">Open the kitchen products catalogue</Link> for
+          stock-level indicators and inbound/outbound ingredient orders.
         </p>
         <p className="inventory__api-hint">
           Inventory API: <code>{apiBase || "(same origin / Vite proxy)"}</code>
