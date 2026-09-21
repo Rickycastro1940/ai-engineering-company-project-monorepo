@@ -51,6 +51,9 @@ export function inboundOrderPath(productId?: number): string {
   return `/inventory/orders/inbound?product_id=${encodeURIComponent(String(productId))}`;
 }
 
-export function outboundOrderPath(productId: number): string {
-  return `/inventory/orders/new?product_id=${encodeURIComponent(String(productId))}&direction=outbound`;
+export function outboundOrderPath(productId?: number): string {
+  if (productId == null || !Number.isFinite(productId)) {
+    return "/inventory/orders/outbound";
+  }
+  return `/inventory/orders/outbound?product_id=${encodeURIComponent(String(productId))}`;
 }

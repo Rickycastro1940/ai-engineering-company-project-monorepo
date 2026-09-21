@@ -9,6 +9,7 @@ export type InventoryProduct = {
   name: string;
   quantity: number;
   unit: string;
+  current_stock?: number;
 };
 
 export type InventoryProductCreate = {
@@ -193,6 +194,28 @@ export async function createInboundOrder(payload: {
   quantity: number;
 }): Promise<InboundOrderResult> {
   return inventoryRequest<InboundOrderResult>("/inventory/orders/inbound", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getInventoryProduct(productId: number): Promise<InventoryProduct> {
+  return inventoryRequest<InventoryProduct>(
+    `/inventory/${encodeURIComponent(String(productId))}`,
+  );
+}
+
+export type OutboundOrderResult = {
+  order_type: "outbound";
+  quantity: number;
+  product: InventoryProduct;
+};
+
+export async function createOutboundOrder(payload: {
+  product_id: number;
+  quantity: number;
+}): Promise<OutboundOrderResult> {
+  return inventoryRequest<OutboundOrderResult>("/inventory/orders/outbound", {
     method: "POST",
     body: JSON.stringify(payload),
   });

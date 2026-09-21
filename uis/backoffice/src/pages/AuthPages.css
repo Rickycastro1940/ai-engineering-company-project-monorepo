@@ -114,9 +114,32 @@
   font-size: 0.9rem;
 }
 
-.auth-form__field-error {
-  color: #fca5a5;
+.auth-form__warning {
+  color: var(--bo-warn);
   font-size: 0.8rem;
+}
+
+.outbound-stock {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+}
+
+.outbound-stock__label {
+  font-size: 0.75rem;
+  color: var(--bo-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.outbound-stock__value {
+  color: var(--bo-text);
+  font-size: 0.95rem;
+}
+
+.outbound-stock__value strong {
+  font-family: var(--font-mono);
+  font-size: 1.2rem;
 }
 
 .auth-form__success {

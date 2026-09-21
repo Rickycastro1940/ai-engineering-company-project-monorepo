@@ -105,6 +105,8 @@ Inventory data is stored in [`products.csv`](../../products.csv) at the reposito
 | `PATCH` | `/inventory/{product_id}` | Update stock by `delta` (+ incoming, − outgoing) |
 | `GET` | `/inventory/alerts` | Products below threshold (default `10`) |
 | `POST` | `/inventory/orders/inbound` | Record a supplier inbound order (`product_id`, `quantity` > 0). JWT required. Adds that quantity to on-hand stock. |
+| `POST` | `/inventory/orders/outbound` | Record kitchen usage (`product_id`, `quantity` > 0). JWT required. Subtracts on-hand stock; 400 if it would go below 0. |
+| `GET` | `/inventory/{product_id}` | One kitchen product, including `current_stock` |
 
 ### Examples
 

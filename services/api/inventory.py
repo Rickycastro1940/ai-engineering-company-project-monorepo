@@ -36,6 +36,11 @@ class InboundOrderCreate(BaseModel):
     quantity: int = Field(gt=0)
 
 
+class OutboundOrderCreate(BaseModel):
+    product_id: int = Field(ge=1)
+    quantity: int = Field(gt=0)
+
+
 def _ensure_products_file() -> None:
     if PRODUCTS_FILE.exists():
         return
@@ -132,6 +137,16 @@ def apply_delta(product_id: int, delta: int) -> ProductRow:
     return product
 
 
+def _product_with_current_stock(product: ProductRow) -> dict:
+    return {
+        "product_id": product["product_id"],
+        "name": product["name"],
+        "quantity": product["quantity"],
+        "unit": product["unit"],
+        "current_stock": int(product["quantity"]),
+    }
+
+
 def get_alerts(threshold: int = 10) -> List[ProductRow]:
     if threshold < 0:
         raise HTTPException(status_code=400, detail="Threshold must be greater than or equal to 0")
@@ -162,8 +177,29 @@ def create_inbound_order(
     return {
         "order_type": "inbound",
         "quantity": body.quantity,
-        "product": updated,
+        "product": _product_with_current_stock(updated),
     }
+
+
+@router.post("/orders/outbound", status_code=201)
+def create_outbound_order(
+    body: OutboundOrderCreate,
+    _current_user: dict = Depends(get_current_user),
+) -> dict:
+    updated = apply_delta(body.product_id, -body.quantity)
+    return {
+        "order_type": "outbound",
+        "quantity": body.quantity,
+        "product": _product_with_current_stock(updated),
+    }
+
+
+@router.get("/{product_id}")
+def read_product(product_id: int) -> dict:
+    product = _find_product(load_products(), product_id)
+    if product is None:
+        raise HTTPException(status_code=404, detail=f"Product {product_id} not found")
+    return _product_with_current_stock(product)
 
 
 @router.patch("/{product_id}")
