@@ -15,7 +15,7 @@ Verified **2026-09-20** on clone `Rickycastro1940/ai-engineering-company-project
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
 | Technology: telemetry + pipeline to dashboards | **Partial** — `data/pipelines/` weekly location cost/waste; Celery async path |
-| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — `/inventory/products` lists kitchen products with on-hand stock bands and inbound/outbound orders; sales dashboard / no-sales alerts / forecast ordering still not built |
+| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — `/inventory/products` lists kitchen products with on-hand stock bands; inbound/outbound forms plus read-only `/inventory/orders` history; sales dashboard / no-sales alerts / forecast ordering still not built |
 | Procurement: supplier price history, consolidated spend | **Not done** (supplier docs may exist on other branches; not claimed here) |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
 | People: HR portal / KPIs by country | **Not done** |
@@ -252,6 +252,33 @@ Department served: **Technology** (structured HTTP, no env names in 503s) + **Op
 uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py tests/test_users_api.py -q → 33 passed
 cd uis/backoffice && npm run build → green
 ```
+
+## Latest kitchen order history (`cursor/backoffice-inventory-cbbe`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — audit trail for ingredient movements instead of WhatsApp) + **Technology** (`GET /inventory/orders` on the inventory router).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+GET http://127.0.0.1:8000/docs → 200
+locations=present
+menus=missing
+sales=missing
+customers=missing
+suppliers=missing
+inventory=present
+path_count=24
+GET /inventory/orders no JWT → 401
+GET /inventory/orders with JWT empty → 200 []
+POST inbound Tomatoes +2 then outbound Mozzarella −1 → GET /inventory/orders newest-first with product_name, quantity, order_type, created_at, user_uuid
+/workspace/.venv/bin/python -m unittest tests.test_inventory_orders -v → 11 OK
+cd uis/backoffice && npm run build → tsc -b && vite build green
+Unauthenticated /inventory/orders → /login?next=/inventory/orders
+JWT /inventory/orders table: Mozzarella 1 kg outbound + Tomatoes 2 kg inbound, user_uuid, no edit/delete
+/backoffice/inventory/orders → /inventory/orders
+src/pages has no fetch( — listInventoryOrders in src/lib/inventory.ts
+```
+
+Skill **passed** (criteria 1–4 + 6). Technology central API remains **incomplete** while menus/sales/customers/suppliers are `missing`.
 
 ## Planned next steps (order)
 
