@@ -221,6 +221,21 @@ export async function createOutboundOrder(payload: {
   });
 }
 
+export type InventoryOrder = {
+  order_id: number;
+  product_id: number;
+  product_name: string;
+  quantity: number;
+  unit?: string;
+  order_type: "inbound" | "outbound" | string;
+  created_at: string;
+  user_uuid: string;
+};
+
+export async function listInventoryOrders(): Promise<InventoryOrder[]> {
+  return inventoryRequest<InventoryOrder[]>("/inventory/orders");
+}
+
 export async function listInventoryAlerts(threshold = 10): Promise<InventoryProduct[]> {
   const query = new URLSearchParams({ threshold: String(threshold) });
   return inventoryRequest<InventoryProduct[]>(`/inventory/alerts?${query}`);

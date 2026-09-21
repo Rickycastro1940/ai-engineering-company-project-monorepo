@@ -111,6 +111,8 @@ export function InboundOrderPage() {
           Record a supplier delivery into kitchen stock for the 14 Brasaland locations
           — the replacement for WhatsApp inbound orders. Choose the product by name.{" "}
           <Link to="/inventory/products">Back to kitchen products</Link>
+          {" · "}
+          <Link to="/inventory/orders">Order history</Link>
         </p>
       </div>
 

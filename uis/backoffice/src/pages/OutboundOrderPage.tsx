@@ -180,6 +180,8 @@ export function OutboundOrderPage() {
           stock is loaded when you pick a product. The API rejects usage that would
           go below 0.{" "}
           <Link to="/inventory/products">Back to kitchen products</Link>
+          {" · "}
+          <Link to="/inventory/orders">Order history</Link>
         </p>
       </div>
 

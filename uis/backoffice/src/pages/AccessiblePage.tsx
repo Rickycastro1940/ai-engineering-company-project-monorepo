@@ -219,8 +219,10 @@ export function AccessiblePage() {
           <p className="accessible__link-row">
             <Link to="/inventory">Open inventory management</Link>
             {" · "}
-            <Link to="/inventory/products">Kitchen products</Link> to review on-hand
-            stock and create inbound or outbound ingredient orders.
+            <Link to="/inventory/products">Kitchen products</Link>
+            {" · "}
+            <Link to="/inventory/orders">Order history</Link> to review on-hand
+            stock and inbound or outbound ingredient orders.
           </p>
           <AsyncPanel
             status={inventoryStatus}
