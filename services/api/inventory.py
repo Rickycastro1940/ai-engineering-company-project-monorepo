@@ -240,8 +240,8 @@ def record_order(
 
 
 @router.get("")
-def list_inventory() -> List[ProductRow]:
-    return load_products()
+def list_inventory() -> List[dict]:
+    return [_product_with_current_stock(product) for product in load_products()]
 
 
 @router.post("", status_code=201)

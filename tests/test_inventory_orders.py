@@ -128,6 +128,12 @@ class OutboundOrderApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
 
     def test_product_current_stock_is_returned(self) -> None:
+        listed = self.client.get("/inventory")
+        self.assertEqual(listed.status_code, 200)
+        mozzarella = next(item for item in listed.json() if item["name"] == "Mozzarella")
+        self.assertEqual(mozzarella["current_stock"], 8)
+        self.assertEqual(mozzarella["quantity"], 8)
+
         response = self.client.get("/inventory/2")
         self.assertEqual(response.status_code, 200)
         body = response.json()

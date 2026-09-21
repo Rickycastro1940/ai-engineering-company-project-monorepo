@@ -9,6 +9,7 @@ import {
 import {
   inboundOrderPath,
   outboundOrderPath,
+  currentStockOf,
   stockLevelForQuantity,
   stockLevelLabel,
 } from "../lib/stockLevels";
@@ -127,7 +128,8 @@ export function ProductsPage() {
                 <tbody>
                   {rows.map((product, index) => {
                     const id = product.product_id;
-                    const level = stockLevelForQuantity(Number(product.quantity));
+                    const onHand = currentStockOf(product);
+                    const level = stockLevelForQuantity(Number(onHand ?? 0));
                     return (
                       <tr
                         key={id ?? `${product.name}-${index}`}
@@ -135,7 +137,7 @@ export function ProductsPage() {
                       >
                         <td>{product.name ?? "Unnamed ingredient"}</td>
                         <td className="products__on-hand">
-                          {product.quantity ?? "—"}
+                          {onHand ?? "—"}
                         </td>
                         <td>{product.unit ?? "—"}</td>
                         <td>

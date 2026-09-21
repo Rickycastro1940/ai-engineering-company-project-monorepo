@@ -18,6 +18,17 @@ export const OVERSTOCK_MIN = 100;
 
 export type StockLevel = "stockout" | "low" | "healthy" | "overstock";
 
+export function currentStockOf(product: {
+  current_stock?: number;
+  quantity?: number;
+} | null): number | null {
+  if (!product) {
+    return null;
+  }
+  const stock = product.current_stock ?? product.quantity;
+  return Number.isFinite(Number(stock)) ? Number(stock) : null;
+}
+
 export function stockLevelForQuantity(quantity: number): StockLevel {
   if (!Number.isFinite(quantity) || quantity <= STOCKOUT_MAX) {
     return "stockout";

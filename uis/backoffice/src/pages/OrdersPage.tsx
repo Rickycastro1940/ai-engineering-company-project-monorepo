@@ -143,7 +143,9 @@ export function OrdersPage() {
                     <th scope="col">Quantity</th>
                     <th scope="col">Supply movement</th>
                     <th scope="col">Recorded</th>
-                    <th scope="col">Kitchen staff</th>
+                    <th scope="col">
+                      Kitchen staff <code>user_uuid</code>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>

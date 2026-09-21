@@ -8,19 +8,12 @@ import {
   listInventory,
   type InventoryProduct,
 } from "../lib/inventory";
+import { currentStockOf } from "../lib/stockLevels";
 import "./AuthPages.css";
 import "./AccessiblePage.css";
 
 function asProductList(value: unknown): InventoryProduct[] {
   return Array.isArray(value) ? value : [];
-}
-
-function currentStockOf(product: InventoryProduct | null): number | null {
-  if (!product) {
-    return null;
-  }
-  const stock = product.current_stock ?? product.quantity;
-  return Number.isFinite(Number(stock)) ? Number(stock) : null;
 }
 
 export function OutboundOrderPage() {
