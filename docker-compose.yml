@@ -1,8 +1,12 @@
 # Local stack for Brasaland Digital (Technology API, Marketing website,
 # Operations/Executive backoffice, Redis + Celery weekly pipeline).
 # Requires a root .env (see .env.example). Create .env before starting Compose.
+#
+# Sibling containers use host.docker.internal + published ports so Redis/API
+# stay reachable when Docker bridge ICC is restricted (common on locked-down
+# Linux). Docker Desktop still publishes 6379/8000 on the host.
 
-x-redis-url: &redis_url redis://redis:6379/0
+x-redis-url: &redis_url redis://host.docker.internal:6379/0
 
 services:
   redis:
@@ -23,6 +27,8 @@ services:
       context: .
       dockerfile: services/Dockerfile
     container_name: brasaland-api
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
       - .env
     environment:
@@ -52,6 +58,8 @@ services:
       args:
         APP_DIR: website
     container_name: brasaland-website
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
       - .env
     command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
@@ -69,10 +77,12 @@ services:
       args:
         APP_DIR: backoffice
     container_name: brasaland-backoffice
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
       - .env
     environment:
-      VITE_API_PROXY: http://api:8000
+      VITE_API_PROXY: http://host.docker.internal:8000
     command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5174"]
     ports:
       - "5174:5174"
@@ -84,9 +94,11 @@ services:
   flower:
     image: mher/flower:2.0
     container_name: brasaland-flower
-    command: ["celery", "--broker=redis://redis:6379/0", "flower", "--port=5555"]
+    command: ["celery", "--broker=redis://host.docker.internal:6379/0", "flower", "--port=5555"]
     ports:
       - "5555:5555"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
       - .env
     environment:
@@ -102,6 +114,8 @@ services:
       context: .
       dockerfile: services/Dockerfile
     container_name: brasaland-celery-worker
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     command: ["celery", "-A", "services.celery_app", "worker", "--loglevel=info", "-E"]
     env_file:
       - .env
