@@ -280,6 +280,19 @@ src/pages has no fetch( — listInventoryOrders in src/lib/inventory.ts
 
 Skill **passed** (criteria 1–4 + 6). Technology central API remains **incomplete** while menus/sales/customers/suppliers are `missing`.
 
+## Latest CONTEXT.md vocabulary on kitchen stock UI (`cursor/backoffice-inventory-cbbe`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — ingredient orders, stockouts, overstock, 14 locations) + **Procurement** adjacency (supplier deliveries).
+
+```text
+cd uis/backoffice && npm run build → tsc -b && vite build green
+Nav: Operations home, Kitchen stock, Ingredients, Ingredient orders, Supplier delivery, Kitchen usage
+/inventory/orders headers: Ingredient, Quantity, Supply movement, Recorded, Kitchen staff
+Badges: Supplier delivery / Kitchen usage (no Product name, Order type, user_uuid, Inbound, Outbound, Staff console)
+/inventory/products: Current kitchen stock; Ingredient; Record supplier delivery / Record kitchen usage
+/inventory/orders/inbound: Ingredient + Delivery quantity
+```
+
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).
