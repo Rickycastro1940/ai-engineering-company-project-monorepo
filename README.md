@@ -44,7 +44,7 @@ docker compose up --build
 | Staff backoffice (`uis/Dockerfile` `APP_DIR=backoffice`) | http://localhost:5174/login |
 | Flower (Celery) | http://localhost:5555 |
 
-Inside Compose, Redis is `redis://redis:6379/0`. On the host, keep `REDIS_URL=redis://localhost:6379/0`.
+Inside Compose, Redis is reached at `redis://host.docker.internal:6379/0` (published host port). On the host without Compose, keep `REDIS_URL=redis://localhost:6379/0`.
 
 ### Run locally (API + Agent)
 
