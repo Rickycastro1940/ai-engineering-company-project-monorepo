@@ -14,7 +14,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
-| Technology: telemetry + pipeline to dashboards | **Partial** — event contract in `docs/telemetry/` (17 events, COP/USD, 14 location ids). Weekly cost/waste pipeline and Celery path exist. Live emitters are not wired |
+| Technology: telemetry + pipeline to dashboards | **Partial** — Phase 1 floor of 32 day-one metrics in `docs/telemetry/telemetry-plan.md`, with schemas for the events those metrics need. Weekly cost/waste pipeline and Celery path exist. Live emitters are not wired |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Not done** as product UI; pipeline design targets cost/waste for Mariana + Felipe |
 | Procurement: supplier price history, consolidated spend | **Not done** (supplier docs may exist on other branches; not claimed here) |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
@@ -182,6 +182,21 @@ Department served: **Technology** (structured HTTP, no env names in 503s) + **Op
 uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py tests/test_users_api.py -q → 33 passed
 cd uis/backoffice && npm run build → green
 ```
+
+## Latest telemetry floor catalog (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology**, so every `CONTEXT.md` day-one metric for Operations, Procurement, Marketing, People, Training, and Executive stays in the telemetry plan.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+Phase 1 floor ids in telemetry-plan.md = 32
+weekly_report_dispatched example lists the same 32 ids
+Draft202012Validator.check_schema → pass
+29 event examples validate
+Dropping people.turnover from floor_metric_ids → schema reject
+```
+
+Emitters are still not wired. Menus, sales, customers, and suppliers remain missing on the central API.
 
 ## Latest telemetry plan (`cursor/telemetry-plan-ff8d`)
 

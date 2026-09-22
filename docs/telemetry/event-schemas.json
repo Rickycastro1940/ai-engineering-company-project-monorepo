@@ -54,6 +54,42 @@
     },
     {
       "$ref": "#/$defs/pageView"
+    },
+    {
+      "$ref": "#/$defs/employeeHired"
+    },
+    {
+      "$ref": "#/$defs/employeeSeparated"
+    },
+    {
+      "$ref": "#/$defs/absenceRecorded"
+    },
+    {
+      "$ref": "#/$defs/rosterDayScheduled"
+    },
+    {
+      "$ref": "#/$defs/vacancyOpened"
+    },
+    {
+      "$ref": "#/$defs/vacancyFilled"
+    },
+    {
+      "$ref": "#/$defs/customerPreferenceRecorded"
+    },
+    {
+      "$ref": "#/$defs/recommendationShown"
+    },
+    {
+      "$ref": "#/$defs/recommendationAccepted"
+    },
+    {
+      "$ref": "#/$defs/recipeUpdatePublished"
+    },
+    {
+      "$ref": "#/$defs/recipeUpdateAcknowledged"
+    },
+    {
+      "$ref": "#/$defs/weeklyReportDispatched"
     }
   ],
   "$defs": {
@@ -81,6 +117,11 @@
         "services.api.orders",
         "services.api.sales",
         "services.api.loyalty",
+        "services.api.customers",
+        "services.api.recommendations",
+        "services.api.people",
+        "services.api.training",
+        "services.telemetry.weekly_report",
         "services.api.users",
         "services.api.errors",
         "services.telemetry.silence_monitor",
@@ -1854,6 +1895,10 @@
                   "type": "string",
                   "pattern": "^loy_[A-Za-z0-9]{8,}$"
                 },
+                "customer_id": {
+                  "type": "string",
+                  "pattern": "^cus_[A-Za-z0-9]{8,}$"
+                },
                 "points_earned": {
                   "type": "integer",
                   "minimum": 0
@@ -1985,6 +2030,7 @@
             ],
             "loyalty_attached": true,
             "loyalty_account_id": "loy_A1b2C3d4",
+            "customer_id": "cus_Medellin1",
             "points_earned": 4
           }
         }
@@ -2875,6 +2921,1372 @@
             "location_scope": "none",
             "app": "backoffice",
             "path": "/accessible"
+          }
+        }
+      ]
+    },
+    "employeeHired": {
+      "description": "Hire fact for country headcount. employee_id is opaque. No name.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "employee_hired"
+            },
+            "source": {
+              "enum": [
+                "services.api.people"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "country": {
+                  "enum": [
+                    "Colombia",
+                    "United States"
+                  ]
+                },
+                "employee_id": {
+                  "type": "string",
+                  "pattern": "^emp_[A-Za-z0-9]{6,}$"
+                },
+                "effective_date": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "employment_basis": {
+                  "enum": [
+                    "kitchen",
+                    "floor",
+                    "management",
+                    "support"
+                  ]
+                }
+              },
+              "required": [
+                "location_scope",
+                "country",
+                "employee_id",
+                "effective_date",
+                "employment_basis"
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "14141414-1414-4141-8141-141414141414",
+          "event_type": "employee_hired",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.people",
+          "tags": {
+            "source": "services.api.people",
+            "location_scope": "none",
+            "country": "Colombia"
+          },
+          "payload": {
+            "location_scope": "none",
+            "country": "Colombia",
+            "employee_id": "emp_kitch1",
+            "effective_date": "2026-09-01",
+            "employment_basis": "kitchen"
+          }
+        }
+      ]
+    },
+    "employeeSeparated": {
+      "description": "Leaver fact for people.turnover, segmented by country.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "employee_separated"
+            },
+            "source": {
+              "enum": [
+                "services.api.people"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "country": {
+                  "enum": [
+                    "Colombia",
+                    "United States"
+                  ]
+                },
+                "employee_id": {
+                  "type": "string",
+                  "pattern": "^emp_[A-Za-z0-9]{6,}$"
+                },
+                "effective_date": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "separation_kind": {
+                  "enum": [
+                    "resignation",
+                    "dismissal",
+                    "end_of_contract",
+                    "other"
+                  ]
+                }
+              },
+              "required": [
+                "location_scope",
+                "country",
+                "employee_id",
+                "effective_date",
+                "separation_kind"
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "15151515-1515-4151-8151-151515151515",
+          "event_type": "employee_separated",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.people",
+          "tags": {
+            "source": "services.api.people",
+            "location_scope": "none",
+            "country": "United States"
+          },
+          "payload": {
+            "location_scope": "none",
+            "country": "United States",
+            "employee_id": "emp_floor2",
+            "effective_date": "2026-09-15",
+            "separation_kind": "resignation"
+          }
+        }
+      ]
+    },
+    "absenceRecorded": {
+      "description": "Absence day or fraction for people.absenteeism. Holiday taken is absence_kind holiday.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "absence_recorded"
+            },
+            "source": {
+              "enum": [
+                "services.api.people"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "country": {
+                  "enum": [
+                    "Colombia",
+                    "United States"
+                  ]
+                },
+                "employee_id": {
+                  "type": "string",
+                  "pattern": "^emp_[A-Za-z0-9]{6,}$"
+                },
+                "absence_date": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "day_fraction": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 1
+                },
+                "absence_kind": {
+                  "enum": [
+                    "holiday",
+                    "sick",
+                    "unpaid",
+                    "other"
+                  ]
+                }
+              },
+              "required": [
+                "location_scope",
+                "country",
+                "employee_id",
+                "absence_date",
+                "day_fraction",
+                "absence_kind"
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "16161616-1616-4161-8161-161616161616",
+          "event_type": "absence_recorded",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.people",
+          "tags": {
+            "source": "services.api.people",
+            "location_scope": "none",
+            "country": "Colombia"
+          },
+          "payload": {
+            "location_scope": "none",
+            "country": "Colombia",
+            "employee_id": "emp_kitch1",
+            "absence_date": "2026-09-18",
+            "day_fraction": 1,
+            "absence_kind": "sick"
+          }
+        }
+      ]
+    },
+    "rosterDayScheduled": {
+      "description": "Denominator day for absenteeism. One row per employee per scheduled day.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "roster_day_scheduled"
+            },
+            "source": {
+              "enum": [
+                "services.api.people"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "country": {
+                  "enum": [
+                    "Colombia",
+                    "United States"
+                  ]
+                },
+                "employee_id": {
+                  "type": "string",
+                  "pattern": "^emp_[A-Za-z0-9]{6,}$"
+                },
+                "roster_date": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "scheduled": {
+                  "const": true
+                }
+              },
+              "required": [
+                "location_scope",
+                "country",
+                "employee_id",
+                "roster_date",
+                "scheduled"
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "17171717-1717-4171-8171-171717171717",
+          "event_type": "roster_day_scheduled",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.people",
+          "tags": {
+            "source": "services.api.people",
+            "location_scope": "none",
+            "country": "Colombia"
+          },
+          "payload": {
+            "location_scope": "none",
+            "country": "Colombia",
+            "employee_id": "emp_kitch1",
+            "roster_date": "2026-09-18",
+            "scheduled": true
+          }
+        }
+      ]
+    },
+    "vacancyOpened": {
+      "description": "Vacancy open date. Paired with vacancy_filled for time to fill.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "vacancy_opened"
+            },
+            "source": {
+              "enum": [
+                "services.api.people"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "country": {
+                  "enum": [
+                    "Colombia",
+                    "United States"
+                  ]
+                },
+                "vacancy_id": {
+                  "type": "string",
+                  "pattern": "^vac_[A-Za-z0-9]{4,}$"
+                },
+                "opened_on": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "employment_basis": {
+                  "enum": [
+                    "kitchen",
+                    "floor",
+                    "management",
+                    "support"
+                  ]
+                }
+              },
+              "required": [
+                "location_scope",
+                "country",
+                "vacancy_id",
+                "opened_on",
+                "employment_basis"
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "18181818-1818-4181-8181-181818181818",
+          "event_type": "vacancy_opened",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.people",
+          "tags": {
+            "source": "services.api.people",
+            "location_scope": "none",
+            "country": "United States"
+          },
+          "payload": {
+            "location_scope": "none",
+            "country": "United States",
+            "vacancy_id": "vac_grill1",
+            "opened_on": "2026-09-01",
+            "employment_basis": "kitchen"
+          }
+        }
+      ]
+    },
+    "vacancyFilled": {
+      "description": "days_to_fill is filled_on minus opened_on in calendar days.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "vacancy_filled"
+            },
+            "source": {
+              "enum": [
+                "services.api.people"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "country": {
+                  "enum": [
+                    "Colombia",
+                    "United States"
+                  ]
+                },
+                "vacancy_id": {
+                  "type": "string",
+                  "pattern": "^vac_[A-Za-z0-9]{4,}$"
+                },
+                "opened_on": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "filled_on": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "days_to_fill": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "location_scope",
+                "country",
+                "vacancy_id",
+                "opened_on",
+                "filled_on",
+                "days_to_fill"
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "19191919-1919-4191-8191-191919191919",
+          "event_type": "vacancy_filled",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.people",
+          "tags": {
+            "source": "services.api.people",
+            "location_scope": "none",
+            "country": "United States"
+          },
+          "payload": {
+            "location_scope": "none",
+            "country": "United States",
+            "vacancy_id": "vac_grill1",
+            "opened_on": "2026-09-01",
+            "filled_on": "2026-09-20",
+            "days_to_fill": 19
+          }
+        }
+      ]
+    },
+    "customerPreferenceRecorded": {
+      "description": "CRM preference. No free-text personal data.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "customer_preference_recorded"
+            },
+            "source": {
+              "enum": [
+                "services.api.customers"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "customer_id": {
+                  "type": "string",
+                  "pattern": "^cus_[A-Za-z0-9]{8,}$"
+                },
+                "preference_code": {
+                  "enum": [
+                    "diet",
+                    "favorite_menu_item",
+                    "preferred_channel",
+                    "preferred_language"
+                  ]
+                },
+                "preference_value": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                }
+              },
+              "required": [
+                "location_scope",
+                "customer_id",
+                "preference_code",
+                "preference_value"
+              ],
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "preference_code": {
+                        "const": "preferred_language"
+                      }
+                    },
+                    "required": [
+                      "preference_code"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "preference_value": {
+                        "enum": [
+                          "es",
+                          "en"
+                        ]
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "preference_code": {
+                        "const": "preferred_channel"
+                      }
+                    },
+                    "required": [
+                      "preference_code"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "preference_value": {
+                        "enum": [
+                          "in_store",
+                          "delivery",
+                          "digital_app"
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "20202020-2020-4202-8202-202020202020",
+          "event_type": "customer_preference_recorded",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.customers",
+          "tags": {
+            "source": "services.api.customers",
+            "location_scope": "none"
+          },
+          "payload": {
+            "location_scope": "none",
+            "customer_id": "cus_Medellin1",
+            "preference_code": "preferred_language",
+            "preference_value": "es"
+          }
+        }
+      ]
+    },
+    "recommendationShown": {
+      "description": "Personalisation impression. customer_id is optional when the guest is anonymous.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "recommendation_shown"
+            },
+            "source": {
+              "enum": [
+                "services.api.recommendations"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "location"
+                },
+                "location_id": {
+                  "$ref": "#/$defs/locationId"
+                },
+                "country": {
+                  "enum": [
+                    "Colombia",
+                    "United States"
+                  ]
+                },
+                "currency": {
+                  "enum": [
+                    "COP",
+                    "USD"
+                  ]
+                },
+                "timezone": {
+                  "enum": [
+                    "America/Bogota",
+                    "America/New_York"
+                  ]
+                },
+                "recommendation_id": {
+                  "type": "string",
+                  "pattern": "^recm_[A-Za-z0-9]{8,}$"
+                },
+                "customer_id": {
+                  "type": "string",
+                  "pattern": "^cus_[A-Za-z0-9]{8,}$"
+                },
+                "menu_item_name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "surface": {
+                  "enum": [
+                    "checkout",
+                    "kiosk",
+                    "app_home"
+                  ]
+                }
+              },
+              "required": [
+                "location_scope",
+                "location_id",
+                "country",
+                "currency",
+                "timezone",
+                "recommendation_id",
+                "menu_item_name",
+                "surface"
+              ],
+              "allOf": [
+                {
+                  "$ref": "#/$defs/locationFacts"
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "21212121-2121-4212-8212-212121212121",
+          "event_type": "recommendation_shown",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.recommendations",
+          "tags": {
+            "source": "services.api.recommendations",
+            "location_scope": "location",
+            "location_id": "co-med-centro",
+            "country": "Colombia",
+            "currency": "COP"
+          },
+          "payload": {
+            "location_scope": "location",
+            "location_id": "co-med-centro",
+            "country": "Colombia",
+            "currency": "COP",
+            "timezone": "America/Bogota",
+            "recommendation_id": "recm_Sirloin1",
+            "customer_id": "cus_Medellin1",
+            "menu_item_name": "Grilled Sirloin",
+            "surface": "checkout"
+          }
+        }
+      ]
+    },
+    "recommendationAccepted": {
+      "description": "Guest accepted the suggested menu item. recommendation_id matches the impression.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "recommendation_accepted"
+            },
+            "source": {
+              "enum": [
+                "services.api.recommendations"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "location"
+                },
+                "location_id": {
+                  "$ref": "#/$defs/locationId"
+                },
+                "country": {
+                  "enum": [
+                    "Colombia",
+                    "United States"
+                  ]
+                },
+                "currency": {
+                  "enum": [
+                    "COP",
+                    "USD"
+                  ]
+                },
+                "timezone": {
+                  "enum": [
+                    "America/Bogota",
+                    "America/New_York"
+                  ]
+                },
+                "recommendation_id": {
+                  "type": "string",
+                  "pattern": "^recm_[A-Za-z0-9]{8,}$"
+                },
+                "customer_id": {
+                  "type": "string",
+                  "pattern": "^cus_[A-Za-z0-9]{8,}$"
+                },
+                "menu_item_name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "accepted": {
+                  "const": true
+                }
+              },
+              "required": [
+                "location_scope",
+                "location_id",
+                "country",
+                "currency",
+                "timezone",
+                "recommendation_id",
+                "menu_item_name",
+                "accepted"
+              ],
+              "allOf": [
+                {
+                  "$ref": "#/$defs/locationFacts"
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "23232323-2323-4232-8232-232323232323",
+          "event_type": "recommendation_accepted",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.recommendations",
+          "tags": {
+            "source": "services.api.recommendations",
+            "location_scope": "location",
+            "location_id": "co-med-centro",
+            "country": "Colombia",
+            "currency": "COP"
+          },
+          "payload": {
+            "location_scope": "location",
+            "location_id": "co-med-centro",
+            "country": "Colombia",
+            "currency": "COP",
+            "timezone": "America/Bogota",
+            "recommendation_id": "recm_Sirloin1",
+            "customer_id": "cus_Medellin1",
+            "menu_item_name": "Grilled Sirloin",
+            "accepted": true
+          }
+        }
+      ]
+    },
+    "recipeUpdatePublished": {
+      "description": "Recipe push. locale es is the base language. en is an additional publish.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "recipe_update_published"
+            },
+            "source": {
+              "enum": [
+                "services.api.training"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "recipe_id": {
+                  "type": "string",
+                  "pattern": "^rec_[a-z0-9_]{2,64}$"
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "locale": {
+                  "enum": [
+                    "es",
+                    "en"
+                  ]
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "location_scope",
+                "recipe_id",
+                "version",
+                "locale",
+                "title"
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "24242424-2424-4242-8242-242424242424",
+          "event_type": "recipe_update_published",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.training",
+          "tags": {
+            "source": "services.api.training",
+            "location_scope": "none"
+          },
+          "payload": {
+            "location_scope": "none",
+            "recipe_id": "rec_sirloin",
+            "version": 3,
+            "locale": "es",
+            "title": "Lomo a la Brasa"
+          }
+        }
+      ]
+    },
+    "recipeUpdateAcknowledged": {
+      "description": "One location confirms it has the recipe version. Coverage denominator is 14.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "recipe_update_acknowledged"
+            },
+            "source": {
+              "enum": [
+                "services.api.training"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "location"
+                },
+                "location_id": {
+                  "$ref": "#/$defs/locationId"
+                },
+                "country": {
+                  "enum": [
+                    "Colombia",
+                    "United States"
+                  ]
+                },
+                "currency": {
+                  "enum": [
+                    "COP",
+                    "USD"
+                  ]
+                },
+                "timezone": {
+                  "enum": [
+                    "America/Bogota",
+                    "America/New_York"
+                  ]
+                },
+                "recipe_id": {
+                  "type": "string",
+                  "pattern": "^rec_[a-z0-9_]{2,64}$"
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "location_scope",
+                "location_id",
+                "country",
+                "currency",
+                "timezone",
+                "recipe_id",
+                "version"
+              ],
+              "allOf": [
+                {
+                  "$ref": "#/$defs/locationFacts"
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "25252525-2525-4252-8252-252525252525",
+          "event_type": "recipe_update_acknowledged",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.training",
+          "tags": {
+            "source": "services.api.training",
+            "location_scope": "location",
+            "location_id": "us-mia-downtown",
+            "country": "United States",
+            "currency": "USD"
+          },
+          "payload": {
+            "location_scope": "location",
+            "location_id": "us-mia-downtown",
+            "country": "United States",
+            "currency": "USD",
+            "timezone": "America/New_York",
+            "recipe_id": "rec_sirloin",
+            "version": 3
+          }
+        }
+      ]
+    },
+    "weeklyReportDispatched": {
+      "description": "Monday executive report send. floor_metric_ids must list every Phase 1 floor id.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "weekly_report_dispatched"
+            },
+            "source": {
+              "enum": [
+                "services.telemetry.weekly_report"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "week_start": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "timezone": {
+                  "const": "America/Bogota"
+                },
+                "deadline_local": {
+                  "const": "07:00"
+                },
+                "dispatched_at": {
+                  "$ref": "#/$defs/timestamp"
+                },
+                "on_time": {
+                  "type": "boolean"
+                },
+                "channel": {
+                  "const": "email"
+                },
+                "audience": {
+                  "const": "executive"
+                },
+                "floor_metric_ids": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "ops.sales.gross_native",
+                      "ops.sales.covers",
+                      "ops.sales.slow_week",
+                      "ops.sales.average_ticket",
+                      "exec.ticket.top_location",
+                      "ops.sales.silence",
+                      "ops.stockout.count",
+                      "ops.ordering.on_hand",
+                      "ops.ordering.suggested_qty",
+                      "proc.price.history",
+                      "proc.price.alerts",
+                      "proc.purchase.consolidated",
+                      "mkt.customers.identified_rate",
+                      "mkt.customers.order_history",
+                      "mkt.customers.preference_coverage",
+                      "mkt.personalisation.accept_rate",
+                      "mkt.orders.digital_share",
+                      "mkt.loyalty.attach_rate",
+                      "mkt.loyalty.points_earned",
+                      "mkt.loyalty.redeem_value",
+                      "people.turnover",
+                      "people.absenteeism",
+                      "people.time_to_fill",
+                      "train.update.coverage",
+                      "tech.locations.live",
+                      "tech.dashboards.fed",
+                      "exec.chain.sales",
+                      "exec.florida.week_sales",
+                      "exec.report.on_time",
+                      "exec.assistant.named_questions",
+                      "finance.sales.native",
+                      "finance.purchases.native"
+                    ]
+                  },
+                  "uniqueItems": true,
+                  "allOf": [
+                    {
+                      "contains": {
+                        "const": "ops.sales.gross_native"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "ops.sales.covers"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "ops.sales.slow_week"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "ops.sales.average_ticket"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "exec.ticket.top_location"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "ops.sales.silence"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "ops.stockout.count"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "ops.ordering.on_hand"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "ops.ordering.suggested_qty"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "proc.price.history"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "proc.price.alerts"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "proc.purchase.consolidated"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "mkt.customers.identified_rate"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "mkt.customers.order_history"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "mkt.customers.preference_coverage"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "mkt.personalisation.accept_rate"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "mkt.orders.digital_share"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "mkt.loyalty.attach_rate"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "mkt.loyalty.points_earned"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "mkt.loyalty.redeem_value"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "people.turnover"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "people.absenteeism"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "people.time_to_fill"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "train.update.coverage"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "tech.locations.live"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "tech.dashboards.fed"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "exec.chain.sales"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "exec.florida.week_sales"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "exec.report.on_time"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "exec.assistant.named_questions"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "finance.sales.native"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "finance.purchases.native"
+                      }
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "location_scope",
+                "week_start",
+                "timezone",
+                "deadline_local",
+                "dispatched_at",
+                "on_time",
+                "channel",
+                "audience",
+                "floor_metric_ids"
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "26262626-2626-4262-8262-262626262626",
+          "event_type": "weekly_report_dispatched",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.telemetry.weekly_report",
+          "tags": {
+            "source": "services.telemetry.weekly_report",
+            "location_scope": "none"
+          },
+          "payload": {
+            "location_scope": "none",
+            "week_start": "2026-09-21",
+            "timezone": "America/Bogota",
+            "deadline_local": "07:00",
+            "dispatched_at": "2026-09-28T12:00:00Z",
+            "on_time": true,
+            "channel": "email",
+            "audience": "executive",
+            "floor_metric_ids": [
+              "ops.sales.gross_native",
+              "ops.sales.covers",
+              "ops.sales.slow_week",
+              "ops.sales.average_ticket",
+              "exec.ticket.top_location",
+              "ops.sales.silence",
+              "ops.stockout.count",
+              "ops.ordering.on_hand",
+              "ops.ordering.suggested_qty",
+              "proc.price.history",
+              "proc.price.alerts",
+              "proc.purchase.consolidated",
+              "mkt.customers.identified_rate",
+              "mkt.customers.order_history",
+              "mkt.customers.preference_coverage",
+              "mkt.personalisation.accept_rate",
+              "mkt.orders.digital_share",
+              "mkt.loyalty.attach_rate",
+              "mkt.loyalty.points_earned",
+              "mkt.loyalty.redeem_value",
+              "people.turnover",
+              "people.absenteeism",
+              "people.time_to_fill",
+              "train.update.coverage",
+              "tech.locations.live",
+              "tech.dashboards.fed",
+              "exec.chain.sales",
+              "exec.florida.week_sales",
+              "exec.report.on_time",
+              "exec.assistant.named_questions",
+              "finance.sales.native",
+              "finance.purchases.native"
+            ]
           }
         }
       ]
