@@ -308,6 +308,24 @@ backend printenv PYTHONPATH → /app (from .env)
 GET :3000/ :3001/login :8000/docs → 200
 ```
 
+## Latest compose platform eval (`cursor/compose-platform-eval-2c91`)
+
+Department served: **Technology** (Nicolás Park — run the central stack from the repo root) + **Marketing** (website :3000) + **Operations/Executive** (backoffice :3001).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+docker compose up from /workspace with .env moved aside (only .env.example) → both containers Up
+ui Cmd=["./start.sh"] ExtraHosts=[]
+two next-server processes: port 3000 and 3001 in brasaland-ui
+ui printenv API_PROXY → http://backend:8000
+ui getent hosts backend → 172.18.0.2 (Compose DNS / container IP, not host-gateway)
+ui wget http://backend:8000/docs → 200; /menus → 6 items
+backend GET http://ui:3000/ → 200
+host GET :3000/ :3001/login :8000/docs :3001/menus → 200
+bind-mount (no rebuild): layout title + menus.py description picked up by Next/WatchFiles
+verify-brasaland-api: locations/menus/sales/customers/suppliers/inventory=present path_count=34
+```
+
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).
