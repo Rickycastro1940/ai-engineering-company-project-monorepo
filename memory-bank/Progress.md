@@ -224,6 +224,21 @@ GET /suppliers/overview → 20 suppliers, 10 Colombia / 10 Florida, price alerts
 
 Skill **passed**. Seeded snapshots; POS is still not integrated (`CONTEXT.md`).
 
+## Latest uis start.sh Next.js pair (`cursor/uis-start-sh-2c91`)
+
+Department served: **Technology** (container runtime) + **Marketing** (website :3000) + **Operations/Executive** (backoffice :3001).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+docker inspect Cmd → ["./start.sh"] ExposedPorts 3000/tcp 3001/tcp
+npm ci --prefix /uis/website then npm ci --prefix /uis/backoffice (separate)
+next build website + backoffice green inside node:22-alpine
+container: next start --port 3000 and next start --port 3001 Ready
+GET http://127.0.0.1:3000/ → 200 Brasaland — Grilled food, Colombia & Florida
+GET http://127.0.0.1:3001/login → 200 Brasaland Backoffice
+uis/.dockerignore includes node_modules, .next, .env*, *.log
+```
+
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).
