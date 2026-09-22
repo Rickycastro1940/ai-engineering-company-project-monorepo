@@ -255,6 +255,15 @@ path_count=34
 uv --version in image → uv 0.12.17
 ```
 
+## Latest services/.dockerignore (`cursor/services-dockerignore-2c91`)
+
+Department served: **Technology** (backend image must not ship bytecode, secrets, tests, or logs).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+services/.dockerignore includes __pycache__, *.pyc, .env*, test/, *.log
+```
+
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).

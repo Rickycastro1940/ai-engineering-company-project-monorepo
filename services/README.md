@@ -13,6 +13,8 @@ Each subfolder inside `services/` must correspond to **one specific service** (f
 
 `uvicorn api.app:app --host 0.0.0.0 --port 8000 --reload`
 
+[`.dockerignore`](./.dockerignore) excludes `__pycache__`, `*.pyc`, `.env*`, `test/`, and `*.log`.
+
 Build from the **monorepo root** (so `api/` and `requirements.txt` are in the context):
 
 ```bash
