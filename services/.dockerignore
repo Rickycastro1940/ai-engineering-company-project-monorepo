@@ -1,0 +1,11 @@
+# Keep bytecode, secrets, tests, and logs out of the backend image context.
+__pycache__
+**/__pycache__
+*.pyc
+**/*.pyc
+.env*
+**/.env*
+test/
+**/test/
+*.log
+**/*.log
