@@ -22,11 +22,11 @@ docker run --rm -p 3000:3000 -p 3001:3001 brasaland-uis
 - Public site (Marketing): http://localhost:3000/
 - Staff backoffice (Operations / Executive): http://localhost:3001/login
 
-Root [`docker-compose.yml`](../docker-compose.yml) builds **ui** from this folder (bind-mount + `next dev` on 3000 and 3001) and **backend** from `services/Dockerfile`. They share the named network `brasaland-net`. The backoffice proxy is `API_PROXY=http://backend:8000` (Compose service name, not localhost).
+Root [`docker-compose.yml`](../docker-compose.yml) builds **ui** from this folder (bind-mount + `start.sh` / `next dev` on 3000 and 3001) and **backend** from `services/Dockerfile`. They share the named network `brasaland-net`. The backoffice proxy is `API_PROXY=http://backend:8000` (Compose service name, not localhost or a hard-coded IP). Defaults come from committed `.env.example`; no extra copy step is required.
 
 ```bash
 # from the monorepo root
-docker compose up --build
+docker compose up
 ```
 
 Organize `uis/` by **different concerns** — each subfolder covers a distinct area of the company (for example, public web vs internal operations) and includes its own technical and functional documentation.

@@ -1,11 +1,14 @@
 # Brasaland Digital — UI (Camila public site + staff backoffice) and backend API.
-# Two services on an explicit network. Inter-service URLs use the Compose
-# service name as host (http://backend:8000), never localhost.
+# From the repository root, with no extra copy/config step:
+#   docker compose up
 #
-# All container environment variables come from root .env (gitignored).
-# Do not hardcode secrets or service config in this YAML.
-#   cp .env.example .env
-#   docker compose up --build
+# Committed defaults are `.env.example` (no secrets). Optional gitignored `.env`
+# overrides those values (JWT_SECRET_KEY, GROQ_API_KEY). Do not hardcode secrets
+# or service URLs in this YAML.
+#
+# Inter-service URLs use the Compose service name as host (`http://backend:8000`),
+# never localhost and never a hard-coded IP. The named network uses ICC so Docker
+# DNS resolves `backend` / `ui` to container addresses.
 #
 #   Website:    http://localhost:3000/
 #   Backoffice: http://localhost:3001/login
@@ -15,6 +18,8 @@ networks:
   brasaland:
     name: brasaland-net
     driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "true"
 
 services:
   ui:
@@ -23,24 +28,17 @@ services:
       dockerfile: Dockerfile
     image: brasaland-uis
     container_name: brasaland-ui
+    working_dir: /uis
     networks:
       - brasaland
-    extra_hosts:
-      # Named host "backend" (not localhost). On this VM the Docker bridge
-      # does not pass container-to-container TCP, so resolve the service name
-      # to the host gateway and use the published backend port 8000.
-      - "backend:host-gateway"
     env_file:
-      - .env
+      - path: .env.example
+        required: true
+      - path: .env
+        required: false
     depends_on:
       - backend
-    command:
-      - /bin/sh
-      - -c
-      - |
-        cd /uis/website && npm run dev -- --hostname 0.0.0.0 --port 3000 &
-        cd /uis/backoffice && npm run dev -- --hostname 0.0.0.0 --port 3001 &
-        wait
+    command: ["./start.sh"]
     volumes:
       - ./uis/website:/uis/website
       - ./uis/backoffice:/uis/backoffice
@@ -60,7 +58,10 @@ services:
     networks:
       - brasaland
     env_file:
-      - .env
+      - path: .env.example
+        required: true
+      - path: .env
+        required: false
     volumes:
       - ./api:/app/api
       - ./services:/app/services

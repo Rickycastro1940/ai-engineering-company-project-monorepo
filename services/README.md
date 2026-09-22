@@ -22,7 +22,7 @@ docker build -f services/Dockerfile -t brasaland-api .
 docker run --rm -p 8000:8000 brasaland-api
 ```
 
-Root [`docker-compose.yml`](../docker-compose.yml) service **backend** builds this file, bind-mounts source, publishes **8000**, and joins named network `brasaland-net`. The UI reaches it at `http://backend:8000`.
+Root [`docker-compose.yml`](../docker-compose.yml) service **backend** builds this file, bind-mounts source, publishes **8000**, and joins named network `brasaland-net`. The UI reaches it at `http://backend:8000` (Compose service name). `docker compose up` from the repo root starts both services using `.env.example` defaults.
 
 ## Celery (Message Queues and Async Tasks)
 
