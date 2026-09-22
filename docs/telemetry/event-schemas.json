@@ -17,6 +17,12 @@
       "$ref": "#/$defs/stockThresholdCleared"
     },
     {
+      "$ref": "#/$defs/inventoryValidationFailed"
+    },
+    {
+      "$ref": "#/$defs/stockModificationRejected"
+    },
+    {
       "$ref": "#/$defs/inboundOrderCreated"
     },
     {
@@ -790,6 +796,285 @@
             "quantity_after": 14,
             "threshold": 10
           }
+        }
+      ]
+    },
+    "inventoryValidationFailed": {
+      "description": "422 on an inventory or order body. loc and pydantic type only. IP-3.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "inventory_validation_failed"
+            },
+            "source": {
+              "enum": [
+                "services.api.errors"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "method": {
+                  "enum": [
+                    "GET",
+                    "POST",
+                    "PATCH"
+                  ]
+                },
+                "route_template": {
+                  "enum": [
+                    "/inventory",
+                    "/inventory/{product_id}",
+                    "/inventory/alerts",
+                    "/orders"
+                  ]
+                },
+                "http_status": {
+                  "const": 422
+                },
+                "fields": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 20,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "loc": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9_.]+$"
+                      },
+                      "error_type": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "loc",
+                      "error_type"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "location_scope",
+                "method",
+                "route_template",
+                "http_status",
+                "fields"
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "27272727-2727-4272-8272-272727272727",
+          "event_type": "inventory_validation_failed",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.errors",
+          "tags": {
+            "source": "services.api.errors",
+            "location_scope": "none"
+          },
+          "payload": {
+            "location_scope": "none",
+            "method": "POST",
+            "route_template": "/inventory",
+            "http_status": 422,
+            "fields": [
+              {
+                "loc": "body.quantity",
+                "error_type": "greater_than_equal"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "stockModificationRejected": {
+      "description": "Direct stock change or alert threshold the API refuses. CSV is unchanged. IP-4.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "stock_modification_rejected"
+            },
+            "source": {
+              "enum": [
+                "services.api.inventory"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "chain"
+                },
+                "reason": {
+                  "enum": [
+                    "below_zero",
+                    "product_not_found",
+                    "negative_alert_threshold"
+                  ]
+                },
+                "http_status": {
+                  "enum": [
+                    400,
+                    404
+                  ]
+                },
+                "product_id": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "product_name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "delta": {
+                  "type": "integer"
+                },
+                "quantity_before": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "attempted_threshold": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "location_scope",
+                "reason",
+                "http_status"
+              ],
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "reason": {
+                        "const": "below_zero"
+                      }
+                    },
+                    "required": [
+                      "reason"
+                    ]
+                  },
+                  "then": {
+                    "required": [
+                      "product_id",
+                      "product_name",
+                      "delta",
+                      "quantity_before"
+                    ],
+                    "properties": {
+                      "http_status": {
+                        "const": 400
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "reason": {
+                        "const": "product_not_found"
+                      }
+                    },
+                    "required": [
+                      "reason"
+                    ]
+                  },
+                  "then": {
+                    "required": [
+                      "product_id",
+                      "delta"
+                    ],
+                    "properties": {
+                      "http_status": {
+                        "const": 404
+                      },
+                      "product_name": false,
+                      "quantity_before": false
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "reason": {
+                        "const": "negative_alert_threshold"
+                      }
+                    },
+                    "required": [
+                      "reason"
+                    ]
+                  },
+                  "then": {
+                    "required": [
+                      "attempted_threshold"
+                    ],
+                    "properties": {
+                      "http_status": {
+                        "const": 400
+                      },
+                      "product_id": false,
+                      "product_name": false,
+                      "delta": false,
+                      "quantity_before": false
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "28282828-2828-4282-8282-282828282828",
+          "event_type": "stock_modification_rejected",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.inventory",
+          "tags": {
+            "source": "services.api.inventory",
+            "location_scope": "chain"
+          },
+          "payload": {
+            "location_scope": "chain",
+            "reason": "below_zero",
+            "http_status": 400,
+            "product_id": 2,
+            "product_name": "Mozzarella",
+            "delta": -20,
+            "quantity_before": 8
+          },
+          "actor_id": "7"
         }
       ]
     },

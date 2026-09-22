@@ -75,7 +75,7 @@ Eight Colombia ids, six Florida ids. `country` is `Colombia` or `United States` 
 | --- | --- | --- |
 | `product_id` | `product_id` | Integer ≥ 1, assigned by `create_product` |
 | `name` | `product_name` | Strip whitespace, same value written to the CSV |
-| `quantity` | `quantity`, `quantity_before`, `quantity_after` | Integers ≥ 0. `apply_delta` rejects a result below 0 with HTTP 400 and emits nothing |
+| `quantity` | `quantity`, `quantity_before`, `quantity_after` | Integers ≥ 0. `apply_delta` rejects a result below 0 with HTTP 400, leaves `products.csv` unchanged, and emits `stock_modification_rejected` |
 | `unit` | `unit` | Free string, length ≥ 1 (`kg`, `liters`, `boxes` are current samples) |
 
 `services/api/schemas.py` also declares `sku`, `price`, and string `product_id` on a future product model. The live writer does not have those columns. Emit the CSV shape. When a router starts writing `services/api/models.py` `Product`, keep `product_id` as that row’s integer primary key (do not switch the telemetry id to a SKU).
@@ -279,6 +279,8 @@ Price alert: after an inbound line is priced, load the previous `unit_price` for
 | `user_login_failed` | `none` | Those handlers’ 401 branches | No |
 | `api_error` | `none` | `services/api/errors.py` 500 and 503 handlers | No |
 | `page_view` | `none` | `uis/website` and `uis/backoffice` | No |
+| `inventory_validation_failed` | `none` | `handle_validation_error` for an inventory or order route | No |
+| `stock_modification_rejected` | `chain` | `apply_delta` or `get_alerts` when the write is refused | No |
 
 `data/pipelines/pipeline.py` `extract_telemetry_events` filters exactly these four types: `inbound_order_created`, `stock_waste_registered`, `stock_threshold_triggered`, `ingredient_price_variance_detected`. `scripts/nightly_export.py` copies only the first three. When that export is next edited, add `ingredient_price_variance_detected` so the CSV matches the extractor. The extractor reads Supabase itself; the CSV is not the aggregation input.
 
@@ -322,6 +324,27 @@ Retries reuse the same `id`. Consumers dedupe on `id`. A silence episode reuses 
 
 The outbox directory is `data/uploads/` because that path is already gitignored. A dedicated telemetry path needs a `.gitignore` edit, which this repo treats as a confirmed change.
 
+## Inventory flow and instrumentation points
+
+This is the path from a signed-in staff session to a completed inbound or outbound order. The backoffice at `uis/backoffice` currently ends at a read of `GET /inventory`. Stock writes go through `services/api/inventory.py`. Inbound and outbound completion is the order contract in `services/api/models.py` and `services/api/schemas.py` (`OrderType` `INBOUND` or `OUTBOUND`). The same `PATCH` handler serves `agent.py` `update_stock`.
+
+`actor_id` is `str(users.id)` when the request carries a staff JWT. The inventory router does not require that JWT today, so a call with no user omits `actor_id`.
+
+| Step | What the code does | Instrumentation |
+| --- | --- | --- |
+| 1. Open the console | `LoginPage` submits `POST /auth/login`. `login` calls `authenticate_user`. | **IP-1.** Active user → `user_login_succeeded` (`method` `json`), then the JWT is stored. Unknown or inactive user → `user_login_failed`, then HTTP 401. The staff member stops here. |
+| 2. Enter the protected view | `ProtectedRoute` calls `GET /auth/me`. A 401 returns the browser to `/login`. A 200 renders `AccessiblePage`, which loads `GET /locations/overview` and `GET /inventory`. | **IP-2.** `page_view` with `app` `backoffice` and `path` `/accessible` when `AccessiblePage` mounts. The two GETs emit no inventory event. A successful list is not a stock change. |
+| 3. Submit a stock or product body | `POST /inventory` must match `ProductCreate` (`name` length ≥ 1, `quantity` ≥ 0, `unit` length ≥ 1). `PATCH /inventory/{product_id}` must match `StockDelta` (`delta` integer) and an integer path id. | **IP-3. Failed validation.** `handle_validation_error` emits `inventory_validation_failed` and returns 422. `create_product` and `apply_delta` are not called. `products.csv` stays as it was. Field entries are `loc` plus pydantic `type` (`body.quantity` / `greater_than_equal`, `body.delta` / `missing`, `path.product_id` / `int_parsing`). The rejected input value stays out of the payload. |
+| 4. Apply a direct stock change | `update_stock` calls `apply_delta`. This is the only live quantity write. | **IP-4. Rejected direct modification.** Unknown `product_id` → HTTP 404, reason `product_not_found`. `quantity + delta < 0` → HTTP 400, reason `below_zero`. `GET /inventory/alerts` with `threshold < 0` → HTTP 400, reason `negative_alert_threshold`. Each refusal emits `stock_modification_rejected` and does not write the file. |
+| 5. Commit the direct change | `apply_delta` saves the new quantity. | **IP-5.** `stock_count_adjusted` with `reason` `count_correction`. A `delta` of 0 is accepted by the API and changes nothing, so it emits no event. |
+| 6. Minimum stock line | After the save, compare `quantity_before` and `quantity_after` with **10**, the default of `get_alerts`. | **IP-6. Minimum threshold activation.** Crossing from ≥ 10 to < 10 emits `stock_threshold_crossed` (`threshold` 10) in addition to IP-5. Crossing back to ≥ 10 emits `stock_threshold_cleared`. A quantity that stays under 10 does not emit another activation. `GET /inventory/alerts` only lists rows already under the threshold. The list itself is not an activation. |
+| 7. Complete an inbound order | `POST /orders` with `type` `INBOUND` (`InboundOrderCreate`). One row per line, shaped like `InboundOrder` in `models.py`. A 422 on this body is IP-3 with `route_template` `/orders`. | **IP-7.** After each line commits, `inbound_order_created`. Then `ingredient_price_variance_detected` when the 1% price rule matches. This commit does not call `apply_delta`. |
+| 8. Complete an outbound order | `POST /orders` with `type` `OUTBOUND`. | **IP-8.** After each line commits, `outbound_order_created`. A guest check remains `sale_completed`. |
+
+IP-3, IP-4, and IP-6 are required in this flow: failed validation, a direct stock modification the system refuses, and a minimum-threshold activation. IP-1 and IP-7 are the session start and the inbound completion. IP-5, IP-2, and IP-8 complete the path through the outbound order.
+
+`api_error` stays limited to HTTP 500 and 503. These inventory refusals use their own event types so a bad `delta` is not counted as platform instability, and a rejected cut is not counted as a stockout.
+
 ## Instrumentation map
 
 Wire these call sites. Validate after the business write has succeeded.
@@ -339,11 +362,11 @@ On `apply_delta` only, using threshold 10:
 - `quantity_before < 10` and `quantity_after >= 10` → also `stock_threshold_cleared`
 - A change that stays under 10 or stays at/above 10 emits only `stock_count_adjusted`
 
-`GET /inventory` and `GET /inventory/alerts` emit nothing (a poll would inflate stockout counts).
+`GET /inventory` and a successful `GET /inventory/alerts` emit nothing. A poll of the alert list would inflate stockout counts. The activation is IP-6, on the write that crosses 10.
 
-HTTP 400 from `apply_delta` (insufficient stock, or a negative threshold on `get_alerts`) emits nothing.
+HTTP 400 and 404 from `apply_delta`, and HTTP 400 from `get_alerts` when `threshold < 0`, emit `stock_modification_rejected` and leave the CSV unchanged. See IP-4.
 
-`PATCH` is a count correction. A supplier receipt is an inbound order event with a real `cost`, `supplier_id`, and `location_id`. A positive `delta` on `PATCH` does not become `inbound_order_created` (that would add a purchase with no supplier price and distort `waste_ratio`).
+`PATCH` is a count correction. A supplier receipt is an inbound order event with a real `cost`, `supplier_id`, and `location_id`. A positive `delta` on `PATCH` stays `stock_count_adjusted`. It is not an `inbound_order_created` event.
 
 `actor_id` is present when the inventory route is called with the staff JWT (`users.id`). The inventory router does not require auth today; omit `actor_id` when there is no user.
 
@@ -363,7 +386,7 @@ Emit the failure event, then raise the existing `HTTPException`. The payload has
 | `handle_unhandled_error` when it returns 500 | `api_error` with `http_status` 500 and `code` `internal_error` |
 | `handle_external_service_error` | `api_error` with `http_status` 503 and `code` `service_unavailable` |
 
-`handle_validation_error` and 4xx responses in `handle_http_exception` do not emit `api_error` (the auth failure rate already counts 401s on the login routes). `route_template` is `request.scope["route"].path` when a route matched (`/inventory/{product_id}`), otherwise the literal `unmatched`. Copy `request.method`. Do not copy the query string, the body, or `logger.exception` text into the payload.
+`handle_validation_error` emits `inventory_validation_failed` when the matched route is `/inventory`, `/inventory/{product_id}`, `/inventory/alerts`, or `/orders` (IP-3). It does not emit `api_error`. Other 4xx responses in `handle_http_exception`, including login 401s, do not emit `api_error`. `route_template` is `request.scope["route"].path` when a route matched, otherwise the literal `unmatched`. Copy `request.method`. Copy each validation item’s `loc` joined by `.` and its `type`. Leave the submitted value, the query string, and the body out of the payload.
 
 ### `uis/website/src/pages/HomePage.tsx`
 
@@ -442,8 +465,8 @@ Brasa Points on a ticket: 45,000 COP → `points_earned` 4. 27 USD → `points_e
 2. Write both `timestamp` and `created_at` from `occurred_at`.
 3. Put business fields in `event_payload` and the small copy in `tags`.
 4. Use a roster `location_id` whenever `location_scope` is `location`, and the matching currency (`COP` or `USD`).
-5. From `POST /inventory` and `PATCH /inventory/{product_id}`, emit only the chain events listed for `inventory.py`.
-6. Leave `GET` handlers, HTTP 400 stock rejections, and 4xx error handlers silent.
+5. From `POST /inventory` and `PATCH /inventory/{product_id}`, emit the chain events listed for `inventory.py`, plus `stock_modification_rejected` when `apply_delta` refuses the write.
+6. Leave successful `GET /inventory` and successful `GET /inventory/alerts` silent. Emit `inventory_validation_failed` on inventory 422s and `stock_modification_rejected` on the refused stock write. Keep other 4xx responses off `api_error`.
 7. Keep `cost` in the location currency on inbound and waste events so `waste_ratio` stays dimensionally consistent.
 8. Deduplicate on `id`.
 9. Run `aggregate_location_kpis` on a four-event fixture that uses `us-mia-downtown` and expect `waste_ratio` 0.15 with `currency` USD.

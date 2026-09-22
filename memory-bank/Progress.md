@@ -183,6 +183,18 @@ uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py te
 cd uis/backoffice && npm run build → green
 ```
 
+## Latest inventory-flow instrumentation (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology** and **Operations**. The authenticated inventory path is mapped through inbound and outbound completion, including refused stock writes, 422 validation, and the minimum-stock crossing.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+Draft202012Validator.check_schema → pass
+31 event examples validate
+stock_modification_rejected below_zero, product_not_found, and negative_alert_threshold validate
+below_zero without quantity_before → schema reject
+```
+
 ## Latest telemetry floor catalog (`cursor/telemetry-plan-ff8d`)
 
 Department served: **Technology**, so every `CONTEXT.md` day-one metric for Operations, Procurement, Marketing, People, Training, and Executive stays in the telemetry plan.
