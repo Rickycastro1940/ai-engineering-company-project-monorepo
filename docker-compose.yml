@@ -32,6 +32,18 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  api:
+    build:
+      context: .
+      dockerfile: services/Dockerfile
+    container_name: brasaland-api
+    environment:
+      REDIS_URL: *redis_url
+      PYTHONPATH: /app
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
   worker:
     build:
       context: .

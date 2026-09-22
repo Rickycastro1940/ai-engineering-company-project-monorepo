@@ -1,0 +1,16 @@
+# Used when the compose/build context is the monorepo root (dockerfile: services/Dockerfile).
+.git
+.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/node_modules
+**/.next
+**/.env
+**/.env.*
+**/*.log
+uis
+docs
+memory-bank
+data/uploads
+data/celery_dead_letters.sqlite3
