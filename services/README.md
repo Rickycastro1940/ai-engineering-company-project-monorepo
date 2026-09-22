@@ -7,6 +7,19 @@ Each subfolder inside `services/` must correspond to **one specific service** (f
 - **Main purpose**: to centralize all the backend logic, APIs, and queue consumers that support the company's use cases.
 - **Recommendation**: document in this file (or in sub-READMEs) the services you add, their objective, the technology used, and how to run them.
 
+## Docker
+
+[`Dockerfile`](./Dockerfile) uses the official **Python** image (`python:3.11-slim`), installs **uv**, then `uv pip install -r requirements.txt`. The default command starts Brasaland's central API with reload:
+
+`uvicorn api.app:app --host 0.0.0.0 --port 8000 --reload`
+
+Build from the **monorepo root** (so `api/` and `requirements.txt` are in the context):
+
+```bash
+docker build -f services/Dockerfile -t brasaland-api .
+docker run --rm -p 8000:8000 brasaland-api
+```
+
 ## Celery (Message Queues and Async Tasks)
 
 - Config: `services/celery_app.py` — Redis via **`REDIS_URL`** as broker **and** result backend.
