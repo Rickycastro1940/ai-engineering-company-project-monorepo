@@ -294,6 +294,20 @@ docker-compose.yml / Dockerfile / uis/Dockerfile / services/Dockerfile → no AP
 compose env_file → .env (required: false); secrets not inlined
 ```
 
+## Latest Compose env from root .env (`cursor/compose-env-from-dotenv-2c91`)
+
+Department served: **Technology** (all service env vars from gitignored `.env`, none hardcoded in YAML).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+.gitignore:3:.env → .env
+git status --ignored lists .env as Ignored
+docker-compose.yml has env_file: .env and no environment: block
+ui printenv API_PROXY → http://backend:8000 (from .env)
+backend printenv PYTHONPATH → /app (from .env)
+GET :3000/ :3001/login :8000/docs → 200
+```
+
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).
