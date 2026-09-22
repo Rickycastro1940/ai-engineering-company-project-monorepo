@@ -13,6 +13,22 @@ export default defineConfig({
         target: apiTarget,
         changeOrigin: true,
       },
+      "/menus": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+      "/sales": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+      "/customers": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+      "/suppliers": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
       "/inventory": {
         target: apiTarget,
         changeOrigin: true,
