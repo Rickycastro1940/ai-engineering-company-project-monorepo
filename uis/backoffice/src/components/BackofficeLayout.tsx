@@ -1,7 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
 import "./BackofficeLayout.css";
-import "../pages/AuthPages.css";
+import "../views/AuthPages.css";
 
 const nav = [
   { to: "/accessible", label: "Accessible entry", end: true },
