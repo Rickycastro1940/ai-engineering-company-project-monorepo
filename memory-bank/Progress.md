@@ -13,14 +13,14 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
-| Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
+| Technology: central API (locations, menus, sales, customers, suppliers) | **Present** — `locations`/`menus`/`sales`/`customers`/`suppliers`/`inventory` on `:8000` (sales/customers/suppliers JWT; menus public; POS still not live) |
 | Technology: telemetry + pipeline to dashboards | **Partial** — Part 2 weekly location cost/waste ETL + Phase one Prefect stage subflows + Phase two isolated KPI transform unit tests + Phase three CLI (`python data/pipelines/pipeline.py --offline`) + Phase four backoffice Monday weekly report (`/reporting/weekly-performance`, stakeholder copy); engineering `GET /telemetry/report` untouched |
-| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — no sales UI yet; weekly Purchase cost / Waste cost / Waste ratio / Stockout frequency / Price alert frequency per location (COP/USD) on Monday weekly report |
-| Procurement: supplier price history, consolidated spend | **Partial** — Price alert frequency + Purchase cost per location-week on Monday weekly report |
-| Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
+| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — `GET /sales/overview` and `/sales/alerts` (JWT, 14 sites, COP+USD snapshot); weekly Purchase cost / Waste cost / Waste ratio / Stockout frequency / Price alert frequency on Monday report; no smart ordering UI |
+| Procurement: supplier price history, consolidated spend | **Partial** — `GET /suppliers` 20 vendors Colombia+Florida with `price_history` and `price_alert`; Monday report purchase/price-alert KPIs; no negotiation UI |
+| Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `GET /customers` CRM + order history; Brasa Points still physical stamp cards; public site `/` live |
 | People: HR portal / KPIs by country | **Not done** |
-| Training: recipe catalogue, push to 14 locations | **Not done** — knowledge docs under `docs/company-knowledge-base/` are source material only |
-| Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial** — Monday weekly ops & finance report live for Mariana / Felipe / Lucía (stakeholder labels); chain sales USD+COP still a separate gap |
+| Training: recipe catalogue, push to 14 locations | **Partial** — `GET /menus/catalogue` same recipes + COP/USD prices for 14 kitchens; knowledge docs under `docs/company-knowledge-base/` are source material only; no push/onboarding platform |
+| Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial** — `GET /sales/overview` chain COP+USD; Monday weekly ops & finance report for Mariana / Felipe / Lucía; inventory Groq agent; no Monday email export yet |
 
 ## What already runs (engineering)
 
@@ -259,10 +259,33 @@ head -n 5 CONTEXT.md → # Welcome to Brasaland
 .venv/bin/python -m pytest tests/pipelines/ -q → 36 passed
 ```
 
+## Latest central API nouns (`cursor/central-api-nouns-2c91`)
+
+Department served: **Technology** (Nicolás Park — locations, menus, sales, customers, suppliers) + **Operations/Executive** (sales COP/USD) + **Marketing** (CRM, physical Brasa Points) + **Procurement** (~20 suppliers, price alerts) + **Training** (same chain menu).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+GET http://127.0.0.1:8000/docs → 200
+locations=present
+menus=present
+sales=present
+customers=present
+suppliers=present
+inventory=present
+path_count=34
+PYTHONPATH=/workspace python3 -m pytest tests/test_central_api_domains.py tests/test_users_api.py -q → 22 passed
+GET /menus/catalogue → 6 items, COP+USD, 14 kitchens
+GET /sales/overview without token → 401; with JWT → 14 locations, chain COP+USD
+GET /customers/overview → digital_loyalty=false, Brasa Points physical
+GET /suppliers/overview → 20 suppliers, 10 Colombia / 10 Florida, price alerts
+```
+
+Skill **passed**. Seeded snapshots; POS is still not integrated (`CONTEXT.md`).
+
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).
-2. Extend the central API toward missing Technology nouns: **locations → menus → sales → customers → suppliers**, reusing `services/api` routers.
+2. Wire menus/sales/customers/suppliers into the staff console and keep telemetry/Monday report work on the existing pipeline.
 3. Executive path: surface chain sales in **USD and COP**, wire Monday-style weekly report to the existing async pipeline, keep Mariana’s NL assistant on the documented agent loop.
 4. Later phases: keep staff dashboard consumers for `reporting.weekly_location_performance` current; extend sales USD+COP for Mariana.
 5. Do not rewrite the monorepo or invent another company.
