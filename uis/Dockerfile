@@ -17,7 +17,9 @@ ENV NEXT_TELEMETRY_DISABLED=1 \
 COPY website/package.json website/package-lock.json ./website/
 RUN npm ci --prefix /uis/website
 
-# uis/backoffice — Operations/Executive staff console (Next.js, JWT, COP/USD locations)
+# uis/backoffice — Operations/Executive staff console (Next.js, JWT, COP/USD locations).
+# Build context is this folder (uis/), so these paths are uis/backoffice/*.
+# Do not copy services/api/uis — that tree is leftover pages, not this app.
 COPY backoffice/package.json backoffice/package-lock.json ./backoffice/
 RUN npm ci --prefix /uis/backoffice
 

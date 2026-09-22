@@ -341,6 +341,20 @@ uis/.dockerignore exists (node_modules, .next, .env*, *.log)
 services/.dockerignore exists (__pycache__, *.pyc, .env*, test/, *.log)
 ```
 
+## Latest UI image clean-clone build (`cursor/uis-clean-clone-build-2c91`)
+
+Department served: **Technology** (container build) + **Marketing/Operations** (website + staff backoffice images).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+git clone current branch → uis/backoffice/package.json exists
+services/api/uis is 3 leftover files (knowledge.js, rag docs/test), not a Node app
+docker build -t brasaland-uis-clean-clone from clone/uis
+COPY backoffice/package.json → ok (cached layer)
+next build website + backoffice → Compiled successfully
+Successfully tagged brasaland-uis-clean-clone:latest
+```
+
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).
