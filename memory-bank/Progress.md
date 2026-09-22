@@ -14,7 +14,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
-| Technology: telemetry + pipeline to dashboards | **Partial** — 34 mandatory metrics from `CONTEXT.md` with `$defs.mandatoryMetricSet`, 18 mandatory + 23 opportunity events on the `entity_action` taxonomy, a standard event envelope, and per-event property allowlists (`additionalProperties: false`). Weekly cost/waste pipeline and Celery path exist. Live emitters are not wired |
+| Technology: telemetry + pipeline to dashboards | **Partial** — 34 mandatory metrics from `CONTEXT.md` with `definitions.mandatoryMetricSet`, 18 mandatory + 23 opportunity events on the `entity_action` taxonomy, a standard event envelope, and per-event property allowlists (`additionalProperties: false`). Weekly cost/waste pipeline and Celery path exist. Live emitters are not wired |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Not done** as product UI; pipeline design targets cost/waste for Mariana + Felipe |
 | Procurement: supplier price history, consolidated spend | **Not done** (supplier docs may exist on other branches; not claimed here) |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
@@ -183,6 +183,23 @@ uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py te
 cd uis/backoffice && npm run build → green
 ```
 
+## Latest draft-07 schema export (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology**. `docs/telemetry/event-schemas.json` is exported as JSON Schema draft-07 (`$schema` `http://json-schema.org/draft-07/schema#`) with a root `oneOf` and `definitions` (not `$defs`), validatable with `Draft7Validator`.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+$schema = http://json-schema.org/draft-07/schema#
+Draft7Validator.check_schema → pass
+41 event examples validate
+mandatoryMetricSet example validates
+definitions present; $defs absent
+sale_completed + email → reject
+missing requestID → reject
+```
+
+Emitters are still not wired. Menus, sales, customers, and suppliers remain missing on the central API.
+
 ## Latest property allowlists (`cursor/telemetry-plan-ff8d`)
 
 Department served: **Technology**. Every catalog event has an explicit `properties` allowlist (name, type, required/optional, description, Sensitive/PII handling). Schemas keep `additionalProperties: false` so keys outside the list are rejected before storage.
@@ -201,7 +218,7 @@ Emitters are still not wired. Menus, sales, customers, and suppliers remain miss
 
 ## Latest event taxonomy and complete schemas (`cursor/telemetry-plan-ff8d`)
 
-Department served: **Technology**. Every `Event_type` follows `entity_action` with a closed verb list. `$defs.mandatoryMetricSet` is the complete observation schema for all 34 `CONTEXT.md` mandatory metrics. Opportunity schemas cover business/inventory, authentication, performance, errors, and navigation (examples: `direct_stock_edit_rejected`, `session_expired`, `api_latency_recorded`).
+Department served: **Technology**. Every `Event_type` follows `entity_action` with a closed verb list. `definitions.mandatoryMetricSet` is the complete observation schema for all 34 `CONTEXT.md` mandatory metrics. Opportunity schemas cover business/inventory, authentication, performance, errors, and navigation (examples: `direct_stock_edit_rejected`, `session_expired`, `api_latency_recorded`).
 
 ```text
 head -n 5 CONTEXT.md → # Welcome to Brasaland

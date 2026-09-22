@@ -1,6 +1,6 @@
 # Brasaland telemetry plan
 
-Normative field names and types live in [`event-schemas.json`](./event-schemas.json) (JSON Schema draft 2020-12). This document is normative for **when** to emit, **how** to compute metrics, and **how** a row is stored. If a field name here and in the schema ever diverge, follow the schema and update this file in the same change.
+Normative field names and types live in [`event-schemas.json`](./event-schemas.json) (JSON Schema draft-07). This document is normative for **when** to emit, **how** to compute metrics, and **how** a row is stored. If a field name here and in the schema ever diverge, follow the schema and update this file in the same change.
 
 Department served: **Technology** (Nicolás Park) — real-time telemetry from each location into the operations, marketing, and finance path. Mandatory metrics below are the needs `CONTEXT.md` states for Restaurant Operations (Felipe Guerrero), Procurement (Lucía Fernández), Marketing (Camila Ospina), People (Ashley Turner), Training (Jake Morrison), and Executive Direction (Mariana Restrepo). Identified opportunities are the rest of the catalog.
 
@@ -278,9 +278,23 @@ Examples that match this contract: `inbound_order_created`, `stock_threshold_tri
 
 ## Complete schemas in `event-schemas.json`
 
-`$defs` holds one JSON Schema (draft 2020-12) per catalog event, plus:
+`docs/telemetry/event-schemas.json` is a **JSON Schema draft-07** document (`"$schema": "http://json-schema.org/draft-07/schema#"`). Validate producer documents with a draft-07 implementation (for example `jsonschema.Draft7Validator`) with format checking on.
 
-| `$defs` key | What it validates |
+Document structure:
+
+| Key | Role |
+| --- | --- |
+| `$schema` | `http://json-schema.org/draft-07/schema#` |
+| `$id` | `https://brasaland.digital/telemetry/event-schemas.json` |
+| `oneOf` | Exactly one branch per catalog event; each entry is `{"$ref": "#/definitions/<EventKey>"}` |
+| `definitions` | Shared and per-event schemas (`envelope`, camelCase event keys, `mandatoryMetricObservation`, `mandatoryMetricSet`, …) |
+| `definitions.<Event>.examples` | Valid instances of that event (and of `mandatoryMetricSet`) |
+
+`$ref` values use the draft-07 form `#/definitions/...` (not `#/$defs/...`). Each event’s `properties` object sets `additionalProperties: false` so the property allowlist is machine-enforced.
+
+`definitions` holds one JSON Schema (draft-07) per catalog event, plus:
+
+| `definitions` key | What it validates |
 | --- | --- |
 | `envelope` | The eight mandatory envelope fields plus `source` and `tags` |
 | every event camelCase key | That event’s `Event_type`, allowed `source` values, and `properties` |
@@ -534,7 +548,7 @@ def build_tags(source: str, properties: dict) -> dict:
 
 ```text
 emit(event):
-  1. Validate the producer document against event-schemas.json (draft 2020-12, format checks on). The document must carry eventID, timestamp, sessionID, UserID, Event_type, SchemaVersion, requestID, and properties.
+  1. Validate the producer document against event-schemas.json (draft-07, format checks on). The document must carry eventID, timestamp, sessionID, UserID, Event_type, SchemaVersion, requestID, and properties.
   2. If validation fails: log a warning on logger "brasaland.telemetry" with Event_type and a one-line reason. Do not insert. Do not raise into the HTTP handler.
   3. Insert the storage row.
   4. If the insert fails: append the producer document as one JSON line to data/uploads/telemetry_outbox.jsonl (data/uploads/ is gitignored). Do not raise.

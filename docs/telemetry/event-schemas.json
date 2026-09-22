@@ -1,134 +1,134 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://brasaland.digital/telemetry/event-schemas.json",
   "title": "Brasaland telemetry event and mandatory metric schemas",
-  "description": "Brasaland telemetry schemas. Event_type values follow the entity_action taxonomy (consistent verbs: created, adjusted, crossed, cleared, triggered, registered, detected, completed, recorded, shown, accepted, hired, separated, scheduled, opened, filled, published, acknowledged, dispatched, redeemed, transferred, succeeded, failed, rejected, ended, viewed, expired, raised, caught, updated). The envelope requires eventID, timestamp (ISO 8601 UTC), sessionID, UserID, Event_type, SchemaVersion, requestID, and properties. $defs.mandatoryMetricSet is the complete observation schema for every CONTEXT.md mandatory metric. Storage mapping is in docs/telemetry/telemetry-plan.md.",
+  "description": "Validatable JSON Schema draft-07 export of Brasaland telemetry. Root is a oneOf over every catalog event under definitions. Event_type values follow the entity_action taxonomy (consistent verbs: created, adjusted, crossed, cleared, triggered, registered, detected, completed, recorded, shown, accepted, hired, separated, scheduled, opened, filled, published, acknowledged, dispatched, redeemed, transferred, succeeded, failed, rejected, ended, viewed, expired, raised, caught, updated). The envelope requires eventID, timestamp (ISO 8601 UTC), sessionID, UserID, Event_type, SchemaVersion, requestID, and properties. definitions.mandatoryMetricSet is the complete observation schema for every CONTEXT.md mandatory metric. Property allowlists live in docs/telemetry/property-allowlists.md. Storage mapping is in docs/telemetry/telemetry-plan.md. Validate with a draft-07 implementation (e.g. jsonschema.Draft7Validator) with format checking enabled.",
   "oneOf": [
     {
-      "$ref": "#/$defs/productCreated"
+      "$ref": "#/definitions/productCreated"
     },
     {
-      "$ref": "#/$defs/stockCountAdjusted"
+      "$ref": "#/definitions/stockCountAdjusted"
     },
     {
-      "$ref": "#/$defs/stockThresholdCrossed"
+      "$ref": "#/definitions/stockThresholdCrossed"
     },
     {
-      "$ref": "#/$defs/stockThresholdCleared"
+      "$ref": "#/definitions/stockThresholdCleared"
     },
     {
-      "$ref": "#/$defs/inventoryValidationFailed"
+      "$ref": "#/definitions/inventoryValidationFailed"
     },
     {
-      "$ref": "#/$defs/directStockEditRejected"
+      "$ref": "#/definitions/directStockEditRejected"
     },
     {
-      "$ref": "#/$defs/inboundOrderCreated"
+      "$ref": "#/definitions/inboundOrderCreated"
     },
     {
-      "$ref": "#/$defs/outboundOrderCreated"
+      "$ref": "#/definitions/outboundOrderCreated"
     },
     {
-      "$ref": "#/$defs/stockWasteRegistered"
+      "$ref": "#/definitions/stockWasteRegistered"
     },
     {
-      "$ref": "#/$defs/stockThresholdTriggered"
+      "$ref": "#/definitions/stockThresholdTriggered"
     },
     {
-      "$ref": "#/$defs/ingredientPriceVarianceDetected"
+      "$ref": "#/definitions/ingredientPriceVarianceDetected"
     },
     {
-      "$ref": "#/$defs/saleCompleted"
+      "$ref": "#/definitions/saleCompleted"
     },
     {
-      "$ref": "#/$defs/locationSalesSilenceDetected"
+      "$ref": "#/definitions/locationSalesSilenceDetected"
     },
     {
-      "$ref": "#/$defs/loyaltyPointsRedeemed"
+      "$ref": "#/definitions/loyaltyPointsRedeemed"
     },
     {
-      "$ref": "#/$defs/loyaltyCardTransferred"
+      "$ref": "#/definitions/loyaltyCardTransferred"
     },
     {
-      "$ref": "#/$defs/userLoginSucceeded"
+      "$ref": "#/definitions/userLoginSucceeded"
     },
     {
-      "$ref": "#/$defs/userLoginFailed"
+      "$ref": "#/definitions/userLoginFailed"
     },
     {
-      "$ref": "#/$defs/apiErrorRaised"
+      "$ref": "#/definitions/apiErrorRaised"
     },
     {
-      "$ref": "#/$defs/pageViewed"
+      "$ref": "#/definitions/pageViewed"
     },
     {
-      "$ref": "#/$defs/authFormRejected"
+      "$ref": "#/definitions/authFormRejected"
     },
     {
-      "$ref": "#/$defs/sessionExpired"
+      "$ref": "#/definitions/sessionExpired"
     },
     {
-      "$ref": "#/$defs/sessionRejected"
+      "$ref": "#/definitions/sessionRejected"
     },
     {
-      "$ref": "#/$defs/sessionEnded"
+      "$ref": "#/definitions/sessionEnded"
     },
     {
-      "$ref": "#/$defs/accountUpdated"
+      "$ref": "#/definitions/accountUpdated"
     },
     {
-      "$ref": "#/$defs/apiLatencyRecorded"
+      "$ref": "#/definitions/apiLatencyRecorded"
     },
     {
-      "$ref": "#/$defs/uiLatencyRecorded"
+      "$ref": "#/definitions/uiLatencyRecorded"
     },
     {
-      "$ref": "#/$defs/clientExceptionCaught"
+      "$ref": "#/definitions/clientExceptionCaught"
     },
     {
-      "$ref": "#/$defs/sectionViewed"
+      "$ref": "#/definitions/sectionViewed"
     },
     {
-      "$ref": "#/$defs/flowStepRecorded"
+      "$ref": "#/definitions/flowStepRecorded"
     },
     {
-      "$ref": "#/$defs/employeeHired"
+      "$ref": "#/definitions/employeeHired"
     },
     {
-      "$ref": "#/$defs/employeeSeparated"
+      "$ref": "#/definitions/employeeSeparated"
     },
     {
-      "$ref": "#/$defs/absenceRecorded"
+      "$ref": "#/definitions/absenceRecorded"
     },
     {
-      "$ref": "#/$defs/rosterDayScheduled"
+      "$ref": "#/definitions/rosterDayScheduled"
     },
     {
-      "$ref": "#/$defs/vacancyOpened"
+      "$ref": "#/definitions/vacancyOpened"
     },
     {
-      "$ref": "#/$defs/vacancyFilled"
+      "$ref": "#/definitions/vacancyFilled"
     },
     {
-      "$ref": "#/$defs/customerPreferenceRecorded"
+      "$ref": "#/definitions/customerPreferenceRecorded"
     },
     {
-      "$ref": "#/$defs/recommendationShown"
+      "$ref": "#/definitions/recommendationShown"
     },
     {
-      "$ref": "#/$defs/recommendationAccepted"
+      "$ref": "#/definitions/recommendationAccepted"
     },
     {
-      "$ref": "#/$defs/recipeUpdatePublished"
+      "$ref": "#/definitions/recipeUpdatePublished"
     },
     {
-      "$ref": "#/$defs/recipeUpdateAcknowledged"
+      "$ref": "#/definitions/recipeUpdateAcknowledged"
     },
     {
-      "$ref": "#/$defs/weeklyReportDispatched"
+      "$ref": "#/definitions/weeklyReportDispatched"
     }
   ],
-  "$defs": {
+  "definitions": {
     "locationId": {
       "enum": [
         "co-med-centro",
@@ -244,7 +244,7 @@
       ],
       "properties": {
         "source": {
-          "$ref": "#/$defs/source"
+          "$ref": "#/definitions/source"
         },
         "location_scope": {
           "enum": [
@@ -254,7 +254,7 @@
           ]
         },
         "location_id": {
-          "$ref": "#/$defs/locationId"
+          "$ref": "#/definitions/locationId"
         },
         "country": {
           "enum": [
@@ -292,7 +292,7 @@
           "format": "uuid"
         },
         "timestamp": {
-          "$ref": "#/$defs/timestamp"
+          "$ref": "#/definitions/timestamp"
         },
         "sessionID": {
           "anyOf": [
@@ -328,10 +328,10 @@
           "format": "uuid"
         },
         "source": {
-          "$ref": "#/$defs/source"
+          "$ref": "#/definitions/source"
         },
         "tags": {
-          "$ref": "#/$defs/tags"
+          "$ref": "#/definitions/tags"
         },
         "properties": {
           "type": "object"
@@ -388,7 +388,7 @@
       "description": "POST /inventory after create_product writes products.csv. Map CSV name to product_name.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -411,7 +411,7 @@
                   ]
                 },
                 "location_id": {
-                  "$ref": "#/$defs/locationId"
+                  "$ref": "#/definitions/locationId"
                 },
                 "country": {
                   "enum": [
@@ -488,7 +488,7 @@
                     ]
                   },
                   "then": {
-                    "$ref": "#/$defs/locationFacts"
+                    "$ref": "#/definitions/locationFacts"
                   }
                 }
               ]
@@ -529,7 +529,7 @@
       "description": "PATCH /inventory/{product_id} after apply_delta commits. reason is count_correction.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -552,7 +552,7 @@
                   ]
                 },
                 "location_id": {
-                  "$ref": "#/$defs/locationId"
+                  "$ref": "#/definitions/locationId"
                 },
                 "country": {
                   "enum": [
@@ -645,7 +645,7 @@
                     ]
                   },
                   "then": {
-                    "$ref": "#/$defs/locationFacts"
+                    "$ref": "#/definitions/locationFacts"
                   }
                 }
               ]
@@ -689,7 +689,7 @@
       "description": "Chain CSV edge: quantity_before >= 10 and quantity_after < 10. The weekly pipeline ignores this type.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -780,7 +780,7 @@
       "description": "Chain CSV edge: quantity_before < 10 and quantity_after >= 10.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -871,7 +871,7 @@
       "description": "422 on an inventory or order body. loc and pydantic type only. IP-3.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -982,7 +982,7 @@
       "description": "Direct stock change or alert threshold the API refuses. CSV is unchanged. IP-4.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -1155,7 +1155,7 @@
       "description": "One event per inbound line. Pipeline sums payload.cost into total_purchase_cost.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -1175,7 +1175,7 @@
                   "const": "location"
                 },
                 "location_id": {
-                  "$ref": "#/$defs/locationId"
+                  "$ref": "#/definitions/locationId"
                 },
                 "country": {
                   "enum": [
@@ -1307,15 +1307,15 @@
               ],
               "allOf": [
                 {
-                  "$ref": "#/$defs/locationFacts"
+                  "$ref": "#/definitions/locationFacts"
                 },
                 {
                   "oneOf": [
                     {
-                      "$ref": "#/$defs/fxRecorded"
+                      "$ref": "#/definitions/fxRecorded"
                     },
                     {
-                      "$ref": "#/$defs/fxMissing"
+                      "$ref": "#/definitions/fxMissing"
                     }
                   ]
                 },
@@ -1426,7 +1426,7 @@
       "description": "One event per outbound line. Guest tickets use sale_completed.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -1446,7 +1446,7 @@
                   "const": "location"
                 },
                 "location_id": {
-                  "$ref": "#/$defs/locationId"
+                  "$ref": "#/definitions/locationId"
                 },
                 "country": {
                   "enum": [
@@ -1505,7 +1505,7 @@
                   ]
                 },
                 "destination_location_id": {
-                  "$ref": "#/$defs/locationId"
+                  "$ref": "#/definitions/locationId"
                 },
                 "cost": {
                   "type": "number",
@@ -1530,7 +1530,7 @@
               ],
               "allOf": [
                 {
-                  "$ref": "#/$defs/locationFacts"
+                  "$ref": "#/definitions/locationFacts"
                 },
                 {
                   "if": {
@@ -1604,7 +1604,7 @@
       "description": "Shift-close waste log. Pipeline sums payload.cost into total_waste_cost.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -1624,7 +1624,7 @@
                   "const": "location"
                 },
                 "location_id": {
-                  "$ref": "#/$defs/locationId"
+                  "$ref": "#/definitions/locationId"
                 },
                 "country": {
                   "enum": [
@@ -1708,7 +1708,7 @@
               ],
               "allOf": [
                 {
-                  "$ref": "#/$defs/locationFacts"
+                  "$ref": "#/definitions/locationFacts"
                 },
                 {
                   "if": {
@@ -1798,7 +1798,7 @@
       "description": "Location-scoped downward crossing, or protein cover under 3 days. Pipeline counts rows.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -1819,7 +1819,7 @@
                   "const": "location"
                 },
                 "location_id": {
-                  "$ref": "#/$defs/locationId"
+                  "$ref": "#/definitions/locationId"
                 },
                 "country": {
                   "enum": [
@@ -1894,7 +1894,7 @@
               ],
               "allOf": [
                 {
-                  "$ref": "#/$defs/locationFacts"
+                  "$ref": "#/definitions/locationFacts"
                 },
                 {
                   "if": {
@@ -2009,7 +2009,7 @@
       "description": "Previous unit price for product_id + supplier_id + currency moved by at least 1 percent. Pipeline counts rows.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -2029,7 +2029,7 @@
                   "const": "location"
                 },
                 "location_id": {
-                  "$ref": "#/$defs/locationId"
+                  "$ref": "#/definitions/locationId"
                 },
                 "country": {
                   "enum": [
@@ -2093,7 +2093,7 @@
               ],
               "allOf": [
                 {
-                  "$ref": "#/$defs/locationFacts"
+                  "$ref": "#/definitions/locationFacts"
                 }
               ]
             }
@@ -2143,7 +2143,7 @@
       "description": "One closed ticket. points_earned is floor(amount/10000) for COP and floor(amount/10) for USD.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -2163,7 +2163,7 @@
                   "const": "location"
                 },
                 "location_id": {
-                  "$ref": "#/$defs/locationId"
+                  "$ref": "#/definitions/locationId"
                 },
                 "country": {
                   "enum": [
@@ -2292,15 +2292,15 @@
               ],
               "allOf": [
                 {
-                  "$ref": "#/$defs/locationFacts"
+                  "$ref": "#/definitions/locationFacts"
                 },
                 {
                   "oneOf": [
                     {
-                      "$ref": "#/$defs/fxRecorded"
+                      "$ref": "#/definitions/fxRecorded"
                     },
                     {
-                      "$ref": "#/$defs/fxMissing"
+                      "$ref": "#/definitions/fxMissing"
                     }
                   ]
                 },
@@ -2412,7 +2412,7 @@
       "description": "Open location with no sale_completed for 45 minutes. Reuse id for the episode.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -2432,7 +2432,7 @@
                   "const": "location"
                 },
                 "location_id": {
-                  "$ref": "#/$defs/locationId"
+                  "$ref": "#/definitions/locationId"
                 },
                 "country": {
                   "enum": [
@@ -2453,10 +2453,10 @@
                   ]
                 },
                 "silence_started_at": {
-                  "$ref": "#/$defs/timestamp"
+                  "$ref": "#/definitions/timestamp"
                 },
                 "evaluated_at": {
-                  "$ref": "#/$defs/timestamp"
+                  "$ref": "#/definitions/timestamp"
                 },
                 "business_date": {
                   "type": "string",
@@ -2495,7 +2495,7 @@
               ],
               "allOf": [
                 {
-                  "$ref": "#/$defs/locationFacts"
+                  "$ref": "#/definitions/locationFacts"
                 }
               ]
             }
@@ -2546,7 +2546,7 @@
       "description": "Redemption in multiples of 5 points once balance_before is at least 15. 5 points discount 20000 COP or 20 USD.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -2566,7 +2566,7 @@
                   "const": "location"
                 },
                 "location_id": {
-                  "$ref": "#/$defs/locationId"
+                  "$ref": "#/definitions/locationId"
                 },
                 "country": {
                   "enum": [
@@ -2622,7 +2622,7 @@
               ],
               "allOf": [
                 {
-                  "$ref": "#/$defs/locationFacts"
+                  "$ref": "#/definitions/locationFacts"
                 }
               ]
             }
@@ -2670,7 +2670,7 @@
       "description": "One-time physical stamp card transfer onto an app account, at a location.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -2690,7 +2690,7 @@
                   "const": "location"
                 },
                 "location_id": {
-                  "$ref": "#/$defs/locationId"
+                  "$ref": "#/definitions/locationId"
                 },
                 "country": {
                   "enum": [
@@ -2738,7 +2738,7 @@
               ],
               "allOf": [
                 {
-                  "$ref": "#/$defs/locationFacts"
+                  "$ref": "#/definitions/locationFacts"
                 }
               ]
             }
@@ -2785,7 +2785,7 @@
       "description": "POST /auth/login or POST /auth/token after authenticate_user succeeds. UserID is users.id.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -2905,7 +2905,7 @@
       "description": "401 branch of the login handlers. No email or password.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -3025,7 +3025,7 @@
       "description": "500 from handle_unhandled_error or 503 from handle_external_service_error.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -3160,7 +3160,7 @@
       "description": "Public corporate home mount. path is /.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -3226,7 +3226,7 @@
       "description": "Staff form blocked a submit, or the matching HTTP 422 was shown. No email or password. The server does not emit a second copy.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -3442,7 +3442,7 @@
       "description": "JWT past exp. Emitted on ExpiredSignatureError before decode_access_token collapses the error. Distinct from user_login_failed.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -3504,7 +3504,7 @@
       "description": "Invalid JWT, inactive subject, or a protected route opened with no token. Distinct from session_expired and user_login_failed.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -3661,7 +3661,7 @@
       "description": "Logout, or a later 401 cleared the stored token. Does not restate expired versus invalid.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -3725,7 +3725,7 @@
       "description": "Register, profile save, or password change finished or was refused. No contact fields.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -3873,7 +3873,7 @@
       "description": "One apiRequest, including network failure. route_template has no query string.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -4060,7 +4060,7 @@
       "description": "Session, panel, or form clock until success, error, or the effect was cancelled.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -4221,7 +4221,7 @@
       "description": "Error boundary, window error, or unhandled rejection. error_name only. No message and no stack.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -4353,7 +4353,7 @@
       "description": "Operator surface actually shown. required and ready are fixed per section id.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -4646,7 +4646,7 @@
       "description": "One step of a staff flow. Abandoned and completed both close the flow_instance.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -4736,7 +4736,7 @@
       "description": "Hire fact for country headcount. employee_id is opaque. No name.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -4823,7 +4823,7 @@
       "description": "Leaver fact for people.turnover, segmented by country.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -4910,7 +4910,7 @@
       "description": "Absence day or fraction for people.absenteeism. Holiday taken is absence_kind holiday.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -5004,7 +5004,7 @@
       "description": "Denominator day for absenteeism. One row per employee per scheduled day.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -5086,7 +5086,7 @@
       "description": "Vacancy open date. Paired with vacancy_filled for time to fill.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -5173,7 +5173,7 @@
       "description": "days_to_fill is filled_on minus opened_on in calendar days.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -5262,7 +5262,7 @@
       "description": "CRM preference. No free-text personal data.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -5388,7 +5388,7 @@
       "description": "Personalisation impression. customer_id is optional when the guest is anonymous.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -5408,7 +5408,7 @@
                   "const": "location"
                 },
                 "location_id": {
-                  "$ref": "#/$defs/locationId"
+                  "$ref": "#/definitions/locationId"
                 },
                 "country": {
                   "enum": [
@@ -5460,7 +5460,7 @@
               ],
               "allOf": [
                 {
-                  "$ref": "#/$defs/locationFacts"
+                  "$ref": "#/definitions/locationFacts"
                 }
               ]
             }
@@ -5507,7 +5507,7 @@
       "description": "Guest accepted the suggested menu item. recommendation_id matches the impression.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -5527,7 +5527,7 @@
                   "const": "location"
                 },
                 "location_id": {
-                  "$ref": "#/$defs/locationId"
+                  "$ref": "#/definitions/locationId"
                 },
                 "country": {
                   "enum": [
@@ -5575,7 +5575,7 @@
               ],
               "allOf": [
                 {
-                  "$ref": "#/$defs/locationFacts"
+                  "$ref": "#/definitions/locationFacts"
                 }
               ]
             }
@@ -5622,7 +5622,7 @@
       "description": "Recipe push. locale es is the base language. en is an additional publish.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -5704,7 +5704,7 @@
       "description": "One location confirms it has the recipe version. Coverage denominator is 14.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -5724,7 +5724,7 @@
                   "const": "location"
                 },
                 "location_id": {
-                  "$ref": "#/$defs/locationId"
+                  "$ref": "#/definitions/locationId"
                 },
                 "country": {
                   "enum": [
@@ -5764,7 +5764,7 @@
               ],
               "allOf": [
                 {
-                  "$ref": "#/$defs/locationFacts"
+                  "$ref": "#/definitions/locationFacts"
                 }
               ]
             }
@@ -5809,7 +5809,7 @@
       "description": "Monday executive report send. floor_metric_ids must list every Phase 1 floor id.",
       "allOf": [
         {
-          "$ref": "#/$defs/envelope"
+          "$ref": "#/definitions/envelope"
         },
         {
           "properties": {
@@ -5839,7 +5839,7 @@
                   "const": "07:00"
                 },
                 "dispatched_at": {
-                  "$ref": "#/$defs/timestamp"
+                  "$ref": "#/definitions/timestamp"
                 },
                 "on_time": {
                   "type": "boolean"
@@ -6223,7 +6223,7 @@
           ]
         },
         "location_id": {
-          "$ref": "#/$defs/locationId"
+          "$ref": "#/definitions/locationId"
         },
         "grain": {
           "type": "string",
@@ -6238,7 +6238,7 @@
           ]
         },
         "as_of": {
-          "$ref": "#/$defs/timestamp"
+          "$ref": "#/definitions/timestamp"
         }
       },
       "allOf": [
@@ -6269,7 +6269,7 @@
       "minItems": 34,
       "maxItems": 34,
       "items": {
-        "$ref": "#/$defs/mandatoryMetricObservation"
+        "$ref": "#/definitions/mandatoryMetricObservation"
       },
       "uniqueItems": true,
       "allOf": [

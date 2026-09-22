@@ -6,7 +6,7 @@ Normative companion to [`telemetry-plan.md`](telemetry-plan.md) and [`event-sche
 
 For every event, `properties` may contain **only** the keys listed for that `Event_type`.
 JSON Schema sets `additionalProperties: false` on each event’s `properties` object (and on nested objects such as sale `lines[]` and validation `fields[]`). A document with any other key is rejected and must not be stored.
-Envelope keys (`eventID`, `timestamp`, `sessionID`, `UserID`, `Event_type`, `SchemaVersion`, `requestID`, `source`, `tags`) are outside this allowlist; see `$defs.envelope`.
+Envelope keys (`eventID`, `timestamp`, `sessionID`, `UserID`, `Event_type`, `SchemaVersion`, `requestID`, `source`, `tags`) are outside this allowlist; see `definitions.envelope`.
 
 ## Forbidden keys (every event)
 
