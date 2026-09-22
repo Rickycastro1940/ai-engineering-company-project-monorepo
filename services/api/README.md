@@ -88,6 +88,18 @@ agent  | We have Tomatoes, Mozzarella... |              | 2026-...
 
 The root-level `api/` package is a compatibility shim that re-exports this service's FastAPI app so `uvicorn api.app:app` works from the repo root.
 
+## Central API (CONTEXT.md Technology nouns)
+
+Routers live next to this README. Locations, sales, customers, and suppliers require a Bearer JWT (same as `/locations`). The public menu catalogue does not.
+
+| Method | Endpoint | Domain |
+|--------|----------|--------|
+| `GET` | `/locations`, `/locations/overview` | 14 sites, Colombia 8 / Florida 6, COP+USD |
+| `GET` | `/menus`, `/menus/catalogue`, `/menus/{id}` | Chain recipes with COP and USD list prices |
+| `GET` | `/sales`, `/sales/overview`, `/sales/alerts`, `/sales/{location_id}` | Per-location and chain totals in COP and USD (seeded; POS not integrated) |
+| `GET` | `/customers`, `/customers/overview`, `/customers/{id}` | CRM + order history; Brasa Points still physical stamp cards |
+| `GET` | `/suppliers`, `/suppliers/overview`, `/suppliers/{id}` | 20 suppliers, two markets, price history + alerts |
+
 ## Alternative run command
 
 ```bash
