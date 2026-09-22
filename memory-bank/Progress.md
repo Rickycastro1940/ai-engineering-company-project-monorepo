@@ -14,7 +14,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
-| Technology: telemetry + pipeline to dashboards | **Partial** — `data/pipelines/` weekly location cost/waste; Celery async path |
+| Technology: telemetry + pipeline to dashboards | **Partial** — event contract in `docs/telemetry/` (17 events, COP/USD, 14 location ids). Weekly cost/waste pipeline and Celery path exist. Live emitters are not wired |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Not done** as product UI; pipeline design targets cost/waste for Mariana + Felipe |
 | Procurement: supplier price history, consolidated spend | **Not done** (supplier docs may exist on other branches; not claimed here) |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
@@ -182,6 +182,22 @@ Department served: **Technology** (structured HTTP, no env names in 503s) + **Op
 uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py tests/test_users_api.py -q → 33 passed
 cd uis/backoffice && npm run build → green
 ```
+
+## Latest telemetry plan (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology** (real-time telemetry contract for Nicolás Park) so Restaurant Operations and Executive metrics in `CONTEXT.md` can be instrumented on the existing inventory API, login handlers, and weekly pipeline.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+python3 -c json load docs/telemetry/event-schemas.json
+Draft202012Validator.check_schema → pass
+17 examples validate (format checks on)
+pipeline event types present: inbound_order_created, stock_waste_registered, stock_threshold_triggered, ingredient_price_variance_detected
+locationId enum count = 14
+rejected: US location + COP, chain event with location_id, email field, protein waste > 2kg without note, balance_before 10
+```
+
+Emitters are specified in `docs/telemetry/telemetry-plan.md` and are not implemented in this change. Technology’s menus/sales/customers/suppliers nouns remain **missing**.
 
 ## Planned next steps (order)
 

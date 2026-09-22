@@ -1,0 +1,2883 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brasaland.digital/telemetry/event-schemas.json",
+  "title": "Brasaland telemetry event",
+  "description": "Producer document for one Brasaland telemetry event. Storage mapping into telemetry_events is defined in docs/telemetry/telemetry-plan.md. Validate before insert. examples on each $defs event are valid instances of this schema.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/productCreated"
+    },
+    {
+      "$ref": "#/$defs/stockCountAdjusted"
+    },
+    {
+      "$ref": "#/$defs/stockThresholdCrossed"
+    },
+    {
+      "$ref": "#/$defs/stockThresholdCleared"
+    },
+    {
+      "$ref": "#/$defs/inboundOrderCreated"
+    },
+    {
+      "$ref": "#/$defs/outboundOrderCreated"
+    },
+    {
+      "$ref": "#/$defs/stockWasteRegistered"
+    },
+    {
+      "$ref": "#/$defs/stockThresholdTriggered"
+    },
+    {
+      "$ref": "#/$defs/ingredientPriceVarianceDetected"
+    },
+    {
+      "$ref": "#/$defs/saleCompleted"
+    },
+    {
+      "$ref": "#/$defs/locationSalesSilenceDetected"
+    },
+    {
+      "$ref": "#/$defs/loyaltyPointsRedeemed"
+    },
+    {
+      "$ref": "#/$defs/loyaltyCardTransferred"
+    },
+    {
+      "$ref": "#/$defs/userLoginSucceeded"
+    },
+    {
+      "$ref": "#/$defs/userLoginFailed"
+    },
+    {
+      "$ref": "#/$defs/apiError"
+    },
+    {
+      "$ref": "#/$defs/pageView"
+    }
+  ],
+  "$defs": {
+    "locationId": {
+      "enum": [
+        "co-med-centro",
+        "co-med-elpoblado",
+        "co-bog-chapinero",
+        "co-bog-norte",
+        "co-cali-norte",
+        "co-barranquilla",
+        "co-cartagena",
+        "co-pereira",
+        "us-mia-brickell",
+        "us-mia-downtown",
+        "us-orlando",
+        "us-tampa",
+        "us-ftlauderdale",
+        "us-jacksonville"
+      ]
+    },
+    "source": {
+      "enum": [
+        "services.api.inventory",
+        "services.api.orders",
+        "services.api.sales",
+        "services.api.loyalty",
+        "services.api.users",
+        "services.api.errors",
+        "services.telemetry.silence_monitor",
+        "services.telemetry.cover_monitor",
+        "uis.website",
+        "uis.backoffice"
+      ]
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+    },
+    "locationFacts": {
+      "oneOf": [
+        {
+          "properties": {
+            "location_id": {
+              "enum": [
+                "co-med-centro",
+                "co-med-elpoblado",
+                "co-bog-chapinero",
+                "co-bog-norte",
+                "co-cali-norte",
+                "co-barranquilla",
+                "co-cartagena",
+                "co-pereira"
+              ]
+            },
+            "country": {
+              "const": "Colombia"
+            },
+            "currency": {
+              "const": "COP"
+            },
+            "timezone": {
+              "const": "America/Bogota"
+            }
+          },
+          "required": [
+            "location_id",
+            "country",
+            "currency",
+            "timezone"
+          ]
+        },
+        {
+          "properties": {
+            "location_id": {
+              "enum": [
+                "us-mia-brickell",
+                "us-mia-downtown",
+                "us-orlando",
+                "us-tampa",
+                "us-ftlauderdale",
+                "us-jacksonville"
+              ]
+            },
+            "country": {
+              "const": "United States"
+            },
+            "currency": {
+              "const": "USD"
+            },
+            "timezone": {
+              "const": "America/New_York"
+            }
+          },
+          "required": [
+            "location_id",
+            "country",
+            "currency",
+            "timezone"
+          ]
+        }
+      ]
+    },
+    "tags": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "location_scope"
+      ],
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "location_scope": {
+          "enum": [
+            "chain",
+            "location",
+            "none"
+          ]
+        },
+        "location_id": {
+          "$ref": "#/$defs/locationId"
+        },
+        "country": {
+          "enum": [
+            "Colombia",
+            "United States"
+          ]
+        },
+        "currency": {
+          "enum": [
+            "COP",
+            "USD"
+          ]
+        }
+      }
+    },
+    "envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "id",
+        "event_type",
+        "occurred_at",
+        "source",
+        "tags",
+        "payload"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "event_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "occurred_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "actor_id": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        },
+        "tags": {
+          "$ref": "#/$defs/tags"
+        },
+        "payload": {
+          "type": "object"
+        }
+      }
+    },
+    "fxRecorded": {
+      "type": "object",
+      "properties": {
+        "fx_status": {
+          "const": "recorded"
+        },
+        "fx_rate_usd_per_local": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "amount_usd": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "fx_status",
+        "fx_rate_usd_per_local",
+        "amount_usd"
+      ]
+    },
+    "fxMissing": {
+      "type": "object",
+      "properties": {
+        "fx_status": {
+          "const": "missing"
+        }
+      },
+      "required": [
+        "fx_status"
+      ],
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "fx_rate_usd_per_local"
+            ]
+          },
+          {
+            "required": [
+              "amount_usd"
+            ]
+          }
+        ]
+      }
+    },
+    "productCreated": {
+      "description": "POST /inventory after create_product writes products.csv. Map CSV name to product_name.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "product_created"
+            },
+            "source": {
+              "enum": [
+                "services.api.inventory"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "enum": [
+                    "chain",
+                    "location"
+                  ]
+                },
+                "location_id": {
+                  "$ref": "#/$defs/locationId"
+                },
+                "country": {
+                  "enum": [
+                    "Colombia",
+                    "United States"
+                  ]
+                },
+                "currency": {
+                  "enum": [
+                    "COP",
+                    "USD"
+                  ]
+                },
+                "timezone": {
+                  "enum": [
+                    "America/Bogota",
+                    "America/New_York"
+                  ]
+                },
+                "product_id": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "product_name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "location_scope",
+                "product_id",
+                "product_name",
+                "quantity",
+                "unit"
+              ],
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "location_scope": {
+                        "const": "chain"
+                      }
+                    },
+                    "required": [
+                      "location_scope"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "location_id": false,
+                      "country": false,
+                      "currency": false,
+                      "timezone": false
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "location_scope": {
+                        "const": "location"
+                      }
+                    },
+                    "required": [
+                      "location_scope"
+                    ]
+                  },
+                  "then": {
+                    "$ref": "#/$defs/locationFacts"
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "11111111-1111-4111-8111-111111111111",
+          "event_type": "product_created",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.inventory",
+          "tags": {
+            "source": "services.api.inventory",
+            "location_scope": "chain"
+          },
+          "payload": {
+            "location_scope": "chain",
+            "product_id": 4,
+            "product_name": "Olive Oil",
+            "quantity": 15,
+            "unit": "liters"
+          }
+        }
+      ]
+    },
+    "stockCountAdjusted": {
+      "description": "PATCH /inventory/{product_id} after apply_delta commits. reason is count_correction.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "stock_count_adjusted"
+            },
+            "source": {
+              "enum": [
+                "services.api.inventory"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "enum": [
+                    "chain",
+                    "location"
+                  ]
+                },
+                "location_id": {
+                  "$ref": "#/$defs/locationId"
+                },
+                "country": {
+                  "enum": [
+                    "Colombia",
+                    "United States"
+                  ]
+                },
+                "currency": {
+                  "enum": [
+                    "COP",
+                    "USD"
+                  ]
+                },
+                "timezone": {
+                  "enum": [
+                    "America/Bogota",
+                    "America/New_York"
+                  ]
+                },
+                "product_id": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "product_name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "reason": {
+                  "const": "count_correction"
+                },
+                "delta": {
+                  "type": "integer",
+                  "not": {
+                    "const": 0
+                  }
+                },
+                "quantity_before": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "quantity_after": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "location_scope",
+                "product_id",
+                "product_name",
+                "unit",
+                "reason",
+                "delta",
+                "quantity_before",
+                "quantity_after"
+              ],
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "location_scope": {
+                        "const": "chain"
+                      }
+                    },
+                    "required": [
+                      "location_scope"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "location_id": false,
+                      "country": false,
+                      "currency": false,
+                      "timezone": false
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "location_scope": {
+                        "const": "location"
+                      }
+                    },
+                    "required": [
+                      "location_scope"
+                    ]
+                  },
+                  "then": {
+                    "$ref": "#/$defs/locationFacts"
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "22222222-2222-4222-8222-222222222222",
+          "event_type": "stock_count_adjusted",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.inventory",
+          "tags": {
+            "source": "services.api.inventory",
+            "location_scope": "chain"
+          },
+          "payload": {
+            "location_scope": "chain",
+            "product_id": 2,
+            "product_name": "Mozzarella",
+            "unit": "kg",
+            "reason": "count_correction",
+            "delta": -3,
+            "quantity_before": 8,
+            "quantity_after": 5
+          },
+          "actor_id": "7"
+        }
+      ]
+    },
+    "stockThresholdCrossed": {
+      "description": "Chain CSV edge: quantity_before >= 10 and quantity_after < 10. The weekly pipeline ignores this type.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "stock_threshold_crossed"
+            },
+            "source": {
+              "enum": [
+                "services.api.inventory"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "chain"
+                },
+                "product_id": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "product_name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "quantity_before": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "quantity_after": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "threshold": {
+                  "const": 10
+                }
+              },
+              "required": [
+                "location_scope",
+                "product_id",
+                "product_name",
+                "unit",
+                "quantity_before",
+                "quantity_after",
+                "threshold"
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "33333333-3333-4333-8333-333333333333",
+          "event_type": "stock_threshold_crossed",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.inventory",
+          "tags": {
+            "source": "services.api.inventory",
+            "location_scope": "chain"
+          },
+          "payload": {
+            "location_scope": "chain",
+            "product_id": 2,
+            "product_name": "Mozzarella",
+            "unit": "kg",
+            "quantity_before": 12,
+            "quantity_after": 9,
+            "threshold": 10
+          }
+        }
+      ]
+    },
+    "stockThresholdCleared": {
+      "description": "Chain CSV edge: quantity_before < 10 and quantity_after >= 10.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "stock_threshold_cleared"
+            },
+            "source": {
+              "enum": [
+                "services.api.inventory"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "chain"
+                },
+                "product_id": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "product_name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "quantity_before": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "quantity_after": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "threshold": {
+                  "const": 10
+                }
+              },
+              "required": [
+                "location_scope",
+                "product_id",
+                "product_name",
+                "unit",
+                "quantity_before",
+                "quantity_after",
+                "threshold"
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "44444444-4444-4444-8444-444444444444",
+          "event_type": "stock_threshold_cleared",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.inventory",
+          "tags": {
+            "source": "services.api.inventory",
+            "location_scope": "chain"
+          },
+          "payload": {
+            "location_scope": "chain",
+            "product_id": 2,
+            "product_name": "Mozzarella",
+            "unit": "kg",
+            "quantity_before": 9,
+            "quantity_after": 14,
+            "threshold": 10
+          }
+        }
+      ]
+    },
+    "inboundOrderCreated": {
+      "description": "One event per inbound line. Pipeline sums payload.cost into total_purchase_cost.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "inbound_order_created"
+            },
+            "source": {
+              "enum": [
+                "services.api.orders"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "location"
+                },
+                "location_id": {
+                  "$ref": "#/$defs/locationId"
+                },
+                "country": {
+                  "enum": [
+                    "Colombia",
+                    "United States"
+                  ]
+                },
+                "currency": {
+                  "enum": [
+                    "COP",
+                    "USD"
+                  ]
+                },
+                "timezone": {
+                  "enum": [
+                    "America/Bogota",
+                    "America/New_York"
+                  ]
+                },
+                "order_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "line_index": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "product_id": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "product_name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "supplier_id": {
+                  "type": "string",
+                  "pattern": "^sup_[a-z0-9_]{2,64}$"
+                },
+                "category": {
+                  "enum": [
+                    "proteins",
+                    "vegetables_fruit",
+                    "beverages_packaging",
+                    "imported_sauces",
+                    "cleaning",
+                    "other"
+                  ]
+                },
+                "order_kind": {
+                  "enum": [
+                    "scheduled",
+                    "emergency"
+                  ]
+                },
+                "list_cost": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "surcharge_rate": {
+                  "enum": [
+                    0,
+                    0.08
+                  ]
+                },
+                "cost": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "unit_price": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "fx_status": {
+                  "enum": [
+                    "recorded",
+                    "missing"
+                  ]
+                },
+                "fx_rate_usd_per_local": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "amount_usd": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "approval_required": {
+                  "type": "boolean"
+                },
+                "approval_state": {
+                  "enum": [
+                    "not_required",
+                    "pending",
+                    "approved"
+                  ]
+                }
+              },
+              "required": [
+                "location_scope",
+                "location_id",
+                "country",
+                "currency",
+                "timezone",
+                "order_id",
+                "line_index",
+                "product_id",
+                "product_name",
+                "quantity",
+                "unit",
+                "supplier_id",
+                "category",
+                "order_kind",
+                "list_cost",
+                "surcharge_rate",
+                "cost",
+                "unit_price",
+                "fx_status",
+                "approval_required",
+                "approval_state"
+              ],
+              "allOf": [
+                {
+                  "$ref": "#/$defs/locationFacts"
+                },
+                {
+                  "oneOf": [
+                    {
+                      "$ref": "#/$defs/fxRecorded"
+                    },
+                    {
+                      "$ref": "#/$defs/fxMissing"
+                    }
+                  ]
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "order_kind": {
+                        "const": "emergency"
+                      }
+                    },
+                    "required": [
+                      "order_kind"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "surcharge_rate": {
+                        "const": 0.08
+                      }
+                    }
+                  },
+                  "else": {
+                    "properties": {
+                      "surcharge_rate": {
+                        "const": 0
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "order_kind": {
+                        "const": "scheduled"
+                      }
+                    },
+                    "required": [
+                      "order_kind"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "approval_state": {
+                        "const": "not_required"
+                      },
+                      "approval_required": {
+                        "const": false
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "55555555-5555-4555-8555-555555555555",
+          "event_type": "inbound_order_created",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.orders",
+          "tags": {
+            "source": "services.api.orders",
+            "location_scope": "location",
+            "location_id": "us-mia-downtown",
+            "country": "United States",
+            "currency": "USD"
+          },
+          "payload": {
+            "location_scope": "location",
+            "location_id": "us-mia-downtown",
+            "country": "United States",
+            "currency": "USD",
+            "timezone": "America/New_York",
+            "order_id": "in-1001",
+            "line_index": 0,
+            "product_id": 1,
+            "product_name": "Beef ribeye",
+            "quantity": 20,
+            "unit": "kg",
+            "supplier_id": "sup_fl_meats",
+            "category": "proteins",
+            "order_kind": "scheduled",
+            "list_cost": 1000,
+            "surcharge_rate": 0,
+            "cost": 1000,
+            "unit_price": 50,
+            "fx_status": "recorded",
+            "fx_rate_usd_per_local": 1,
+            "amount_usd": 1000,
+            "approval_required": false,
+            "approval_state": "not_required"
+          },
+          "actor_id": "3"
+        }
+      ]
+    },
+    "outboundOrderCreated": {
+      "description": "One event per outbound line. Guest tickets use sale_completed.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "outbound_order_created"
+            },
+            "source": {
+              "enum": [
+                "services.api.orders"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "location"
+                },
+                "location_id": {
+                  "$ref": "#/$defs/locationId"
+                },
+                "country": {
+                  "enum": [
+                    "Colombia",
+                    "United States"
+                  ]
+                },
+                "currency": {
+                  "enum": [
+                    "COP",
+                    "USD"
+                  ]
+                },
+                "timezone": {
+                  "enum": [
+                    "America/Bogota",
+                    "America/New_York"
+                  ]
+                },
+                "order_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "line_index": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "product_id": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "product_name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "reason": {
+                  "enum": [
+                    "kitchen_consumption",
+                    "transfer",
+                    "other"
+                  ]
+                },
+                "protein_class": {
+                  "enum": [
+                    "main_protein",
+                    "premium_protein",
+                    "none"
+                  ]
+                },
+                "destination_location_id": {
+                  "$ref": "#/$defs/locationId"
+                },
+                "cost": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "location_scope",
+                "location_id",
+                "country",
+                "currency",
+                "timezone",
+                "order_id",
+                "line_index",
+                "product_id",
+                "product_name",
+                "quantity",
+                "unit",
+                "reason",
+                "protein_class",
+                "cost"
+              ],
+              "allOf": [
+                {
+                  "$ref": "#/$defs/locationFacts"
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "reason": {
+                        "const": "transfer"
+                      }
+                    },
+                    "required": [
+                      "reason"
+                    ]
+                  },
+                  "then": {
+                    "required": [
+                      "destination_location_id"
+                    ]
+                  },
+                  "else": {
+                    "properties": {
+                      "destination_location_id": false
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "66666666-6666-4666-8666-666666666666",
+          "event_type": "outbound_order_created",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.orders",
+          "tags": {
+            "source": "services.api.orders",
+            "location_scope": "location",
+            "location_id": "co-med-centro",
+            "country": "Colombia",
+            "currency": "COP"
+          },
+          "payload": {
+            "location_scope": "location",
+            "location_id": "co-med-centro",
+            "country": "Colombia",
+            "currency": "COP",
+            "timezone": "America/Bogota",
+            "order_id": "out-44",
+            "line_index": 0,
+            "product_id": 1,
+            "product_name": "Beef ribeye",
+            "quantity": 4,
+            "unit": "kg",
+            "reason": "kitchen_consumption",
+            "protein_class": "premium_protein",
+            "cost": 180000
+          },
+          "actor_id": "3"
+        }
+      ]
+    },
+    "stockWasteRegistered": {
+      "description": "Shift-close waste log. Pipeline sums payload.cost into total_waste_cost.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "stock_waste_registered"
+            },
+            "source": {
+              "enum": [
+                "services.api.inventory"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "location"
+                },
+                "location_id": {
+                  "$ref": "#/$defs/locationId"
+                },
+                "country": {
+                  "enum": [
+                    "Colombia",
+                    "United States"
+                  ]
+                },
+                "currency": {
+                  "enum": [
+                    "COP",
+                    "USD"
+                  ]
+                },
+                "timezone": {
+                  "enum": [
+                    "America/Bogota",
+                    "America/New_York"
+                  ]
+                },
+                "product_id": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "product_name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "quantity": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "cost": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "waste_category": {
+                  "enum": [
+                    "expiration",
+                    "kitchen_error",
+                    "unexplained_shrinkage"
+                  ]
+                },
+                "protein_class": {
+                  "enum": [
+                    "main_protein",
+                    "premium_protein",
+                    "none"
+                  ]
+                },
+                "shift_code": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "training_waste": {
+                  "type": "boolean"
+                },
+                "note": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "location_scope",
+                "location_id",
+                "country",
+                "currency",
+                "timezone",
+                "product_id",
+                "product_name",
+                "quantity",
+                "unit",
+                "cost",
+                "waste_category",
+                "protein_class",
+                "shift_code",
+                "training_waste"
+              ],
+              "allOf": [
+                {
+                  "$ref": "#/$defs/locationFacts"
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "protein_class": {
+                        "enum": [
+                          "main_protein",
+                          "premium_protein"
+                        ]
+                      },
+                      "unit": {
+                        "const": "kg"
+                      }
+                    },
+                    "required": [
+                      "protein_class",
+                      "unit",
+                      "quantity"
+                    ]
+                  },
+                  "then": {
+                    "if": {
+                      "properties": {
+                        "quantity": {
+                          "exclusiveMinimum": 2
+                        }
+                      },
+                      "required": [
+                        "quantity"
+                      ]
+                    },
+                    "then": {
+                      "required": [
+                        "note"
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "77777777-7777-4777-8777-777777777777",
+          "event_type": "stock_waste_registered",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.inventory",
+          "tags": {
+            "source": "services.api.inventory",
+            "location_scope": "location",
+            "location_id": "us-mia-downtown",
+            "country": "United States",
+            "currency": "USD"
+          },
+          "payload": {
+            "location_scope": "location",
+            "location_id": "us-mia-downtown",
+            "country": "United States",
+            "currency": "USD",
+            "timezone": "America/New_York",
+            "product_id": 1,
+            "product_name": "Beef ribeye",
+            "quantity": 2.5,
+            "unit": "kg",
+            "cost": 150,
+            "waste_category": "kitchen_error",
+            "protein_class": "premium_protein",
+            "shift_code": "dinner-close",
+            "training_waste": false,
+            "note": "Trim discarded after a cut error on the rib station."
+          },
+          "actor_id": "9"
+        }
+      ]
+    },
+    "stockThresholdTriggered": {
+      "description": "Location-scoped downward crossing, or protein cover under 3 days. Pipeline counts rows.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "stock_threshold_triggered"
+            },
+            "source": {
+              "enum": [
+                "services.api.inventory",
+                "services.telemetry.cover_monitor"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "location"
+                },
+                "location_id": {
+                  "$ref": "#/$defs/locationId"
+                },
+                "country": {
+                  "enum": [
+                    "Colombia",
+                    "United States"
+                  ]
+                },
+                "currency": {
+                  "enum": [
+                    "COP",
+                    "USD"
+                  ]
+                },
+                "timezone": {
+                  "enum": [
+                    "America/Bogota",
+                    "America/New_York"
+                  ]
+                },
+                "product_id": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "product_name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "reason": {
+                  "enum": [
+                    "quantity_below_api_threshold",
+                    "protein_cover_below_3_days"
+                  ]
+                },
+                "edge": {
+                  "const": "crossed_below"
+                },
+                "quantity_before": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "quantity_after": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "threshold": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "cover_days_remaining": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "location_scope",
+                "location_id",
+                "country",
+                "currency",
+                "timezone",
+                "product_id",
+                "product_name",
+                "unit",
+                "reason",
+                "edge",
+                "quantity_before",
+                "quantity_after",
+                "threshold"
+              ],
+              "allOf": [
+                {
+                  "$ref": "#/$defs/locationFacts"
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "reason": {
+                        "const": "protein_cover_below_3_days"
+                      }
+                    },
+                    "required": [
+                      "reason"
+                    ]
+                  },
+                  "then": {
+                    "required": [
+                      "cover_days_remaining"
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        },
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "services.telemetry.cover_monitor"
+              }
+            },
+            "required": [
+              "source"
+            ]
+          },
+          "then": {
+            "properties": {
+              "payload": {
+                "properties": {
+                  "reason": {
+                    "const": "protein_cover_below_3_days"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "services.api.inventory"
+              }
+            },
+            "required": [
+              "source"
+            ]
+          },
+          "then": {
+            "properties": {
+              "payload": {
+                "properties": {
+                  "reason": {
+                    "const": "quantity_below_api_threshold"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "88888888-8888-4888-8888-888888888888",
+          "event_type": "stock_threshold_triggered",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.telemetry.cover_monitor",
+          "tags": {
+            "source": "services.telemetry.cover_monitor",
+            "location_scope": "location",
+            "location_id": "co-med-centro",
+            "country": "Colombia",
+            "currency": "COP"
+          },
+          "payload": {
+            "location_scope": "location",
+            "location_id": "co-med-centro",
+            "country": "Colombia",
+            "currency": "COP",
+            "timezone": "America/Bogota",
+            "product_id": 1,
+            "product_name": "Beef ribeye",
+            "unit": "kg",
+            "reason": "protein_cover_below_3_days",
+            "edge": "crossed_below",
+            "quantity_before": 12,
+            "quantity_after": 12,
+            "threshold": 3,
+            "cover_days_remaining": 2.4
+          }
+        }
+      ]
+    },
+    "ingredientPriceVarianceDetected": {
+      "description": "Previous unit price for product_id + supplier_id + currency moved by at least 1 percent. Pipeline counts rows.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "ingredient_price_variance_detected"
+            },
+            "source": {
+              "enum": [
+                "services.api.orders"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "location"
+                },
+                "location_id": {
+                  "$ref": "#/$defs/locationId"
+                },
+                "country": {
+                  "enum": [
+                    "Colombia",
+                    "United States"
+                  ]
+                },
+                "currency": {
+                  "enum": [
+                    "COP",
+                    "USD"
+                  ]
+                },
+                "timezone": {
+                  "enum": [
+                    "America/Bogota",
+                    "America/New_York"
+                  ]
+                },
+                "product_id": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "product_name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "supplier_id": {
+                  "type": "string",
+                  "pattern": "^sup_[a-z0-9_]{2,64}$"
+                },
+                "order_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "previous_unit_price": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "unit_price": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "variance_pct": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "location_scope",
+                "location_id",
+                "country",
+                "currency",
+                "timezone",
+                "product_id",
+                "product_name",
+                "supplier_id",
+                "order_id",
+                "previous_unit_price",
+                "unit_price",
+                "variance_pct"
+              ],
+              "allOf": [
+                {
+                  "$ref": "#/$defs/locationFacts"
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "99999999-9999-4999-8999-999999999999",
+          "event_type": "ingredient_price_variance_detected",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.orders",
+          "tags": {
+            "source": "services.api.orders",
+            "location_scope": "location",
+            "location_id": "us-mia-downtown",
+            "country": "United States",
+            "currency": "USD"
+          },
+          "payload": {
+            "location_scope": "location",
+            "location_id": "us-mia-downtown",
+            "country": "United States",
+            "currency": "USD",
+            "timezone": "America/New_York",
+            "product_id": 1,
+            "product_name": "Beef ribeye",
+            "supplier_id": "sup_fl_meats",
+            "order_id": "in-1008",
+            "previous_unit_price": 50,
+            "unit_price": 54,
+            "variance_pct": 0.08
+          },
+          "actor_id": "3"
+        }
+      ]
+    },
+    "saleCompleted": {
+      "description": "One closed ticket. points_earned is floor(amount/10000) for COP and floor(amount/10) for USD.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "sale_completed"
+            },
+            "source": {
+              "enum": [
+                "services.api.sales"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "location"
+                },
+                "location_id": {
+                  "$ref": "#/$defs/locationId"
+                },
+                "country": {
+                  "enum": [
+                    "Colombia",
+                    "United States"
+                  ]
+                },
+                "currency": {
+                  "enum": [
+                    "COP",
+                    "USD"
+                  ]
+                },
+                "timezone": {
+                  "enum": [
+                    "America/Bogota",
+                    "America/New_York"
+                  ]
+                },
+                "ticket_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "business_date": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "channel": {
+                  "enum": [
+                    "in_store",
+                    "delivery",
+                    "digital_app"
+                  ]
+                },
+                "covers": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "covers_source": {
+                  "enum": [
+                    "pos",
+                    "defaulted_to_one"
+                  ]
+                },
+                "amount": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "fx_status": {
+                  "enum": [
+                    "recorded",
+                    "missing"
+                  ]
+                },
+                "fx_rate_usd_per_local": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "amount_usd": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "lines": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "menu_item_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "menu_item_name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "quantity": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "line_amount": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "menu_item_name",
+                      "quantity",
+                      "line_amount"
+                    ]
+                  }
+                },
+                "loyalty_attached": {
+                  "type": "boolean"
+                },
+                "loyalty_account_id": {
+                  "type": "string",
+                  "pattern": "^loy_[A-Za-z0-9]{8,}$"
+                },
+                "points_earned": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "location_scope",
+                "location_id",
+                "country",
+                "currency",
+                "timezone",
+                "ticket_id",
+                "business_date",
+                "channel",
+                "covers",
+                "covers_source",
+                "amount",
+                "fx_status",
+                "lines",
+                "loyalty_attached",
+                "points_earned"
+              ],
+              "allOf": [
+                {
+                  "$ref": "#/$defs/locationFacts"
+                },
+                {
+                  "oneOf": [
+                    {
+                      "$ref": "#/$defs/fxRecorded"
+                    },
+                    {
+                      "$ref": "#/$defs/fxMissing"
+                    }
+                  ]
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "covers_source": {
+                        "const": "defaulted_to_one"
+                      }
+                    },
+                    "required": [
+                      "covers_source"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "covers": {
+                        "const": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "loyalty_attached": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "loyalty_attached"
+                    ]
+                  },
+                  "then": {
+                    "required": [
+                      "loyalty_account_id"
+                    ]
+                  },
+                  "else": {
+                    "properties": {
+                      "loyalty_account_id": false
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          "event_type": "sale_completed",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.sales",
+          "tags": {
+            "source": "services.api.sales",
+            "location_scope": "location",
+            "location_id": "co-med-centro",
+            "country": "Colombia",
+            "currency": "COP"
+          },
+          "payload": {
+            "location_scope": "location",
+            "location_id": "co-med-centro",
+            "country": "Colombia",
+            "currency": "COP",
+            "timezone": "America/Bogota",
+            "ticket_id": "tkt-900",
+            "business_date": "2026-09-22",
+            "channel": "in_store",
+            "covers": 3,
+            "covers_source": "pos",
+            "amount": 45000,
+            "fx_status": "recorded",
+            "fx_rate_usd_per_local": 0.00025,
+            "amount_usd": 11.25,
+            "lines": [
+              {
+                "menu_item_id": "grilled-sirloin",
+                "menu_item_name": "Grilled Sirloin",
+                "quantity": 2,
+                "line_amount": 36000
+              },
+              {
+                "menu_item_name": "House Sauce",
+                "quantity": 1,
+                "line_amount": 9000
+              }
+            ],
+            "loyalty_attached": true,
+            "loyalty_account_id": "loy_A1b2C3d4",
+            "points_earned": 4
+          }
+        }
+      ]
+    },
+    "locationSalesSilenceDetected": {
+      "description": "Open location with no sale_completed for 45 minutes. Reuse id for the episode.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "location_sales_silence_detected"
+            },
+            "source": {
+              "enum": [
+                "services.telemetry.silence_monitor"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "location"
+                },
+                "location_id": {
+                  "$ref": "#/$defs/locationId"
+                },
+                "country": {
+                  "enum": [
+                    "Colombia",
+                    "United States"
+                  ]
+                },
+                "currency": {
+                  "enum": [
+                    "COP",
+                    "USD"
+                  ]
+                },
+                "timezone": {
+                  "enum": [
+                    "America/Bogota",
+                    "America/New_York"
+                  ]
+                },
+                "silence_started_at": {
+                  "$ref": "#/$defs/timestamp"
+                },
+                "evaluated_at": {
+                  "$ref": "#/$defs/timestamp"
+                },
+                "business_date": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "open_local_start": {
+                  "const": "11:00"
+                },
+                "open_local_end": {
+                  "const": "22:00"
+                },
+                "threshold_minutes": {
+                  "const": 45
+                },
+                "opening_hours_source": {
+                  "const": "telemetry-plan.v1"
+                },
+                "sale_count": {
+                  "const": 0
+                }
+              },
+              "required": [
+                "location_scope",
+                "location_id",
+                "country",
+                "currency",
+                "timezone",
+                "silence_started_at",
+                "evaluated_at",
+                "business_date",
+                "open_local_start",
+                "open_local_end",
+                "threshold_minutes",
+                "opening_hours_source",
+                "sale_count"
+              ],
+              "allOf": [
+                {
+                  "$ref": "#/$defs/locationFacts"
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          "event_type": "location_sales_silence_detected",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.telemetry.silence_monitor",
+          "tags": {
+            "source": "services.telemetry.silence_monitor",
+            "location_scope": "location",
+            "location_id": "co-med-centro",
+            "country": "Colombia",
+            "currency": "COP"
+          },
+          "payload": {
+            "location_scope": "location",
+            "location_id": "co-med-centro",
+            "country": "Colombia",
+            "currency": "COP",
+            "timezone": "America/Bogota",
+            "silence_started_at": "2026-09-22T16:00:00Z",
+            "evaluated_at": "2026-09-22T16:45:00Z",
+            "business_date": "2026-09-22",
+            "open_local_start": "11:00",
+            "open_local_end": "22:00",
+            "threshold_minutes": 45,
+            "opening_hours_source": "telemetry-plan.v1",
+            "sale_count": 0
+          }
+        }
+      ]
+    },
+    "loyaltyPointsRedeemed": {
+      "description": "Redemption in multiples of 5 points once balance_before is at least 15. 5 points discount 20000 COP or 20 USD.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "loyalty_points_redeemed"
+            },
+            "source": {
+              "enum": [
+                "services.api.loyalty"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "location"
+                },
+                "location_id": {
+                  "$ref": "#/$defs/locationId"
+                },
+                "country": {
+                  "enum": [
+                    "Colombia",
+                    "United States"
+                  ]
+                },
+                "currency": {
+                  "enum": [
+                    "COP",
+                    "USD"
+                  ]
+                },
+                "timezone": {
+                  "enum": [
+                    "America/Bogota",
+                    "America/New_York"
+                  ]
+                },
+                "ticket_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "loyalty_account_id": {
+                  "type": "string",
+                  "pattern": "^loy_[A-Za-z0-9]{8,}$"
+                },
+                "balance_before": {
+                  "type": "integer",
+                  "minimum": 15
+                },
+                "points": {
+                  "type": "integer",
+                  "minimum": 5,
+                  "multipleOf": 5
+                },
+                "discount_amount": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              },
+              "required": [
+                "location_scope",
+                "location_id",
+                "country",
+                "currency",
+                "timezone",
+                "ticket_id",
+                "loyalty_account_id",
+                "balance_before",
+                "points",
+                "discount_amount"
+              ],
+              "allOf": [
+                {
+                  "$ref": "#/$defs/locationFacts"
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+          "event_type": "loyalty_points_redeemed",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.loyalty",
+          "tags": {
+            "source": "services.api.loyalty",
+            "location_scope": "location",
+            "location_id": "us-mia-brickell",
+            "country": "United States",
+            "currency": "USD"
+          },
+          "payload": {
+            "location_scope": "location",
+            "location_id": "us-mia-brickell",
+            "country": "United States",
+            "currency": "USD",
+            "timezone": "America/New_York",
+            "ticket_id": "tkt-901",
+            "loyalty_account_id": "loy_A1b2C3d4",
+            "balance_before": 15,
+            "points": 15,
+            "discount_amount": 60
+          }
+        }
+      ]
+    },
+    "loyaltyCardTransferred": {
+      "description": "One-time physical stamp card transfer onto an app account, at a location.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "loyalty_card_transferred"
+            },
+            "source": {
+              "enum": [
+                "services.api.loyalty"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "location"
+                },
+                "location_id": {
+                  "$ref": "#/$defs/locationId"
+                },
+                "country": {
+                  "enum": [
+                    "Colombia",
+                    "United States"
+                  ]
+                },
+                "currency": {
+                  "enum": [
+                    "COP",
+                    "USD"
+                  ]
+                },
+                "timezone": {
+                  "enum": [
+                    "America/Bogota",
+                    "America/New_York"
+                  ]
+                },
+                "loyalty_account_id": {
+                  "type": "string",
+                  "pattern": "^loy_[A-Za-z0-9]{8,}$"
+                },
+                "from_medium": {
+                  "const": "physical_card"
+                },
+                "to_medium": {
+                  "const": "app"
+                },
+                "points_balance": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "location_scope",
+                "location_id",
+                "country",
+                "currency",
+                "timezone",
+                "loyalty_account_id",
+                "from_medium",
+                "to_medium",
+                "points_balance"
+              ],
+              "allOf": [
+                {
+                  "$ref": "#/$defs/locationFacts"
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+          "event_type": "loyalty_card_transferred",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.loyalty",
+          "tags": {
+            "source": "services.api.loyalty",
+            "location_scope": "location",
+            "location_id": "co-bog-chapinero",
+            "country": "Colombia",
+            "currency": "COP"
+          },
+          "payload": {
+            "location_scope": "location",
+            "location_id": "co-bog-chapinero",
+            "country": "Colombia",
+            "currency": "COP",
+            "timezone": "America/Bogota",
+            "loyalty_account_id": "loy_Stamp001",
+            "from_medium": "physical_card",
+            "to_medium": "app",
+            "points_balance": 12
+          },
+          "actor_id": "4"
+        }
+      ]
+    },
+    "userLoginSucceeded": {
+      "description": "POST /auth/login or POST /auth/token after authenticate_user succeeds. actor_id is users.id.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "user_login_succeeded"
+            },
+            "source": {
+              "enum": [
+                "services.api.users"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "method": {
+                  "enum": [
+                    "json",
+                    "oauth2_form"
+                  ]
+                },
+                "route": {
+                  "enum": [
+                    "/auth/login",
+                    "/auth/token"
+                  ]
+                }
+              },
+              "required": [
+                "location_scope",
+                "method",
+                "route"
+              ],
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "method": {
+                        "const": "json"
+                      }
+                    },
+                    "required": [
+                      "method"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "route": {
+                        "const": "/auth/login"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "method": {
+                        "const": "oauth2_form"
+                      }
+                    },
+                    "required": [
+                      "method"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "route": {
+                        "const": "/auth/token"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        },
+        {
+          "required": [
+            "actor_id"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+          "event_type": "user_login_succeeded",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.users",
+          "tags": {
+            "source": "services.api.users",
+            "location_scope": "none"
+          },
+          "payload": {
+            "location_scope": "none",
+            "method": "json",
+            "route": "/auth/login"
+          },
+          "actor_id": "7"
+        }
+      ]
+    },
+    "userLoginFailed": {
+      "description": "401 branch of the login handlers. No email or password.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "user_login_failed"
+            },
+            "source": {
+              "enum": [
+                "services.api.users"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "method": {
+                  "enum": [
+                    "json",
+                    "oauth2_form"
+                  ]
+                },
+                "route": {
+                  "enum": [
+                    "/auth/login",
+                    "/auth/token"
+                  ]
+                },
+                "failure_reason": {
+                  "enum": [
+                    "invalid_credentials",
+                    "inactive_user"
+                  ]
+                }
+              },
+              "required": [
+                "location_scope",
+                "method",
+                "route",
+                "failure_reason"
+              ],
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "method": {
+                        "const": "json"
+                      }
+                    },
+                    "required": [
+                      "method"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "route": {
+                        "const": "/auth/login"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "method": {
+                        "const": "oauth2_form"
+                      }
+                    },
+                    "required": [
+                      "method"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "route": {
+                        "const": "/auth/token"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "ffffffff-ffff-4fff-8fff-ffffffffffff",
+          "event_type": "user_login_failed",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.users",
+          "tags": {
+            "source": "services.api.users",
+            "location_scope": "none"
+          },
+          "payload": {
+            "location_scope": "none",
+            "method": "oauth2_form",
+            "route": "/auth/token",
+            "failure_reason": "invalid_credentials"
+          }
+        }
+      ]
+    },
+    "apiError": {
+      "description": "500 from handle_unhandled_error or 503 from handle_external_service_error.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "api_error"
+            },
+            "source": {
+              "enum": [
+                "services.api.errors"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "http_status": {
+                  "enum": [
+                    500,
+                    503
+                  ]
+                },
+                "code": {
+                  "enum": [
+                    "internal_error",
+                    "service_unavailable"
+                  ]
+                },
+                "method": {
+                  "enum": [
+                    "GET",
+                    "POST",
+                    "PUT",
+                    "PATCH",
+                    "DELETE"
+                  ]
+                },
+                "route_template": {
+                  "type": "string",
+                  "pattern": "^(/[A-Za-z0-9_./{}-]*|unmatched)$"
+                },
+                "message": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "location_scope",
+                "http_status",
+                "code",
+                "method",
+                "route_template",
+                "message"
+              ],
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "http_status": {
+                        "const": 500
+                      }
+                    },
+                    "required": [
+                      "http_status"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "code": {
+                        "const": "internal_error"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "http_status": {
+                        "const": 503
+                      }
+                    },
+                    "required": [
+                      "http_status"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "code": {
+                        "const": "service_unavailable"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "12121212-1212-4121-8121-121212121212",
+          "event_type": "api_error",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.errors",
+          "tags": {
+            "source": "services.api.errors",
+            "location_scope": "none"
+          },
+          "payload": {
+            "location_scope": "none",
+            "http_status": 500,
+            "code": "internal_error",
+            "method": "GET",
+            "route_template": "/inventory",
+            "message": "Internal server error"
+          }
+        }
+      ]
+    },
+    "pageView": {
+      "description": "Client route mount. path is the pathname with no query string.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "page_view"
+            },
+            "source": {
+              "enum": [
+                "uis.website",
+                "uis.backoffice"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "app": {
+                  "enum": [
+                    "website",
+                    "backoffice"
+                  ]
+                },
+                "path": {
+                  "type": "string",
+                  "pattern": "^/[^?#]*$"
+                }
+              },
+              "required": [
+                "location_scope",
+                "app",
+                "path"
+              ],
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "app": {
+                        "const": "website"
+                      }
+                    },
+                    "required": [
+                      "app"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "path": {
+                        "const": "/"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "app": {
+                        "const": "backoffice"
+                      }
+                    },
+                    "required": [
+                      "app"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "path": {
+                        "enum": [
+                          "/login",
+                          "/register",
+                          "/accessible",
+                          "/account/profile",
+                          "/account/change-password"
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        },
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "uis.website"
+              }
+            },
+            "required": [
+              "source"
+            ]
+          },
+          "then": {
+            "properties": {
+              "payload": {
+                "properties": {
+                  "app": {
+                    "const": "website"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "uis.backoffice"
+              }
+            },
+            "required": [
+              "source"
+            ]
+          },
+          "then": {
+            "properties": {
+              "payload": {
+                "properties": {
+                  "app": {
+                    "const": "backoffice"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "13131313-1313-4131-8131-131313131313",
+          "event_type": "page_view",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "uis.backoffice",
+          "tags": {
+            "source": "uis.backoffice",
+            "location_scope": "none"
+          },
+          "payload": {
+            "location_scope": "none",
+            "app": "backoffice",
+            "path": "/accessible"
+          }
+        }
+      ]
+    }
+  }
+}
