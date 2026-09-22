@@ -32,6 +32,6 @@ npm run build   # production build → dist/
 src/
   components/   # SiteHeader, Hero, BrandPillars, Markets, LoyaltyTeaser, SiteFooter
   content/      # brand.ts — CONTEXT-aligned facts
-  pages/        # HomePage
+  views/        # HomePage
   styles/       # tokens.css — company visual identity
 ```

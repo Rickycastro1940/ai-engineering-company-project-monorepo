@@ -1,5 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { HomePage } from "./pages/HomePage";
+import { HomePage } from "./views/HomePage";
 
 export default function App() {
   return (

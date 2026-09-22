@@ -1,0 +1,15 @@
+**/node_modules
+node_modules
+**/.next
+.next
+.env*
+**/.env*
+*.log
+**/*.log
+**/dist
+**/dist-ssr
+**/.vite
+**/.DS_Store
+web
+README.md
+README.es.md

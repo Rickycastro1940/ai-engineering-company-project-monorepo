@@ -2,11 +2,11 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./auth/AuthProvider";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { BackofficeLayout } from "./components/BackofficeLayout";
-import { AccessiblePage } from "./pages/AccessiblePage";
-import { ChangePasswordPage } from "./pages/ChangePasswordPage";
-import { LoginPage } from "./pages/LoginPage";
-import { ProfilePage } from "./pages/ProfilePage";
-import { RegisterPage } from "./pages/RegisterPage";
+import { AccessiblePage } from "./views/AccessiblePage";
+import { ChangePasswordPage } from "./views/ChangePasswordPage";
+import { LoginPage } from "./views/LoginPage";
+import { ProfilePage } from "./views/ProfilePage";
+import { RegisterPage } from "./views/RegisterPage";
 
 export default function App() {
   return (
