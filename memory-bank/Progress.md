@@ -14,7 +14,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
-| Technology: telemetry + pipeline to dashboards | **Partial** — 34 mandatory metrics from `CONTEXT.md`, an identified-opportunity catalog, and a standard event envelope (`eventID`, ISO 8601 `timestamp`, `sessionID`, `UserID`, `Event_type`, `SchemaVersion`, `requestID`, `properties`). Weekly cost/waste pipeline and Celery path exist. Live emitters are not wired |
+| Technology: telemetry + pipeline to dashboards | **Partial** — 34 mandatory metrics from `CONTEXT.md` with `$defs.mandatoryMetricSet`, 18 mandatory + 23 opportunity events on the `entity_action` taxonomy, and a standard event envelope. Weekly cost/waste pipeline and Celery path exist. Live emitters are not wired |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Not done** as product UI; pipeline design targets cost/waste for Mariana + Felipe |
 | Procurement: supplier price history, consolidated spend | **Not done** (supplier docs may exist on other branches; not claimed here) |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
@@ -182,6 +182,23 @@ Department served: **Technology** (structured HTTP, no env names in 503s) + **Op
 uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py tests/test_users_api.py -q → 33 passed
 cd uis/backoffice && npm run build → green
 ```
+
+## Latest event taxonomy and complete schemas (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology**. Every `Event_type` follows `entity_action` with a closed verb list. `$defs.mandatoryMetricSet` is the complete observation schema for all 34 `CONTEXT.md` mandatory metrics. Opportunity schemas cover business/inventory, authentication, performance, errors, and navigation (examples: `direct_stock_edit_rejected`, `session_expired`, `api_latency_recorded`).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+Draft202012Validator.check_schema → pass
+41 event examples validate
+mandatoryMetricSet example = 34 observations
+entity_action examples present: inbound_order_created, stock_threshold_triggered, direct_stock_edit_rejected, session_expired, api_latency_recorded
+old names absent: stock_modification_rejected, api_call_completed, page_view, api_error, ui_timing
+session_expired split from session_rejected; expired reason removed from session_rejected
+mandatory metrics remain 34
+```
+
+Emitters are still not wired. Menus, sales, customers, and suppliers remain missing on the central API.
 
 ## Latest event envelope (`cursor/telemetry-plan-ff8d`)
 

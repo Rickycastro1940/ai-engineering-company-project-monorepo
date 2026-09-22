@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://brasaland.digital/telemetry/event-schemas.json",
-  "title": "Brasaland telemetry event",
-  "description": "Producer document for one Brasaland telemetry event. Storage mapping into telemetry_events is defined in docs/telemetry/telemetry-plan.md. Validate before insert. examples on each $defs event are valid instances of this schema.",
+  "title": "Brasaland telemetry event and mandatory metric schemas",
+  "description": "Brasaland telemetry schemas. Event_type values follow the entity_action taxonomy (consistent verbs: created, adjusted, crossed, cleared, triggered, registered, detected, completed, recorded, shown, accepted, hired, separated, scheduled, opened, filled, published, acknowledged, dispatched, redeemed, transferred, succeeded, failed, rejected, ended, viewed, expired, raised, caught, updated). The envelope requires eventID, timestamp (ISO 8601 UTC), sessionID, UserID, Event_type, SchemaVersion, requestID, and properties. $defs.mandatoryMetricSet is the complete observation schema for every CONTEXT.md mandatory metric. Storage mapping is in docs/telemetry/telemetry-plan.md.",
   "oneOf": [
     {
       "$ref": "#/$defs/productCreated"
@@ -20,7 +20,7 @@
       "$ref": "#/$defs/inventoryValidationFailed"
     },
     {
-      "$ref": "#/$defs/stockModificationRejected"
+      "$ref": "#/$defs/directStockEditRejected"
     },
     {
       "$ref": "#/$defs/inboundOrderCreated"
@@ -56,13 +56,16 @@
       "$ref": "#/$defs/userLoginFailed"
     },
     {
-      "$ref": "#/$defs/apiError"
+      "$ref": "#/$defs/apiErrorRaised"
     },
     {
-      "$ref": "#/$defs/pageView"
+      "$ref": "#/$defs/pageViewed"
     },
     {
       "$ref": "#/$defs/authFormRejected"
+    },
+    {
+      "$ref": "#/$defs/sessionExpired"
     },
     {
       "$ref": "#/$defs/sessionRejected"
@@ -71,22 +74,22 @@
       "$ref": "#/$defs/sessionEnded"
     },
     {
-      "$ref": "#/$defs/accountMutation"
+      "$ref": "#/$defs/accountUpdated"
     },
     {
-      "$ref": "#/$defs/apiCallCompleted"
+      "$ref": "#/$defs/apiLatencyRecorded"
     },
     {
-      "$ref": "#/$defs/uiTiming"
+      "$ref": "#/$defs/uiLatencyRecorded"
     },
     {
-      "$ref": "#/$defs/clientException"
+      "$ref": "#/$defs/clientExceptionCaught"
     },
     {
       "$ref": "#/$defs/sectionViewed"
     },
     {
-      "$ref": "#/$defs/flowProgress"
+      "$ref": "#/$defs/flowStepRecorded"
     },
     {
       "$ref": "#/$defs/employeeHired"
@@ -975,7 +978,7 @@
         }
       ]
     },
-    "stockModificationRejected": {
+    "directStockEditRejected": {
       "description": "Direct stock change or alert threshold the API refuses. CSV is unchanged. IP-4.",
       "allOf": [
         {
@@ -984,7 +987,7 @@
         {
           "properties": {
             "Event_type": {
-              "const": "stock_modification_rejected"
+              "const": "direct_stock_edit_rejected"
             },
             "source": {
               "enum": [
@@ -1129,7 +1132,7 @@
           "timestamp": "2026-09-22T15:04:05Z",
           "sessionID": "02020202-0202-4202-8202-020202020202",
           "UserID": "7",
-          "Event_type": "stock_modification_rejected",
+          "Event_type": "direct_stock_edit_rejected",
           "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.inventory",
           "tags": {
@@ -3018,7 +3021,7 @@
         }
       ]
     },
-    "apiError": {
+    "apiErrorRaised": {
       "description": "500 from handle_unhandled_error or 503 from handle_external_service_error.",
       "allOf": [
         {
@@ -3027,7 +3030,7 @@
         {
           "properties": {
             "Event_type": {
-              "const": "api_error"
+              "const": "api_error_raised"
             },
             "source": {
               "enum": [
@@ -3135,7 +3138,7 @@
           "timestamp": "2026-09-22T15:04:05Z",
           "sessionID": null,
           "UserID": null,
-          "Event_type": "api_error",
+          "Event_type": "api_error_raised",
           "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.errors",
           "tags": {
@@ -3153,7 +3156,7 @@
         }
       ]
     },
-    "pageView": {
+    "pageViewed": {
       "description": "Public corporate home mount. path is /.",
       "allOf": [
         {
@@ -3162,7 +3165,7 @@
         {
           "properties": {
             "Event_type": {
-              "const": "page_view"
+              "const": "page_viewed"
             },
             "source": {
               "enum": [
@@ -3204,7 +3207,7 @@
           "timestamp": "2026-09-22T15:04:05Z",
           "sessionID": null,
           "UserID": null,
-          "Event_type": "page_view",
+          "Event_type": "page_viewed",
           "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "uis.website",
           "tags": {
@@ -3435,8 +3438,70 @@
         }
       ]
     },
+    "sessionExpired": {
+      "description": "JWT past exp. Emitted on ExpiredSignatureError before decode_access_token collapses the error. Distinct from user_login_failed.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "Event_type": {
+              "const": "session_expired"
+            },
+            "source": {
+              "enum": [
+                "services.api.auth"
+              ]
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "route_template": {
+                  "type": "string",
+                  "pattern": "^/[A-Za-z0-9_./{}-]+$"
+                }
+              },
+              "required": [
+                "location_scope",
+                "route_template"
+              ]
+            }
+          },
+          "required": [
+            "Event_type",
+            "source",
+            "properties"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "SchemaVersion": 1,
+          "eventID": "30303030-3030-4303-8303-303030303030",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "session_expired",
+          "requestID": "01010101-0101-4101-8101-010101010101",
+          "source": "services.api.auth",
+          "tags": {
+            "source": "services.api.auth",
+            "location_scope": "none"
+          },
+          "properties": {
+            "location_scope": "none",
+            "route_template": "/auth/me"
+          }
+        }
+      ]
+    },
     "sessionRejected": {
-      "description": "Expired or invalid JWT, inactive subject, or a protected route opened with no token. Distinct from user_login_failed.",
+      "description": "Invalid JWT, inactive subject, or a protected route opened with no token. Distinct from session_expired and user_login_failed.",
       "allOf": [
         {
           "$ref": "#/$defs/envelope"
@@ -3462,7 +3527,6 @@
                 },
                 "reason": {
                   "enum": [
-                    "expired",
                     "invalid_token",
                     "inactive_user",
                     "missing_token"
@@ -3505,10 +3569,7 @@
               "properties": {
                 "properties": {
                   "reason": {
-                    "enum": [
-                      "expired",
-                      "invalid_token"
-                    ]
+                    "const": "invalid_token"
                   }
                 },
                 "required": [
@@ -3577,7 +3638,7 @@
       "examples": [
         {
           "SchemaVersion": 1,
-          "eventID": "30303030-3030-4303-8303-303030303030",
+          "eventID": "31313131-3131-4313-8313-313131313131",
           "timestamp": "2026-09-22T15:04:05Z",
           "sessionID": null,
           "UserID": null,
@@ -3590,7 +3651,7 @@
           },
           "properties": {
             "location_scope": "none",
-            "reason": "expired",
+            "reason": "invalid_token",
             "route_template": "/auth/me"
           }
         }
@@ -3660,7 +3721,7 @@
         }
       ]
     },
-    "accountMutation": {
+    "accountUpdated": {
       "description": "Register, profile save, or password change finished or was refused. No contact fields.",
       "allOf": [
         {
@@ -3669,7 +3730,7 @@
         {
           "properties": {
             "Event_type": {
-              "const": "account_mutation"
+              "const": "account_updated"
             },
             "source": {
               "enum": [
@@ -3792,7 +3853,7 @@
           "timestamp": "2026-09-22T15:04:05Z",
           "sessionID": null,
           "UserID": null,
-          "Event_type": "account_mutation",
+          "Event_type": "account_updated",
           "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "uis.backoffice",
           "tags": {
@@ -3808,7 +3869,7 @@
         }
       ]
     },
-    "apiCallCompleted": {
+    "apiLatencyRecorded": {
       "description": "One apiRequest, including network failure. route_template has no query string.",
       "allOf": [
         {
@@ -3817,7 +3878,7 @@
         {
           "properties": {
             "Event_type": {
-              "const": "api_call_completed"
+              "const": "api_latency_recorded"
             },
             "source": {
               "enum": [
@@ -3977,7 +4038,7 @@
           "timestamp": "2026-09-22T15:04:05Z",
           "sessionID": null,
           "UserID": null,
-          "Event_type": "api_call_completed",
+          "Event_type": "api_latency_recorded",
           "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "uis.backoffice",
           "tags": {
@@ -3995,7 +4056,7 @@
         }
       ]
     },
-    "uiTiming": {
+    "uiLatencyRecorded": {
       "description": "Session, panel, or form clock until success, error, or the effect was cancelled.",
       "allOf": [
         {
@@ -4004,7 +4065,7 @@
         {
           "properties": {
             "Event_type": {
-              "const": "ui_timing"
+              "const": "ui_latency_recorded"
             },
             "source": {
               "enum": [
@@ -4139,7 +4200,7 @@
           "timestamp": "2026-09-22T15:04:05Z",
           "sessionID": null,
           "UserID": null,
-          "Event_type": "ui_timing",
+          "Event_type": "ui_latency_recorded",
           "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "uis.backoffice",
           "tags": {
@@ -4156,7 +4217,7 @@
         }
       ]
     },
-    "clientException": {
+    "clientExceptionCaught": {
       "description": "Error boundary, window error, or unhandled rejection. error_name only. No message and no stack.",
       "allOf": [
         {
@@ -4165,7 +4226,7 @@
         {
           "properties": {
             "Event_type": {
-              "const": "client_exception"
+              "const": "client_exception_caught"
             },
             "source": {
               "enum": [
@@ -4271,7 +4332,7 @@
           "timestamp": "2026-09-22T15:04:05Z",
           "sessionID": null,
           "UserID": null,
-          "Event_type": "client_exception",
+          "Event_type": "client_exception_caught",
           "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "uis.backoffice",
           "tags": {
@@ -4581,7 +4642,7 @@
         }
       ]
     },
-    "flowProgress": {
+    "flowStepRecorded": {
       "description": "One step of a staff flow. Abandoned and completed both close the flow_instance.",
       "allOf": [
         {
@@ -4590,7 +4651,7 @@
         {
           "properties": {
             "Event_type": {
-              "const": "flow_progress"
+              "const": "flow_step_recorded"
             },
             "source": {
               "enum": [
@@ -4654,7 +4715,7 @@
           "timestamp": "2026-09-22T15:04:05Z",
           "sessionID": null,
           "UserID": null,
-          "Event_type": "flow_progress",
+          "Event_type": "flow_step_recorded",
           "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "uis.backoffice",
           "tags": {
@@ -6085,6 +6146,817 @@
             ]
           }
         }
+      ]
+    },
+    "mandatoryMetricObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "One published value for a CONTEXT.md mandatory metric. status null_pending_writer means the writer is not live yet; value must be null.",
+      "required": [
+        "metric_id",
+        "value",
+        "grain",
+        "status",
+        "as_of"
+      ],
+      "properties": {
+        "metric_id": {
+          "enum": [
+            "ops.sales.gross_native",
+            "ops.sales.covers",
+            "ops.sales.slow_week",
+            "ops.sales.average_ticket",
+            "exec.ticket.top_location",
+            "ops.sales.silence",
+            "ops.ordering.on_hand",
+            "ops.ordering.suggested_qty",
+            "proc.price.history",
+            "proc.price.alerts",
+            "proc.purchase.consolidated",
+            "mkt.customers.identified_rate",
+            "mkt.customers.order_history",
+            "mkt.customers.preference_coverage",
+            "mkt.personalisation.accept_rate",
+            "mkt.orders.digital_share",
+            "mkt.loyalty.attach_rate",
+            "people.turnover",
+            "people.absenteeism",
+            "people.time_to_fill",
+            "people.holiday.requests",
+            "people.onboarding.completion",
+            "train.update.coverage",
+            "train.catalogue.search_hit_rate",
+            "train.onboarding.path_completion",
+            "tech.locations.live",
+            "tech.api.noun_coverage",
+            "tech.dashboards.fed",
+            "exec.chain.sales",
+            "exec.florida.week_sales",
+            "exec.report.on_time",
+            "exec.assistant.named_questions",
+            "finance.sales.native",
+            "finance.purchases.native"
+          ]
+        },
+        "value": {
+          "description": "Computed number, boolean, object, or null when the writer is pending.",
+          "type": [
+            "number",
+            "integer",
+            "boolean",
+            "string",
+            "object",
+            "array",
+            "null"
+          ]
+        },
+        "currency": {
+          "enum": [
+            "COP",
+            "USD"
+          ]
+        },
+        "country": {
+          "enum": [
+            "Colombia",
+            "United States"
+          ]
+        },
+        "location_id": {
+          "$ref": "#/$defs/locationId"
+        },
+        "grain": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "status": {
+          "enum": [
+            "recorded",
+            "null_pending_writer",
+            "insufficient_data"
+          ]
+        },
+        "as_of": {
+          "$ref": "#/$defs/timestamp"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "null_pending_writer"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "mandatoryMetricSet": {
+      "type": "array",
+      "description": "Complete set of observations for every CONTEXT.md mandatory metric. Exactly one row per floor metric id.",
+      "minItems": 34,
+      "maxItems": 34,
+      "items": {
+        "$ref": "#/$defs/mandatoryMetricObservation"
+      },
+      "uniqueItems": true,
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "ops.sales.gross_native"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "ops.sales.covers"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "ops.sales.slow_week"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "ops.sales.average_ticket"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "exec.ticket.top_location"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "ops.sales.silence"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "ops.ordering.on_hand"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "ops.ordering.suggested_qty"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "proc.price.history"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "proc.price.alerts"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "proc.purchase.consolidated"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "mkt.customers.identified_rate"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "mkt.customers.order_history"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "mkt.customers.preference_coverage"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "mkt.personalisation.accept_rate"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "mkt.orders.digital_share"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "mkt.loyalty.attach_rate"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "people.turnover"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "people.absenteeism"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "people.time_to_fill"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "people.holiday.requests"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "people.onboarding.completion"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "train.update.coverage"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "train.catalogue.search_hit_rate"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "train.onboarding.path_completion"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "tech.locations.live"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "tech.api.noun_coverage"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "tech.dashboards.fed"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "exec.chain.sales"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "exec.florida.week_sales"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "exec.report.on_time"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "exec.assistant.named_questions"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "finance.sales.native"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "finance.purchases.native"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      ],
+      "examples": [
+        [
+          {
+            "metric_id": "ops.sales.gross_native",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "ops.sales.covers",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "ops.sales.slow_week",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "ops.sales.average_ticket",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "exec.ticket.top_location",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "ops.sales.silence",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "ops.ordering.on_hand",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "ops.ordering.suggested_qty",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "proc.price.history",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "proc.price.alerts",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "proc.purchase.consolidated",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "mkt.customers.identified_rate",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "mkt.customers.order_history",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "mkt.customers.preference_coverage",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "mkt.personalisation.accept_rate",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "mkt.orders.digital_share",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "mkt.loyalty.attach_rate",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "people.turnover",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "people.absenteeism",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "people.time_to_fill",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "people.holiday.requests",
+            "value": null,
+            "grain": "chain_week",
+            "status": "null_pending_writer",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "people.onboarding.completion",
+            "value": null,
+            "grain": "chain_week",
+            "status": "null_pending_writer",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "train.update.coverage",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "train.catalogue.search_hit_rate",
+            "value": null,
+            "grain": "chain_week",
+            "status": "null_pending_writer",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "train.onboarding.path_completion",
+            "value": null,
+            "grain": "chain_week",
+            "status": "null_pending_writer",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "tech.locations.live",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "tech.api.noun_coverage",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "tech.dashboards.fed",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "exec.chain.sales",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "exec.florida.week_sales",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "exec.report.on_time",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "exec.assistant.named_questions",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "finance.sales.native",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          },
+          {
+            "metric_id": "finance.purchases.native",
+            "value": 1.0,
+            "grain": "chain_week",
+            "status": "recorded",
+            "as_of": "2026-09-22T15:04:05Z"
+          }
+        ]
       ]
     }
   }
