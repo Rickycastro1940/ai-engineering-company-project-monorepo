@@ -62,6 +62,36 @@
       "$ref": "#/$defs/pageView"
     },
     {
+      "$ref": "#/$defs/authFormRejected"
+    },
+    {
+      "$ref": "#/$defs/sessionRejected"
+    },
+    {
+      "$ref": "#/$defs/sessionCheckFailed"
+    },
+    {
+      "$ref": "#/$defs/sessionEnded"
+    },
+    {
+      "$ref": "#/$defs/accountMutation"
+    },
+    {
+      "$ref": "#/$defs/apiCallCompleted"
+    },
+    {
+      "$ref": "#/$defs/uiTiming"
+    },
+    {
+      "$ref": "#/$defs/clientException"
+    },
+    {
+      "$ref": "#/$defs/sectionViewed"
+    },
+    {
+      "$ref": "#/$defs/flowProgress"
+    },
+    {
       "$ref": "#/$defs/employeeHired"
     },
     {
@@ -129,6 +159,7 @@
         "services.api.training",
         "services.telemetry.weekly_report",
         "services.api.users",
+        "services.api.auth",
         "services.api.errors",
         "services.telemetry.silence_monitor",
         "services.telemetry.cover_monitor",
@@ -3206,6 +3237,1586 @@
             "location_scope": "none",
             "app": "backoffice",
             "path": "/accessible"
+          }
+        }
+      ]
+    },
+    "authFormRejected": {
+      "description": "Staff form blocked a submit, or the matching HTTP 422 was shown. No email or password. The server does not emit a second copy.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "auth_form_rejected"
+            },
+            "source": {
+              "enum": [
+                "uis.backoffice"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "form": {
+                  "enum": [
+                    "login",
+                    "register",
+                    "password_change",
+                    "profile"
+                  ]
+                },
+                "reason": {
+                  "enum": [
+                    "validation",
+                    "mismatch",
+                    "too_short"
+                  ]
+                },
+                "field": {
+                  "enum": [
+                    "email",
+                    "password",
+                    "confirm_password",
+                    "name",
+                    "phone",
+                    "address",
+                    "form"
+                  ]
+                }
+              },
+              "required": [
+                "location_scope",
+                "form",
+                "reason",
+                "field"
+              ],
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "reason": {
+                        "enum": [
+                          "mismatch",
+                          "too_short"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "reason"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "form": {
+                        "const": "password_change"
+                      },
+                      "field": {
+                        "enum": [
+                          "password",
+                          "confirm_password"
+                        ]
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "form": {
+                        "const": "login"
+                      }
+                    },
+                    "required": [
+                      "form"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "field": {
+                        "enum": [
+                          "email",
+                          "password",
+                          "form"
+                        ]
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "form": {
+                        "const": "register"
+                      }
+                    },
+                    "required": [
+                      "form"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "field": {
+                        "enum": [
+                          "email",
+                          "password",
+                          "name",
+                          "form"
+                        ]
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "form": {
+                        "const": "profile"
+                      }
+                    },
+                    "required": [
+                      "form"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "field": {
+                        "enum": [
+                          "name",
+                          "phone",
+                          "address",
+                          "form"
+                        ]
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "form": {
+                        "const": "password_change"
+                      },
+                      "reason": {
+                        "const": "validation"
+                      }
+                    },
+                    "required": [
+                      "form",
+                      "reason"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "field": {
+                        "enum": [
+                          "password",
+                          "confirm_password",
+                          "form"
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "29292929-2929-4292-8292-292929292929",
+          "event_type": "auth_form_rejected",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "uis.backoffice",
+          "tags": {
+            "source": "uis.backoffice",
+            "location_scope": "none"
+          },
+          "payload": {
+            "location_scope": "none",
+            "form": "password_change",
+            "reason": "mismatch",
+            "field": "confirm_password"
+          }
+        }
+      ]
+    },
+    "sessionRejected": {
+      "description": "Expired or invalid JWT, inactive subject, or a protected route opened with no token. Distinct from user_login_failed.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "session_rejected"
+            },
+            "source": {
+              "enum": [
+                "services.api.auth",
+                "services.api.users",
+                "uis.backoffice"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "reason": {
+                  "enum": [
+                    "expired",
+                    "invalid_token",
+                    "inactive_user",
+                    "missing_token"
+                  ]
+                },
+                "route_template": {
+                  "type": "string",
+                  "pattern": "^/[A-Za-z0-9_./{}-]+$"
+                },
+                "path": {
+                  "type": "string",
+                  "pattern": "^/[^?#]*$"
+                }
+              },
+              "required": [
+                "location_scope",
+                "reason"
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        },
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "services.api.auth"
+              }
+            },
+            "required": [
+              "source"
+            ]
+          },
+          "then": {
+            "properties": {
+              "payload": {
+                "properties": {
+                  "reason": {
+                    "enum": [
+                      "expired",
+                      "invalid_token"
+                    ]
+                  }
+                },
+                "required": [
+                  "route_template"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "services.api.users"
+              }
+            },
+            "required": [
+              "source"
+            ]
+          },
+          "then": {
+            "properties": {
+              "payload": {
+                "properties": {
+                  "reason": {
+                    "enum": [
+                      "invalid_token",
+                      "inactive_user"
+                    ]
+                  }
+                },
+                "required": [
+                  "route_template"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "uis.backoffice"
+              }
+            },
+            "required": [
+              "source"
+            ]
+          },
+          "then": {
+            "properties": {
+              "payload": {
+                "properties": {
+                  "reason": {
+                    "const": "missing_token"
+                  }
+                },
+                "required": [
+                  "path"
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "30303030-3030-4303-8303-303030303030",
+          "event_type": "session_rejected",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "services.api.auth",
+          "tags": {
+            "source": "services.api.auth",
+            "location_scope": "none"
+          },
+          "payload": {
+            "location_scope": "none",
+            "reason": "expired",
+            "route_template": "/auth/me"
+          }
+        }
+      ]
+    },
+    "sessionCheckFailed": {
+      "description": "AuthProvider could not finish GET /auth/me for a reason other than 401.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "session_check_failed"
+            },
+            "source": {
+              "enum": [
+                "uis.backoffice"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "reason": {
+                  "enum": [
+                    "network",
+                    "server"
+                  ]
+                }
+              },
+              "required": [
+                "location_scope",
+                "reason"
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "31313131-3131-4313-8313-313131313131",
+          "event_type": "session_check_failed",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "uis.backoffice",
+          "tags": {
+            "source": "uis.backoffice",
+            "location_scope": "none"
+          },
+          "payload": {
+            "location_scope": "none",
+            "reason": "network"
+          }
+        }
+      ]
+    },
+    "sessionEnded": {
+      "description": "Logout, or a later 401 cleared the stored token. Does not restate expired versus invalid.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "session_ended"
+            },
+            "source": {
+              "enum": [
+                "uis.backoffice"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "reason": {
+                  "enum": [
+                    "logout",
+                    "rejected_session"
+                  ]
+                }
+              },
+              "required": [
+                "location_scope",
+                "reason"
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "32323232-3232-4323-8323-323232323232",
+          "event_type": "session_ended",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "uis.backoffice",
+          "tags": {
+            "source": "uis.backoffice",
+            "location_scope": "none"
+          },
+          "payload": {
+            "location_scope": "none",
+            "reason": "logout"
+          }
+        }
+      ]
+    },
+    "accountMutation": {
+      "description": "Register, profile save, or password change finished or was refused. No contact fields.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "account_mutation"
+            },
+            "source": {
+              "enum": [
+                "uis.backoffice"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "action": {
+                  "enum": [
+                    "register",
+                    "profile_save",
+                    "password_change"
+                  ]
+                },
+                "outcome": {
+                  "enum": [
+                    "completed",
+                    "rejected"
+                  ]
+                },
+                "reason": {
+                  "enum": [
+                    "none",
+                    "validation",
+                    "duplicate_email",
+                    "unauthorized",
+                    "api_error"
+                  ]
+                }
+              },
+              "required": [
+                "location_scope",
+                "action",
+                "outcome",
+                "reason"
+              ],
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "outcome": {
+                        "const": "completed"
+                      }
+                    },
+                    "required": [
+                      "outcome"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "reason": {
+                        "const": "none"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "outcome": {
+                        "const": "rejected"
+                      }
+                    },
+                    "required": [
+                      "outcome"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "reason": {
+                        "enum": [
+                          "validation",
+                          "duplicate_email",
+                          "unauthorized",
+                          "api_error"
+                        ]
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "reason": {
+                        "const": "duplicate_email"
+                      }
+                    },
+                    "required": [
+                      "reason"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "action": {
+                        "const": "register"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "34343434-3434-4343-8343-343434343434",
+          "event_type": "account_mutation",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "uis.backoffice",
+          "tags": {
+            "source": "uis.backoffice",
+            "location_scope": "none"
+          },
+          "payload": {
+            "location_scope": "none",
+            "action": "register",
+            "outcome": "rejected",
+            "reason": "duplicate_email"
+          }
+        }
+      ]
+    },
+    "apiCallCompleted": {
+      "description": "One apiRequest, including network failure. route_template has no query string.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "api_call_completed"
+            },
+            "source": {
+              "enum": [
+                "uis.backoffice"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "method": {
+                  "enum": [
+                    "GET",
+                    "POST",
+                    "PUT",
+                    "PATCH",
+                    "DELETE"
+                  ]
+                },
+                "route_template": {
+                  "enum": [
+                    "/auth/login",
+                    "/auth/token",
+                    "/auth/register",
+                    "/auth/me",
+                    "/users",
+                    "/users/{id}",
+                    "/profiles/me",
+                    "/locations/overview",
+                    "/inventory"
+                  ]
+                },
+                "http_status": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 599
+                },
+                "duration_ms": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3600000
+                },
+                "outcome": {
+                  "enum": [
+                    "ok",
+                    "http_error",
+                    "network",
+                    "parse_error"
+                  ]
+                }
+              },
+              "required": [
+                "location_scope",
+                "method",
+                "route_template",
+                "http_status",
+                "duration_ms",
+                "outcome"
+              ],
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "outcome": {
+                        "const": "ok"
+                      }
+                    },
+                    "required": [
+                      "outcome"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "http_status": {
+                        "minimum": 200,
+                        "maximum": 299
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "outcome": {
+                        "const": "network"
+                      }
+                    },
+                    "required": [
+                      "outcome"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "http_status": {
+                        "const": 0
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "outcome": {
+                        "const": "http_error"
+                      }
+                    },
+                    "required": [
+                      "outcome"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "http_status": {
+                        "minimum": 400,
+                        "maximum": 599
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "outcome": {
+                        "const": "parse_error"
+                      }
+                    },
+                    "required": [
+                      "outcome"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "http_status": {
+                        "minimum": 200,
+                        "maximum": 299
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "35353535-3535-4353-8353-353535353535",
+          "event_type": "api_call_completed",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "uis.backoffice",
+          "tags": {
+            "source": "uis.backoffice",
+            "location_scope": "none"
+          },
+          "payload": {
+            "location_scope": "none",
+            "method": "GET",
+            "route_template": "/locations/overview",
+            "http_status": 200,
+            "duration_ms": 180,
+            "outcome": "ok"
+          }
+        }
+      ]
+    },
+    "uiTiming": {
+      "description": "Session, panel, or form clock until success, error, or the effect was cancelled.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "ui_timing"
+            },
+            "source": {
+              "enum": [
+                "uis.backoffice"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "kind": {
+                  "enum": [
+                    "session_check",
+                    "panel",
+                    "form"
+                  ]
+                },
+                "name": {
+                  "enum": [
+                    "auth_me",
+                    "locations_overview",
+                    "inventory",
+                    "profile",
+                    "login_form",
+                    "register_form",
+                    "password_form"
+                  ]
+                },
+                "duration_ms": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3600000
+                },
+                "outcome": {
+                  "enum": [
+                    "success",
+                    "error",
+                    "cancelled"
+                  ]
+                }
+              },
+              "required": [
+                "location_scope",
+                "kind",
+                "name",
+                "duration_ms",
+                "outcome"
+              ],
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "kind": {
+                        "const": "session_check"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "name": {
+                        "const": "auth_me"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "kind": {
+                        "const": "panel"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "name": {
+                        "enum": [
+                          "locations_overview",
+                          "inventory",
+                          "profile"
+                        ]
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "kind": {
+                        "const": "form"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "name": {
+                        "enum": [
+                          "login_form",
+                          "register_form",
+                          "password_form"
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "36363636-3636-4363-8363-363636363636",
+          "event_type": "ui_timing",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "uis.backoffice",
+          "tags": {
+            "source": "uis.backoffice",
+            "location_scope": "none"
+          },
+          "payload": {
+            "location_scope": "none",
+            "kind": "panel",
+            "name": "inventory",
+            "duration_ms": 240,
+            "outcome": "success"
+          }
+        }
+      ]
+    },
+    "clientException": {
+      "description": "Error boundary, window error, or unhandled rejection. error_name only. No message and no stack.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "client_exception"
+            },
+            "source": {
+              "enum": [
+                "uis.backoffice",
+                "uis.website"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "catch_site": {
+                  "enum": [
+                    "error_boundary",
+                    "window_error",
+                    "unhandled_rejection"
+                  ]
+                },
+                "app": {
+                  "enum": [
+                    "backoffice",
+                    "website"
+                  ]
+                },
+                "path": {
+                  "type": "string",
+                  "pattern": "^/[^?#]*$"
+                },
+                "error_name": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$"
+                }
+              },
+              "required": [
+                "location_scope",
+                "catch_site",
+                "app",
+                "path",
+                "error_name"
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        },
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "uis.website"
+              }
+            },
+            "required": [
+              "source"
+            ]
+          },
+          "then": {
+            "properties": {
+              "payload": {
+                "properties": {
+                  "app": {
+                    "const": "website"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "uis.backoffice"
+              }
+            },
+            "required": [
+              "source"
+            ]
+          },
+          "then": {
+            "properties": {
+              "payload": {
+                "properties": {
+                  "app": {
+                    "const": "backoffice"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "37373737-3737-4373-8373-373737373737",
+          "event_type": "client_exception",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "uis.backoffice",
+          "tags": {
+            "source": "uis.backoffice",
+            "location_scope": "none"
+          },
+          "payload": {
+            "location_scope": "none",
+            "catch_site": "error_boundary",
+            "app": "backoffice",
+            "path": "/accessible",
+            "error_name": "TypeError"
+          }
+        }
+      ]
+    },
+    "sectionViewed": {
+      "description": "Operator surface actually shown. required and ready are fixed per section id.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "section_viewed"
+            },
+            "source": {
+              "enum": [
+                "uis.backoffice"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "app": {
+                  "const": "backoffice"
+                },
+                "section": {
+                  "enum": [
+                    "login",
+                    "register",
+                    "accessible_entry",
+                    "location_roster",
+                    "kitchen_inventory",
+                    "executive_sales",
+                    "account_profile",
+                    "account_password",
+                    "suppliers",
+                    "people",
+                    "training",
+                    "reporting"
+                  ]
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "ready": {
+                  "type": "boolean"
+                },
+                "path": {
+                  "type": "string",
+                  "pattern": "^/[^?#]*$"
+                }
+              },
+              "required": [
+                "location_scope",
+                "app",
+                "section",
+                "required",
+                "ready",
+                "path"
+              ],
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "section": {
+                        "const": "login"
+                      }
+                    },
+                    "required": [
+                      "section"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "required": {
+                        "const": false
+                      },
+                      "ready": {
+                        "const": true
+                      },
+                      "path": {
+                        "const": "/login"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "section": {
+                        "const": "register"
+                      }
+                    },
+                    "required": [
+                      "section"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "required": {
+                        "const": false
+                      },
+                      "ready": {
+                        "const": true
+                      },
+                      "path": {
+                        "const": "/register"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "section": {
+                        "const": "accessible_entry"
+                      }
+                    },
+                    "required": [
+                      "section"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "required": {
+                        "const": true
+                      },
+                      "ready": {
+                        "const": true
+                      },
+                      "path": {
+                        "const": "/accessible"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "section": {
+                        "const": "location_roster"
+                      }
+                    },
+                    "required": [
+                      "section"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "required": {
+                        "const": true
+                      },
+                      "ready": {
+                        "const": true
+                      },
+                      "path": {
+                        "const": "/accessible"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "section": {
+                        "const": "kitchen_inventory"
+                      }
+                    },
+                    "required": [
+                      "section"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "required": {
+                        "const": true
+                      },
+                      "ready": {
+                        "const": true
+                      },
+                      "path": {
+                        "const": "/accessible"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "section": {
+                        "const": "executive_sales"
+                      }
+                    },
+                    "required": [
+                      "section"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "required": {
+                        "const": true
+                      },
+                      "ready": {
+                        "const": false
+                      },
+                      "path": {
+                        "const": "/accessible"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "section": {
+                        "const": "account_profile"
+                      }
+                    },
+                    "required": [
+                      "section"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "required": {
+                        "const": false
+                      },
+                      "ready": {
+                        "const": true
+                      },
+                      "path": {
+                        "const": "/account/profile"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "section": {
+                        "const": "account_password"
+                      }
+                    },
+                    "required": [
+                      "section"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "required": {
+                        "const": false
+                      },
+                      "ready": {
+                        "const": true
+                      },
+                      "path": {
+                        "const": "/account/change-password"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "section": {
+                        "const": "suppliers"
+                      }
+                    },
+                    "required": [
+                      "section"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "required": {
+                        "const": true
+                      },
+                      "ready": {
+                        "const": false
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "section": {
+                        "const": "people"
+                      }
+                    },
+                    "required": [
+                      "section"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "required": {
+                        "const": true
+                      },
+                      "ready": {
+                        "const": false
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "section": {
+                        "const": "training"
+                      }
+                    },
+                    "required": [
+                      "section"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "required": {
+                        "const": true
+                      },
+                      "ready": {
+                        "const": false
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "section": {
+                        "const": "reporting"
+                      }
+                    },
+                    "required": [
+                      "section"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "required": {
+                        "const": false
+                      },
+                      "ready": {
+                        "const": true
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "38383838-3838-4383-8383-383838383838",
+          "event_type": "section_viewed",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "uis.backoffice",
+          "tags": {
+            "source": "uis.backoffice",
+            "location_scope": "none"
+          },
+          "payload": {
+            "location_scope": "none",
+            "app": "backoffice",
+            "section": "kitchen_inventory",
+            "required": true,
+            "ready": true,
+            "path": "/accessible"
+          }
+        }
+      ]
+    },
+    "flowProgress": {
+      "description": "One step of a staff flow. Abandoned and completed both close the flow_instance.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "flow_progress"
+            },
+            "source": {
+              "enum": [
+                "uis.backoffice"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "location_scope": {
+                  "const": "none"
+                },
+                "flow_id": {
+                  "enum": [
+                    "staff_sign_in",
+                    "staff_register",
+                    "session_restore",
+                    "profile_edit",
+                    "password_change",
+                    "operations_review",
+                    "inventory_inbound",
+                    "inventory_outbound"
+                  ]
+                },
+                "flow_instance": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "step": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9_]{1,64}$"
+                },
+                "outcome": {
+                  "enum": [
+                    "started",
+                    "advanced",
+                    "completed",
+                    "abandoned"
+                  ]
+                }
+              },
+              "required": [
+                "location_scope",
+                "flow_id",
+                "flow_instance",
+                "step",
+                "outcome"
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "source",
+            "payload"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "schema_version": 1,
+          "id": "39393939-3939-4393-8393-393939393939",
+          "event_type": "flow_progress",
+          "occurred_at": "2026-09-22T15:04:05Z",
+          "source": "uis.backoffice",
+          "tags": {
+            "source": "uis.backoffice",
+            "location_scope": "none"
+          },
+          "payload": {
+            "location_scope": "none",
+            "flow_id": "operations_review",
+            "flow_instance": "40404040-4040-4404-8404-404040404040",
+            "step": "inventory_error",
+            "outcome": "abandoned"
           }
         }
       ]

@@ -14,7 +14,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
-| Technology: telemetry + pipeline to dashboards | **Partial** — Phase 1 floor of 32 day-one metrics in `docs/telemetry/telemetry-plan.md`, with schemas for the events those metrics need. Weekly cost/waste pipeline and Celery path exist. Live emitters are not wired |
+| Technology: telemetry + pipeline to dashboards | **Partial** — Phase 1 floor of 32 day-one metrics in `docs/telemetry/telemetry-plan.md`, plus a backoffice catalog (auth, timing, client exceptions, required sections, abandoned flows) that stays off that floor. Schemas cover both. Weekly cost/waste pipeline and Celery path exist. Live emitters are not wired |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Not done** as product UI; pipeline design targets cost/waste for Mariana + Felipe |
 | Procurement: supplier price history, consolidated spend | **Not done** (supplier docs may exist on other branches; not claimed here) |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
@@ -182,6 +182,33 @@ Department served: **Technology** (structured HTTP, no env names in 503s) + **Op
 uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py tests/test_users_api.py -q → 33 passed
 cd uis/backoffice && npm run build → green
 ```
+
+## Latest backoffice catalog (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology** (staff-console telemetry for Nicolás Park) and **Operations** (which sections a session reaches, and which flows are left unfinished). Authentication, API timing, uncaught front-end errors, required visits, and abandoned flows are specified. The 32 Phase 1 floor ids are unchanged. `bo.*` questions are not on the weekly report list.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+Draft202012Validator.check_schema → pass
+41 event examples validate
+floor ids in weekly_report_dispatched example = 32, matching the schema enum
+bo.* ids in the plan = 11, none of them in the floor enum
+expired session from the browser → schema reject
+missing_token from services.api.auth → schema reject
+inactive_user from services.api.users → pass
+completed account_mutation with duplicate_email → schema reject
+network api_call_completed with http_status 500 → schema reject
+login form with reason mismatch → schema reject
+email property on auth_form_rejected → schema reject
+website client_exception with app backoffice → schema reject
+componentStack on client_exception → schema reject
+executive_sales ready true → schema reject
+suppliers required false → schema reject
+ui_timing kind form with name inventory → schema reject
+weekly report missing people.turnover → schema reject
+```
+
+Emitters are still not wired. Menus, sales, customers, and suppliers remain missing on the central API.
 
 ## Latest inventory-flow instrumentation (`cursor/telemetry-plan-ff8d`)
 
