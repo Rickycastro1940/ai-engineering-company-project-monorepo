@@ -239,6 +239,22 @@ GET http://127.0.0.1:3001/login → 200 Brasaland Backoffice
 uis/.dockerignore includes node_modules, .next, .env*, *.log
 ```
 
+## Latest services Python uv image (`cursor/services-python-uv-dockerfile-2c91`)
+
+Department served: **Technology** (Nicolás Park — containerized central FastAPI).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+docker build -f services/Dockerfile -t brasaland-api . → FROM python:3.11-slim
+install uv; RUN uv pip install -r requirements.txt (61 packages)
+CMD ["uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+logs: Started reloader process using WatchFiles
+GET /docs 200
+locations=present menus=present sales=present customers=present suppliers=present inventory=present
+path_count=34
+uv --version in image → uv 0.12.17
+```
+
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).
