@@ -9,6 +9,24 @@ The two main projects stored here are:
 
 Also present: **`web/`** — incident-analysis HTML tool (not the public marketing site).
 
+## Docker
+
+[`Dockerfile`](./Dockerfile) uses the official **Node Alpine** image (`node:22-alpine`). It installs npm dependencies for `uis/website` and `uis/backoffice` in **separate** `npm ci` layers, then copies each app’s source. The default command serves the public site on port 5173; run the staff console by setting `working_dir` to `/uis/backoffice` and port 5174.
+
+```bash
+# from this folder
+docker build -t brasaland-uis .
+
+# public site (Marketing)
+docker run --rm -p 5173:5173 brasaland-uis
+
+# staff backoffice (Operations / Executive)
+docker run --rm -p 5174:5174 -w /uis/backoffice brasaland-uis \
+  npm run dev -- --host 0.0.0.0 --port 5174
+```
+
+Root Compose also builds this image for the `website` and `backoffice` services.
+
 Organize `uis/` by **different concerns** — each subfolder covers a distinct area of the company (for example, public web vs internal operations) and includes its own technical and functional documentation.
 
 - **Main purpose**: to centralize in a single place all frontend applications that support the company's use cases.
