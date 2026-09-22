@@ -3,6 +3,9 @@
 # Default CMD runs start.sh, which starts both Next.js apps (website:3000, backoffice:3001).
 # Build from this folder: docker build -t brasaland-uis .
 
+# Never bake GROQ_API_KEY, JWT_SECRET_KEY, or passwords into this image.
+# Pass secrets at runtime from root .env (gitignored) via Compose env_file.
+
 FROM node:22-alpine
 
 WORKDIR /uis
