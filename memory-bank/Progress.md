@@ -282,6 +282,18 @@ GET http://127.0.0.1:8000/docs → 200
 GET http://127.0.0.1:3001/menus (Next rewrite to backend) → 200
 ```
 
+## Latest Docker secret hygiene (`cursor/docker-no-secrets-in-git-2c91`)
+
+Department served: **Technology** (credentials never in Git-versioned Compose/Dockerfiles).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+git check-ignore .env .env.local .env.production → ignored
+.git ls-files '.env*' → .env.example only (placeholders, no real keys)
+docker-compose.yml / Dockerfile / uis/Dockerfile / services/Dockerfile → no API keys or passwords
+compose env_file → .env (required: false); secrets not inlined
+```
+
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).
