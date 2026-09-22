@@ -14,7 +14,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
-| Technology: telemetry + pipeline to dashboards | **Partial** — Phase 1 floor of 32 day-one metrics in `docs/telemetry/telemetry-plan.md`. Each remaining event has a capture sentence (hypothesis and decision). Four staff points were dropped because they did not change a decision. Weekly cost/waste pipeline and Celery path exist. Live emitters are not wired |
+| Technology: telemetry + pipeline to dashboards | **Partial** — 34 mandatory metrics taken from `CONTEXT.md` needs, and a separate identified-opportunity catalog (metrics and staff-console events). Weekly cost/waste pipeline and Celery path exist. Live emitters are not wired |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Not done** as product UI; pipeline design targets cost/waste for Mariana + Felipe |
 | Procurement: supplier price history, consolidated spend | **Not done** (supplier docs may exist on other branches; not claimed here) |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
@@ -182,6 +182,24 @@ Department served: **Technology** (structured HTTP, no env names in 503s) + **Op
 uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py tests/test_users_api.py -q → 33 passed
 cd uis/backoffice && npm run build → green
 ```
+
+## Latest mandatory versus opportunity split (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology**, so the team can see which telemetry is the `CONTEXT.md` baseline and which is exploration of the application and the operating procedures.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+Draft202012Validator.check_schema → pass
+40 event examples validate
+mandatory metrics in the plan = 34 = weekly_report_dispatched.floor_metric_ids
+identified opportunity metrics = 34, no id shared with the mandatory list
+mandatory events = 18, identified opportunity events = 22, together the 40 schema events
+report missing people.holiday.requests → schema reject
+report containing ops.stockout.count → schema reject
+mkt.loyalty.points_earned is not a mandatory id
+```
+
+Earn and redeem rates, waste bands, opening hours, and the stock threshold of 10 are labeled as plan bindings or opportunities. They are not written in `CONTEXT.md`. Emitters are still not wired. Menus, sales, customers, and suppliers remain missing on the central API.
 
 ## Latest capture decisions (`cursor/telemetry-plan-ff8d`)
 

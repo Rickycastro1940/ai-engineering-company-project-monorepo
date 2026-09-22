@@ -5661,7 +5661,6 @@
                       "ops.sales.average_ticket",
                       "exec.ticket.top_location",
                       "ops.sales.silence",
-                      "ops.stockout.count",
                       "ops.ordering.on_hand",
                       "ops.ordering.suggested_qty",
                       "proc.price.history",
@@ -5673,13 +5672,16 @@
                       "mkt.personalisation.accept_rate",
                       "mkt.orders.digital_share",
                       "mkt.loyalty.attach_rate",
-                      "mkt.loyalty.points_earned",
-                      "mkt.loyalty.redeem_value",
                       "people.turnover",
                       "people.absenteeism",
                       "people.time_to_fill",
+                      "people.holiday.requests",
+                      "people.onboarding.completion",
                       "train.update.coverage",
+                      "train.catalogue.search_hit_rate",
+                      "train.onboarding.path_completion",
                       "tech.locations.live",
+                      "tech.api.noun_coverage",
                       "tech.dashboards.fed",
                       "exec.chain.sales",
                       "exec.florida.week_sales",
@@ -5719,11 +5721,6 @@
                     {
                       "contains": {
                         "const": "ops.sales.silence"
-                      }
-                    },
-                    {
-                      "contains": {
-                        "const": "ops.stockout.count"
                       }
                     },
                     {
@@ -5783,16 +5780,6 @@
                     },
                     {
                       "contains": {
-                        "const": "mkt.loyalty.points_earned"
-                      }
-                    },
-                    {
-                      "contains": {
-                        "const": "mkt.loyalty.redeem_value"
-                      }
-                    },
-                    {
-                      "contains": {
                         "const": "people.turnover"
                       }
                     },
@@ -5808,12 +5795,37 @@
                     },
                     {
                       "contains": {
+                        "const": "people.holiday.requests"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "people.onboarding.completion"
+                      }
+                    },
+                    {
+                      "contains": {
                         "const": "train.update.coverage"
                       }
                     },
                     {
                       "contains": {
+                        "const": "train.catalogue.search_hit_rate"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "train.onboarding.path_completion"
+                      }
+                    },
+                    {
+                      "contains": {
                         "const": "tech.locations.live"
+                      }
+                    },
+                    {
+                      "contains": {
+                        "const": "tech.api.noun_coverage"
                       }
                     },
                     {
@@ -5901,7 +5913,6 @@
               "ops.sales.average_ticket",
               "exec.ticket.top_location",
               "ops.sales.silence",
-              "ops.stockout.count",
               "ops.ordering.on_hand",
               "ops.ordering.suggested_qty",
               "proc.price.history",
@@ -5913,13 +5924,16 @@
               "mkt.personalisation.accept_rate",
               "mkt.orders.digital_share",
               "mkt.loyalty.attach_rate",
-              "mkt.loyalty.points_earned",
-              "mkt.loyalty.redeem_value",
               "people.turnover",
               "people.absenteeism",
               "people.time_to_fill",
+              "people.holiday.requests",
+              "people.onboarding.completion",
               "train.update.coverage",
+              "train.catalogue.search_hit_rate",
+              "train.onboarding.path_completion",
               "tech.locations.live",
+              "tech.api.noun_coverage",
               "tech.dashboards.fed",
               "exec.chain.sales",
               "exec.florida.week_sales",

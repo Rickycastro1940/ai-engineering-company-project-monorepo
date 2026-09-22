@@ -2,7 +2,7 @@
 
 Normative field names and types live in [`event-schemas.json`](./event-schemas.json) (JSON Schema draft 2020-12). This document is normative for **when** to emit, **how** to compute metrics, and **how** a row is stored. If a field name here and in the schema ever diverge, follow the schema and update this file in the same change.
 
-Department served: **Technology** (Nicolás Park) — real-time telemetry from each location into the operations, marketing, and finance path. Phase 1 below is the day-one floor from `CONTEXT.md` for Restaurant Operations (Felipe Guerrero), Procurement (Lucía Fernández), Marketing (Camila Ospina), People (Ashley Turner), Training (Jake Morrison), and Executive Direction (Mariana Restrepo).
+Department served: **Technology** (Nicolás Park) — real-time telemetry from each location into the operations, marketing, and finance path. Mandatory metrics below are the needs `CONTEXT.md` states for Restaurant Operations (Felipe Guerrero), Procurement (Lucía Fernández), Marketing (Camila Ospina), People (Ashley Turner), Training (Jake Morrison), and Executive Direction (Mariana Restrepo). Identified opportunities are the rest of the catalog.
 
 There is no telemetry writer in the running API today. `CONTEXT.md` states the chain has no telemetry. This plan is the contract for adding it to the code that already exists.
 
@@ -23,7 +23,29 @@ There is no telemetry writer in the running API today. `CONTEXT.md` states the c
 | Weekly KPI consumer | `data/pipelines/pipeline.py` → table `weekly_location_performance` |
 | Waste, supplier cadence, loyalty arithmetic | `docs/company-knowledge-base/` |
 
-`CONTEXT.md` wins if a knowledge-base file disagrees with it. The knowledge base supplies the operating thresholds the briefing does not spell out (waste bands, protein cover, Brasa Points rates, order cadence).
+`CONTEXT.md` wins if a knowledge-base file disagrees with it. The knowledge base supplies the operating thresholds the briefing does not spell out (waste bands, protein cover, Brasa Points rates, order cadence). Those thresholds are identified opportunities. They are not mandatory.
+
+### Identifiers
+
+Mandatory identifiers are only the strings `CONTEXT.md` writes. A plan binding is how this repo points at that string. It is not another mandatory identifier.
+
+| `CONTEXT.md` writes | Plan binding |
+| --- | --- |
+| 14 company-owned restaurants | The 14 rows in `services/api/locations.py` |
+| Colombia; the United States (Florida) | `country` `Colombia` or `United States`. Florida is `region` on the location API |
+| COP and USD | `currency` on each location and on each money event. Colombia is COP. Florida is USD |
+| the Medellín downtown location | API id `co-med-centro` (name Medellín Centro). `CONTEXT.md` does not print that id |
+| the Miami restaurant | `CONTEXT.md` does not name which Florida site. The worked slow-week example uses `us-mia-downtown`. The same test runs for all 14 |
+| around 20 suppliers; meat, vegetables, sauces, beverages, packaging, cleaning products | `supplier_id` values minted by this plan. The `sup_` pattern is not in `CONTEXT.md` |
+| Brasa Points; physical stamp cards; 60% of customers do not use them | Loyalty participation on `sale_completed`. Earn and redeem rates are not in `CONTEXT.md` |
+| website from 2019; no online orders; 2.8 app store rating | Facts. `page_view` and the 2.8 baseline are opportunities |
+| about 115 people; two countries | People metrics are split by `Colombia` and `United States` |
+| Spanish and English, optional, one base language first | `es` is the base locale on a recipe publish. `en` coverage is an opportunity |
+| locations, menus, sales, customers, suppliers | The five central-API nouns. Inventory is not one of them |
+| every Monday at 7am | 07:00 in `America/Bogota`, because headquarters is Medellín. `CONTEXT.md` does not name the timezone |
+| how many covers were served today; whether the Miami restaurant is having a slow week; how much did we sell this week in Florida; which location has the highest average ticket this month | `ops.sales.covers`, `ops.sales.slow_week`, `exec.florida.week_sales`, `exec.ticket.top_location` |
+
+Opening hours, the 45-minute silence gap, the stock threshold of 10, Brasa Points rates, waste bands, and supplier delivery days are not in `CONTEXT.md`.
 
 ## Constraints every emitter obeys
 
@@ -94,25 +116,24 @@ Locations are the roster above (`GET /locations`). Sales, menus, customers, and 
 
 `supplier_id` matches `^sup_[a-z0-9_]{2,64}$`. Mint one stable id per supplier (the briefing’s count is about 20, split across the two markets) and reuse it on every receipt.
 
-## Phase 1 — Exhaustive catalog of data opportunities
+## Phase 1 — Mandatory baseline and identified opportunities
 
-`CONTEXT.md` is the only source for what is mandatory. The rows in the floor table are the minimum the company requires from day one. They are a floor. The catalog under “Above the floor” is the rest of the opportunity set in the same briefing and in the operating procedures. Adding an opportunity never removes a floor row. A floor metric whose writer is not live yet is published as null. Omitting the row is a plan violation.
+Two groups, and only two. **Mandatory** means `CONTEXT.md` states the need in a department’s “What they need” or “What she needs”, or it states the question the dashboard exists to answer (covers today in Medellín downtown, a slow week at the Miami restaurant, Florida week sales, highest average ticket). **Identified opportunity** means this plan found the signal in the running application, in a problem sentence that is not itself the need, or in an operating procedure. An opportunity never replaces a mandatory row. A mandatory metric whose writer is not live yet is published as null. Omitting a mandatory row is a plan violation.
 
-The Monday report (`weekly_report_dispatched`) lists every floor id in `floor_metric_ids`. The natural-language assistant reads these same ids. It does not keep a second definition of Florida week sales or of average ticket.
+The Monday report (`weekly_report_dispatched`) lists every mandatory id in `floor_metric_ids`. The natural-language assistant reads these same ids. It does not keep a second definition of Florida week sales or of average ticket.
 
-### Floor (day one)
+### Mandatory metrics (`CONTEXT.md`)
 
 | Id | `CONTEXT.md` requirement | Formula | Grain |
 | --- | --- | --- | --- |
 | `ops.sales.gross_native` | Real-time sales dashboard per location, in COP and in USD | Sum of `sale_completed.amount` for that location. Colombia locations stay in COP. Florida locations stay in USD. A new ticket is visible within 5 minutes | Location × `business_date` |
-| `ops.sales.covers` | Covers served today (the Medellín downtown question) | Sum of `covers`. Medellín downtown is `co-med-centro` | Location × `business_date` |
-| `ops.sales.slow_week` | Whether a location is having a slow week (the Miami question) | Native sales in the current chain week compared with the previous full chain week. `slow_week` is true when current is lower. Miami Downtown is `us-mia-downtown`. The same test runs for all 14 | Location × chain week |
+| `ops.sales.covers` | How many covers were served today at the Medellín downtown location | Sum of `covers`. The API binding for Medellín downtown is `co-med-centro` | Location × `business_date` |
+| `ops.sales.slow_week` | Whether the Miami restaurant is having a slow week. The same test runs for every location | Native sales in the current chain week compared with the previous full chain week. `slow_week` is true when current is lower. The worked example binds “the Miami restaurant” to `us-mia-downtown` | Location × chain week |
 | `ops.sales.average_ticket` | Average ticket, the input to Mariana’s monthly question | `sum(amount) / count(sale_completed)` in the location currency | Location × calendar month in the location timezone |
 | `exec.ticket.top_location` | Which location has the highest average ticket this month | Highest `ops.sales.average_ticket`. Publish a ranking inside COP and a ranking inside USD, plus one chain answer ranked on `amount_usd` where `fx_status` is `recorded`. The single location she asks for is the converted ranking, with the currency basis named beside it | Calendar month |
-| `ops.sales.silence` | Alert when a location shows no sales during opening hours | One open `location_sales_silence_detected` episode. Hours and the 45-minute gap are the v1 contract in this plan | Location, while open |
-| `ops.stockout.count` | Stockouts that today are invisible to Felipe | Count of `stock_threshold_triggered` | Location × chain week |
+| `ops.sales.silence` | Alert when a location shows no sales during opening hours | One open `location_sales_silence_detected` episode. `CONTEXT.md` does not publish the hours. The 11:00–22:00 window and the 45-minute gap are the v1 binding in this plan | Location, while open |
 | `ops.ordering.on_hand` | Current stock for ingredient ordering | Latest `quantity_after` per product. Location-scoped stock uses the location. Until `products.csv` has a location, the CSV quantity is chain on-hand and is labeled `chain` | Product × location, or product × chain |
-| `ops.ordering.suggested_qty` | Ingredient ordering from historical sales and current stock | `max(0, daily_demand × days_until_next_delivery − on_hand)`. `daily_demand` is trailing 28 location-days of sale-line quantity mapped through the recipe bill of materials to `product_id`, divided by 28. When that bill of materials is missing, use trailing 28-day `kitchen_consumption` outbound quantity plus waste quantity for the product, divided by 28. Delivery days follow the cadence table below. Proteins target at least 3 days of cover | Location × product |
+| `ops.ordering.suggested_qty` | Ingredient ordering from historical sales and current stock | `max(0, daily_demand × days_until_next_delivery − on_hand)`. `daily_demand` is trailing 28 location-days of sale-line quantity mapped through the recipe bill of materials to `product_id`, divided by 28. When that bill of materials is missing, the value is null. Delivery days in the cadence table are an opportunity binding, not a `CONTEXT.md` rule | Location × product |
 | `proc.price.history` | Supplier price history | `unit_price` on each `inbound_order_created` for the same `product_id`, `supplier_id`, and `currency`, ordered by `occurred_at` | Supplier × product × currency |
 | `proc.price.alerts` | Alert when a raw-material price changes, before the invoice is the only notice | Count of `ingredient_price_variance_detected`, per location and rolled up by `supplier_id` | Chain week |
 | `proc.purchase.consolidated` | Consolidated purchasing across both markets for central negotiation | Sum of inbound `cost` grouped by `country`, and again by `supplier_id`. COP and USD stay in separate totals. The same events grouped by `location_id` are the location view inside that consolidation | Chain week |
@@ -121,32 +142,36 @@ The Monday report (`weekly_report_dispatched`) lists every floor id in `floor_me
 | `mkt.customers.preference_coverage` | CRM preferences | Distinct `customer_id` on `customer_preference_recorded` / distinct `customer_id` on sales. Null when no customer is identified yet. The row stays visible | Chain week |
 | `mkt.personalisation.accept_rate` | Suggestions based on behaviour | `recommendation_accepted` / `recommendation_shown`, joined on `recommendation_id` | Country × chain week |
 | `mkt.orders.digital_share` | Digital ordering (the website takes no orders today) | `sale_completed` with `channel` `digital_app` / all `sale_completed` | Country × chain week |
-| `mkt.loyalty.attach_rate` | Brasa Points participation (stamp cards generate no data; 60% of customers do not use them) | `loyalty_attached` true / all `sale_completed` | Country × chain week |
-| `mkt.loyalty.points_earned` | Digital Brasa Points earn rule | `floor(amount / 10000)` when currency is COP. `floor(amount / 10)` when currency is USD. Stored on the sale | Ticket |
-| `mkt.loyalty.redeem_value` | Digital Brasa Points redeem rule | `points / 5 × 20000` COP, or `points / 5 × 20` USD. Redeem in multiples of 5 once `balance_before` is at least 15 | Redemption |
-| `people.turnover` | Turnover, segmented by country | Separations in the calendar month / average daily headcount that month × 100. A person counts on a day when `employee_hired.effective_date` is on or before that day and no `employee_separated` is on or before that day. Colombia and the United States are always both present. A country with no hire history is null, not zero | Country × month |
+| `mkt.loyalty.attach_rate` | Brasa Points participation. Stamp cards generate no data, and 60% of customers do not use them | `loyalty_attached` true / all `sale_completed` | Country × chain week |
+| `people.turnover` | Turnover, segmented by country | Separations in the calendar month / average daily headcount that month × 100. A person counts on a day when `employee_hired.effective_date` is on or before that day and no `employee_separated` is on or before that day. Colombia and the United States are always both present. A country with no hire history is null | Country × month |
 | `people.absenteeism` | Absenteeism, segmented by country | Sum of `absence_recorded.day_fraction` / count of `roster_day_scheduled` × 100 | Country × month |
 | `people.time_to_fill` | Vacancy fill times, segmented by country | Mean and median of `days_to_fill` on `vacancy_filled`. `days_to_fill` is `filled_on` minus `opened_on` in calendar days | Country × month |
+| `people.holiday.requests` | An HR portal for holiday requests | Counts of requests opened, approved, and declined, by country. No event in this pack yet. Publish null until the portal exists. A holiday day that was taken still counts inside `absence_recorded` | Country × month |
+| `people.onboarding.completion` | An automated onboarding flow for new kitchen staff | Share of `employee_hired` with `employment_basis` `kitchen` who finish the onboarding path, and days from `effective_date` to completion. No completion event yet. Publish null | Country × month |
 | `train.update.coverage` | Push a recipe update to all 14 locations | For each `recipe_update_published`, distinct acknowledging locations for that `recipe_id` and `version`, divided by 14. The week’s value is the minimum of those ratios. Target is 1 | Recipe version |
-| `tech.locations.live` | Real-time telemetry from each location | During the v1 open window, a location is live when it has a `sale_completed` or a `location_sales_silence_detected` with `evaluated_at` in the last 15 minutes. Value = live locations / 14 | Instant |
-| `tech.dashboards.fed` | Pipeline into the operations, marketing, and finance dashboards | 3 when the latest Monday report includes every `ops.*` floor id, every `mkt.*` floor id, and both `finance.*` floor ids. Otherwise the count of those three audiences that are complete | Each Monday report |
+| `train.catalogue.search_hit_rate` | A searchable recipe catalogue | Searches that open a recipe / searches. No search event yet. Publish null | Chain week |
+| `train.onboarding.path_completion` | A structured onboarding path for new staff | Share of new hires who finish the recipe steps of the onboarding path. No step event yet. Publish null. This is the Training path. `people.onboarding.completion` is the People flow | Chain week |
+| `tech.locations.live` | Real-time telemetry from each location | During the v1 open window, a location is live when it has a `sale_completed` or a `location_sales_silence_detected` with `evaluated_at` in the last 15 minutes. The 15-minute rule is a plan binding. Value = live locations / 14 | Instant |
+| `tech.api.noun_coverage` | Central API covering locations, menus, sales, customers, and suppliers | Count of those five nouns present on the running OpenAPI document. Inventory does not fill a missing noun | Each check |
+| `tech.dashboards.fed` | Pipeline into the operations, marketing, and finance dashboards | 3 when the latest Monday report includes every mandatory `ops.*` id, every mandatory `mkt.*` id, and both `finance.*` ids. Otherwise the count of those three audiences that are complete | Each Monday report |
 | `exec.chain.sales` | Total chain sales in USD and in COP | Sum of `amount` grouped by `currency` for the chain week. Two numbers | Chain week |
 | `exec.florida.week_sales` | How much did we sell this week in Florida? | Sum of `amount` where `country` is United States, chain week. Currency USD | Chain week |
 | `exec.report.on_time` | Weekly report generated and sent every Monday at 7am | `weekly_report_dispatched` with `on_time` true. `week_start` is the previous Monday. `dispatched_at` is at or before Monday 07:00 America/Bogota, which is 12:00 UTC. `floor_metric_ids` lists every id in this table | Each Monday |
 | `exec.assistant.named_questions` | AI assistant she can query in natural language | The assistant answers the Florida week question from `exec.florida.week_sales` and the average-ticket question from `exec.ticket.top_location` | The two named questions |
-| `finance.sales.native` | Finance dashboard, sales | Same calculation as `exec.chain.sales`, read by finance | Chain week |
-| `finance.purchases.native` | Finance dashboard, purchasing | Same calculation as `proc.purchase.consolidated`, read by finance | Chain week |
+| `finance.sales.native` | The pipeline feeds the finance dashboards. Sales are the chain sales `CONTEXT.md` already requires, in USD and in COP | Same calculation as `exec.chain.sales`, read by finance | Chain week |
+| `finance.purchases.native` | The same finance dashboards. Purchasing is the consolidated supplier spend | Same calculation as `proc.purchase.consolidated`, read by finance | Chain week |
 
 `customer_id` on `sale_completed` matches `^cus_[A-Za-z0-9]{8,}$`. Staff and customer names, emails, phones, and national ids stay off the event. `employee_id` matches `^emp_[A-Za-z0-9]{6,}$`.
 
-### Above the floor
+### Identified opportunity metrics
 
-These opportunities come from the same briefing paragraphs and from the operating procedures. They are in the catalog so a later iteration can pick them up. They do not replace a floor row.
+These are not in the “What they need” lines. They come from a problem sentence, the knowledge base, or the running application. They stay in the catalog. They are not listed in `floor_metric_ids`.
 
 | Id | Where it comes from | Signal |
 | --- | --- | --- |
 | `ops.sales.tickets` | Denominator of average ticket | Count of `sale_completed` per location per day |
-| `ops.stock.overstock` | Overstock beside the stockouts Felipe already sees | On-hand above `suggested_qty` plus the days until the next delivery |
+| `ops.stockout.count` | Problem sentence: overstock in some locations and stockouts in others. The stated need is the ordering system | Count of `stock_threshold_triggered` |
+| `ops.stock.overstock` | Same problem sentence, the overstock half | On-hand above `suggested_qty` plus the days until the next delivery |
 | `ops.shift.closed` | Paper or Excel shift reports sent to HR weekly | One shift-close record per location: sales, covers, waste, staff on duty |
 | `ops.order.channel_mix` | Ingredient orders placed by WhatsApp or phone | Share of inbound lines with a recorded `supplier_id` versus lines still flagged manual |
 | `ops.kitchen.ticket_minutes` | A kitchen that moves fast | Minutes from ticket open to `sale_completed` |
@@ -159,24 +184,21 @@ These opportunities come from the same briefing paragraphs and from the operatin
 | `proc.purchase.emergency_rate` | Emergency orders, 8% surcharge, Procurement Manager approval above 500 USD | Emergency inbound lines / all inbound lines, plus `approval_state` |
 | `proc.delivery.lateness` | 48-hour, 24-hour, and 5-business-day delivery promises | Receipt `occurred_at` minus order placement, against the cadence for `category` |
 | `proc.supplier.active_count` | About 20 suppliers across both markets | Distinct `supplier_id` with an inbound line in the last 90 days |
+| `mkt.loyalty.points_earned` | Knowledge-base earn rule. `CONTEXT.md` names Brasa Points and does not state the rate | `floor(amount / 10000)` COP, or `floor(amount / 10)` USD, stored on the sale |
+| `mkt.loyalty.redeem_value` | Knowledge-base redeem rule | `points / 5 × 20000` COP, or `points / 5 × 20` USD, once `balance_before` is at least 15 |
 | `mkt.loyalty.tier_mix` | Bronze, Silver, Gold benefits | Accounts by point balance bands 0–19, 20–49, 50+ |
 | `mkt.loyalty.transfer_count` | One-time physical card to app | Count of `loyalty_card_transferred` |
 | `mkt.loyalty.active_12m` | Points stay alive with one purchase per 12 months | Identified customers with a sale in the trailing 365 days |
 | `mkt.site.page_views` | 2019 website, corporate home | `page_view` where `app` is `website` |
 | `mkt.app.rating_baseline` | 2.8 app store rating | External store rating. Record the 2.8 baseline beside `mkt.orders.digital_share`. Do not invent a scrape in this pack |
-| `people.holiday.requests` | Holiday requests in the HR portal | Request opened, approved, declined, by country. Taken holiday days already sit inside `absence_recorded` |
-| `people.onboarding.completion` | Automated onboarding for new kitchen staff | Share of `employee_hired` with `employment_basis` `kitchen` who finish the onboarding path, and days from `effective_date` to completion |
-| `people.headcount` | About 115 people | The daily headcount series already required by `people.turnover`, also shown as a level |
+| `people.headcount` | About 115 people, shown as a level beside the mandatory turnover rate | The daily headcount series already required by `people.turnover` |
 | `people.turnover.early_kitchen` | Kitchen staff turn over frequently | Separations whose matching hire has `employment_basis` `kitchen` and whose separation falls within 14 days of that hire’s `effective_date`, divided by kitchen hires |
-| `train.catalogue.search_hit_rate` | Searchable recipe catalogue | Searches that open a recipe / searches |
-| `train.onboarding.path_completion` | Structured onboarding path for new staff | Same completion share as `people.onboarding.completion`, scored on recipe steps |
-| `train.locale.coverage` | Spanish and English, base language first | Recipes whose latest version has an `es` publish, and the share that also have `en` |
+| `train.locale.coverage` | Spanish and English are optional in `CONTEXT.md` | Recipes whose latest version has an `es` publish, and the share that also have `en` |
 | `train.update.hours_to_14` | Updates that today take days | Hours from `recipe_update_published` to the 14th acknowledgement |
 | `tech.traffic.events_per_day` | Engineering report already sketched in the repo | Count of stored rows by UTC date |
 | `tech.errors.by_type` | API instability | Count of `api_error` by `code` |
 | `tech.auth.failure_rate` | Sign-in failures | `user_login_failed / (user_login_failed + user_login_succeeded)` per UTC date |
 | `tech.pipeline.run_success` | Monday pipeline actually ran | `records_processed` and status on the weekly run. Zero rows means collection failed |
-| `tech.api.noun_coverage` | Central API: locations, menus, sales, customers, suppliers | Checklist of those five nouns on the running OpenAPI document. Inventory is adjacent, not a substitute for a missing noun |
 | `exec.chain.week_change` | Unified dashboard beyond the two named questions | Chain-week native sales versus the previous chain week, per currency |
 | `exec.revenue.run_rate` | About USD 6 million annual revenue | Trailing 52 chain weeks of `amount_usd` where `fx_status` is `recorded`, labeled converted |
 | `finance.food_cost` | Finance view of margin | `(purchase cost + waste cost) / sales`, computed inside COP and again inside USD |
@@ -184,7 +206,7 @@ These opportunities come from the same briefing paragraphs and from the operatin
 
 ## Formula detail
 
-Phase 1 is the complete day-one floor. The notes below keep pipeline rounding and the above-floor waste rules next to the events that feed them. “Chain week” and “location day” are defined in the clock section.
+The notes below keep pipeline rounding and the opportunity waste rules next to the events that feed them. “Chain week” and “location day” are defined in the clock section. Mandatory formulas are the table above. Rows here that are not in that table are identified opportunities.
 
 Grain, formula, and the events that feed the number.
 
@@ -216,7 +238,7 @@ Grain, formula, and the events that feed the number.
 | `people.absenteeism` | Absence, by country | Phase 1 formula. Absence fractions / scheduled roster days × 100 | Country × month | Monthly | `absence_recorded`, `roster_day_scheduled` |
 | `people.time_to_fill` | Vacancy fill time, by country | Phase 1 formula. Mean and median of `days_to_fill` | Country × month | Monthly | `vacancy_opened`, `vacancy_filled` |
 
-Phase 1 is authoritative for these three formulas. The events are `employee_hired`, `employee_separated`, `absence_recorded`, `roster_day_scheduled`, `vacancy_opened`, and `vacancy_filled`. There is no HR router in the running API yet. The events are still part of this pack, because the People KPIs are day-one floor metrics.
+The three People KPI formulas above are mandatory. The events are `employee_hired`, `employee_separated`, `absence_recorded`, `roster_day_scheduled`, `vacancy_opened`, and `vacancy_filled`. There is no HR router in the running API yet. The events stay, because turnover, absenteeism, and vacancy fill time are in `CONTEXT.md`.
 
 ### Clocks
 
@@ -248,52 +270,61 @@ Price alert: after an inbound line is priced, load the previous `unit_price` for
 
 ## Event catalog
 
-| `event_type` | `location_scope` | Producer | Pipeline reads it? |
-| --- | --- | --- | --- |
-| `product_created` | `chain` today; `location` once the row has a location | `services.api.inventory` `create_product` | No |
-| `stock_count_adjusted` | `chain` or `location` | `services.api.inventory` `apply_delta` | No |
-| `stock_threshold_crossed` | `chain` | `apply_delta` when quantity crosses from ≥ 10 to < 10 | No |
-| `stock_threshold_cleared` | `chain` | `apply_delta` when quantity crosses from < 10 to ≥ 10 | No |
-| `inbound_order_created` | `location` | Future order writer, one event per inbound line | Yes — sums `cost` into `total_purchase_cost` |
-| `outbound_order_created` | `location` | Future order writer, one event per outbound line | No |
-| `stock_waste_registered` | `location` | Waste log at shift close | Yes — sums `cost` into `total_waste_cost` |
-| `stock_threshold_triggered` | `location` | Location-scoped stock edge, or the protein-cover monitor | Yes — counted |
-| `ingredient_price_variance_detected` | `location` | Same transaction as the inbound line that changed price | Yes — counted |
-| `sale_completed` | `location` | Future sales writer, one event per closed ticket. Optional `customer_id` feeds the CRM floor | No (executive/ops/marketing readers) |
-| `location_sales_silence_detected` | `location` | `services.telemetry.silence_monitor` | No |
-| `loyalty_points_redeemed` | `location` | Future loyalty writer | No |
-| `loyalty_card_transferred` | `location` | One-time physical card → app transfer | No |
-| `customer_preference_recorded` | `none` | `services.api.customers` | No |
-| `recommendation_shown` | `location` | `services.api.recommendations` | No |
-| `recommendation_accepted` | `location` | `services.api.recommendations` | No |
-| `employee_hired` | `none` | `services.api.people` | No |
-| `employee_separated` | `none` | `services.api.people` | No |
-| `absence_recorded` | `none` | `services.api.people` | No |
-| `roster_day_scheduled` | `none` | `services.api.people` | No |
-| `vacancy_opened` | `none` | `services.api.people` | No |
-| `vacancy_filled` | `none` | `services.api.people` | No |
-| `recipe_update_published` | `none` | `services.api.training` | No |
-| `recipe_update_acknowledged` | `location` | `services.api.training` | No |
-| `weekly_report_dispatched` | `none` | `services.telemetry.weekly_report` | No |
-| `user_login_succeeded` | `none` | `services/api/users.py` login handlers | No |
-| `user_login_failed` | `none` | Those handlers’ 401 branches | No |
-| `api_error` | `none` | `services/api/errors.py` 500 and 503 handlers | No |
-| `page_view` | `none` | `uis/website` mount of `/` | No |
-| `auth_form_rejected` | `none` | Login, register, password, and profile forms in the browser, including the 422 those forms show | No |
-| `session_rejected` | `none` | `decode_access_token`, `get_current_user`, `useRequireAuth` | No |
-| `session_ended` | `none` | Logout, or `clearSessionAndRedirectToLogin` | No |
-| `account_mutation` | `none` | Register, `PUT /profiles/me`, `PUT /users/{id}` | No |
-| `api_call_completed` | `none` | `apiRequest` in `uis/backoffice/src/lib/api.ts` | No |
-| `ui_timing` | `none` | Session effect and each panel effect | No |
-| `client_exception` | `none` | Backoffice and website `ErrorBoundary`, plus `window` listeners | No |
-| `section_viewed` | `none` | Sidebar destinations and the panels on `/accessible` | No |
-| `flow_progress` | `none` | Sign-in, register, session restore, profile, password, and the operations review | No |
-| `inventory_validation_failed` | `none` | `handle_validation_error` for an inventory or order route | No |
-| `stock_modification_rejected` | `chain` | `apply_delta` or `get_alerts` when the write is refused | No |
+Every event is in one group. Mandatory events are the ones a `CONTEXT.md` need cannot be computed without. Identified opportunities are the rest of the application and the operating procedures. Holiday requests, onboarding completion, catalogue search, and the onboarding path are mandatory metrics with no event yet. They are published as null. They are not given a placeholder event.
+
+### Mandatory events
+
+| `event_type` | `CONTEXT.md` need it serves | `location_scope` | Producer | Pipeline reads it? |
+| --- | --- | --- | --- | --- |
+| `product_created` | Current stock for ingredient ordering. The ingredient has to exist | `chain` today; `location` once the row has a location | `services.api.inventory` `create_product` | No |
+| `stock_count_adjusted` | Current stock for ingredient ordering | `chain` or `location` | `services.api.inventory` `apply_delta` | No |
+| `inbound_order_created` | Supplier price history and consolidated purchasing across both markets | `location` | Future order writer, one event per inbound line | Yes — sums `cost` into `total_purchase_cost` |
+| `ingredient_price_variance_detected` | Alert when a raw-material price changes, before the invoice is the only notice | `location` | Same transaction as the inbound line that changed price | Yes — counted |
+| `sale_completed` | Sales per location in COP and USD; covers; slow week; average ticket; Florida week sales; chain sales; who customers are; order history; digital ordering; Brasa Points participation | `location` | Future sales writer, one event per closed ticket | No (executive, operations, marketing, and finance readers) |
+| `location_sales_silence_detected` | Alert when a location shows no sales during opening hours | `location` | `services.telemetry.silence_monitor` | No |
+| `customer_preference_recorded` | CRM preferences | `none` | `services.api.customers` | No |
+| `recommendation_shown` | Personalisation based on behaviour. The offer has to have been shown | `location` | `services.api.recommendations` | No |
+| `recommendation_accepted` | Personalisation based on behaviour. The guest took the suggestion | `location` | `services.api.recommendations` | No |
+| `employee_hired` | Turnover by country, and the onboarding denominator | `none` | `services.api.people` | No |
+| `employee_separated` | Turnover by country | `none` | `services.api.people` | No |
+| `absence_recorded` | Absenteeism by country, and absence management | `none` | `services.api.people` | No |
+| `roster_day_scheduled` | Absenteeism by country. The rate needs scheduled days | `none` | `services.api.people` | No |
+| `vacancy_opened` | Vacancy fill times by country. The clock starts here | `none` | `services.api.people` | No |
+| `vacancy_filled` | Vacancy fill times by country | `none` | `services.api.people` | No |
+| `recipe_update_published` | Push a recipe update to all 14 locations | `none` | `services.api.training` | No |
+| `recipe_update_acknowledged` | The location confirms that update | `location` | `services.api.training` | No |
+| `weekly_report_dispatched` | Weekly report generated and sent every Monday at 7am | `none` | `services.telemetry.weekly_report` | No |
+
+### Identified opportunity events
+
+| `event_type` | Where it was found | `location_scope` | Producer | Pipeline reads it? |
+| --- | --- | --- | --- | --- |
+| `stock_threshold_crossed` | Live chain CSV and the default alert threshold of 10 in `get_alerts` | `chain` | `apply_delta` when quantity crosses from ≥ 10 to < 10 | No |
+| `stock_threshold_cleared` | Same CSV, the count climbing back through 10 | `chain` | `apply_delta` when quantity crosses from < 10 to ≥ 10 | No |
+| `outbound_order_created` | Declared `OUTBOUND` order in `services/api/schemas.py`. Kitchen consumption is not the sales history `CONTEXT.md` names | `location` | Future order writer, one event per outbound line | No |
+| `stock_waste_registered` | Waste protocol and the weekly pipeline’s `total_waste_cost` | `location` | Waste log at shift close | Yes — sums `cost` into `total_waste_cost` |
+| `stock_threshold_triggered` | Stockouts in the Operations problem sentence, and protein cover in the ordering procedure | `location` | Location-scoped stock edge, or the protein-cover monitor | Yes — counted |
+| `loyalty_points_redeemed` | Knowledge-base redeem rule. `CONTEXT.md` does not state the points rate | `location` | Future loyalty writer | No |
+| `loyalty_card_transferred` | Physical stamp cards that customers lose. The one-time move onto an app account | `location` | One-time physical card → app transfer | No |
+| `user_login_succeeded` | Staff sign-in in `services/api/users.py` | `none` | `login` and `login_for_access_token` | No |
+| `user_login_failed` | The 401 branches of those handlers | `none` | Same handlers | No |
+| `api_error` | HTTP 500 and 503 handlers in `services/api/errors.py` | `none` | `handle_unhandled_error`, `handle_external_service_error` | No |
+| `page_view` | The 2019 corporate site, route `/` in `uis/website` | `none` | `uis/website` | No |
+| `auth_form_rejected` | Login, register, password, and profile forms in `uis/backoffice` | `none` | Those forms, including the 422 they show | No |
+| `session_rejected` | JWT expiry, invalid token, inactive subject, or a protected page with no token | `none` | `decode_access_token`, `get_current_user`, `useRequireAuth` | No |
+| `session_ended` | Logout, or a later 401 that clears `auth_token` | `none` | `BackofficeLayout` and `clearSessionAndRedirectToLogin` | No |
+| `account_mutation` | Register, `PUT /profiles/me`, `PUT /users/{id}` | `none` | Those three writes in the staff console | No |
+| `api_call_completed` | Every `apiRequest` in `uis/backoffice/src/lib/api.ts` | `none` | That helper, including network failure | No |
+| `ui_timing` | Session, panel, and form clocks in the staff console | `none` | `AuthProvider` and the page effects | No |
+| `client_exception` | `ErrorBoundary` in the backoffice and the website, plus `window` errors | `none` | Those listeners | No |
+| `section_viewed` | Sidebar and the panels on `/accessible` | `none` | The page that actually paints the section | No |
+| `flow_progress` | Sign-in, register, session restore, profile, password, and the operations review | `none` | Those screen lifecycles | No |
+| `inventory_validation_failed` | HTTP 422 on an inventory or order body, before any write | `none` | `handle_validation_error` | No |
+| `stock_modification_rejected` | A direct stock change the API refuses, leaving `products.csv` unchanged | `chain` | `apply_delta` or `get_alerts` | No |
 
 ## Why we capture each event
 
-Each event that remains can finish this sentence. A point that could not name the decision was removed.
+Each event that remains can finish this sentence. Its group is the table above: the first eighteen are mandatory, and the rest are identified opportunities. A point that could not name the decision was removed.
 
 We capture `product_created` because we need to know a new ingredient landed in the chain inventory file, which allows us to make the decision, whether Felipe’s next order includes it or the row was a mistaken create that must be reversed before ordering.
 
@@ -647,7 +678,7 @@ On mount of the page component, emit `section_viewed` and `flow_progress` from t
 | Suggestion shown or accepted | `recommendation_shown`, `recommendation_accepted` |
 | Hire, separation, absence, roster day, vacancy open, vacancy fill | The six `services.api.people` events in the catalog |
 | Recipe publish or location acknowledgement | `recipe_update_published`, `recipe_update_acknowledged` |
-| Monday 07:00 report send | `weekly_report_dispatched` with every Phase 1 floor id |
+| Monday 07:00 report send | `weekly_report_dispatched` with every mandatory metric id |
 
 Protein cover emits `stock_threshold_triggered` from a monitor (`source` `services.telemetry.cover_monitor`), at most once per location + product per 24 hours while cover stays under 3 days.
 
@@ -675,7 +706,7 @@ Stored weekly row: `total_purchase_cost` 1000, `total_waste_cost` 150, `waste_ra
 
 A COP receipt at `co-med-centro` with `list_cost` 1000000, `order_kind` `scheduled`, `surcharge_rate` 0, stores `cost` 1000000 and `currency` COP. It is summed only with other COP events for that location. It is not added to the Miami USD total.
 
-Brasa Points on a ticket: 45,000 COP → `points_earned` 4. 27 USD → `points_earned` 2. A redemption of 15 points (the minimum balance the loyalty procedure allows before redeeming) in increments of 5 discounts `15 / 5 * 20000` = 60,000 COP, or 60 USD in Florida. The event records `balance_before` (at least 15), the points redeemed on that ticket (a multiple of 5, at least 5, and less than or equal to `balance_before`), and the `discount_amount`.
+Brasa Points rates are an identified opportunity from the loyalty procedure. `CONTEXT.md` names the programme and does not state the rates. Under that procedure, 45,000 COP earns `points_earned` 4, and 27 USD earns 2. A redemption of 15 points, in increments of 5, discounts `15 / 5 * 20000` = 60,000 COP, or 60 USD in Florida. The event records `balance_before` (at least 15), the points redeemed on that ticket (a multiple of 5, at least 5, and less than or equal to `balance_before`), and the `discount_amount`. Mandatory loyalty telemetry is participation (`mkt.loyalty.attach_rate`), not this rate.
 
 ## Privacy and logging
 
@@ -698,5 +729,5 @@ Brasa Points on a ticket: 45,000 COP → `points_earned` 4. 27 USD → `points_e
 8. Deduplicate on `id`.
 9. Run `aggregate_location_kpis` on a four-event fixture that uses `us-mia-downtown` and expect `waste_ratio` 0.15 with `currency` USD.
 10. Confirm a COP `inbound_order_created` for `co-med-centro` does not land in the USD weekly total.
-11. Keep every Phase 1 floor id in the plan. `weekly_report_dispatched.floor_metric_ids` must contain each of them. A null value stays on the dashboard. The `bo.*` questions in the backoffice catalog stay out of that list.
+11. Keep every mandatory id from the `CONTEXT.md` table in the plan. `weekly_report_dispatched.floor_metric_ids` must contain each of them. A null value stays on the dashboard. Identified opportunities, including the `bo.*` questions, stay out of that list.
 12. Emit a backoffice event only when its sentence in “Why we capture each event” names the decision. That set is login and session outcomes, `api_call_completed` durations, panel `ui_timing`, `client_exception` with no stack, `section_viewed` only for a surface that is on screen, and `flow_progress` when one of the six live flows closes unfinished.
