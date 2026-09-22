@@ -326,6 +326,21 @@ bind-mount (no rebuild): layout title + menus.py description picked up by Next/W
 verify-brasaland-api: locations/menus/sales/customers/suppliers/inventory=present path_count=34
 ```
 
+## Latest Docker secrets + dockerignore eval (`cursor/docker-secrets-dockerignore-2c91`)
+
+Department served: **Technology** (Nicolás Park — credentials stay out of images and Git).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+docker-compose.yml / uis/Dockerfile / services/Dockerfile / root Dockerfile → no API key, password, or JWT value assignments
+.env.example JWT_SECRET_KEY= and GROQ_API_KEY= empty placeholders
+.gitignore:3:.env  git check-ignore .env .env.local .env.production → ignored
+git ls-files '.env*' → .env.example only
+git rev-list all trees: no path named `.env` (root or nested)
+uis/.dockerignore exists (node_modules, .next, .env*, *.log)
+services/.dockerignore exists (__pycache__, *.pyc, .env*, test/, *.log)
+```
+
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).
