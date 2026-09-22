@@ -183,6 +183,24 @@ uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py te
 cd uis/backoffice && npm run build → green
 ```
 
+## Latest uis Node Alpine image (`cursor/uis-node-alpine-dockerfile-2c91`)
+
+Department served: **Technology** (repeatable container runtime) + **Marketing** (Camila’s public site) + **Operations/Executive** (staff backoffice).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+docker build -t brasaland-uis ./uis → FROM node:22-alpine, image library/node
+RUN npm ci --prefix /uis/website (32 packages) then RUN npm ci --prefix /uis/backoffice (32 packages) — separate layers
+container: NODE=v22.23.2 PRETTY_NAME="Alpine Linux v3.24"
+/uis/website/node_modules and /uis/backoffice/node_modules both present (react ok)
+docker run -w /uis/website … npm run build → tsc -b && vite build green
+docker run -w /uis/backoffice … npm run build → tsc -b && vite build green
+GET http://127.0.0.1:5173/ → 200 <title>Brasaland — Grilled food, Colombia & Florida</title>
+GET http://127.0.0.1:5174/login → 200 <title>Brasaland Backoffice</title>
+```
+
+Does **not** complete Technology’s central API (menus/sales/customers/suppliers still missing).
+
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).
