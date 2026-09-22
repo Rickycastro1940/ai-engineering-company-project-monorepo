@@ -1,79 +1,78 @@
-# Local stack for Message Queues and Async Tasks.
-# Redis is the shared broker/result backend for API + workers (REDIS_URL).
+# Brasaland Digital — UI (Camila public site + staff backoffice) and backend API.
+# Two services on an explicit network. Inter-service URLs use the Compose
+# service name as host (http://backend:8000), never localhost.
+#
+#   docker compose up --build
+#   Website:    http://localhost:3000/
+#   Backoffice: http://localhost:3001/login
+#   API:        http://localhost:8000/docs
+#
+# Redis/Flower/Celery worker: see services/README.md (not part of this file).
 
-x-redis-url: &redis_url redis://redis:6379/0
+networks:
+  brasaland:
+    name: brasaland-net
+    driver: bridge
 
 services:
-  redis:
-    image: redis:7
-    container_name: brasaland-redis
-    command: ["redis-server", "--maxmemory-policy", "noeviction"]
-    ports:
-      - "6379:6379"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-  flower:
-    image: mher/flower:2.0
-    container_name: brasaland-flower
-    command: ["celery", "--broker=redis://redis:6379/0", "flower", "--port=5555"]
-    ports:
-      - "5555:5555"
-    environment:
-      REDIS_URL: *redis_url
-      # Allow local demo access to /api/tasks without basic auth.
-      FLOWER_UNAUTHENTICATED_API: "true"
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-
-  api:
-    build:
-      context: .
-      dockerfile: services/Dockerfile
-    container_name: brasaland-api
-    environment:
-      REDIS_URL: *redis_url
-      PYTHONPATH: /app
-    ports:
-      - "8000:8000"
-    restart: unless-stopped
-
-  worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: brasaland-celery-worker
-    command: ["celery", "-A", "services.celery_app", "worker", "--loglevel=info", "-E"]
-    environment:
-      REDIS_URL: *redis_url
-      CELERY_BROKER_URL: *redis_url
-      CELERY_RESULT_BACKEND: *redis_url
-    volumes:
-      - ./:/app
-    working_dir: /app
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-
-  uis:
+  ui:
     build:
       context: ./uis
       dockerfile: Dockerfile
     image: brasaland-uis
-    container_name: brasaland-uis
+    container_name: brasaland-ui
+    networks:
+      - brasaland
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      # Named host "backend" (not localhost). On this VM the Docker bridge
+      # does not pass container-to-container TCP, so resolve the service name
+      # to the host gateway and use the published backend port 8000.
+      - "backend:host-gateway"
+    depends_on:
+      - backend
     environment:
-      API_PROXY: http://host.docker.internal:8000
-      VITE_API_PROXY: http://host.docker.internal:8000
+      NODE_ENV: development
+      # Next.js rewrites in the ui container talk to the backend service by name.
+      API_PROXY: http://backend:8000
+      VITE_API_PROXY: http://backend:8000
+    command:
+      - /bin/sh
+      - -c
+      - |
+        cd /uis/website && npm run dev -- --hostname 0.0.0.0 --port 3000 &
+        cd /uis/backoffice && npm run dev -- --hostname 0.0.0.0 --port 3001 &
+        wait
+    volumes:
+      - ./uis/website:/uis/website
+      - ./uis/backoffice:/uis/backoffice
+      - ui_website_node_modules:/uis/website/node_modules
+      - ui_backoffice_node_modules:/uis/backoffice/node_modules
     ports:
       - "3000:3000"
       - "3001:3001"
     restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: services/Dockerfile
+    image: brasaland-api
+    container_name: brasaland-backend
+    networks:
+      - brasaland
+    environment:
+      PYTHONPATH: /app
+    volumes:
+      - ./api:/app/api
+      - ./services:/app/services
+      - ./data:/app/data
+      - ./scripts:/app/scripts
+      - ./agent.py:/app/agent.py
+      - ./products.csv:/app/products.csv
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+volumes:
+  ui_website_node_modules:
+  ui_backoffice_node_modules:

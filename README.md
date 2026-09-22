@@ -76,20 +76,14 @@ Config: [`services/celery_app.py`](./services/celery_app.py) · Task: [`services
 
 ```bash
 # 1) Broker (Redis) — required
-docker compose up -d redis
+docker run -d --name brasaland-redis -p 6379:6379 redis:7
 
 # 2) Worker as its own process (separate terminal from uvicorn)
 export REDIS_URL=redis://localhost:6379/0
 uv run celery -A services.celery_app worker --loglevel=info -E
 ```
 
-Or run Redis + Flower + worker together:
-
-```bash
-docker compose up -d redis flower worker
-```
-
-Flower UI (optional): http://localhost:5555 — shows **queued**, **in-progress**, and **completed** tasks (worker runs with `-E` / task events enabled).
+Flower UI (optional): run Flower separately; http://localhost:5555 — shows **queued**, **in-progress**, and **completed** tasks (worker runs with `-E` / task events enabled).
 
 Each task attempt logs `task_id`, `attempt`, `status`, and `duration_ms`; failures also log the full `error` message.
 
@@ -97,11 +91,7 @@ Each task attempt logs `task_id`, `attempt`, `status`, and `duration_ms`; failur
 
 ```bash
 # If started with uv/celery in a terminal: Ctrl+C
-
-# If started with Docker Compose:
-docker compose stop worker
-# or tear down the stack:
-docker compose down
+docker rm -f brasaland-redis
 ```
 
 Poll task status from the API (separate from the worker process): `GET /tasks/{task_id}`.

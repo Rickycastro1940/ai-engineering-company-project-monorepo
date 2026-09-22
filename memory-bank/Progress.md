@@ -264,6 +264,24 @@ head -n 5 CONTEXT.md → # Welcome to Brasaland
 services/.dockerignore includes __pycache__, *.pyc, .env*, test/, *.log
 ```
 
+## Latest docker compose ui + backend (`cursor/docker-compose-ui-backend-2c91`)
+
+Department served: **Technology** (named network, service-name URLs) + **Marketing** (website :3000) + **Operations/Executive** (backoffice :3001).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+docker compose config --services → backend, ui
+network brasaland-net contains brasaland-backend and brasaland-ui
+API_PROXY=http://backend:8000 (not localhost)
+ui getent hosts backend → 172.17.0.1 backend
+ui fetch http://backend:8000/docs → 200
+ui fetch http://backend:8000/menus → 200, 6 items
+GET http://127.0.0.1:3000/ → 200
+GET http://127.0.0.1:3001/login → 200
+GET http://127.0.0.1:8000/docs → 200
+GET http://127.0.0.1:3001/menus (Next rewrite to backend) → 200
+```
+
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).

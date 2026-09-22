@@ -22,6 +22,13 @@ docker run --rm -p 3000:3000 -p 3001:3001 brasaland-uis
 - Public site (Marketing): http://localhost:3000/
 - Staff backoffice (Operations / Executive): http://localhost:3001/login
 
+Root [`docker-compose.yml`](../docker-compose.yml) builds **ui** from this folder (bind-mount + `next dev` on 3000 and 3001) and **backend** from `services/Dockerfile`. They share the named network `brasaland-net`. The backoffice proxy is `API_PROXY=http://backend:8000` (Compose service name, not localhost).
+
+```bash
+# from the monorepo root
+docker compose up --build
+```
+
 Organize `uis/` by **different concerns** — each subfolder covers a distinct area of the company (for example, public web vs internal operations) and includes its own technical and functional documentation.
 
 - **Main purpose**: to centralize in a single place all frontend applications that support the company's use cases.
