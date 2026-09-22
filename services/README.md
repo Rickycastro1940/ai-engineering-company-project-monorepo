@@ -22,6 +22,8 @@ docker build -f services/Dockerfile -t brasaland-api .
 docker run --rm -p 8000:8000 brasaland-api
 ```
 
+Root [`docker-compose.yml`](../docker-compose.yml) service **backend** builds this file, bind-mounts source, publishes **8000**, and joins named network `brasaland-net`. The UI reaches it at `http://backend:8000`.
+
 ## Celery (Message Queues and Async Tasks)
 
 - Config: `services/celery_app.py` — Redis via **`REDIS_URL`** as broker **and** result backend.
@@ -31,8 +33,9 @@ docker run --rm -p 8000:8000 brasaland-api
   (`task_id`, `attempt`, `error_message`, `recorded_at`) via `services/dead_letter.py`.
 
 ```bash
-# Infrastructure
-docker compose up -d redis flower worker
+# Infrastructure (Redis is not in the two-service root compose file)
+docker run -d --name brasaland-redis -p 6379:6379 redis:7
+```
 
 # Or locally (Redis must be up)
 export REDIS_URL=redis://localhost:6379/0

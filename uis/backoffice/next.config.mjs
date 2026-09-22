@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const apiTarget = process.env.API_PROXY ?? process.env.VITE_API_PROXY ?? "http://127.0.0.1:8000";
+// Compose sets API_PROXY=http://backend:8000 so the ui container reaches FastAPI by service name.
 
 const proxied = [
   "/locations",
