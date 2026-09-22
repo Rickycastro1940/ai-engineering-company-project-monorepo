@@ -797,18 +797,40 @@ A COP receipt at `co-med-centro` with `list_cost` 1000000, `order_kind` `schedul
 
 Brasa Points rates are an identified opportunity from the loyalty procedure. `CONTEXT.md` names the programme and does not state the rates. Under that procedure, 45,000 COP earns `points_earned` 4, and 27 USD earns 2. A redemption of 15 points, in increments of 5, discounts `15 / 5 * 20000` = 60,000 COP, or 60 USD in Florida. The event records `balance_before` (at least 15), the points redeemed on that ticket (a multiple of 5, at least 5, and less than or equal to `balance_before`), and the `discount_amount`. Mandatory loyalty telemetry is participation (`mkt.loyalty.attach_rate`), not this rate.
 
+## Property allowlists (anti-leakage)
+
+Every event has an explicit **property allowlist**. `properties` may contain only the keys listed for that `Event_type`. JSON Schema enforces this with `additionalProperties: false` on each event’s `properties` object and on nested objects (`sale_completed.lines[]`, `inventory_validation_failed.fields[]`). A document with any other key is schema-rejected and must not be stored.
+
+Normative tables (one section per `Event_type`):
+
+- [`property-allowlists.md`](property-allowlists.md) — human-readable: name, type, required/optional, description, Sensitive/PII handling
+- [`property-allowlists.json`](property-allowlists.json) — same content for tooling
+
+For each property the allowlist records:
+
+| Column | Meaning |
+| --- | --- |
+| Name | Exact JSON key |
+| Type | Type / enum / pattern |
+| Required | `required` or `optional` on the base object |
+| Description | What the field means |
+| Sensitive / PII | `No`, `Pseudonymous`, or `Sanitized`, plus how it is anonymised or sanitized before emit |
+
+**Omit the event** when the only available value would be forbidden PII (email, phone, postal address, legal or display name, password, JWT, raw exception message, stack, request body, query string, connection string, or API key). Pseudonymous ids (`cus_…`, `emp_…`, `loy_…`) are allowed when the opaque token already exists. Sanitized fields keep only a public or structural fragment (`Error.name`, public `error_body` text, pathname without query, validation `loc` without the submitted value).
+
 ## Privacy and logging
 
 - Logger name: `brasaland.telemetry`.
 - Log `Event_type`, `eventID`, and `schema_rejected` or `store_unavailable`. Do not log `properties`.
 - `user_login_failed.failure_reason` is `invalid_credentials` or `inactive_user`.
-- `api_error.message` is the public message already returned by `error_body` (`Internal server error` or the 503 public text). It is not `str(exc)` when that string might contain a host, a key, or a query.
+- `api_error_raised.message` is the public message already returned by `error_body` (`Internal server error` or the 503 public text). It is not `str(exc)` when that string might contain a host, a key, or a query.
 - Page paths have no query and no fragment.
 - `auth_form_rejected`, `account_updated`, `session_rejected`, `session_ended`, and `client_exception_caught` carry no email, phone, address, password, token, message, or stack. `client_exception_caught.error_name` is `Error.name` only. Inside `properties` the field is `catch_site`, because `source` is already the envelope.
+- Prefer the per-event allowlist over this summary when wiring an emitter.
 
 ## Checklist for the person wiring this in
 
-1. Validate each producer document against `docs/telemetry/event-schemas.json` before the insert (the `examples` arrays in that file are valid documents). The root schema is a `oneOf` over every event in the file. On failure, read the branch whose `event_type` const matches the document.
+1. Validate each producer document against `docs/telemetry/event-schemas.json` before the insert (the `examples` arrays in that file are valid documents). The root schema is a `oneOf` over every event in the file. On failure, read the branch whose `event_type` const matches the document. Keep `properties` inside the allowlist in `docs/telemetry/property-allowlists.md`; any extra key must fail validation.
 2. Write both storage columns `timestamp` and `created_at` from the envelope `timestamp`.
 3. Put `properties` in `event_payload` and the small copy in `tags`. Copy `eventID` to `id` and `Event_type` to `event_type`.
 4. Use a roster `location_id` whenever `location_scope` is `location`, and the matching currency (`COP` or `USD`).
