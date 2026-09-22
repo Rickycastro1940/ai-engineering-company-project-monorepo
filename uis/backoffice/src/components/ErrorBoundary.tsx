@@ -1,5 +1,5 @@
 import { Component, type ReactNode } from "react";
-import "../pages/AuthPages.css";
+import "../views/AuthPages.css";
 
 type Props = { children: ReactNode };
 type State = { hasError: boolean };

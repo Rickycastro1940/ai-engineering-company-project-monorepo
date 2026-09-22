@@ -13,6 +13,10 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from inventory import router as inventory_router
 from locations import router as locations_router
+from menus import router as menus_router
+from sales import router as sales_router
+from customers import router as customers_router
+from suppliers import router as suppliers_router
 from errors import register_error_handlers
 from pydantic import BaseModel, Field
 from users import router as users_router
@@ -118,12 +122,22 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         "http://localhost:5174",
         "http://127.0.0.1:5174",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "http://ui:3000",
+        "http://ui:3001",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 app.include_router(locations_router)
+app.include_router(menus_router)
+app.include_router(sales_router)
+app.include_router(customers_router)
+app.include_router(suppliers_router)
 app.include_router(inventory_router)
 app.include_router(users_router)
 _register_analyze_routes(app, "anylayze")
