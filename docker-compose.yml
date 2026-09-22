@@ -2,16 +2,14 @@
 # Two services on an explicit network. Inter-service URLs use the Compose
 # service name as host (http://backend:8000), never localhost.
 #
-# Secrets (GROQ_API_KEY, JWT_SECRET_KEY, passwords) belong only in root .env
-# (gitignored). Never put real keys in this file or any Dockerfile.
+# All container environment variables come from root .env (gitignored).
+# Do not hardcode secrets or service config in this YAML.
 #   cp .env.example .env
-#
 #   docker compose up --build
+#
 #   Website:    http://localhost:3000/
 #   Backoffice: http://localhost:3001/login
 #   API:        http://localhost:8000/docs
-#
-# Redis/Flower/Celery worker: see services/README.md (not part of this file).
 
 networks:
   brasaland:
@@ -33,15 +31,9 @@ services:
       # to the host gateway and use the published backend port 8000.
       - "backend:host-gateway"
     env_file:
-      - path: .env
-        required: false
+      - .env
     depends_on:
       - backend
-    environment:
-      NODE_ENV: development
-      # Next.js rewrites in the ui container talk to the backend service by name.
-      API_PROXY: http://backend:8000
-      VITE_API_PROXY: http://backend:8000
     command:
       - /bin/sh
       - -c
@@ -68,10 +60,7 @@ services:
     networks:
       - brasaland
     env_file:
-      - path: .env
-        required: false
-    environment:
-      PYTHONPATH: /app
+      - .env
     volumes:
       - ./api:/app/api
       - ./services:/app/services
