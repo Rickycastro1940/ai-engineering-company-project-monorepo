@@ -11,21 +11,16 @@ Also present: **`web/`** — incident-analysis HTML tool (not the public marketi
 
 ## Docker
 
-[`Dockerfile`](./Dockerfile) uses the official **Node Alpine** image (`node:22-alpine`). It installs npm dependencies for `uis/website` and `uis/backoffice` in **separate** `npm ci` layers, then copies each app’s source. The default command serves the public site on port 5173; run the staff console by setting `working_dir` to `/uis/backoffice` and port 5174.
+[`Dockerfile`](./Dockerfile) uses the official **Node Alpine** image (`node:22-alpine`). It installs npm dependencies for `uis/website` and `uis/backoffice` in **separate** `npm ci` layers, builds both Next.js apps, then the default **CMD** runs [`start.sh`](./start.sh) so both processes start: website on **3000**, backoffice on **3001**. [`.dockerignore`](./.dockerignore) excludes `node_modules`, `.next`, `.env*`, and `*.log`.
 
 ```bash
 # from this folder
 docker build -t brasaland-uis .
-
-# public site (Marketing)
-docker run --rm -p 5173:5173 brasaland-uis
-
-# staff backoffice (Operations / Executive)
-docker run --rm -p 5174:5174 -w /uis/backoffice brasaland-uis \
-  npm run dev -- --host 0.0.0.0 --port 5174
+docker run --rm -p 3000:3000 -p 3001:3001 brasaland-uis
 ```
 
-Root Compose also builds this image for the `website` and `backoffice` services.
+- Public site (Marketing): http://localhost:3000/
+- Staff backoffice (Operations / Executive): http://localhost:3001/login
 
 Organize `uis/` by **different concerns** — each subfolder covers a distinct area of the company (for example, public web vs internal operations) and includes its own technical and functional documentation.
 

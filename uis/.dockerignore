@@ -1,10 +1,14 @@
 **/node_modules
+node_modules
+**/.next
+.next
+.env*
+**/.env*
+*.log
+**/*.log
 **/dist
 **/dist-ssr
 **/.vite
-**/*.log
-**/.env
-**/.env.*
 **/.DS_Store
 web
 README.md

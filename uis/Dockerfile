@@ -1,23 +1,32 @@
 # Brasaland Digital frontends (CONTEXT.md: Marketing public site + staff backoffice).
 # Official Node image on Alpine. Website and backoffice dependencies install separately.
+# Default CMD runs start.sh, which starts both Next.js apps (website:3000, backoffice:3001).
 # Build from this folder: docker build -t brasaland-uis .
 
 FROM node:22-alpine
 
 WORKDIR /uis
 
-# uis/website — Camila Ospina / public corporate site (Vite + React)
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    HOSTNAME=0.0.0.0
+
+# uis/website — Camila Ospina / public corporate site (Next.js)
 COPY website/package.json website/package-lock.json ./website/
 RUN npm ci --prefix /uis/website
 
-# uis/backoffice — Operations/Executive staff console (Vite + React, JWT, COP/USD locations)
+# uis/backoffice — Operations/Executive staff console (Next.js, JWT, COP/USD locations)
 COPY backoffice/package.json backoffice/package-lock.json ./backoffice/
 RUN npm ci --prefix /uis/backoffice
 
 COPY website ./website
 COPY backoffice ./backoffice
+COPY start.sh /uis/start.sh
+RUN chmod +x /uis/start.sh \
+    && npm run build --prefix /uis/website \
+    && npm run build --prefix /uis/backoffice
 
-EXPOSE 5173 5174
+ENV NODE_ENV=production
 
-WORKDIR /uis/website
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
+EXPOSE 3000 3001
+
+CMD ["./start.sh"]
