@@ -14,7 +14,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
-| Technology: telemetry + pipeline to dashboards | **Partial** — Phase 1 floor of 32 day-one metrics in `docs/telemetry/telemetry-plan.md`, plus a backoffice catalog (auth, timing, client exceptions, required sections, abandoned flows) that stays off that floor. Schemas cover both. Weekly cost/waste pipeline and Celery path exist. Live emitters are not wired |
+| Technology: telemetry + pipeline to dashboards | **Partial** — Phase 1 floor of 32 day-one metrics in `docs/telemetry/telemetry-plan.md`. Each remaining event has a capture sentence (hypothesis and decision). Four staff points were dropped because they did not change a decision. Weekly cost/waste pipeline and Celery path exist. Live emitters are not wired |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Not done** as product UI; pipeline design targets cost/waste for Mariana + Felipe |
 | Procurement: supplier price history, consolidated spend | **Not done** (supplier docs may exist on other branches; not claimed here) |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
@@ -182,6 +182,23 @@ Department served: **Technology** (structured HTTP, no env names in 503s) + **Op
 uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py tests/test_users_api.py -q → 33 passed
 cd uis/backoffice && npm run build → green
 ```
+
+## Latest capture decisions (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology**, with the decision owner named on each event (Operations, Procurement, Marketing, People, Training, or Executive). An event stays only when the sentence “We capture [event_type] because we need to know [hypothesis] which allows us to make the decision, [decision]” can be completed.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+Draft202012Validator.check_schema → pass
+40 event examples validate
+40 capture sentences, one per event_type, none missing, none extra
+floor ids = 32, example matches the schema enum
+backoffice page_view → schema reject
+section suppliers → schema reject
+flow inventory_inbound → schema reject
+```
+
+Dropped: `session_check_failed` (same decision as `api_call_completed` on `GET /auth/me`), backoffice `page_view` (staff visits are `section_viewed`), section ids `suppliers` / `people` / `training` / `reporting`, and flows `inventory_inbound` / `inventory_outbound`. Emitters are still not wired. Menus, sales, customers, and suppliers remain missing on the central API.
 
 ## Latest backoffice catalog (`cursor/telemetry-plan-ff8d`)
 

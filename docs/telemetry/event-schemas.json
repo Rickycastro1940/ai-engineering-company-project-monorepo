@@ -68,9 +68,6 @@
       "$ref": "#/$defs/sessionRejected"
     },
     {
-      "$ref": "#/$defs/sessionCheckFailed"
-    },
-    {
       "$ref": "#/$defs/sessionEnded"
     },
     {
@@ -3082,7 +3079,7 @@
       ]
     },
     "pageView": {
-      "description": "Client route mount. path is the pathname with no query string.",
+      "description": "Public corporate home mount. path is /.",
       "allOf": [
         {
           "$ref": "#/$defs/envelope"
@@ -3094,8 +3091,7 @@
             },
             "source": {
               "enum": [
-                "uis.website",
-                "uis.backoffice"
+                "uis.website"
               ]
             },
             "payload": {
@@ -3106,66 +3102,16 @@
                   "const": "none"
                 },
                 "app": {
-                  "enum": [
-                    "website",
-                    "backoffice"
-                  ]
+                  "const": "website"
                 },
                 "path": {
-                  "type": "string",
-                  "pattern": "^/[^?#]*$"
+                  "const": "/"
                 }
               },
               "required": [
                 "location_scope",
                 "app",
                 "path"
-              ],
-              "allOf": [
-                {
-                  "if": {
-                    "properties": {
-                      "app": {
-                        "const": "website"
-                      }
-                    },
-                    "required": [
-                      "app"
-                    ]
-                  },
-                  "then": {
-                    "properties": {
-                      "path": {
-                        "const": "/"
-                      }
-                    }
-                  }
-                },
-                {
-                  "if": {
-                    "properties": {
-                      "app": {
-                        "const": "backoffice"
-                      }
-                    },
-                    "required": [
-                      "app"
-                    ]
-                  },
-                  "then": {
-                    "properties": {
-                      "path": {
-                        "enum": [
-                          "/login",
-                          "/register",
-                          "/accessible",
-                          "/account/profile",
-                          "/account/change-password"
-                        ]
-                      }
-                    }
-                  }
-                }
               ]
             }
           },
@@ -3174,52 +3120,6 @@
             "source",
             "payload"
           ]
-        },
-        {
-          "if": {
-            "properties": {
-              "source": {
-                "const": "uis.website"
-              }
-            },
-            "required": [
-              "source"
-            ]
-          },
-          "then": {
-            "properties": {
-              "payload": {
-                "properties": {
-                  "app": {
-                    "const": "website"
-                  }
-                }
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "source": {
-                "const": "uis.backoffice"
-              }
-            },
-            "required": [
-              "source"
-            ]
-          },
-          "then": {
-            "properties": {
-              "payload": {
-                "properties": {
-                  "app": {
-                    "const": "backoffice"
-                  }
-                }
-              }
-            }
-          }
         }
       ],
       "examples": [
@@ -3228,15 +3128,15 @@
           "id": "13131313-1313-4131-8131-131313131313",
           "event_type": "page_view",
           "occurred_at": "2026-09-22T15:04:05Z",
-          "source": "uis.backoffice",
+          "source": "uis.website",
           "tags": {
-            "source": "uis.backoffice",
+            "source": "uis.website",
             "location_scope": "none"
           },
           "payload": {
             "location_scope": "none",
-            "app": "backoffice",
-            "path": "/accessible"
+            "app": "website",
+            "path": "/"
           }
         }
       ]
@@ -3608,67 +3508,6 @@
             "location_scope": "none",
             "reason": "expired",
             "route_template": "/auth/me"
-          }
-        }
-      ]
-    },
-    "sessionCheckFailed": {
-      "description": "AuthProvider could not finish GET /auth/me for a reason other than 401.",
-      "allOf": [
-        {
-          "$ref": "#/$defs/envelope"
-        },
-        {
-          "properties": {
-            "event_type": {
-              "const": "session_check_failed"
-            },
-            "source": {
-              "enum": [
-                "uis.backoffice"
-              ]
-            },
-            "payload": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "location_scope": {
-                  "const": "none"
-                },
-                "reason": {
-                  "enum": [
-                    "network",
-                    "server"
-                  ]
-                }
-              },
-              "required": [
-                "location_scope",
-                "reason"
-              ]
-            }
-          },
-          "required": [
-            "event_type",
-            "source",
-            "payload"
-          ]
-        }
-      ],
-      "examples": [
-        {
-          "schema_version": 1,
-          "id": "31313131-3131-4313-8313-313131313131",
-          "event_type": "session_check_failed",
-          "occurred_at": "2026-09-22T15:04:05Z",
-          "source": "uis.backoffice",
-          "tags": {
-            "source": "uis.backoffice",
-            "location_scope": "none"
-          },
-          "payload": {
-            "location_scope": "none",
-            "reason": "network"
           }
         }
       ]
@@ -4385,11 +4224,7 @@
                     "kitchen_inventory",
                     "executive_sales",
                     "account_profile",
-                    "account_password",
-                    "suppliers",
-                    "people",
-                    "training",
-                    "reporting"
+                    "account_password"
                   ]
                 },
                 "required": {
@@ -4611,94 +4446,6 @@
                       }
                     }
                   }
-                },
-                {
-                  "if": {
-                    "properties": {
-                      "section": {
-                        "const": "suppliers"
-                      }
-                    },
-                    "required": [
-                      "section"
-                    ]
-                  },
-                  "then": {
-                    "properties": {
-                      "required": {
-                        "const": true
-                      },
-                      "ready": {
-                        "const": false
-                      }
-                    }
-                  }
-                },
-                {
-                  "if": {
-                    "properties": {
-                      "section": {
-                        "const": "people"
-                      }
-                    },
-                    "required": [
-                      "section"
-                    ]
-                  },
-                  "then": {
-                    "properties": {
-                      "required": {
-                        "const": true
-                      },
-                      "ready": {
-                        "const": false
-                      }
-                    }
-                  }
-                },
-                {
-                  "if": {
-                    "properties": {
-                      "section": {
-                        "const": "training"
-                      }
-                    },
-                    "required": [
-                      "section"
-                    ]
-                  },
-                  "then": {
-                    "properties": {
-                      "required": {
-                        "const": true
-                      },
-                      "ready": {
-                        "const": false
-                      }
-                    }
-                  }
-                },
-                {
-                  "if": {
-                    "properties": {
-                      "section": {
-                        "const": "reporting"
-                      }
-                    },
-                    "required": [
-                      "section"
-                    ]
-                  },
-                  "then": {
-                    "properties": {
-                      "required": {
-                        "const": false
-                      },
-                      "ready": {
-                        "const": true
-                      }
-                    }
-                  }
                 }
               ]
             }
@@ -4762,9 +4509,7 @@
                     "session_restore",
                     "profile_edit",
                     "password_change",
-                    "operations_review",
-                    "inventory_inbound",
-                    "inventory_outbound"
+                    "operations_review"
                   ]
                 },
                 "flow_instance": {

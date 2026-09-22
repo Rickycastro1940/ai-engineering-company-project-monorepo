@@ -278,19 +278,109 @@ Price alert: after an inbound line is priced, load the previous `unit_price` for
 | `user_login_succeeded` | `none` | `services/api/users.py` login handlers | No |
 | `user_login_failed` | `none` | Those handlers’ 401 branches | No |
 | `api_error` | `none` | `services/api/errors.py` 500 and 503 handlers | No |
-| `page_view` | `none` | `uis/website` and `uis/backoffice` | No |
+| `page_view` | `none` | `uis/website` mount of `/` | No |
 | `auth_form_rejected` | `none` | Login, register, password, and profile forms in the browser, including the 422 those forms show | No |
 | `session_rejected` | `none` | `decode_access_token`, `get_current_user`, `useRequireAuth` | No |
-| `session_check_failed` | `none` | `AuthProvider` when `GET /auth/me` is not a 401 | No |
 | `session_ended` | `none` | Logout, or `clearSessionAndRedirectToLogin` | No |
 | `account_mutation` | `none` | Register, `PUT /profiles/me`, `PUT /users/{id}` | No |
 | `api_call_completed` | `none` | `apiRequest` in `uis/backoffice/src/lib/api.ts` | No |
 | `ui_timing` | `none` | Session effect and each panel effect | No |
 | `client_exception` | `none` | Backoffice and website `ErrorBoundary`, plus `window` listeners | No |
 | `section_viewed` | `none` | Sidebar destinations and the panels on `/accessible` | No |
-| `flow_progress` | `none` | Sign-in, register, session restore, profile, password, operations review, orders | No |
+| `flow_progress` | `none` | Sign-in, register, session restore, profile, password, and the operations review | No |
 | `inventory_validation_failed` | `none` | `handle_validation_error` for an inventory or order route | No |
 | `stock_modification_rejected` | `chain` | `apply_delta` or `get_alerts` when the write is refused | No |
+
+## Why we capture each event
+
+Each event that remains can finish this sentence. A point that could not name the decision was removed.
+
+We capture `product_created` because we need to know a new ingredient landed in the chain inventory file, which allows us to make the decision, whether Felipe’s next order includes it or the row was a mistaken create that must be reversed before ordering.
+
+We capture `stock_count_adjusted` because we need to know the on-hand quantity moved and by how much, which allows us to make the decision, whether the suggested order uses the new count or a large delta needs a recount before the order goes out.
+
+We capture `stock_threshold_crossed` because we need to know the chain inventory file fell from at least 10 to under 10, which allows us to make the decision, to place or advance a purchase before a location runs out, since this CSV is the only live stock.
+
+We capture `stock_threshold_cleared` because we need to know the same file climbed back to at least 10, which allows us to make the decision, to cancel a top-up that was started for the low count.
+
+We capture `inbound_order_created` because we need to know what each location bought, from whom, and at what cost in COP or USD, which allows us to make the decision, whether Lucía consolidates or renegotiates that supplier and whether finance books the purchase.
+
+We capture `outbound_order_created` because we need to know what the kitchen consumed or transferred, which allows us to make the decision, how much to reorder so cover stays ahead of the next delivery.
+
+We capture `stock_waste_registered` because we need to know waste cost and premium-protein kilograms by location, which allows us to make the decision, whether a kitchen starts the improvement plan when waste exceeds 6% for two months, or Felipe is called for more than 5 kg of premium protein in a week.
+
+We capture `stock_threshold_triggered` because we need to know a location crossed its stock or protein-cover line, which allows us to make the decision, to reorder that product at that location before the next scheduled delivery.
+
+We capture `ingredient_price_variance_detected` because we need to know a supplier’s unit price moved by at least 1% before the invoice is the only notice, which allows us to make the decision, whether Lucía challenges that price or switches supplier on the next order.
+
+We capture `sale_completed` because we need to know each location’s sales, covers, and currency, which allows us to make the decision, whether Florida’s week is behind and whether a location’s average ticket is the one Mariana asks about.
+
+We capture `location_sales_silence_detected` because we need to know an open location has had no sale for 45 minutes, which allows us to make the decision, to call that location during service.
+
+We capture `loyalty_points_redeemed` because we need to know points left a digital account and the discount in COP or USD, which allows us to make the decision, whether the points liability is large enough for finance to accrue and for Camila to keep the digital redeem rule.
+
+We capture `loyalty_card_transferred` because we need to know a physical stamp card was moved onto an app account, which allows us to make the decision, whether the counter migration is working or Camila stops pushing transfers.
+
+We capture `customer_preference_recorded` because we need to know which identified guests have a language or channel preference, which allows us to make the decision, to hold personalisation until that coverage is real.
+
+We capture `recommendation_shown` because we need to know a suggestion was actually displayed, which allows us to make the decision, to score the accept rate on offers that rendered.
+
+We capture `recommendation_accepted` because we need to know the guest took the suggested dish, which allows us to make the decision, to keep that suggestion surface or pull it when accepted stays low against shown.
+
+We capture `employee_hired` because we need to know headcount gained by country, which allows us to make the decision, whether turnover in Colombia or the United States is a real rate or an empty denominator.
+
+We capture `employee_separated` because we need to know who left and in which country, which allows us to make the decision, whether Ashley adds hiring in that country this month.
+
+We capture `absence_recorded` because we need to know absence days by country, which allows us to make the decision, whether that country needs a larger on-duty buffer.
+
+We capture `roster_day_scheduled` because we need to know how many days were scheduled, which allows us to make the decision, to publish absenteeism as a rate and to leave a country with an empty roster null.
+
+We capture `vacancy_opened` because we need to know when a vacancy started, which allows us to make the decision, to start the fill clock Ashley reports by country.
+
+We capture `vacancy_filled` because we need to know how many days the fill took, which allows us to make the decision, whether kitchen hiring in that country is too slow and the process has to change.
+
+We capture `recipe_update_published` because we need to know which recipe version was pushed, which allows us to make the decision, which version all 14 kitchens are supposed to be cooking.
+
+We capture `recipe_update_acknowledged` because we need to know which locations confirmed that version, which allows us to make the decision, to chase the kitchens still on the old recipe before service.
+
+We capture `weekly_report_dispatched` because we need to know the Monday 07:00 report went out on time and listed every floor metric, which allows us to make the decision, whether Mariana uses that issue or Technology reruns the job.
+
+We capture `user_login_succeeded` because we need to know a staff sign-in worked, which allows us to make the decision, to treat a rise in failures with flat successes as a password problem and a drop in both as an outage.
+
+We capture `user_login_failed` because we need to know whether the password was wrong or the account is inactive, which allows us to make the decision, to send a reset or to reactivate the account with People.
+
+We capture `api_error` because we need to know the API returned 500 or 503, which allows us to make the decision, to fix that handler or hold a deploy.
+
+We capture `page_view` because we need to know the public corporate home was opened, which allows us to make the decision, whether Camila treats the 2019 site as a live channel.
+
+We capture `auth_form_rejected` because we need to know the form blocked the submit, which allows us to make the decision, to fix the form or the client check.
+
+We capture `session_rejected` because we need to know a 401 was an expired token, a broken token, an inactive subject, or a missing token, which allows us to make the decision, to extend or refresh the 30-minute token, rotate the signing secret, finish offboarding, or fix the deep link.
+
+We capture `session_ended` because we need to know the operator logged out or was sent back to `/login`, which allows us to make the decision, to extend the 30-minute token when `rejected_session` is what interrupts the shift.
+
+We capture `account_mutation` because we need to know register, profile save, or password change finished or was refused, which allows us to make the decision, to send a duplicate email to sign-in, or to fix the permission or the write before People relies on that form.
+
+We capture `api_call_completed` because we need to know which staff route was slow, failed, or unreachable, which allows us to make the decision, which endpoint to fix before Felipe is asked to trust the console, including a session check that never returned 200.
+
+We capture `ui_timing` because we need to know how long the panel or form spun and whether the operator left mid-load, which allows us to make the decision, to fix the screen when the API call was fast, or to shorten the wait when the outcome is cancelled.
+
+We capture `client_exception` because we need to know which pathname threw and the error name, which allows us to make the decision, to hotfix that route before the next service or to leave a single account page for later.
+
+We capture `section_viewed` because we need to know which live staff surface was actually shown, including executive sales while it still has no numbers, which allows us to make the decision, to fix navigation when the roster or inventory never appears, and to withhold the sales dashboard from Mariana until that panel is ready.
+
+We capture `flow_progress` because we need to know which live staff flow was left unfinished and at which step, which allows us to make the decision, to fix that step before training people to finish the flow.
+
+We capture `inventory_validation_failed` because we need to know a stock or order body was rejected before any write, which allows us to make the decision, to fix the client payload.
+
+We capture `stock_modification_rejected` because we need to know a direct quantity change was refused and the file did not change, which allows us to make the decision, to correct the product or the delta.
+
+### Discarded
+
+- `session_check_failed`. Whether the session check could not reach the API or the API returned 5xx is already `api_call_completed` on `GET /auth/me`. A second event does not change the decision of which side to fix.
+- Backoffice `page_view`. Which staff screen was shown is `section_viewed`. `page_view` stays for the public home only.
+- Section ids `suppliers`, `people`, `training`, and `reporting`. Those screens are not in the staff app, so there is no visit to capture and no decision the row would change.
+- Flows `inventory_inbound` and `inventory_outbound`. There is no order form to abandon. Purchase and consumption decisions are `inbound_order_created` and `outbound_order_created`.
 
 `data/pipelines/pipeline.py` `extract_telemetry_events` filters exactly these four types: `inbound_order_created`, `stock_waste_registered`, `stock_threshold_triggered`, `ingredient_price_variance_detected`. `scripts/nightly_export.py` copies only the first three. When that export is next edited, add `ingredient_price_variance_detected` so the CSV matches the extractor. The extractor reads Supabase itself; the CSV is not the aggregation input.
 
@@ -343,7 +433,7 @@ This is the path from a signed-in staff session to a completed inbound or outbou
 | Step | What the code does | Instrumentation |
 | --- | --- | --- |
 | 1. Open the console | `LoginPage` submits `POST /auth/login`. `login` calls `authenticate_user`. | **IP-1.** Active user → `user_login_succeeded` (`method` `json`), then the JWT is stored. Unknown or inactive user → `user_login_failed`, then HTTP 401. The staff member stops here. |
-| 2. Enter the protected view | `ProtectedRoute` calls `GET /auth/me`. A 401 returns the browser to `/login`. A 200 renders `AccessiblePage`, which loads `GET /locations/overview` and `GET /inventory`. | **IP-2.** `page_view` with `app` `backoffice` and `path` `/accessible` when `AccessiblePage` mounts. The two GETs emit no inventory event. A successful list is not a stock change. |
+| 2. Enter the protected view | `ProtectedRoute` calls `GET /auth/me`. A 401 returns the browser to `/login`. A 200 renders `AccessiblePage`, which loads `GET /locations/overview` and `GET /inventory`. | **IP-2.** `section_viewed` section `accessible_entry` when `AccessiblePage` mounts. The two GETs emit no inventory event. A successful list is not a stock change. |
 | 3. Submit a stock or product body | `POST /inventory` must match `ProductCreate` (`name` length ≥ 1, `quantity` ≥ 0, `unit` length ≥ 1). `PATCH /inventory/{product_id}` must match `StockDelta` (`delta` integer) and an integer path id. | **IP-3. Failed validation.** `handle_validation_error` emits `inventory_validation_failed` and returns 422. `create_product` and `apply_delta` are not called. `products.csv` stays as it was. Field entries are `loc` plus pydantic `type` (`body.quantity` / `greater_than_equal`, `body.delta` / `missing`, `path.product_id` / `int_parsing`). The rejected input value stays out of the payload. |
 | 4. Apply a direct stock change | `update_stock` calls `apply_delta`. This is the only live quantity write. | **IP-4. Rejected direct modification.** Unknown `product_id` → HTTP 404, reason `product_not_found`. `quantity + delta < 0` → HTTP 400, reason `below_zero`. `GET /inventory/alerts` with `threshold < 0` → HTTP 400, reason `negative_alert_threshold`. Each refusal emits `stock_modification_rejected` and does not write the file. |
 | 5. Commit the direct change | `apply_delta` saves the new quantity. | **IP-5.** `stock_count_adjusted` with `reason` `count_correction`. A `delta` of 0 is accepted by the API and changes nothing, so it emits no event. |
@@ -383,7 +473,7 @@ Tokens last `ACCESS_TOKEN_EXPIRE_MINUTES` (default 30) in `services/api/auth.py`
 | Bearer token is signed wrong, truncated, or has no `sub` | Other `JWTError`, or `sub` missing | `session_rejected` reason `invalid_token` |
 | Token subject points at an inactive or missing user | `get_current_user` | `session_rejected` reason `inactive_user` |
 | Protected route with no token | `useRequireAuth` `isMissingToken`, redirect to `/login?next=` | `session_rejected` reason `missing_token` |
-| Session check could not reach the API, or the API returned 5xx | `AuthProvider` catch when the error is not HTTP 401. The screen is “Could not verify session” with `retrySession` | `session_check_failed` reason `network` or `server` |
+| Session check could not reach the API, or the API returned 5xx | `AuthProvider` catch when the error is not HTTP 401. The screen is “Could not verify session” with `retrySession` | `api_call_completed` on `GET /auth/me`, outcome `network` or `http_error`, and `flow_progress` `session_restore` outcome `abandoned` |
 | Any later call returns 401 while a token was sent | `apiRequest` calls `clearSessionAndRedirectToLogin` | `session_ended` reason `rejected_session`. The server event above already says why. |
 | Logout clicked | `BackofficeLayout` `logout` → `clearToken` and `/login` | `session_ended` reason `logout` |
 | Profile opened and `GET /auth/me` fills name, phone, address | `ProfilePage` load effect | `ui_timing` name `profile`, plus `section_viewed` |
@@ -423,7 +513,7 @@ Panel load times are a second clock, `ui_timing`, measured in the page effect fr
 | `register_form` | Same on `RegisterPage` |
 | `password_form` | `ChangePasswordPage` `handleSubmit` until message or error |
 
-`page_view` remains the engineering volume event. These timings sit beside it.
+`page_view` is only the public corporate home. Staff route mounts are `section_viewed`. These timings sit beside the staff API durations.
 
 ### Uncaught front-end errors
 
@@ -443,12 +533,8 @@ Panel load times are a second clock, `ui_timing`, measured in the page effect fr
 | `executive_sales` | “Executive sales (placeholder)” on `/accessible` | Yes for a session that is answering Mariana’s sales questions | No. The panel is structure only |
 | `account_profile` | `/account/profile` | No | Yes |
 | `account_password` | `/account/change-password` | No | Yes |
-| `suppliers` | Not in the sidebar. Reserved for Lucía Fernández’s purchasing desk | Yes once that desk exists | No |
-| `people` | Not in the sidebar. Reserved for Ashley Turner’s HR desk | Yes once that desk exists | No |
-| `training` | Not in the sidebar. Reserved for Jake Morrison’s recipe desk | Yes once that desk exists | No |
-| `reporting` | `legacy/telemetry.html` is a separate file, not a React route | No | The file exists. The Vite app does not link it |
 
-A section id is emitted only when that surface is on screen. Reserved desks stay in this catalog so the first real screen uses the same id.
+A section id is emitted only when that surface is on screen. Screens that are not in the staff app are not given a section id in advance.
 
 `flow_progress` uses one `flow_instance` (UUID) kept in `sessionStorage` for that attempt. Outcome `started` opens it, `advanced` records a step, `completed` closes it, `abandoned` closes it without success. Abandon is emitted when the route changes, the document goes `hidden`, or the component unmounts while the instance is still open. A completed instance does not also emit `abandoned`.
 
@@ -456,12 +542,10 @@ A section id is emitted only when that surface is on screen. Reserved desks stay
 | --- | --- | --- | --- | --- |
 | `staff_sign_in` | `LoginPage` shown, including a `next` deep link | Submit pressed | Token stored and navigation to `nextPath` (default `/accessible`) | Leave `/login` with the form dirty and no success. A 401 stays in the flow until they leave or succeed |
 | `staff_register` | `RegisterPage` shown | Client validation, `POST /users`, then `POST /auth/login` | Token stored and navigation onward | Stop after a validation message, a 409, or a login failure |
-| `session_restore` | Boot with a stored token | `GET /auth/me` in flight | Profile applied | `session_rejected` or `session_check_failed` |
+| `session_restore` | Boot with a stored token | `GET /auth/me` in flight | Profile applied | `session_rejected`, or `api_call_completed` on `GET /auth/me` with outcome `network` or `http_error` |
 | `profile_edit` | Profile form shown with loaded fields | A field changes from the loaded value | `PUT /profiles/me` returns 200 | Route change while a field differs from the loaded value and no save succeeded |
 | `password_change` | Password form shown | Confirmation check | `PUT /users/{id}` returns 200 | Mismatch message and the operator opens another section, or the request fails and they leave |
 | `operations_review` | `/accessible` shown | Locations panel success, inventory panel success | Both panels have reached `success` in this visit | One panel is `error` and the operator changes section without pressing the retry control |
-| `inventory_inbound` | Operator starts an inbound order (the future `POST /orders` form) | IP-3 validation, IP-4 rejection, or a line draft | IP-7 `inbound_order_created` for every line | Leave the form with a draft still open |
-| `inventory_outbound` | Operator starts an outbound order | Same | IP-8 `outbound_order_created` | Same |
 
 Questions this catalog answers, without adding them to the Phase 1 floor:
 
@@ -536,7 +620,7 @@ On mount, emit `page_view` with `app` `website` and `path` `/`. The `*` route on
 
 ### `uis/backoffice` pages
 
-On mount of the page component, emit `page_view` with `app` `backoffice` and `path` set to the pathname only. Emit `section_viewed` in the same mount, and `flow_progress` from the form lifecycle in the backoffice catalog. The same catalog names `auth_form_rejected`, `session_check_failed`, `session_ended`, `account_mutation`, `api_call_completed` (from `apiRequest`), `ui_timing`, and `client_exception`. `session_rejected` with reason `missing_token` is the only session rejection the browser emits.
+On mount of the page component, emit `section_viewed` and `flow_progress` from the lifecycle in the backoffice catalog. Do not emit `page_view` from the staff app. The same catalog names `auth_form_rejected`, `session_ended`, `account_mutation`, `api_call_completed` (from `apiRequest`), `ui_timing`, and `client_exception`. `session_rejected` with reason `missing_token` is the only session rejection the browser emits. A session check that fails before a 401 is `api_call_completed` on `GET /auth/me`.
 
 | Component | `path` | `section` |
 | --- | --- | --- |
@@ -600,7 +684,7 @@ Brasa Points on a ticket: 45,000 COP → `points_earned` 4. 27 USD → `points_e
 - `user_login_failed.failure_reason` is `invalid_credentials` or `inactive_user`.
 - `api_error.message` is the public message already returned by `error_body` (`Internal server error` or the 503 public text). It is not `str(exc)` when that string might contain a host, a key, or a query.
 - Page paths have no query and no fragment.
-- `auth_form_rejected`, `account_mutation`, `session_rejected`, `session_ended`, `session_check_failed`, and `client_exception` carry no email, phone, address, password, token, message, or stack. `client_exception.error_name` is `Error.name` only. The payload field is `catch_site`, because `source` is already the envelope.
+- `auth_form_rejected`, `account_mutation`, `session_rejected`, `session_ended`, and `client_exception` carry no email, phone, address, password, token, message, or stack. `client_exception.error_name` is `Error.name` only. The payload field is `catch_site`, because `source` is already the envelope.
 
 ## Checklist for the person wiring this in
 
@@ -615,4 +699,4 @@ Brasa Points on a ticket: 45,000 COP → `points_earned` 4. 27 USD → `points_e
 9. Run `aggregate_location_kpis` on a four-event fixture that uses `us-mia-downtown` and expect `waste_ratio` 0.15 with `currency` USD.
 10. Confirm a COP `inbound_order_created` for `co-med-centro` does not land in the USD weekly total.
 11. Keep every Phase 1 floor id in the plan. `weekly_report_dispatched.floor_metric_ids` must contain each of them. A null value stays on the dashboard. The `bo.*` questions in the backoffice catalog stay out of that list.
-12. Emit the backoffice catalog from the call sites named there: login and session outcomes, `api_call_completed` durations, panel `ui_timing`, `client_exception` with no stack, `section_viewed` only when the surface is on screen, and `flow_progress` abandon when a flow closes unfinished.
+12. Emit a backoffice event only when its sentence in “Why we capture each event” names the decision. That set is login and session outcomes, `api_call_completed` durations, panel `ui_timing`, `client_exception` with no stack, `section_viewed` only for a surface that is on screen, and `flow_progress` when one of the six live flows closes unfinished.
