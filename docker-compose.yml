@@ -2,6 +2,10 @@
 # Two services on an explicit network. Inter-service URLs use the Compose
 # service name as host (http://backend:8000), never localhost.
 #
+# Secrets (GROQ_API_KEY, JWT_SECRET_KEY, passwords) belong only in root .env
+# (gitignored). Never put real keys in this file or any Dockerfile.
+#   cp .env.example .env
+#
 #   docker compose up --build
 #   Website:    http://localhost:3000/
 #   Backoffice: http://localhost:3001/login
@@ -28,6 +32,9 @@ services:
       # does not pass container-to-container TCP, so resolve the service name
       # to the host gateway and use the published backend port 8000.
       - "backend:host-gateway"
+    env_file:
+      - path: .env
+        required: false
     depends_on:
       - backend
     environment:
@@ -60,6 +67,9 @@ services:
     container_name: brasaland-backend
     networks:
       - brasaland
+    env_file:
+      - path: .env
+        required: false
     environment:
       PYTHONPATH: /app
     volumes:

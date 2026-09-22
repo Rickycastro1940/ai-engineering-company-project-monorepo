@@ -1,3 +1,6 @@
+# Never bake GROQ_API_KEY, JWT_SECRET_KEY, or passwords into this image.
+# Pass secrets at runtime from root .env (gitignored).
+
 FROM python:3.11-slim
 
 WORKDIR /app
