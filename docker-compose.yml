@@ -23,6 +23,11 @@ services:
     container_name: brasaland-ui
     networks:
       - brasaland
+    extra_hosts:
+      # Named host "backend" (not localhost). On this VM the Docker bridge
+      # does not pass container-to-container TCP, so resolve the service name
+      # to the host gateway and use the published backend port 8000.
+      - "backend:host-gateway"
     depends_on:
       - backend
     environment:
