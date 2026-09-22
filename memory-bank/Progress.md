@@ -14,7 +14,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
-| Technology: telemetry + pipeline to dashboards | **Partial** — 34 mandatory metrics taken from `CONTEXT.md` needs, and a separate identified-opportunity catalog (metrics and staff-console events). Weekly cost/waste pipeline and Celery path exist. Live emitters are not wired |
+| Technology: telemetry + pipeline to dashboards | **Partial** — 34 mandatory metrics from `CONTEXT.md`, an identified-opportunity catalog, and a standard event envelope (`eventID`, ISO 8601 `timestamp`, `sessionID`, `UserID`, `Event_type`, `SchemaVersion`, `requestID`, `properties`). Weekly cost/waste pipeline and Celery path exist. Live emitters are not wired |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Not done** as product UI; pipeline design targets cost/waste for Mariana + Felipe |
 | Procurement: supplier price history, consolidated spend | **Not done** (supplier docs may exist on other branches; not claimed here) |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
@@ -182,6 +182,26 @@ Department served: **Technology** (structured HTTP, no env names in 503s) + **Op
 uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py tests/test_users_api.py -q → 33 passed
 cd uis/backoffice && npm run build → green
 ```
+
+## Latest event envelope (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology**. Every Brasaland telemetry document uses one envelope so a staff request, a location sale, and a Monday job can be correlated without putting a JWT or an email on the event.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+Draft202012Validator.check_schema → pass
+40 event examples validate
+envelope required keys: eventID, timestamp, sessionID, UserID, Event_type, SchemaVersion, requestID, source, tags, properties
+missing requestID → schema reject
+UserID as an email → schema reject
+null UserID on user_login_succeeded → schema reject
+timestamp with a numeric offset → schema reject
+sessionID shaped like a JWT → schema reject
+weekly report example sessionID and UserID are null
+mandatory metric ids remain 34
+```
+
+Emitters are still not wired. Menus, sales, customers, and suppliers remain missing on the central API.
 
 ## Latest mandatory versus opportunity split (`cursor/telemetry-plan-ff8d`)
 

@@ -270,41 +270,67 @@
     "envelope": {
       "type": "object",
       "additionalProperties": false,
+      "description": "Brasaland standard event envelope. Mandatory keys are eventID, timestamp (ISO 8601 UTC), sessionID, UserID, Event_type, SchemaVersion, requestID, and properties. source and tags are also required so the pipeline and the engineering reader stay aligned.",
       "required": [
-        "schema_version",
-        "id",
-        "event_type",
-        "occurred_at",
+        "eventID",
+        "timestamp",
+        "sessionID",
+        "UserID",
+        "Event_type",
+        "SchemaVersion",
+        "requestID",
         "source",
         "tags",
-        "payload"
+        "properties"
       ],
       "properties": {
-        "schema_version": {
-          "const": 1
-        },
-        "id": {
+        "eventID": {
           "type": "string",
           "format": "uuid"
         },
-        "event_type": {
+        "timestamp": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "sessionID": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "UserID": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "Event_type": {
           "type": "string",
           "minLength": 1
         },
-        "occurred_at": {
-          "$ref": "#/$defs/timestamp"
+        "SchemaVersion": {
+          "const": 1
+        },
+        "requestID": {
+          "type": "string",
+          "format": "uuid"
         },
         "source": {
           "$ref": "#/$defs/source"
         },
-        "actor_id": {
-          "type": "string",
-          "pattern": "^[0-9]+$"
-        },
         "tags": {
           "$ref": "#/$defs/tags"
         },
-        "payload": {
+        "properties": {
           "type": "object"
         }
       }
@@ -363,7 +389,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "product_created"
             },
             "source": {
@@ -371,7 +397,7 @@
                 "services.api.inventory"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -466,24 +492,27 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "11111111-1111-4111-8111-111111111111",
-          "event_type": "product_created",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "11111111-1111-4111-8111-111111111111",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "product_created",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.inventory",
           "tags": {
             "source": "services.api.inventory",
             "location_scope": "chain"
           },
-          "payload": {
+          "properties": {
             "location_scope": "chain",
             "product_id": 4,
             "product_name": "Olive Oil",
@@ -501,7 +530,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "stock_count_adjusted"
             },
             "source": {
@@ -509,7 +538,7 @@
                 "services.api.inventory"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -620,24 +649,27 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "22222222-2222-4222-8222-222222222222",
-          "event_type": "stock_count_adjusted",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "22222222-2222-4222-8222-222222222222",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": "02020202-0202-4202-8202-020202020202",
+          "UserID": "7",
+          "Event_type": "stock_count_adjusted",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.inventory",
           "tags": {
             "source": "services.api.inventory",
             "location_scope": "chain"
           },
-          "payload": {
+          "properties": {
             "location_scope": "chain",
             "product_id": 2,
             "product_name": "Mozzarella",
@@ -646,8 +678,7 @@
             "delta": -3,
             "quantity_before": 8,
             "quantity_after": 5
-          },
-          "actor_id": "7"
+          }
         }
       ]
     },
@@ -659,7 +690,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "stock_threshold_crossed"
             },
             "source": {
@@ -667,7 +698,7 @@
                 "services.api.inventory"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -710,24 +741,27 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "33333333-3333-4333-8333-333333333333",
-          "event_type": "stock_threshold_crossed",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "33333333-3333-4333-8333-333333333333",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "stock_threshold_crossed",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.inventory",
           "tags": {
             "source": "services.api.inventory",
             "location_scope": "chain"
           },
-          "payload": {
+          "properties": {
             "location_scope": "chain",
             "product_id": 2,
             "product_name": "Mozzarella",
@@ -747,7 +781,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "stock_threshold_cleared"
             },
             "source": {
@@ -755,7 +789,7 @@
                 "services.api.inventory"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -798,24 +832,27 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "44444444-4444-4444-8444-444444444444",
-          "event_type": "stock_threshold_cleared",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "44444444-4444-4444-8444-444444444444",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "stock_threshold_cleared",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.inventory",
           "tags": {
             "source": "services.api.inventory",
             "location_scope": "chain"
           },
-          "payload": {
+          "properties": {
             "location_scope": "chain",
             "product_id": 2,
             "product_name": "Mozzarella",
@@ -835,7 +872,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "inventory_validation_failed"
             },
             "source": {
@@ -843,7 +880,7 @@
                 "services.api.errors"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -903,24 +940,27 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "27272727-2727-4272-8272-272727272727",
-          "event_type": "inventory_validation_failed",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "27272727-2727-4272-8272-272727272727",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "inventory_validation_failed",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.errors",
           "tags": {
             "source": "services.api.errors",
             "location_scope": "none"
           },
-          "payload": {
+          "properties": {
             "location_scope": "none",
             "method": "POST",
             "route_template": "/inventory",
@@ -943,7 +983,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "stock_modification_rejected"
             },
             "source": {
@@ -951,7 +991,7 @@
                 "services.api.inventory"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -1076,24 +1116,27 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "28282828-2828-4282-8282-282828282828",
-          "event_type": "stock_modification_rejected",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "28282828-2828-4282-8282-282828282828",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": "02020202-0202-4202-8202-020202020202",
+          "UserID": "7",
+          "Event_type": "stock_modification_rejected",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.inventory",
           "tags": {
             "source": "services.api.inventory",
             "location_scope": "chain"
           },
-          "payload": {
+          "properties": {
             "location_scope": "chain",
             "reason": "below_zero",
             "http_status": 400,
@@ -1101,8 +1144,7 @@
             "product_name": "Mozzarella",
             "delta": -20,
             "quantity_before": 8
-          },
-          "actor_id": "7"
+          }
         }
       ]
     },
@@ -1114,7 +1156,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "inbound_order_created"
             },
             "source": {
@@ -1122,7 +1164,7 @@
                 "services.api.orders"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -1326,18 +1368,21 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "55555555-5555-4555-8555-555555555555",
-          "event_type": "inbound_order_created",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "55555555-5555-4555-8555-555555555555",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": "02020202-0202-4202-8202-020202020202",
+          "UserID": "3",
+          "Event_type": "inbound_order_created",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.orders",
           "tags": {
             "source": "services.api.orders",
@@ -1346,7 +1391,7 @@
             "country": "United States",
             "currency": "USD"
           },
-          "payload": {
+          "properties": {
             "location_scope": "location",
             "location_id": "us-mia-downtown",
             "country": "United States",
@@ -1370,8 +1415,7 @@
             "amount_usd": 1000,
             "approval_required": false,
             "approval_state": "not_required"
-          },
-          "actor_id": "3"
+          }
         }
       ]
     },
@@ -1383,7 +1427,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "outbound_order_created"
             },
             "source": {
@@ -1391,7 +1435,7 @@
                 "services.api.orders"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -1511,18 +1555,21 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "66666666-6666-4666-8666-666666666666",
-          "event_type": "outbound_order_created",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "66666666-6666-4666-8666-666666666666",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": "02020202-0202-4202-8202-020202020202",
+          "UserID": "3",
+          "Event_type": "outbound_order_created",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.orders",
           "tags": {
             "source": "services.api.orders",
@@ -1531,7 +1578,7 @@
             "country": "Colombia",
             "currency": "COP"
           },
-          "payload": {
+          "properties": {
             "location_scope": "location",
             "location_id": "co-med-centro",
             "country": "Colombia",
@@ -1546,8 +1593,7 @@
             "reason": "kitchen_consumption",
             "protein_class": "premium_protein",
             "cost": 180000
-          },
-          "actor_id": "3"
+          }
         }
       ]
     },
@@ -1559,7 +1605,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "stock_waste_registered"
             },
             "source": {
@@ -1567,7 +1613,7 @@
                 "services.api.inventory"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -1702,18 +1748,21 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "77777777-7777-4777-8777-777777777777",
-          "event_type": "stock_waste_registered",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "77777777-7777-4777-8777-777777777777",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": "02020202-0202-4202-8202-020202020202",
+          "UserID": "9",
+          "Event_type": "stock_waste_registered",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.inventory",
           "tags": {
             "source": "services.api.inventory",
@@ -1722,7 +1771,7 @@
             "country": "United States",
             "currency": "USD"
           },
-          "payload": {
+          "properties": {
             "location_scope": "location",
             "location_id": "us-mia-downtown",
             "country": "United States",
@@ -1738,8 +1787,7 @@
             "shift_code": "dinner-close",
             "training_waste": false,
             "note": "Trim discarded after a cut error on the rib station."
-          },
-          "actor_id": "9"
+          }
         }
       ]
     },
@@ -1751,7 +1799,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "stock_threshold_triggered"
             },
             "source": {
@@ -1760,7 +1808,7 @@
                 "services.telemetry.cover_monitor"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -1866,9 +1914,9 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         },
         {
@@ -1884,7 +1932,7 @@
           },
           "then": {
             "properties": {
-              "payload": {
+              "properties": {
                 "properties": {
                   "reason": {
                     "const": "protein_cover_below_3_days"
@@ -1907,7 +1955,7 @@
           },
           "then": {
             "properties": {
-              "payload": {
+              "properties": {
                 "properties": {
                   "reason": {
                     "const": "quantity_below_api_threshold"
@@ -1920,10 +1968,13 @@
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "88888888-8888-4888-8888-888888888888",
-          "event_type": "stock_threshold_triggered",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "88888888-8888-4888-8888-888888888888",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "stock_threshold_triggered",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.telemetry.cover_monitor",
           "tags": {
             "source": "services.telemetry.cover_monitor",
@@ -1932,7 +1983,7 @@
             "country": "Colombia",
             "currency": "COP"
           },
-          "payload": {
+          "properties": {
             "location_scope": "location",
             "location_id": "co-med-centro",
             "country": "Colombia",
@@ -1959,7 +2010,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "ingredient_price_variance_detected"
             },
             "source": {
@@ -1967,7 +2018,7 @@
                 "services.api.orders"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -2045,18 +2096,21 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "99999999-9999-4999-8999-999999999999",
-          "event_type": "ingredient_price_variance_detected",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "99999999-9999-4999-8999-999999999999",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": "02020202-0202-4202-8202-020202020202",
+          "UserID": "3",
+          "Event_type": "ingredient_price_variance_detected",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.orders",
           "tags": {
             "source": "services.api.orders",
@@ -2065,7 +2119,7 @@
             "country": "United States",
             "currency": "USD"
           },
-          "payload": {
+          "properties": {
             "location_scope": "location",
             "location_id": "us-mia-downtown",
             "country": "United States",
@@ -2078,8 +2132,7 @@
             "previous_unit_price": 50,
             "unit_price": 54,
             "variance_pct": 0.08
-          },
-          "actor_id": "3"
+          }
         }
       ]
     },
@@ -2091,7 +2144,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "sale_completed"
             },
             "source": {
@@ -2099,7 +2152,7 @@
                 "services.api.sales"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -2293,18 +2346,21 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-          "event_type": "sale_completed",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "sale_completed",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.sales",
           "tags": {
             "source": "services.api.sales",
@@ -2313,7 +2369,7 @@
             "country": "Colombia",
             "currency": "COP"
           },
-          "payload": {
+          "properties": {
             "location_scope": "location",
             "location_id": "co-med-centro",
             "country": "Colombia",
@@ -2357,7 +2413,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "location_sales_silence_detected"
             },
             "source": {
@@ -2365,7 +2421,7 @@
                 "services.telemetry.silence_monitor"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -2442,18 +2498,21 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-          "event_type": "location_sales_silence_detected",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "location_sales_silence_detected",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.telemetry.silence_monitor",
           "tags": {
             "source": "services.telemetry.silence_monitor",
@@ -2462,7 +2521,7 @@
             "country": "Colombia",
             "currency": "COP"
           },
-          "payload": {
+          "properties": {
             "location_scope": "location",
             "location_id": "co-med-centro",
             "country": "Colombia",
@@ -2488,7 +2547,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "loyalty_points_redeemed"
             },
             "source": {
@@ -2496,7 +2555,7 @@
                 "services.api.loyalty"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -2566,18 +2625,21 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-          "event_type": "loyalty_points_redeemed",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "loyalty_points_redeemed",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.loyalty",
           "tags": {
             "source": "services.api.loyalty",
@@ -2586,7 +2648,7 @@
             "country": "United States",
             "currency": "USD"
           },
-          "payload": {
+          "properties": {
             "location_scope": "location",
             "location_id": "us-mia-brickell",
             "country": "United States",
@@ -2609,7 +2671,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "loyalty_card_transferred"
             },
             "source": {
@@ -2617,7 +2679,7 @@
                 "services.api.loyalty"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -2679,18 +2741,21 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-          "event_type": "loyalty_card_transferred",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": "02020202-0202-4202-8202-020202020202",
+          "UserID": "4",
+          "Event_type": "loyalty_card_transferred",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.loyalty",
           "tags": {
             "source": "services.api.loyalty",
@@ -2699,7 +2764,7 @@
             "country": "Colombia",
             "currency": "COP"
           },
-          "payload": {
+          "properties": {
             "location_scope": "location",
             "location_id": "co-bog-chapinero",
             "country": "Colombia",
@@ -2709,20 +2774,19 @@
             "from_medium": "physical_card",
             "to_medium": "app",
             "points_balance": 12
-          },
-          "actor_id": "4"
+          }
         }
       ]
     },
     "userLoginSucceeded": {
-      "description": "POST /auth/login or POST /auth/token after authenticate_user succeeds. actor_id is users.id.",
+      "description": "POST /auth/login or POST /auth/token after authenticate_user succeeds. UserID is users.id.",
       "allOf": [
         {
           "$ref": "#/$defs/envelope"
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "user_login_succeeded"
             },
             "source": {
@@ -2730,7 +2794,7 @@
                 "services.api.users"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -2798,34 +2862,39 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         },
         {
-          "required": [
-            "actor_id"
-          ]
+          "properties": {
+            "UserID": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          }
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
-          "event_type": "user_login_succeeded",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": "02020202-0202-4202-8202-020202020202",
+          "UserID": "7",
+          "Event_type": "user_login_succeeded",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.users",
           "tags": {
             "source": "services.api.users",
             "location_scope": "none"
           },
-          "payload": {
+          "properties": {
             "location_scope": "none",
             "method": "json",
             "route": "/auth/login"
-          },
-          "actor_id": "7"
+          }
         }
       ]
     },
@@ -2837,7 +2906,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "user_login_failed"
             },
             "source": {
@@ -2845,7 +2914,7 @@
                 "services.api.users"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -2920,24 +2989,27 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "ffffffff-ffff-4fff-8fff-ffffffffffff",
-          "event_type": "user_login_failed",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "ffffffff-ffff-4fff-8fff-ffffffffffff",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "user_login_failed",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.users",
           "tags": {
             "source": "services.api.users",
             "location_scope": "none"
           },
-          "payload": {
+          "properties": {
             "location_scope": "none",
             "method": "oauth2_form",
             "route": "/auth/token",
@@ -2954,7 +3026,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "api_error"
             },
             "source": {
@@ -2962,7 +3034,7 @@
                 "services.api.errors"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -3050,24 +3122,27 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "12121212-1212-4121-8121-121212121212",
-          "event_type": "api_error",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "12121212-1212-4121-8121-121212121212",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "api_error",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.errors",
           "tags": {
             "source": "services.api.errors",
             "location_scope": "none"
           },
-          "payload": {
+          "properties": {
             "location_scope": "none",
             "http_status": 500,
             "code": "internal_error",
@@ -3086,7 +3161,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "page_view"
             },
             "source": {
@@ -3094,7 +3169,7 @@
                 "uis.website"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -3116,24 +3191,27 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "13131313-1313-4131-8131-131313131313",
-          "event_type": "page_view",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "13131313-1313-4131-8131-131313131313",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "page_view",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "uis.website",
           "tags": {
             "source": "uis.website",
             "location_scope": "none"
           },
-          "payload": {
+          "properties": {
             "location_scope": "none",
             "app": "website",
             "path": "/"
@@ -3149,7 +3227,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "auth_form_rejected"
             },
             "source": {
@@ -3157,7 +3235,7 @@
                 "uis.backoffice"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -3328,24 +3406,27 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "29292929-2929-4292-8292-292929292929",
-          "event_type": "auth_form_rejected",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "29292929-2929-4292-8292-292929292929",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "auth_form_rejected",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "uis.backoffice",
           "tags": {
             "source": "uis.backoffice",
             "location_scope": "none"
           },
-          "payload": {
+          "properties": {
             "location_scope": "none",
             "form": "password_change",
             "reason": "mismatch",
@@ -3362,7 +3443,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "session_rejected"
             },
             "source": {
@@ -3372,7 +3453,7 @@
                 "uis.backoffice"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -3403,9 +3484,9 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         },
         {
@@ -3421,7 +3502,7 @@
           },
           "then": {
             "properties": {
-              "payload": {
+              "properties": {
                 "properties": {
                   "reason": {
                     "enum": [
@@ -3450,7 +3531,7 @@
           },
           "then": {
             "properties": {
-              "payload": {
+              "properties": {
                 "properties": {
                   "reason": {
                     "enum": [
@@ -3479,7 +3560,7 @@
           },
           "then": {
             "properties": {
-              "payload": {
+              "properties": {
                 "properties": {
                   "reason": {
                     "const": "missing_token"
@@ -3495,16 +3576,19 @@
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "30303030-3030-4303-8303-303030303030",
-          "event_type": "session_rejected",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "30303030-3030-4303-8303-303030303030",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "session_rejected",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.auth",
           "tags": {
             "source": "services.api.auth",
             "location_scope": "none"
           },
-          "payload": {
+          "properties": {
             "location_scope": "none",
             "reason": "expired",
             "route_template": "/auth/me"
@@ -3520,7 +3604,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "session_ended"
             },
             "source": {
@@ -3528,7 +3612,7 @@
                 "uis.backoffice"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -3549,24 +3633,27 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "32323232-3232-4323-8323-323232323232",
-          "event_type": "session_ended",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "32323232-3232-4323-8323-323232323232",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "session_ended",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "uis.backoffice",
           "tags": {
             "source": "uis.backoffice",
             "location_scope": "none"
           },
-          "payload": {
+          "properties": {
             "location_scope": "none",
             "reason": "logout"
           }
@@ -3581,7 +3668,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "account_mutation"
             },
             "source": {
@@ -3589,7 +3676,7 @@
                 "uis.backoffice"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -3692,24 +3779,27 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "34343434-3434-4343-8343-343434343434",
-          "event_type": "account_mutation",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "34343434-3434-4343-8343-343434343434",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "account_mutation",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "uis.backoffice",
           "tags": {
             "source": "uis.backoffice",
             "location_scope": "none"
           },
-          "payload": {
+          "properties": {
             "location_scope": "none",
             "action": "register",
             "outcome": "rejected",
@@ -3726,7 +3816,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "api_call_completed"
             },
             "source": {
@@ -3734,7 +3824,7 @@
                 "uis.backoffice"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -3874,24 +3964,27 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "35353535-3535-4353-8353-353535353535",
-          "event_type": "api_call_completed",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "35353535-3535-4353-8353-353535353535",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "api_call_completed",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "uis.backoffice",
           "tags": {
             "source": "uis.backoffice",
             "location_scope": "none"
           },
-          "payload": {
+          "properties": {
             "location_scope": "none",
             "method": "GET",
             "route_template": "/locations/overview",
@@ -3910,7 +4003,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "ui_timing"
             },
             "source": {
@@ -3918,7 +4011,7 @@
                 "uis.backoffice"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -4033,24 +4126,27 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "36363636-3636-4363-8363-363636363636",
-          "event_type": "ui_timing",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "36363636-3636-4363-8363-363636363636",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "ui_timing",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "uis.backoffice",
           "tags": {
             "source": "uis.backoffice",
             "location_scope": "none"
           },
-          "payload": {
+          "properties": {
             "location_scope": "none",
             "kind": "panel",
             "name": "inventory",
@@ -4068,7 +4164,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "client_exception"
             },
             "source": {
@@ -4077,7 +4173,7 @@
                 "uis.website"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -4116,9 +4212,9 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         },
         {
@@ -4134,7 +4230,7 @@
           },
           "then": {
             "properties": {
-              "payload": {
+              "properties": {
                 "properties": {
                   "app": {
                     "const": "website"
@@ -4157,7 +4253,7 @@
           },
           "then": {
             "properties": {
-              "payload": {
+              "properties": {
                 "properties": {
                   "app": {
                     "const": "backoffice"
@@ -4170,16 +4266,19 @@
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "37373737-3737-4373-8373-373737373737",
-          "event_type": "client_exception",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "37373737-3737-4373-8373-373737373737",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "client_exception",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "uis.backoffice",
           "tags": {
             "source": "uis.backoffice",
             "location_scope": "none"
           },
-          "payload": {
+          "properties": {
             "location_scope": "none",
             "catch_site": "error_boundary",
             "app": "backoffice",
@@ -4197,7 +4296,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "section_viewed"
             },
             "source": {
@@ -4205,7 +4304,7 @@
                 "uis.backoffice"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -4451,24 +4550,27 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "38383838-3838-4383-8383-383838383838",
-          "event_type": "section_viewed",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "38383838-3838-4383-8383-383838383838",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "section_viewed",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "uis.backoffice",
           "tags": {
             "source": "uis.backoffice",
             "location_scope": "none"
           },
-          "payload": {
+          "properties": {
             "location_scope": "none",
             "app": "backoffice",
             "section": "kitchen_inventory",
@@ -4487,7 +4589,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "flow_progress"
             },
             "source": {
@@ -4495,7 +4597,7 @@
                 "uis.backoffice"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -4539,24 +4641,27 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "39393939-3939-4393-8393-393939393939",
-          "event_type": "flow_progress",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "39393939-3939-4393-8393-393939393939",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "flow_progress",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "uis.backoffice",
           "tags": {
             "source": "uis.backoffice",
             "location_scope": "none"
           },
-          "payload": {
+          "properties": {
             "location_scope": "none",
             "flow_id": "operations_review",
             "flow_instance": "40404040-4040-4404-8404-404040404040",
@@ -4574,7 +4679,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "employee_hired"
             },
             "source": {
@@ -4582,7 +4687,7 @@
                 "services.api.people"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -4622,25 +4727,28 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "14141414-1414-4141-8141-141414141414",
-          "event_type": "employee_hired",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "14141414-1414-4141-8141-141414141414",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "employee_hired",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.people",
           "tags": {
             "source": "services.api.people",
             "location_scope": "none",
             "country": "Colombia"
           },
-          "payload": {
+          "properties": {
             "location_scope": "none",
             "country": "Colombia",
             "employee_id": "emp_kitch1",
@@ -4658,7 +4766,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "employee_separated"
             },
             "source": {
@@ -4666,7 +4774,7 @@
                 "services.api.people"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -4706,25 +4814,28 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "15151515-1515-4151-8151-151515151515",
-          "event_type": "employee_separated",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "15151515-1515-4151-8151-151515151515",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "employee_separated",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.people",
           "tags": {
             "source": "services.api.people",
             "location_scope": "none",
             "country": "United States"
           },
-          "payload": {
+          "properties": {
             "location_scope": "none",
             "country": "United States",
             "employee_id": "emp_floor2",
@@ -4742,7 +4853,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "absence_recorded"
             },
             "source": {
@@ -4750,7 +4861,7 @@
                 "services.api.people"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -4796,25 +4907,28 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "16161616-1616-4161-8161-161616161616",
-          "event_type": "absence_recorded",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "16161616-1616-4161-8161-161616161616",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "absence_recorded",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.people",
           "tags": {
             "source": "services.api.people",
             "location_scope": "none",
             "country": "Colombia"
           },
-          "payload": {
+          "properties": {
             "location_scope": "none",
             "country": "Colombia",
             "employee_id": "emp_kitch1",
@@ -4833,7 +4947,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "roster_day_scheduled"
             },
             "source": {
@@ -4841,7 +4955,7 @@
                 "services.api.people"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -4876,25 +4990,28 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "17171717-1717-4171-8171-171717171717",
-          "event_type": "roster_day_scheduled",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "17171717-1717-4171-8171-171717171717",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "roster_day_scheduled",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.people",
           "tags": {
             "source": "services.api.people",
             "location_scope": "none",
             "country": "Colombia"
           },
-          "payload": {
+          "properties": {
             "location_scope": "none",
             "country": "Colombia",
             "employee_id": "emp_kitch1",
@@ -4912,7 +5029,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "vacancy_opened"
             },
             "source": {
@@ -4920,7 +5037,7 @@
                 "services.api.people"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -4960,25 +5077,28 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "18181818-1818-4181-8181-181818181818",
-          "event_type": "vacancy_opened",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "18181818-1818-4181-8181-181818181818",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "vacancy_opened",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.people",
           "tags": {
             "source": "services.api.people",
             "location_scope": "none",
             "country": "United States"
           },
-          "payload": {
+          "properties": {
             "location_scope": "none",
             "country": "United States",
             "vacancy_id": "vac_grill1",
@@ -4996,7 +5116,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "vacancy_filled"
             },
             "source": {
@@ -5004,7 +5124,7 @@
                 "services.api.people"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -5045,25 +5165,28 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "19191919-1919-4191-8191-191919191919",
-          "event_type": "vacancy_filled",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "19191919-1919-4191-8191-191919191919",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "vacancy_filled",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.people",
           "tags": {
             "source": "services.api.people",
             "location_scope": "none",
             "country": "United States"
           },
-          "payload": {
+          "properties": {
             "location_scope": "none",
             "country": "United States",
             "vacancy_id": "vac_grill1",
@@ -5082,7 +5205,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "customer_preference_recorded"
             },
             "source": {
@@ -5090,7 +5213,7 @@
                 "services.api.customers"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -5171,24 +5294,27 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "20202020-2020-4202-8202-202020202020",
-          "event_type": "customer_preference_recorded",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "20202020-2020-4202-8202-202020202020",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "customer_preference_recorded",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.customers",
           "tags": {
             "source": "services.api.customers",
             "location_scope": "none"
           },
-          "payload": {
+          "properties": {
             "location_scope": "none",
             "customer_id": "cus_Medellin1",
             "preference_code": "preferred_language",
@@ -5205,7 +5331,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "recommendation_shown"
             },
             "source": {
@@ -5213,7 +5339,7 @@
                 "services.api.recommendations"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -5279,18 +5405,21 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "21212121-2121-4212-8212-212121212121",
-          "event_type": "recommendation_shown",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "21212121-2121-4212-8212-212121212121",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "recommendation_shown",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.recommendations",
           "tags": {
             "source": "services.api.recommendations",
@@ -5299,7 +5428,7 @@
             "country": "Colombia",
             "currency": "COP"
           },
-          "payload": {
+          "properties": {
             "location_scope": "location",
             "location_id": "co-med-centro",
             "country": "Colombia",
@@ -5321,7 +5450,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "recommendation_accepted"
             },
             "source": {
@@ -5329,7 +5458,7 @@
                 "services.api.recommendations"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -5391,18 +5520,21 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "23232323-2323-4232-8232-232323232323",
-          "event_type": "recommendation_accepted",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "23232323-2323-4232-8232-232323232323",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "recommendation_accepted",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.recommendations",
           "tags": {
             "source": "services.api.recommendations",
@@ -5411,7 +5543,7 @@
             "country": "Colombia",
             "currency": "COP"
           },
-          "payload": {
+          "properties": {
             "location_scope": "location",
             "location_id": "co-med-centro",
             "country": "Colombia",
@@ -5433,7 +5565,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "recipe_update_published"
             },
             "source": {
@@ -5441,7 +5573,7 @@
                 "services.api.training"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -5477,24 +5609,27 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "24242424-2424-4242-8242-242424242424",
-          "event_type": "recipe_update_published",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "24242424-2424-4242-8242-242424242424",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "recipe_update_published",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.training",
           "tags": {
             "source": "services.api.training",
             "location_scope": "none"
           },
-          "payload": {
+          "properties": {
             "location_scope": "none",
             "recipe_id": "rec_sirloin",
             "version": 3,
@@ -5512,7 +5647,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "recipe_update_acknowledged"
             },
             "source": {
@@ -5520,7 +5655,7 @@
                 "services.api.training"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -5574,18 +5709,21 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "25252525-2525-4252-8252-252525252525",
-          "event_type": "recipe_update_acknowledged",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "25252525-2525-4252-8252-252525252525",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "recipe_update_acknowledged",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.api.training",
           "tags": {
             "source": "services.api.training",
@@ -5594,7 +5732,7 @@
             "country": "United States",
             "currency": "USD"
           },
-          "payload": {
+          "properties": {
             "location_scope": "location",
             "location_id": "us-mia-downtown",
             "country": "United States",
@@ -5614,7 +5752,7 @@
         },
         {
           "properties": {
-            "event_type": {
+            "Event_type": {
               "const": "weekly_report_dispatched"
             },
             "source": {
@@ -5622,7 +5760,7 @@
                 "services.telemetry.weekly_report"
               ]
             },
-            "payload": {
+            "properties": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -5880,24 +6018,27 @@
             }
           },
           "required": [
-            "event_type",
+            "Event_type",
             "source",
-            "payload"
+            "properties"
           ]
         }
       ],
       "examples": [
         {
-          "schema_version": 1,
-          "id": "26262626-2626-4262-8262-262626262626",
-          "event_type": "weekly_report_dispatched",
-          "occurred_at": "2026-09-22T15:04:05Z",
+          "SchemaVersion": 1,
+          "eventID": "26262626-2626-4262-8262-262626262626",
+          "timestamp": "2026-09-22T15:04:05Z",
+          "sessionID": null,
+          "UserID": null,
+          "Event_type": "weekly_report_dispatched",
+          "requestID": "01010101-0101-4101-8101-010101010101",
           "source": "services.telemetry.weekly_report",
           "tags": {
             "source": "services.telemetry.weekly_report",
             "location_scope": "none"
           },
-          "payload": {
+          "properties": {
             "location_scope": "none",
             "week_start": "2026-09-21",
             "timezone": "America/Bogota",

@@ -53,7 +53,7 @@ Opening hours, the 45-minute silence gap, the stock threshold of 10, Brasa Point
 - `location_id` on a location-scoped event is one of the 14 ids in `services/api/locations.py`. The pipeline joins `event_payload.location_id` to `locations.id`. The strings in `tests/pipelines/test_pipeline.py` (`miami-downtown`, `medellin-centro`, `bogota-norte`) are fixture labels. After a failed join, `pipeline.py` fills a missing currency with `USD`, which would report a Colombian location as US dollars. Emit the roster ids below.
 - The live inventory file is one chain-wide CSV. It has no `location_id`. Chain-scoped stock events use `location_scope: "chain"`. They are not the four event types the weekly pipeline aggregates.
 - A successful HTTP handler returns its business response even when the telemetry write fails. Telemetry is appended after the business write commits.
-- Payloads contain no email, phone, postal address, customer name, password, JWT, connection string, or traceback. Staff identity is `actor_id` = decimal `users.id`. Customer identity is an opaque `loyalty_account_id` when a digital account exists.
+- `properties` contains no email, phone, postal address, customer name, password, JWT, connection string, or traceback. `UserID` is decimal `users.id` or null. Customer identity is an opaque `customer_id` in `properties` when a digital account exists. `sessionID` and `requestID` are UUIDs, not tokens.
 - Timestamps are UTC, written as `YYYY-MM-DDTHH:MM:SSZ` (no milliseconds, no offset other than `Z`).
 
 ### Location roster
@@ -104,7 +104,7 @@ Eight Colombia ids, six Florida ids. `country` is `Colombia` or `United States` 
 
 ### Order (declared, no live router)
 
-`InboundOrder` / `OutboundOrder` in `services/api/models.py`: `id`, `product_id`, `quantity`, `created_at`, `user_uuid`. The users table key is an integer, so telemetry stores `actor_id` = `str(users.id)` and does not copy the `user_uuid` column name.
+`InboundOrder` / `OutboundOrder` in `services/api/models.py`: `id`, `product_id`, `quantity`, `created_at`, `user_uuid`. The users table key is an integer, so telemetry stores `UserID` = `str(users.id)` and does not copy the `user_uuid` column name.
 
 `OrderType` in `services/api/schemas.py` is `INBOUND` or `OUTBOUND`, with line items `{product_id, quantity}`. One telemetry event is emitted **per line** after the order row commits, because the weekly pipeline sums a single `cost` per event and groups by one `location_id`. `order_id` ties the lines together. `product_id` on the event is the integer inventory id; if the pydantic body sends a numeric string, parse it with `int` before emit.
 
@@ -134,11 +134,11 @@ The Monday report (`weekly_report_dispatched`) lists every mandatory id in `floo
 | `ops.sales.silence` | Alert when a location shows no sales during opening hours | One open `location_sales_silence_detected` episode. `CONTEXT.md` does not publish the hours. The 11:00–22:00 window and the 45-minute gap are the v1 binding in this plan | Location, while open |
 | `ops.ordering.on_hand` | Current stock for ingredient ordering | Latest `quantity_after` per product. Location-scoped stock uses the location. Until `products.csv` has a location, the CSV quantity is chain on-hand and is labeled `chain` | Product × location, or product × chain |
 | `ops.ordering.suggested_qty` | Ingredient ordering from historical sales and current stock | `max(0, daily_demand × days_until_next_delivery − on_hand)`. `daily_demand` is trailing 28 location-days of sale-line quantity mapped through the recipe bill of materials to `product_id`, divided by 28. When that bill of materials is missing, the value is null. Delivery days in the cadence table are an opportunity binding, not a `CONTEXT.md` rule | Location × product |
-| `proc.price.history` | Supplier price history | `unit_price` on each `inbound_order_created` for the same `product_id`, `supplier_id`, and `currency`, ordered by `occurred_at` | Supplier × product × currency |
+| `proc.price.history` | Supplier price history | `unit_price` on each `inbound_order_created` for the same `product_id`, `supplier_id`, and `currency`, ordered by `timestamp` | Supplier × product × currency |
 | `proc.price.alerts` | Alert when a raw-material price changes, before the invoice is the only notice | Count of `ingredient_price_variance_detected`, per location and rolled up by `supplier_id` | Chain week |
 | `proc.purchase.consolidated` | Consolidated purchasing across both markets for central negotiation | Sum of inbound `cost` grouped by `country`, and again by `supplier_id`. COP and USD stay in separate totals. The same events grouped by `location_id` are the location view inside that consolidation | Chain week |
 | `mkt.customers.identified_rate` | Who Brasaland’s customers are | `sale_completed` with `customer_id` / all `sale_completed` | Country × chain week |
-| `mkt.customers.order_history` | CRM order history | `sale_completed` rows for one `customer_id`, ordered by `occurred_at`, including menu lines | Customer |
+| `mkt.customers.order_history` | CRM order history | `sale_completed` rows for one `customer_id`, ordered by `timestamp`, including menu lines | Customer |
 | `mkt.customers.preference_coverage` | CRM preferences | Distinct `customer_id` on `customer_preference_recorded` / distinct `customer_id` on sales. Null when no customer is identified yet. The row stays visible | Chain week |
 | `mkt.personalisation.accept_rate` | Suggestions based on behaviour | `recommendation_accepted` / `recommendation_shown`, joined on `recommendation_id` | Country × chain week |
 | `mkt.orders.digital_share` | Digital ordering (the website takes no orders today) | `sale_completed` with `channel` `digital_app` / all `sale_completed` | Country × chain week |
@@ -182,7 +182,7 @@ These are not in the “What they need” lines. They come from a problem senten
 | `ops.shrinkage.rate` | Unexplained shrinkage above 3% of weekly inventory | `shrink_qty / (opening_qty + inbound_qty)`. Skip with `insufficient_snapshot` when opening quantity is missing |
 | `ops.protein.cover_days` | At least 3 days of main protein | On-hand / trailing 28-day daily usage. Feeds `stock_threshold_triggered` with reason `protein_cover_below_3_days` |
 | `proc.purchase.emergency_rate` | Emergency orders, 8% surcharge, Procurement Manager approval above 500 USD | Emergency inbound lines / all inbound lines, plus `approval_state` |
-| `proc.delivery.lateness` | 48-hour, 24-hour, and 5-business-day delivery promises | Receipt `occurred_at` minus order placement, against the cadence for `category` |
+| `proc.delivery.lateness` | 48-hour, 24-hour, and 5-business-day delivery promises | Receipt `timestamp` minus order placement, against the cadence for `category` |
 | `proc.supplier.active_count` | About 20 suppliers across both markets | Distinct `supplier_id` with an inbound line in the last 90 days |
 | `mkt.loyalty.points_earned` | Knowledge-base earn rule. `CONTEXT.md` names Brasa Points and does not state the rate | `floor(amount / 10000)` COP, or `floor(amount / 10)` USD, stored on the sale |
 | `mkt.loyalty.redeem_value` | Knowledge-base redeem rule | `points / 5 × 20000` COP, or `points / 5 × 20` USD, once `balance_before` is at least 15 |
@@ -218,8 +218,8 @@ Grain, formula, and the events that feed the number.
 | `ops.sales.tickets` | Distinct tickets | Count of `sale_completed` | Location × `business_date` | Minutes | `sale_completed` |
 | `ops.sales.average_ticket` | Highest average ticket this month | `sum(amount) / count(sale_completed)` in the location currency. Publish the currency beside the number | Location × calendar month in the location timezone | Nightly | `sale_completed` |
 | `ops.sales.silence` | A location is open and has no sales | See silence monitor | One open episode per location | Every 5 minutes | `location_sales_silence_detected` |
-| `proc.purchase.cost` | What did this location buy this week? | Sum of payload `cost` on `inbound_order_created` | Location × chain week | Weekly pipeline, Monday 07:00 | `inbound_order_created` |
-| `ops.waste.cost` | Waste cost | Sum of payload `cost` on `stock_waste_registered` | Location × chain week | Weekly pipeline | `stock_waste_registered` |
+| `proc.purchase.cost` | What did this location buy this week? | Sum of `properties.cost` on `inbound_order_created` | Location × chain week | Weekly pipeline, Monday 07:00 | `inbound_order_created` |
+| `ops.waste.cost` | Waste cost | Sum of `properties.cost` on `stock_waste_registered` | Location × chain week | Weekly pipeline | `stock_waste_registered` |
 | `ops.waste.ratio` | Waste versus purchases (pipeline field `waste_ratio`) | `waste_cost / purchase_cost` when purchase cost > 0, else `0`. Round to 4 decimal places, matching `aggregate_location_kpis` | Location × chain week | Weekly pipeline | the two events above |
 | `ops.waste.monthly_rate` | Keep waste under 4% of monthly ingredient cost; 6% for two months starts an improvement plan | Sum waste `cost` / sum purchase `cost` for the calendar month in the **location** timezone. Compare the ratio to `0.04` (target) and `0.06` (improvement plan if both of the last two months exceed it). Average the weekly ratios is the wrong aggregation | Location × calendar month | Monthly | inbound + waste |
 | `ops.stockout.count` | Stockout frequency | Count of `stock_threshold_triggered` | Location × chain week | Weekly pipeline | `stock_threshold_triggered` |
@@ -244,7 +244,7 @@ The three People KPI formulas above are mandatory. The events are `employee_hire
 
 | Clock | Definition | Used by |
 | --- | --- | --- |
-| `occurred_at` | UTC instant of the business fact | Storage columns `created_at` and `timestamp` |
+| `timestamp` | ISO 8601 UTC instant of the business fact | Storage columns `created_at` and `timestamp` |
 | `business_date` | Calendar date in the location timezone | Per-location day metrics (“covers today in Medellín Centro”) |
 | Chain week | `[Monday 00:00, next Monday 00:00)` America/Bogota | `proc.*` weekly pipeline, Mariana’s Monday report, “this week in Florida” |
 | Calendar month | Month boundaries in the **location** timezone | Average ticket, monthly waste rate |
@@ -415,43 +415,96 @@ We capture `stock_modification_rejected` because we need to know a direct quanti
 
 `data/pipelines/pipeline.py` `extract_telemetry_events` filters exactly these four types: `inbound_order_created`, `stock_waste_registered`, `stock_threshold_triggered`, `ingredient_price_variance_detected`. `scripts/nightly_export.py` copies only the first three. When that export is next edited, add `ingredient_price_variance_detected` so the CSV matches the extractor. The extractor reads Supabase itself; the CSV is not the aggregation input.
 
+## Phase 2 — Event envelope
+
+Every producer document uses this envelope. The eight fields below are mandatory on every event, including a job that has no person at the keyboard. Event-specific fields live only in `properties`. `source` and `tags` are also required, because the engineering reader selects `tags` and the pipeline joins on location facts copied into `tags`.
+
+JSON keys are the names in this table. Casing is part of the contract.
+
+| Field | JSON key | Rule |
+| --- | --- | --- |
+| eventID | `eventID` | UUID. Consumers dedupe on it. A silence episode reuses one `eventID` for the life of that episode. Storage column `id`. |
+| timestamp | `timestamp` | ISO 8601, UTC, pattern `YYYY-MM-DDTHH:MM:SSZ`. No milliseconds. No offset other than `Z`. This is the business instant. |
+| sessionID | `sessionID` | UUID of the browser session, or `null` when the emitter is a job with no session. Not a JWT and not `flow_instance`. The backoffice mints it when sign-in or session restore succeeds, keeps it in `sessionStorage`, and sends it as `X-Brasaland-Session`. Logout clears it. |
+| UserID | `UserID` | Decimal `users.id` when the staff user is known, or `null` when nobody is authenticated. Never an email, a name, or a customer id. A guest’s `customer_id` stays in `properties`. |
+| Event_type | `Event_type` | One catalog name, such as `sale_completed`. |
+| SchemaVersion | `SchemaVersion` | Integer `1`. |
+| requestID | `requestID` | UUID that ties together every event emitted for one HTTP request or one job run. The API reads `X-Request-ID` and generates a UUID when the header is missing. A client-only event mints its own UUID. Never null. |
+| properties | `properties` | The event-specific object defined for that `Event_type`. Storage column `event_payload` is this object and nothing else. |
+
+`source` is the producer module (`services.api.inventory`, `uis.backoffice`, and the other values in the schema). `tags` is the small copy below.
+
+```json
+{
+  "eventID": "55555555-5555-4555-8555-555555555555",
+  "timestamp": "2026-09-22T15:04:05Z",
+  "sessionID": "02020202-0202-4202-8202-020202020202",
+  "UserID": "3",
+  "Event_type": "inbound_order_created",
+  "SchemaVersion": 1,
+  "requestID": "01010101-0101-4101-8101-010101010101",
+  "source": "services.api.orders",
+  "tags": {
+    "source": "services.api.orders",
+    "location_scope": "location",
+    "location_id": "us-mia-downtown",
+    "country": "United States",
+    "currency": "USD"
+  },
+  "properties": {}
+}
+```
+
+`properties` in that sketch is empty only to show the key. A real inbound line carries the fields in the event schema.
+
+Who fills the nullable keys:
+
+| Emitter | `sessionID` | `UserID` | `requestID` |
+| --- | --- | --- | --- |
+| Staff request that carries `X-Brasaland-Session` and a JWT | The header | `str(users.id)` | The request’s id |
+| `user_login_succeeded` | The new session UUID | `str(users.id)`. This event may not send null | The login request’s id |
+| `user_login_failed` before the user is known | null | null | The login request’s id |
+| Public `page_view` on the corporate home | null | null | A UUID minted in the browser |
+| Silence monitor, cover monitor, Monday report | null | null | One UUID for that run, shared by every event the run emits |
+| Inventory call with no JWT | null | null | The request’s id |
+
 ## Storage row
 
-Writers insert one row into Supabase table `telemetry_events`. Both existing readers must see the row:
+Writers insert one row into Supabase table `telemetry_events`. The table columns stay the names the current readers already select. The envelope is mapped on the way in:
 
 | Column | Value | Reader |
 | --- | --- | --- |
-| `id` | Event `id` (UUID) | Engineering select in `skills/data-analysis/scripts/services/telemetry/main.py` |
-| `event_type` | Event `event_type` | Both |
-| `timestamp` | `occurred_at` | Engineering select |
-| `created_at` | The same `occurred_at` | Pipeline `gte` / `lt` filter |
-| `event_payload` | JSON `payload` | Pipeline `location_id` and `cost` |
+| `id` | `eventID` | Engineering select in `skills/data-analysis/scripts/services/telemetry/main.py` |
+| `event_type` | `Event_type` | Both |
+| `timestamp` | Envelope `timestamp` | Engineering select |
+| `created_at` | The same envelope `timestamp` | Pipeline `gte` / `lt` filter |
+| `event_payload` | `properties` | Pipeline `location_id` and `cost` |
 | `tags` | JSON `tags` | Engineering select |
 
-`tags` is a copy, built only by this function, so the engineering reader and the payload cannot drift:
+`tags` is a copy, built only by this function, so the engineering reader and `properties` cannot drift:
 
 ```python
-def build_tags(source: str, payload: dict) -> dict:
-    tags = {"source": source, "location_scope": payload["location_scope"]}
+def build_tags(source: str, properties: dict) -> dict:
+    tags = {"source": source, "location_scope": properties["location_scope"]}
     for key in ("location_id", "country", "currency"):
-        if payload.get(key) is not None:
-            tags[key] = payload[key]
+        if properties.get(key) is not None:
+            tags[key] = properties[key]
     return tags
 ```
 
-`payload.cost`, when present, is a JSON number in the location currency. The pipeline does `float(payload.get("cost", 0) or 0)`. Purchase and waste events always send `cost`. Price-alert and stockout events omit `cost`; the pipeline treats that as zero and only counts the rows.
+`properties.cost`, when present, is a JSON number in the location currency. The pipeline does `float(properties.get("cost", 0) or 0)` on the stored `event_payload`. Purchase and waste events always send `cost`. Price-alert and stockout events omit `cost`; the pipeline treats that as zero and only counts the rows.
 
 ### Emit algorithm
 
 ```text
 emit(event):
-  1. Validate the producer document against event-schemas.json (draft 2020-12, format checks on).
-  2. If validation fails: log a warning on logger "brasaland.telemetry" with event_type and a one-line reason. Do not insert. Do not raise into the HTTP handler.
+  1. Validate the producer document against event-schemas.json (draft 2020-12, format checks on). The document must carry eventID, timestamp, sessionID, UserID, Event_type, SchemaVersion, requestID, and properties.
+  2. If validation fails: log a warning on logger "brasaland.telemetry" with Event_type and a one-line reason. Do not insert. Do not raise into the HTTP handler.
   3. Insert the storage row.
   4. If the insert fails: append the producer document as one JSON line to data/uploads/telemetry_outbox.jsonl (data/uploads/ is gitignored). Do not raise.
 ```
 
-Retries reuse the same `id`. Consumers dedupe on `id`. A silence episode reuses one `id` for the life of that episode (`silence_started_at` + `location_id`). A new episode (after a `sale_completed`, or after the local close) gets a new `id`.
+Retries reuse the same `eventID`. Consumers dedupe on `eventID`. A silence episode reuses one `eventID` for the life of that episode (`silence_started_at` + `location_id`). A new episode (after a `sale_completed`, or after the local close) gets a new `eventID`.
 
 The outbox directory is `data/uploads/` because that path is already gitignored. A dedicated telemetry path needs a `.gitignore` edit, which this repo treats as a confirmed change.
 
@@ -459,13 +512,13 @@ The outbox directory is `data/uploads/` because that path is already gitignored.
 
 This is the path from a signed-in staff session to a completed inbound or outbound order. The backoffice at `uis/backoffice` currently ends at a read of `GET /inventory`. Stock writes go through `services/api/inventory.py`. Inbound and outbound completion is the order contract in `services/api/models.py` and `services/api/schemas.py` (`OrderType` `INBOUND` or `OUTBOUND`). The same `PATCH` handler serves `agent.py` `update_stock`.
 
-`actor_id` is `str(users.id)` when the request carries a staff JWT. The inventory router does not require that JWT today, so a call with no user omits `actor_id`.
+`UserID` is `str(users.id)` when the request carries a staff JWT. The inventory router does not require that JWT today, so a call with no user sends `UserID` null. The field is still present.
 
 | Step | What the code does | Instrumentation |
 | --- | --- | --- |
 | 1. Open the console | `LoginPage` submits `POST /auth/login`. `login` calls `authenticate_user`. | **IP-1.** Active user → `user_login_succeeded` (`method` `json`), then the JWT is stored. Unknown or inactive user → `user_login_failed`, then HTTP 401. The staff member stops here. |
 | 2. Enter the protected view | `ProtectedRoute` calls `GET /auth/me`. A 401 returns the browser to `/login`. A 200 renders `AccessiblePage`, which loads `GET /locations/overview` and `GET /inventory`. | **IP-2.** `section_viewed` section `accessible_entry` when `AccessiblePage` mounts. The two GETs emit no inventory event. A successful list is not a stock change. |
-| 3. Submit a stock or product body | `POST /inventory` must match `ProductCreate` (`name` length ≥ 1, `quantity` ≥ 0, `unit` length ≥ 1). `PATCH /inventory/{product_id}` must match `StockDelta` (`delta` integer) and an integer path id. | **IP-3. Failed validation.** `handle_validation_error` emits `inventory_validation_failed` and returns 422. `create_product` and `apply_delta` are not called. `products.csv` stays as it was. Field entries are `loc` plus pydantic `type` (`body.quantity` / `greater_than_equal`, `body.delta` / `missing`, `path.product_id` / `int_parsing`). The rejected input value stays out of the payload. |
+| 3. Submit a stock or product body | `POST /inventory` must match `ProductCreate` (`name` length ≥ 1, `quantity` ≥ 0, `unit` length ≥ 1). `PATCH /inventory/{product_id}` must match `StockDelta` (`delta` integer) and an integer path id. | **IP-3. Failed validation.** `handle_validation_error` emits `inventory_validation_failed` and returns 422. `create_product` and `apply_delta` are not called. `products.csv` stays as it was. Field entries are `loc` plus pydantic `type` (`body.quantity` / `greater_than_equal`, `body.delta` / `missing`, `path.product_id` / `int_parsing`). The rejected input value stays out of `properties`. |
 | 4. Apply a direct stock change | `update_stock` calls `apply_delta`. This is the only live quantity write. | **IP-4. Rejected direct modification.** Unknown `product_id` → HTTP 404, reason `product_not_found`. `quantity + delta < 0` → HTTP 400, reason `below_zero`. `GET /inventory/alerts` with `threshold < 0` → HTTP 400, reason `negative_alert_threshold`. Each refusal emits `stock_modification_rejected` and does not write the file. |
 | 5. Commit the direct change | `apply_delta` saves the new quantity. | **IP-5.** `stock_count_adjusted` with `reason` `count_correction`. A `delta` of 0 is accepted by the API and changes nothing, so it emits no event. |
 | 6. Minimum stock line | After the save, compare `quantity_before` and `quantity_after` with **10**, the default of `get_alerts`. | **IP-6. Minimum threshold activation.** Crossing from ≥ 10 to < 10 emits `stock_threshold_crossed` (`threshold` 10) in addition to IP-5. Crossing back to ≥ 10 emits `stock_threshold_cleared`. A quantity that stays under 10 does not emit another activation. `GET /inventory/alerts` only lists rows already under the threshold. The list itself is not an activation. |
@@ -514,7 +567,7 @@ Tokens last `ACCESS_TOKEN_EXPIRE_MINUTES` (default 30) in `services/api/auth.py`
 | Password page opened while `user.id` is missing | The form sets “You are not signed in” | `auth_form_rejected` form `password_change`, reason `validation`, field `form` |
 | Profile field rejected before or by `PUT /profiles/me` | `ProfilePage` save | `auth_form_rejected` form `profile`, reason `validation`, field `name`, `phone`, `address`, or `form`. The save result is still `account_mutation` |
 
-Credential checks never copy the email, the password, the phone, or the address into a payload. `actor_id` is present only after the user id is known.
+Credential checks never copy the email, the password, the phone, or the address into `properties`. `UserID` is null until the staff id is known.
 
 ### Performance
 
@@ -548,7 +601,7 @@ Panel load times are a second clock, `ui_timing`, measured in the page effect fr
 
 ### Uncaught front-end errors
 
-`ErrorBoundary` wraps the console in `uis/backoffice/src/main.tsx` and the public site in `uis/website`. `componentDidCatch` today logs a fixed string and no stack. It emits `client_exception` with `catch_site` `error_boundary`, `app` matching the envelope `source` (`backoffice` or `website`), `error_name` from `Error.name` only, and the pathname. The same event fires for `window` `error` and `unhandledrejection` listeners installed once in `main.tsx` (`catch_site` `window_error` or `unhandled_rejection`). The message, the component stack, and the rejection value stay out of the payload. The recovery actions already on screen (Reload, Operations home, homepage) are the staff-facing half. The event is how Medellín sees which section crashed.
+`ErrorBoundary` wraps the console in `uis/backoffice/src/main.tsx` and the public site in `uis/website`. `componentDidCatch` today logs a fixed string and no stack. It emits `client_exception` with `catch_site` `error_boundary`, `app` matching the envelope `source` (`backoffice` or `website`), `error_name` from `Error.name` only, and the pathname. The same event fires for `window` `error` and `unhandledrejection` listeners installed once in `main.tsx` (`catch_site` `window_error` or `unhandled_rejection`). The message, the component stack, and the rejection value stay out of `properties`. The recovery actions already on screen (Reload, Operations home, homepage) are the staff-facing half. The event is how Medellín sees which section crashed.
 
 ### Navigation, required visits, abandoned flows
 
@@ -617,22 +670,22 @@ HTTP 400 and 404 from `apply_delta`, and HTTP 400 from `get_alerts` when `thresh
 
 `PATCH` is a count correction. A supplier receipt is an inbound order event with a real `cost`, `supplier_id`, and `location_id`. A positive `delta` on `PATCH` stays `stock_count_adjusted`. It is not an `inbound_order_created` event.
 
-`actor_id` is present when the inventory route is called with the staff JWT (`users.id`). The inventory router does not require auth today; omit `actor_id` when there is no user.
+`UserID` is `str(users.id)` when the inventory route is called with the staff JWT. The inventory router does not require auth today; send `UserID` null when there is no user.
 
 ### `services/api/users.py`
 
 | Function | Route | Emit |
 | --- | --- | --- |
-| `login` | `POST /auth/login` | `user_login_succeeded` with `method` `json` and `actor_id`, or `user_login_failed` with `failure_reason` `invalid_credentials` or `inactive_user` on the 401 branch |
+| `login` | `POST /auth/login` | `user_login_succeeded` with `method` `json` and `UserID` set to `users.id`, or `user_login_failed` with `failure_reason` `invalid_credentials` or `inactive_user` and `UserID` null on the 401 branch |
 | `login_for_access_token` | `POST /auth/token` | Same pair with `method` `oauth2_form` |
 
-Emit the failure event, then raise the existing `HTTPException`. The payload has no email and no password. `register_and_login` does not emit a login event (the account-creation request is not a sign-in attempt). The browser records registration as `account_mutation`. A 500 on that route is still `api_error`.
+Emit the failure event, then raise the existing `HTTPException`. `properties` has no email and no password. `register_and_login` does not emit a login event (the account-creation request is not a sign-in attempt). The browser records registration as `account_mutation`. A 500 on that route is still `api_error`.
 
 ### `services/api/auth.py`
 
 | Function | Emit |
 | --- | --- |
-| `decode_access_token` | On `ExpiredSignatureError`, `session_rejected` reason `expired`, then the existing 401. On any other `JWTError`, or a payload with no `sub`, `session_rejected` reason `invalid_token`. `route_template` is the matched path. |
+| `decode_access_token` | On `ExpiredSignatureError`, `session_rejected` reason `expired`, then the existing 401. On any other `JWTError`, or a token payload with no `sub`, `session_rejected` reason `invalid_token`. `route_template` is the matched path. |
 
 `get_current_user` emits `session_rejected` reason `inactive_user` when the subject is missing or inactive, and reason `invalid_token` when `sub` is not an integer. Source for those two is `services.api.users`. The browser does not emit `expired` or `invalid_token` again. A protected page with no token emits `session_rejected` reason `missing_token` from `useRequireAuth`, with `path` set to the pathname.
 
@@ -643,7 +696,7 @@ Emit the failure event, then raise the existing `HTTPException`. The payload has
 | `handle_unhandled_error` when it returns 500 | `api_error` with `http_status` 500 and `code` `internal_error` |
 | `handle_external_service_error` | `api_error` with `http_status` 503 and `code` `service_unavailable` |
 
-`handle_validation_error` emits `inventory_validation_failed` when the matched route is `/inventory`, `/inventory/{product_id}`, `/inventory/alerts`, or `/orders` (IP-3). It does not emit `api_error`. A 422 on `/auth/login`, `/auth/token`, `/users`, `/profiles/me`, or `/users/{user_id}` is recorded once, by the browser, as `auth_form_rejected`. This handler does not emit a second copy. Other 4xx responses in `handle_http_exception`, including login 401s, do not emit `api_error`. Login 401s are `user_login_failed`. Bearer 401s are `session_rejected`. `route_template` is `request.scope["route"].path` when a route matched, otherwise the literal `unmatched`. Copy `request.method`. Copy each validation item’s `loc` joined by `.` and its `type`. Leave the submitted value, the query string, and the body out of the payload.
+`handle_validation_error` emits `inventory_validation_failed` when the matched route is `/inventory`, `/inventory/{product_id}`, `/inventory/alerts`, or `/orders` (IP-3). It does not emit `api_error`. A 422 on `/auth/login`, `/auth/token`, `/users`, `/profiles/me`, or `/users/{user_id}` is recorded once, by the browser, as `auth_form_rejected`. This handler does not emit a second copy. Other 4xx responses in `handle_http_exception`, including login 401s, do not emit `api_error`. Login 401s are `user_login_failed`. Bearer 401s are `session_rejected`. `route_template` is `request.scope["route"].path` when a route matched, otherwise the literal `unmatched`. Copy `request.method`. Copy each validation item’s `loc` joined by `.` and its `type`. Leave the submitted value, the query string, and the body out of `properties`.
 
 ### `uis/website/src/pages/HomePage.tsx`
 
@@ -688,7 +741,7 @@ Process `services.telemetry.silence_monitor` (new module; this plan does not add
 
 1. Every 5 minutes, for each of the 14 locations, compute local time.
 2. If local time is outside `[11:00, 22:00)`, close any open episode and emit nothing.
-3. If local time is inside the window, let `last_sale` be the latest `sale_completed.occurred_at` for that `location_id` with `business_date` equal to the location-local date. If there is no such sale, `silence_started_at` is local 11:00 converted to UTC. If the gap from `last_sale` to now is ≥ 45 minutes, `silence_started_at` is `last_sale`.
+3. If local time is inside the window, let `last_sale` be the latest `sale_completed.timestamp` for that `location_id` with `business_date` equal to the location-local date. If there is no such sale, `silence_started_at` is local 11:00 converted to UTC. If the gap from `last_sale` to now is ≥ 45 minutes, `silence_started_at` is `last_sale`.
 4. Emit one `location_sales_silence_detected` per open episode. `sale_count` is `0`. `evaluated_at` is the run instant.
 
 ## Worked pipeline numbers
@@ -711,22 +764,22 @@ Brasa Points rates are an identified opportunity from the loyalty procedure. `CO
 ## Privacy and logging
 
 - Logger name: `brasaland.telemetry`.
-- Log `event_type`, `id`, and `schema_rejected` or `store_unavailable`. Do not log `payload`.
+- Log `Event_type`, `eventID`, and `schema_rejected` or `store_unavailable`. Do not log `properties`.
 - `user_login_failed.failure_reason` is `invalid_credentials` or `inactive_user`.
 - `api_error.message` is the public message already returned by `error_body` (`Internal server error` or the 503 public text). It is not `str(exc)` when that string might contain a host, a key, or a query.
 - Page paths have no query and no fragment.
-- `auth_form_rejected`, `account_mutation`, `session_rejected`, `session_ended`, and `client_exception` carry no email, phone, address, password, token, message, or stack. `client_exception.error_name` is `Error.name` only. The payload field is `catch_site`, because `source` is already the envelope.
+- `auth_form_rejected`, `account_mutation`, `session_rejected`, `session_ended`, and `client_exception` carry no email, phone, address, password, token, message, or stack. `client_exception.error_name` is `Error.name` only. Inside `properties` the field is `catch_site`, because `source` is already the envelope.
 
 ## Checklist for the person wiring this in
 
 1. Validate each producer document against `docs/telemetry/event-schemas.json` before the insert (the `examples` arrays in that file are valid documents). The root schema is a `oneOf` over every event in the file. On failure, read the branch whose `event_type` const matches the document.
-2. Write both `timestamp` and `created_at` from `occurred_at`.
-3. Put business fields in `event_payload` and the small copy in `tags`.
+2. Write both storage columns `timestamp` and `created_at` from the envelope `timestamp`.
+3. Put `properties` in `event_payload` and the small copy in `tags`. Copy `eventID` to `id` and `Event_type` to `event_type`.
 4. Use a roster `location_id` whenever `location_scope` is `location`, and the matching currency (`COP` or `USD`).
 5. From `POST /inventory` and `PATCH /inventory/{product_id}`, emit the chain events listed for `inventory.py`, plus `stock_modification_rejected` when `apply_delta` refuses the write.
 6. Leave successful `GET /inventory` and successful `GET /inventory/alerts` silent. Emit `inventory_validation_failed` on inventory 422s and `stock_modification_rejected` on the refused stock write. Keep other 4xx responses off `api_error`.
 7. Keep `cost` in the location currency on inbound and waste events so `waste_ratio` stays dimensionally consistent.
-8. Deduplicate on `id`.
+8. Deduplicate on `eventID`.
 9. Run `aggregate_location_kpis` on a four-event fixture that uses `us-mia-downtown` and expect `waste_ratio` 0.15 with `currency` USD.
 10. Confirm a COP `inbound_order_created` for `co-med-centro` does not land in the USD weekly total.
 11. Keep every mandatory id from the `CONTEXT.md` table in the plan. `weekly_report_dispatched.floor_metric_ids` must contain each of them. A null value stays on the dashboard. Identified opportunities, including the `bo.*` questions, stay out of that list.
