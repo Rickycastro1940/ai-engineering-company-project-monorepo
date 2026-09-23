@@ -202,6 +202,7 @@ Destination: reporting.weekly_location_performance. services/reporting endpoints
 Phase 3: load failure reruns by replacing (location_id, week_start) with the full recomputed totals, not by adding. reporting.pipeline_runs records started_at, finished_at, records_processed, status, error_message.
 Phase 4: one Prefect flow brasaland_weekly_performance_pipeline; tasks extract_weekly_inputs, aggregate_location_kpis, upsert_to_reporting_table; states Running, Completed, Failed. Backfill flow optional. Supabase URL and key in Prefect block brasaland-supabase. Subflows deferred to Part 3.
 Phase 5 design: services/reporting status GET /reporting/pipeline-runs/latest → get_latest_pipeline_run(); trigger POST /reporting/pipeline-runs → run_pipeline(); KPI query GET /reporting/weekly-location-performance → get_weekly_location_performance(). No ETL in services/. Separate from GET /telemetry/report.
+Domain vocabulary: location_id roster from services/api/locations.py (co-med-centro … us-jacksonville); country Colombia|United States; currency COP|USD; entities Product, InboundOrder, OutboundOrder; waste reason expired|kitchen_error|theft_suspected.
 ```
 
 Technology’s central API nouns menus/sales/customers/suppliers remain **missing**. The design does not claim those routers exist.
