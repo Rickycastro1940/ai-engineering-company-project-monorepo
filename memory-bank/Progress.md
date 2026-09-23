@@ -14,7 +14,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
-| Technology: telemetry + pipeline to dashboards | **Partial** — `data/pipelines/` weekly location cost/waste; Celery async path |
+| Technology: telemetry + pipeline to dashboards | **Partial** — design in `data/pipelines/PIPELINE_DESIGN.md` writes `reporting.weekly_location_performance` (purchase, waste, waste ratio, stockouts, price alerts); Celery async path. Engineering `GET /telemetry/report` stays separate |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Not done** as product UI; pipeline design targets cost/waste for Mariana + Felipe |
 | Procurement: supplier price history, consolidated spend | **Not done** (supplier docs may exist on other branches; not claimed here) |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
@@ -182,6 +182,30 @@ Department served: **Technology** (structured HTTP, no env names in 503s) + **Op
 uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py tests/test_users_api.py -q → 33 passed
 cd uis/backoffice && npm run build → green
 ```
+
+## Latest pipeline design (`cursor/pipeline-design-part1-c69e`)
+
+Department served: **Technology** (Nicolás Park — pipeline into ops/finance dashboards, destination outside `telemetry_events`) + **Operations** (Felipe Guerrero — location purchase, waste, stockouts) + **Procurement** (Lucía Fernández — purchase cost and price alerts) + **Executive** (Mariana Restrepo — Monday 07:00 America/Bogota chain week).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+data/pipelines/PIPELINE_DESIGN.md names reporting.weekly_location_performance
+KPIs: total_purchase_cost, total_waste_cost, waste_ratio, stockout_events_count, price_alert_events_count
+Events: inbound_order_created, stock_waste_registered, stock_threshold_triggered, ingredient_price_variance_detected
+HTTP: services/reporting GET /reporting/weekly-location-performance and POST /reporting/pipeline-runs
+pytest tests/pipelines/test_pipeline.py → 4 passed; hand-calculated row 1000 / 150 / 0.15 / 1 / 1
+test_aggregate_location_kpis_non_dict_payload failed: null location_id is dropped by groupby (pre-existing; design records that omission)
+Phase 1 current state: GET /telemetry/report answers traffic, api_error/user_login_failed counts, and auth failure rate from telemetry_events. Gap question is location-week purchase cost, waste cost, waste ratio, stockouts, and price alerts in COP or USD.
+Phase 2 purpose: one sentence — Monday 07:00 America/Bogota rollup in reporting.weekly_location_performance; KPIs purchase cost, waste cost, waste ratio, stockout frequency, price-alert frequency; built on inbound_order_created, stock_waste_registered, stock_threshold_triggered, ingredient_price_variance_detected.
+Phase 2 extract: telemetry_events plus locations, both JSON row snapshots. Stages: extraction, transformation, load. Duplicate strategy: dedupe telemetry_events.id, recompute the week, upsert on (location_id, week_start).
+Destination: reporting.weekly_location_performance. services/reporting endpoints: GET /reporting/weekly-location-performance (KPI query), POST /reporting/pipeline-runs (manual trigger), GET /reporting/pipeline-runs/latest (status). Separate from telemetry_events and GET /telemetry/report.
+Phase 3: load failure reruns by replacing (location_id, week_start) with the full recomputed totals, not by adding. reporting.pipeline_runs records started_at, finished_at, records_processed, status, error_message.
+Phase 4: one Prefect flow brasaland_weekly_performance_pipeline; tasks extract_weekly_inputs, aggregate_location_kpis, upsert_to_reporting_table; states Running, Completed, Failed. Backfill flow optional. Supabase URL and key in Prefect block brasaland-supabase. Subflows deferred to Part 3.
+Phase 5 design: services/reporting status GET /reporting/pipeline-runs/latest → get_latest_pipeline_run(); trigger POST /reporting/pipeline-runs → run_pipeline(); KPI query GET /reporting/weekly-location-performance → get_weekly_location_performance(). No ETL in services/. Separate from GET /telemetry/report.
+Domain vocabulary: location_id roster from services/api/locations.py (co-med-centro … us-jacksonville); country Colombia|United States; currency COP|USD; entities Product, InboundOrder, OutboundOrder; waste reason expired|kitchen_error|theft_suspected.
+```
+
+Technology’s central API nouns menus/sales/customers/suppliers remain **missing**. The design does not claim those routers exist.
 
 ## Planned next steps (order)
 
