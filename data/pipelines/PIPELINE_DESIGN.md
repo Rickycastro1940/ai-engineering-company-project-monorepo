@@ -214,24 +214,54 @@ Minimum fields on every run:
 
 `window_start` and `window_end` are stored on the same row so the rerun passes the identical chain week. `run_id` distinguishes the failed attempt from the retry in the audit list.
 
-## Phase 4 — Prefect
+## Phase 4 — Mapping to Prefect
 
-### Mapping
+Part 1 is one main flow and three tasks. A second flow for backfill is optional here. Part 3 is where extract, transform, and load become their own subflows.
+
+### Main flow
 
 | Prefect concept | Brasaland object |
 | --- | --- |
 | Flow | `brasaland_weekly_performance_pipeline` (`run_pipeline(start_date, end_date)` in `data/pipelines/pipeline.py`) |
-| Subflows | `extract_brasaland_data_flow`, `transform_brasaland_kpis_flow`, `load_brasaland_reporting_flow` |
-| Tasks | `extract_telemetry_events`, `extract_domain_data`, `aggregate_location_kpis`, `upsert_to_reporting_table` |
-| Schedule | Monday 07:00 America/Bogota, parameters = previous chain week |
-| Completed | Upsert into `reporting.weekly_location_performance` succeeded and the run log says `Success` |
-| Failed | Extract or load error. Retries use the same window. The upsert key prevents double counting |
+| Parameters | `start_date`, `end_date`: the chain-week bounds passed to extract and stored on the run log |
+| Schedule | Deployment cron Monday 07:00 America/Bogota. The parameters are the previous chain week. |
+| What it does | Calls extract, then transform, then load, in that order. Writes `reporting.pipeline_runs` around the call. |
 
-Extract and load tasks retry. The aggregation task is a pure function of its inputs.
+### Tasks
 
-### Secrets
+| Task | Stage | What it does |
+| --- | --- | --- |
+| `extract_weekly_inputs` | Extract | Reads the JSON snapshots: `telemetry_events` for the four KPI event types in the window, and `locations` (`id`, `country`, `currency`). Returns both frames. Retries on a store timeout. |
+| `aggregate_location_kpis` | Transform | Dedupes on event `id`, sums purchase and waste cost, counts stockouts and price alerts, joins `locations`, and returns one row per `location_id` for `week_start`. No database write. |
+| `upsert_to_reporting_table` | Load | Upserts that frame into `reporting.weekly_location_performance` on `(location_id, week_start)`, assigning the recomputed totals. Retries on a store timeout. |
 
-`SUPABASE_URL` and `SUPABASE_KEY` come from the environment (local `.env`, or a Prefect Secret block in a hosted deployment). They are not written into `data/pipelines/` or into this document.
+`extract_telemetry_events` and `extract_domain_data` are the two reads inside the extract task. They stay in this one task until Part 3 splits the stages into subflows.
+
+### States
+
+Prefect state on the flow is what operators see. The same outcome is copied to `reporting.pipeline_runs.status`.
+
+| Prefect state | When it applies | Run log |
+| --- | --- | --- |
+| `Running` | The flow has started and extract, transform, or load is still in progress | `Running`, `started_at` set, `finished_at` empty |
+| `Completed` | Load upsert finished for every row in the frame | `Success`, `finished_at` set, `records_processed` set |
+| `Failed` | Extract or load raised after its retries, or transform raised | `Failed`, `finished_at` set, `error_message` set. The rerun uses the same window and the Phase 3 upsert. |
+
+`Scheduled` is only the deployment waiting for Monday 07:00. It is not a run-log status.
+
+### Optional second flow
+
+`brasaland_weekly_backfill_flow(weeks)` is optional in Part 1. It would call the same three tasks once per chain week (a missed Monday, or a receipt corrected after the report). It does not define new KPI rules. Part 1 ships the Monday flow only. Part 3 splits extract, transform, and load into subflows; the backfill flow would call those subflows per week.
+
+### Prefect blocks
+
+The Supabase connection is a Prefect block, not a value in `data/pipelines/`.
+
+| Block | Type | What it holds |
+| --- | --- | --- |
+| `brasaland-supabase` | Secret block, or a credentials block with a URL and a key | `SUPABASE_URL` and `SUPABASE_KEY` for the project that stores `telemetry_events`, `locations`, and `reporting.weekly_location_performance` |
+
+The flow loads `brasaland-supabase` at the start of extract and load. Local runs may read the same two names from `.env` when the block is absent. The URL and the key are never written into the repository or into this document.
 
 ## Phase 5 — Application integration
 

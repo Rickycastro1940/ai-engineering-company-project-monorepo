@@ -200,6 +200,7 @@ Phase 2 purpose: one sentence — Monday 07:00 America/Bogota rollup in reportin
 Phase 2 extract: telemetry_events plus locations, both JSON row snapshots. Stages: extraction, transformation, load. Duplicate strategy: dedupe telemetry_events.id, recompute the week, upsert on (location_id, week_start).
 Destination: reporting.weekly_location_performance. services/reporting endpoints: GET /reporting/weekly-location-performance (KPI query), POST /reporting/pipeline-runs (manual trigger), GET /reporting/pipeline-runs/latest (status). Separate from telemetry_events and GET /telemetry/report.
 Phase 3: load failure reruns by replacing (location_id, week_start) with the full recomputed totals, not by adding. reporting.pipeline_runs records started_at, finished_at, records_processed, status, error_message.
+Phase 4: one Prefect flow brasaland_weekly_performance_pipeline; tasks extract_weekly_inputs, aggregate_location_kpis, upsert_to_reporting_table; states Running, Completed, Failed. Backfill flow optional. Supabase URL and key in Prefect block brasaland-supabase. Subflows deferred to Part 3.
 ```
 
 Technology’s central API nouns menus/sales/customers/suppliers remain **missing**. The design does not claim those routers exist.
