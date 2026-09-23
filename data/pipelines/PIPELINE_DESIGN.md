@@ -58,11 +58,71 @@ Primary key: `(location_id, week_start)`.
 
 Colombia locations stay in COP. Florida locations stay in USD. A chain total is two native sums. This table does not store a converted USD rollup.
 
-## Phase 1 — Current state
+## Phase 1 — Current state analysis
 
-`telemetry_events` already stores the engineering stream (`page_view`, `user_login_succeeded`, `user_login_failed`, `api_error`) and is what `GET /telemetry/report` aggregates for platform volume, error mix, and authentication failures.
+### Current state
 
-That endpoint does not answer Felipe’s question: which of the 14 kitchens spent more on waste than on receipts this week, which kitchens stocked out, and which kitchens saw a supplier price move. Mariana’s Tuesday PDF does not answer it either. The four operational events above are the mandatory inputs. They need a weekly join to `locations` (country and currency) and a write to a reporting table. Doing that math inside `GET /telemetry/report`, or writing the totals back into `telemetry_events`, would mix a Monday business grain with the engineering cache.
+Brasaland Digital already has an engineering telemetry path. It is a platform health report for Nicolás Park’s team, built before this business pipeline.
+
+What is already in the repo:
+
+| Piece | Where it lives | What it does |
+| --- | --- | --- |
+| Metric functions | `skills/data-analysis/scripts/pandas_clean.py` | `get_events_per_day`, `get_error_rate_by_type`, `get_auth_failure_rate` |
+| Report endpoint | `skills/data-analysis/scripts/services/telemetry/main.py` | `GET /telemetry/report` |
+| Engineering dashboard | `uis/backoffice/legacy/telemetry.html` | Renders traffic, errors, and authentication for the last window |
+| Cache | In-memory map on the report process | 60 seconds per `(start_date, end_date)`. Default window is the last 7 days UTC when the query omits dates |
+
+The report selects `id`, `timestamp`, `event_type`, and `tags`. It returns `{ period: { from, to }, metrics }`. It has no location, currency, or cost fields.
+
+### Telemetry events captured so far
+
+The technical report is written against these `event_type` values already stored for engineering:
+
+| `event_type` | What it records | Which engineering metric uses it |
+| --- | --- | --- |
+| `user_login_succeeded` | A staff sign-in that succeeded | Daily volume, and the denominator of the auth failure rate |
+| `user_login_failed` | A staff sign-in that failed | Daily volume, error counts, and the numerator of the auth failure rate |
+| `api_error` | A technical API failure | Daily volume and error counts by type |
+
+`get_events_per_day` counts every row in the window, so any other stored type still adds to daily traffic. The named metrics above only branch on the three types in the table.
+
+The telemetry contract for the inventory system also names six mandatory business events. They are the raw material for operations and procurement. The engineering report does not aggregate them:
+
+| `event_type` | Fires when |
+| --- | --- |
+| `inbound_order_created` | A location registers a supplier arrival |
+| `outbound_order_created` | A location registers prep consumption |
+| `stock_waste_registered` | Waste is logged (`expired`, `kitchen_error`, or `theft_suspected`) |
+| `stock_threshold_triggered` | Stock falls below the configured minimum |
+| `direct_stock_edit_rejected` | A direct stock edit is blocked |
+| `ingredient_price_variance_detected` | An inbound unit cost jumps versus history |
+
+Those events carry `location_id`, `country` (`CO` or `US`), `product_id`, `quantity`, `unit`, and `currency` (`COP` or `USD`). Waste also carries `reason`. Amounts stay in the location currency.
+
+### Where they are stored
+
+Every captured event is one row in the Supabase table `telemetry_events`. The engineering reader filters that table with `timestamp >= start` and `timestamp < end`. There is no reporting schema and no location-week table on this path. `GET /telemetry/report` reads `telemetry_events` and returns the three engineering metrics. It does not write a second table.
+
+### What the technical report already answers for engineering
+
+`GET /telemetry/report` answers three engineering questions:
+
+1. **Traffic.** How many events hit the platform each UTC day? Formula: count of `id`, grouped by date (`events_per_day`).
+2. **Failures.** Which technical failures showed up in the window? Formula: count of `api_error` and `user_login_failed`, grouped by `event_type` (`error_rate_by_type`).
+3. **Sign-in health.** What share of login attempts failed each day? Formula: `user_login_failed / (user_login_failed + user_login_succeeded)`, rounded to 4 decimal places (`auth_failure_rate`).
+
+The dashboard at `uis/backoffice/legacy/telemetry.html` shows those three tables and nothing else. That is enough for Nicolás to see load, instability, and authentication trouble.
+
+### The gap
+
+The technical report leaves this business question unanswered:
+
+**For each of the 14 locations, in this chain week, what was the purchase cost, the waste cost, the waste ratio, the stockout frequency, and the price-alert frequency, in that location’s own currency (COP or USD)?**
+
+That is the question Felipe Guerrero needs when a kitchen is wasting food or stocking out, the question Lucía Fernández needs when a supplier price moves before the invoice arrives, and the question Mariana Restrepo cannot answer from Tuesday PDFs or from a platform-health chart. `GET /telemetry/report` cannot answer it: its metrics never read `cost` or `location_id`, and they never group `inbound_order_created`, `stock_waste_registered`, `stock_threshold_triggered`, or `ingredient_price_variance_detected`.
+
+Answering it needs a dedicated pipeline: read those events for one chain week, join `locations` for country and currency, aggregate one row per location, and load `reporting.weekly_location_performance`. The engineering endpoint stays the engineering endpoint.
 
 ## Phase 2 — Pipeline design
 

@@ -195,6 +195,7 @@ Events: inbound_order_created, stock_waste_registered, stock_threshold_triggered
 HTTP: services/reporting GET /reporting/weekly-location-performance and POST /reporting/pipeline-runs
 pytest tests/pipelines/test_pipeline.py → 4 passed; hand-calculated row 1000 / 150 / 0.15 / 1 / 1
 test_aggregate_location_kpis_non_dict_payload failed: null location_id is dropped by groupby (pre-existing; design records that omission)
+Phase 1 current state: GET /telemetry/report answers traffic, api_error/user_login_failed counts, and auth failure rate from telemetry_events. Gap question is location-week purchase cost, waste cost, waste ratio, stockouts, and price alerts in COP or USD.
 ```
 
 Technology’s central API nouns menus/sales/customers/suppliers remain **missing**. The design does not claim those routers exist.
