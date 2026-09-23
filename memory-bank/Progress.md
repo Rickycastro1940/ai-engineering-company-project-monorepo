@@ -183,6 +183,23 @@ uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py te
 cd uis/backoffice && npm run build → green
 ```
 
+## Latest CONTEXT coverage evaluation (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology** (audit of the telemetry contract against every `CONTEXT.md` department need). Verdict: **PASS**. All 34 mandatory metric ids in the plan match `weekly_report_dispatched.floor_metric_ids`. Business and technical opportunity coverage includes authentication, performance, errors, navigation, and inventory/marketing/HR exploration (`bo.*` off the floor).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+CONTEXT need phrases present = 22 / 22
+mandatory metrics in plan = 34 = floor_metric_ids
+evaluation Yes rows = 23 department-need mappings
+opportunity metrics = 34; bo.* questions = 11; events = 41
+auth/perf/errors/nav/business event gaps = none
+null-pending floor ids retained (holiday, onboarding, catalogue search, training path)
+ops.stockout.count remains opportunity (not floor)
+```
+
+Emitters are still not wired. Menus, sales, customers, and suppliers remain missing on the central API.
+
 ## Latest delivery strategy Phase 3 (`cursor/telemetry-plan-ff8d`)
 
 Department served: **Technology** (with Operations/Procurement urgency for stream paths). Every catalog event is classified stream or batch from the urgency of the decision it feeds. Throttle/debounce covers silence episodes, protein-cover alerts, latency sampling, and navigation chatter. Risks and exclusions list discarded events plus privacy/cost data that will not be captured.
