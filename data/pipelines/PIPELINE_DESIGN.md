@@ -130,26 +130,57 @@ Answering it needs a dedicated pipeline: read those events for one chain week, j
 
 This pipeline produces the Weekly Location Cost & Waste rollup in `reporting.weekly_location_performance` that feeds Mariana Restrepo’s executive report every Monday at 07:00 America/Bogota, computing purchase cost, waste cost, waste ratio, stockout frequency, and price-alert frequency from the telemetry metrics `inbound_order_created`, `stock_waste_registered`, `stock_threshold_triggered`, and `ingredient_price_variance_detected`.
 
-### Extraction
+### Extraction format
 
-1. Read `telemetry_events` for the chain-week window and the four event types. Columns used: `event_type`, `event_payload`, `created_at`.
-2. Read `locations` for `id`, `country`, `currency` (the 14 Brasaland sites).
-3. Pass both frames to the transform in `data/process/`. The flow does not parse KPI rules inline.
+Two tables, both read from Supabase as a JSON array of row objects (PostgREST). The pipeline keeps that JSON only for the run. It writes the rollup to `reporting.weekly_location_performance`.
 
-### Flow
+| Source | Why it is read | Row format | How often the source changes |
+| --- | --- | --- | --- |
+| `telemetry_events` | Facts for the five KPIs | One JSON object per event. Columns used: `id` (UUID), `event_type`, `created_at`, `event_payload` (JSON object with `location_id` and, on cost events, `cost`) | Continuously, as each kitchen acts. A new receipt, waste log, stockout, or price jump is a row. A correction of a receipt updates that same `id` (new `cost` on the existing row) instead of inserting a second event. |
+| `locations` | Country and currency for the 14 sites | One JSON object per site: `id`, `country`, `currency` (`COP` or `USD`) | When a location record is edited. The same `id` is updated in place. |
+
+The extract for `telemetry_events` is the chain-week snapshot: `event_type` in `inbound_order_created`, `stock_waste_registered`, `stock_threshold_triggered`, `ingredient_price_variance_detected`, and `created_at >= window_start` and `created_at < window_end`. `locations` is read in full (14 rows). Both snapshots are taken when the job runs: Monday 07:00 America/Bogota for the previous chain week, or whenever `POST /reporting/pipeline-runs` asks for a window. The pipeline does not tail the tables between those runs.
+
+### Data flow
+
+Extraction, transformation, and load are three separate stages. Extraction only reads. Transformation only computes a frame. Load only upserts that frame.
 
 ```mermaid
-graph TD
-    A[(telemetry_events)] -->|Four event types, chain week| C[data/pipelines extract]
-    B[(locations)] -->|id, country, currency| C
-    C --> D[data/process aggregate_location_kpis]
-    D -->|One row per location and week| E[data/pipelines load]
-    E -->|Upsert on location_id, week_start| F[(reporting.weekly_location_performance)]
-    G[services/reporting] -->|POST imports the flow| C
-    G -->|GET reads only the reporting table| F
+flowchart LR
+  subgraph extraction [1 Extraction]
+    A[(telemetry_events JSON rows)]
+    B[(locations JSON rows)]
+  end
+  subgraph transformation [2 Transformation]
+    C[Dedupe on event id then aggregate one row per location and week]
+  end
+  subgraph load [3 Load]
+    D[(reporting.weekly_location_performance)]
+  end
+  A --> C
+  B --> C
+  C --> D
 ```
 
-`services/telemetry` and `GET /telemetry/report` are not on this path.
+1. **Extraction.** `extract_telemetry_events` and `extract_domain_data` in `data/pipelines/pipeline.py` pull the two JSON snapshots for the requested window.
+2. **Transformation.** `aggregate_location_kpis` drops duplicate event `id`s, reads `location_id` and `cost` from `event_payload`, sums and counts by location, joins `locations`, and emits one row per `location_id` with `week_start` set to the chain-week start.
+3. **Load.** `upsert_to_reporting_table` writes those rows to `reporting.weekly_location_performance`.
+
+`GET /telemetry/report` stays on its own reader. It is not one of these three stages.
+
+### Updates to existing source rows, and duplicates
+
+`telemetry_events.id` is the identity of one business fact. A supplier receipt that is later corrected keeps that `id` and changes `event_payload.cost`. `locations.id` is the identity of one site. An edit changes `country` or `currency` on that same row.
+
+The pipeline treats every run as a fresh snapshot of those current rows, for the whole chain week. It does not keep a high-water mark of rows inserted since last time, and it does not add this run’s costs onto the costs already stored for that week.
+
+Concrete rules for this rollup:
+
+1. **Dedupe the extract on `telemetry_events.id` before any sum.** If the same id appears twice in the JSON payload, one copy remains. A corrected cost is the cost on that single row, so purchase cost and waste cost are not doubled.
+2. **Recompute the week from that deduped snapshot.** Purchase cost is the sum of `cost` on the current `inbound_order_created` rows. Waste cost, stockout count, and price-alert count are the same kind of full recount. A changed source row changes the sum because the old value is no longer in the snapshot.
+3. **Replace the destination row.** Load is `INSERT ... ON CONFLICT (location_id, week_start) DO UPDATE` for every KPI column, country, and currency (`upsert` with `on_conflict=location_id,week_start`). The second Monday run, or a rerun after a receipt correction, overwrites the same location-week key. It does not insert a second row and it does not add to `total_purchase_cost`.
+
+`locations` follows the same snapshot rule: the join uses the site row as it exists at extract time, and the upsert writes that `country` and `currency` onto the existing location-week key.
 
 ## Phase 3 — Resilience and idempotency
 
