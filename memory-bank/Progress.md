@@ -183,6 +183,23 @@ uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py te
 cd uis/backoffice && npm run build → green
 ```
 
+## Latest event quality evaluation (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology**. Audit of justification, envelope, allowlists, and schema–plan consistency. **Verdict: PASS.**
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+Draft7Validator.check_schema → pass
+41/41 capture sentences (hypothesis + decision); no just-in-case events
+envelope requires eventID, timestamp (ISO 8601 Z), sessionID, UserID, Event_type, SchemaVersion, requestID, properties (+ source, tags)
+entity_action taxonomy: all Event_type values pass
+41 examples validate with full envelope
+41 property allowlists; 0 key mismatches vs schema; additionalProperties false
+plan catalog == schema oneOf == 41
+```
+
+Emitters are still not wired. Menus, sales, customers, and suppliers remain missing on the central API.
+
 ## Latest CONTEXT coverage evaluation (`cursor/telemetry-plan-ff8d`)
 
 Department served: **Technology** (audit of the telemetry contract against every `CONTEXT.md` department need). Verdict: **PASS**. All 34 mandatory metric ids in the plan match `weekly_report_dispatched.floor_metric_ids`. Business and technical opportunity coverage includes authentication, performance, errors, navigation, and inventory/marketing/HR exploration (`bo.*` off the floor).
