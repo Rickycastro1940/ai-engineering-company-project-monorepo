@@ -106,9 +106,9 @@ Primary key: `(location_id, week_start)`.
 
 Colombia locations (`co-*`) stay in COP. United States / Florida locations (`us-*`) stay in USD. A chain total is two native sums. This table does not store a converted USD rollup.
 
-## Phase 1 — Current state analysis
+## Phase 1 — Current State analysis
 
-### Current state
+### Current State
 
 Brasaland Digital already has an engineering telemetry path. It is a platform health report for Nicolás Park’s team, built before this business pipeline.
 
@@ -162,7 +162,7 @@ Every captured event is one row in the Supabase table `telemetry_events`. The en
 
 The dashboard at `uis/backoffice/legacy/telemetry.html` shows those three tables and nothing else. That is enough for Nicolás to see load, instability, and authentication trouble.
 
-### The gap
+### Business Gap
 
 The technical report leaves this business question unanswered:
 
@@ -250,15 +250,15 @@ A rerun uses the same `window_start` and `window_end` as the failed attempt, rec
 
 Every attempt appends one row to `reporting.pipeline_runs` and mirrors the latest row in `data/pipelines/last_run.json` for `GET /reporting/pipeline-runs/latest`. The row is inserted with `status = Running` and `started_at` when the flow begins. It is updated when the flow finishes or when load raises. A failed load and the rerun that follows are two rows, so production can see both.
 
-Minimum fields on every run:
+Minimum fields on every run (name, data type, and production justification):
 
-| Field | What is recorded | Why production needs it |
-| --- | --- | --- |
-| `started_at` | UTC timestamp when this attempt began | Shows whether the Monday 07:00 America/Bogota job actually started, and how long the gap was after the previous success. A missing start means the scheduler never fired. |
-| `finished_at` | UTC timestamp when this attempt ended, success or failure | With `started_at`, gives duration. A run that has `started_at` and a null `finished_at` is still in load or died without closing the log. That is the row to rerun. |
-| `records_processed` | Count of `telemetry_events` rows in the deduped extract for the window | Tells an auditor whether the week had events. A sudden zero against a normally busy week means the extract missed the window or the source was empty. A count that matches the prior success, with the same KPI totals, confirms the rerun replaced rows instead of stacking them. |
-| `status` | `Running`, `Success`, or `Failed` | Separates a finished week from a load that stopped halfway. `Failed` is the signal to rerun that window. `Success` means every location-week key from the frame was upserted. A location with zero waste can still be `Success`. |
-| `error_message` | Public failure text when `status` is `Failed`; empty on success | Names the load failure (timeout, connection drop) so the rerun is aimed at the broken stage. The text stays free of connection strings, keys, and host paths. |
+| Field | Data type | What is recorded | Why production needs it |
+| --- | --- | --- | --- |
+| `started_at` | `timestamptz` (UTC) | Instant when this attempt began | Shows whether the Monday 07:00 America/Bogota job actually started, and how long the gap was after the previous success. A missing start means the scheduler never fired. |
+| `finished_at` | `timestamptz` (UTC), nullable | Instant when this attempt ended, success or failure | With `started_at`, gives duration. A run that has `started_at` and a null `finished_at` is still in load or died without closing the log. That is the row to rerun. |
+| `records_processed` | `integer` | Count of `telemetry_events` rows in the deduped extract for the window | Tells an auditor whether the week had events. A sudden zero against a normally busy week means the extract missed the window or the source was empty. A count that matches the prior success, with the same KPI totals, confirms the rerun replaced rows instead of stacking them. |
+| `status` | `text` (`Running` \| `Success` \| `Failed`) | Outcome of this attempt | Separates a finished week from a load that stopped halfway. `Failed` is the signal to rerun that window. `Success` means every location-week key from the frame was upserted. A location with zero waste can still be `Success`. |
+| `error_message` | `text`, nullable | Public failure text when `status` is `Failed`; null on success | Names the load failure (timeout, connection drop) so the rerun is aimed at the broken stage. The text stays free of connection strings, keys, and host paths. |
 
 `window_start` and `window_end` are stored on the same row so the rerun passes the identical chain week. `run_id` distinguishes the failed attempt from the retry in the audit list.
 
@@ -349,4 +349,4 @@ This module is not `services/telemetry/`. It does not mount `GET /telemetry/repo
 | `GET /telemetry/report` | Telemetry report code (`services/telemetry/` path in the engineering stack) | `telemetry_events` | Nicolás Park — traffic, error types, auth failure rate |
 | `GET /reporting/pipeline-runs/latest`, `POST /reporting/pipeline-runs`, `GET /reporting/weekly-location-performance` | `services/reporting/` | `reporting.pipeline_runs` and `reporting.weekly_location_performance` | Mariana Restrepo, Felipe Guerrero, Lucía Fernández — run status and location-week KPIs |
 
-The reporting routes do not read or write `telemetry_events`. `GET /telemetry/report` does not read `reporting.weekly_location_performance`.
+This design does not modify `services/telemetry/analysis.py` or `GET /telemetry/report`. Those remain the engineering path.
