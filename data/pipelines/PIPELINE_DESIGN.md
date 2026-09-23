@@ -9,6 +9,54 @@
 **Destination table:** `reporting.weekly_location_performance`
 **Source (read-only):** `telemetry_events`, plus the `locations` dimension
 
+## Brasaland domain vocabulary
+
+Field names and values below match the monorepo. They are not generic retail placeholders.
+
+### Locations (`services/api/locations.py`)
+
+`location_id` on every operational event and every `reporting.weekly_location_performance` row is one of these 14 `Location.id` values. `country` is the `Location.country` enum. `currency` is the `Location.currency` enum. Florida is `region` on the API; the pipeline stores `country`, not `region`.
+
+| `location_id` | Name | `country` | `currency` | `region` |
+| --- | --- | --- | --- | --- |
+| `co-med-centro` | Medellín Centro | Colombia | COP | Colombia |
+| `co-med-elpoblado` | Medellín El Poblado | Colombia | COP | Colombia |
+| `co-bog-chapinero` | Bogotá Chapinero | Colombia | COP | Colombia |
+| `co-bog-norte` | Bogotá Norte | Colombia | COP | Colombia |
+| `co-cali-norte` | Cali Norte | Colombia | COP | Colombia |
+| `co-barranquilla` | Barranquilla | Colombia | COP | Colombia |
+| `co-cartagena` | Cartagena | Colombia | COP | Colombia |
+| `co-pereira` | Pereira | Colombia | COP | Colombia |
+| `us-mia-brickell` | Miami Brickell | United States | USD | Florida |
+| `us-mia-downtown` | Miami Downtown | United States | USD | Florida |
+| `us-orlando` | Orlando | United States | USD | Florida |
+| `us-tampa` | Tampa | United States | USD | Florida |
+| `us-ftlauderdale` | Fort Lauderdale | United States | USD | Florida |
+| `us-jacksonville` | Jacksonville | United States | USD | Florida |
+
+Eight Colombia ids, six Florida ids. Emitters must not use fixture labels such as `miami-downtown` or `medellin-centro`. A failed join that fills `currency` with `USD` would mislabel a COP kitchen.
+
+### Inventory entities
+
+| Entity | Monorepo meaning | How this pipeline sees it |
+| --- | --- | --- |
+| `Product` | Ingredient or supply (`product_id`, `name`, `quantity`, `unit` on `products.csv` / `GET /inventory`) | `product_id` (integer ≥ 1) may sit on the event payload; the weekly rollup does not group by product |
+| `InboundOrder` | Goods received from a supplier at a location (`OrderType` `INBOUND`) | Emits `inbound_order_created` per line; `event_payload.cost` feeds `total_purchase_cost` |
+| `OutboundOrder` | Kitchen consumption or transfer (`OrderType` `OUTBOUND`) | Emits `outbound_order_created`; out of this weekly table |
+| `Location` | One of the 14 rows above | Join key `locations.id` = `event_payload.location_id` |
+| Supplier | ~20 suppliers across the two markets (`supplier_id` like `sup_…`) | Price alerts fire when an inbound unit cost moves; counted as `ingredient_price_variance_detected` |
+
+Waste `reason` on `stock_waste_registered` is one of `expired`, `kitchen_error`, or `theft_suspected`. Amounts stay in the location currency. The telemetry layer does not convert COP to USD.
+
+### People and departments (`CONTEXT.md`)
+
+| Name | Role | Why this pipeline exists for them |
+| --- | --- | --- |
+| Mariana Restrepo | CEO, Executive Direction | Monday 07:00 America/Bogota rollup instead of Tuesday PDFs |
+| Felipe Guerrero | Restaurant Operations | Purchase, waste, stockouts per location |
+| Lucía Fernández | Procurement | Purchase cost and price-alert frequency across markets |
+| Nicolás Park | Technology | Engineering telemetry stays on `GET /telemetry/report`; this reporting module is separate |
+
 This pipeline does not insert, update, or aggregate into `telemetry_events`. `telemetry_events` is the raw event log. Every new analytical table for this report lives in the `reporting` schema. The table name is `weekly_location_performance`. It is not `reporting.business_metrics` and it is not `reporting.weekly_location_metrics`.
 
 HTTP that reads or triggers this report lives in `services/reporting/`. That module is separate from the engineering telemetry reader and from `GET /telemetry/report`. `services/reporting/` imports the orchestrator in `data/pipelines/`. `data/pipelines/` does not import `services/reporting/`.
@@ -20,7 +68,7 @@ HTTP that reads or triggers this report lives in `services/reporting/`. That mod
 | `data/raw/` | Optional landing copies of extracted events (for example a nightly CSV). Not the aggregation input and not the dashboard table. |
 | `data/process/` | Reusable, side-effect-free transforms. `aggregate_location_kpis` belongs here so a test can call it without Prefect or HTTP. |
 | `data/pipelines/` | Orchestration only: Prefect flow, extract, and load. Imports the transform from `data/process/`. |
-| `data/eval/` | Hand-calculated location-week fixtures (purchase 1000, waste 150, ratio 0.15, one stockout, one price alert). |
+| `data/eval/` | Hand-calculated location-week fixtures for roster ids (e.g. `us-mia-downtown`: purchase 1000 USD, waste 150 USD, ratio 0.15, one stockout, one price alert). |
 | `services/reporting/` | `GET` the destination table and `POST` a run. No KPI arithmetic in the route. |
 
 ## Chain week
@@ -49,14 +97,14 @@ Each output row also carries:
 
 | Column | Source |
 | --- | --- |
-| `location_id` | `event_payload.location_id` |
+| `location_id` | `event_payload.location_id` — must equal a `Location.id` from the roster (e.g. `co-med-centro`, `us-mia-downtown`) |
 | `week_start` | Chain-week start date passed into the run (`YYYY-MM-DD`) |
-| `country` | Left join to `locations.id`. Unmatched location → `Unknown` |
-| `currency` | Left join to `locations`. Unmatched location → `USD` only as a documented fallback; emitters must send a roster id so a Colombia location is not labeled USD |
+| `country` | Left join to `locations.id`. Values are `Colombia` or `United States`. Unmatched location → `Unknown` |
+| `currency` | Left join to `locations`. Values are `COP` or `USD`. Unmatched location → `USD` only as a documented fallback; emitters must send a roster id so a Colombia location is not labeled USD |
 
 Primary key: `(location_id, week_start)`.
 
-Colombia locations stay in COP. Florida locations stay in USD. A chain total is two native sums. This table does not store a converted USD rollup.
+Colombia locations (`co-*`) stay in COP. United States / Florida locations (`us-*`) stay in USD. A chain total is two native sums. This table does not store a converted USD rollup.
 
 ## Phase 1 — Current state analysis
 
@@ -91,14 +139,14 @@ The telemetry contract for the inventory system also names six mandatory busines
 
 | `event_type` | Fires when |
 | --- | --- |
-| `inbound_order_created` | A location registers a supplier arrival |
-| `outbound_order_created` | A location registers prep consumption |
-| `stock_waste_registered` | Waste is logged (`expired`, `kitchen_error`, or `theft_suspected`) |
-| `stock_threshold_triggered` | Stock falls below the configured minimum |
-| `direct_stock_edit_rejected` | A direct stock edit is blocked |
-| `ingredient_price_variance_detected` | An inbound unit cost jumps versus history |
+| `inbound_order_created` | An `InboundOrder` line (`OrderType` `INBOUND`) is committed at a location |
+| `outbound_order_created` | An `OutboundOrder` line (`OrderType` `OUTBOUND`) is committed |
+| `stock_waste_registered` | Waste is logged; `reason` is `expired`, `kitchen_error`, or `theft_suspected` |
+| `stock_threshold_triggered` | Stock for a `Product` falls below the configured minimum at a location |
+| `direct_stock_edit_rejected` | A direct stock edit is blocked (stock changes only via inbound/outbound orders) |
+| `ingredient_price_variance_detected` | An inbound unit cost for a `Product` / supplier jumps versus history |
 
-Those events carry `location_id`, `country` (`CO` or `US`), `product_id`, `quantity`, `unit`, and `currency` (`COP` or `USD`). Waste also carries `reason`. Amounts stay in the location currency.
+Those events carry `location_id` (roster id), `country` (`Colombia` or `United States`), `product_id` (integer inventory id), `quantity`, `unit`, and `currency` (`COP` or `USD`). Waste also carries `reason`. Amounts stay in the location currency; the telemetry layer does not convert.
 
 ### Where they are stored
 
@@ -136,8 +184,8 @@ Two tables, both read from Supabase as a JSON array of row objects (PostgREST). 
 
 | Source | Why it is read | Row format | How often the source changes |
 | --- | --- | --- | --- |
-| `telemetry_events` | Facts for the five KPIs | One JSON object per event. Columns used: `id` (UUID), `event_type`, `created_at`, `event_payload` (JSON object with `location_id` and, on cost events, `cost`) | Continuously, as each kitchen acts. A new receipt, waste log, stockout, or price jump is a row. A correction of a receipt updates that same `id` (new `cost` on the existing row) instead of inserting a second event. |
-| `locations` | Country and currency for the 14 sites | One JSON object per site: `id`, `country`, `currency` (`COP` or `USD`) | When a location record is edited. The same `id` is updated in place. |
+| `telemetry_events` | Facts for the five KPIs | One JSON object per event. Columns used: `id` (UUID), `event_type`, `created_at`, `event_payload` (JSON with `location_id` as a roster id such as `co-bog-norte` or `us-orlando`, and on cost events `cost` in that location’s `COP` or `USD`) | Continuously, as each kitchen acts. A new `InboundOrder` receipt, waste log, stockout, or price jump is a row. A correction of a receipt updates that same `id` (new `cost` on the existing row) instead of inserting a second event. |
+| `locations` | `Location` dimension for the 14 Brasaland sites | One JSON object per site matching `GET /locations`: `id`, `country` (`Colombia` \| `United States`), `currency` (`COP` \| `USD`) | When a location record is edited. The same `id` is updated in place. |
 
 The extract for `telemetry_events` is the chain-week snapshot: `event_type` in `inbound_order_created`, `stock_waste_registered`, `stock_threshold_triggered`, `ingredient_price_variance_detected`, and `created_at >= window_start` and `created_at < window_end`. `locations` is read in full (14 rows). Both snapshots are taken when the job runs: Monday 07:00 America/Bogota for the previous chain week, or whenever `POST /reporting/pipeline-runs` asks for a window. The pipeline does not tail the tables between those runs.
 
@@ -284,7 +332,7 @@ This module is not `services/telemetry/`. It does not mount `GET /telemetry/repo
 | --- | --- | --- | --- | --- |
 | Status | `GET /reporting/pipeline-runs/latest` | None | Latest run: `started_at`, `finished_at`, `window_start`, `window_end`, `records_processed`, `status`, `error_message` | `get_latest_pipeline_run()` — returns the newest `reporting.pipeline_runs` row (mirrored in `data/pipelines/last_run.json`). No ETL. |
 | Manual trigger | `POST /reporting/pipeline-runs` | Body `{ "start_date": "...", "end_date": "..." }` | `202` with `{ "task_id": "..." }` | Enqueues `run_pipeline(start_date, end_date)` — the Prefect flow `brasaland_weekly_performance_pipeline`. The worker runs extract, transform, and load. The route does not call those tasks itself. |
-| KPI query | `GET /reporting/weekly-location-performance` | Optional query `week_start` | `{ "week_start": "...", "locations": [ { location_id, country, currency, total_purchase_cost, total_waste_cost, waste_ratio, stockout_events_count, price_alert_events_count } ] }` | `get_weekly_location_performance(week_start=None)` — `SELECT` from `reporting.weekly_location_performance` only. Part 3’s dashboard consumes this payload. No ETL. |
+| KPI query | `GET /reporting/weekly-location-performance` | Optional query `week_start` | `{ "week_start": "2026-09-21", "locations": [ { "location_id": "co-med-centro", "country": "Colombia", "currency": "COP", "total_purchase_cost": 18500000, "total_waste_cost": 920000, "waste_ratio": 0.0497, "stockout_events_count": 2, "price_alert_events_count": 1 }, { "location_id": "us-mia-downtown", "country": "United States", "currency": "USD", "total_purchase_cost": 1000, "total_waste_cost": 150, "waste_ratio": 0.15, "stockout_events_count": 1, "price_alert_events_count": 1 } ] }` | `get_weekly_location_performance(week_start=None)` — `SELECT` from `reporting.weekly_location_performance` only. Part 3’s dashboard consumes this payload for Mariana Restrepo and Felipe Guerrero. No ETL. |
 
 `GET /tasks/{task_id}` may sit beside the manual trigger so the client can poll the Celery enqueue until `run_pipeline` finishes. It is not one of the three business endpoints and it does not run ETL.
 
@@ -292,13 +340,13 @@ This module is not `services/telemetry/`. It does not mount `GET /telemetry/repo
 
 1. **Status — `get_latest_pipeline_run()`.** Reads the run log written by `run_pipeline`. Answers whether the Monday job (or the last manual trigger) is `Running`, `Success`, or `Failed`. Does not open `telemetry_events`.
 2. **Manual trigger — `run_pipeline(start_date, end_date)`.** The only path that starts extract → transform → load. `services/reporting/` passes the window and returns `202`. It does not sum purchase cost, count stockouts, or upsert rows.
-3. **KPI query — `get_weekly_location_performance(week_start)`.** Reads the destination table after a successful load. That is the feed Part 3’s dashboard will consume for Mariana and Felipe. It does not recompute waste ratio from events.
+3. **KPI query — `get_weekly_location_performance(week_start)`.** Reads the destination table after a successful load. That is the feed Part 3’s dashboard will consume for Mariana Restrepo and Felipe Guerrero (and Lucía Fernández for purchase cost and price alerts). It does not recompute waste ratio from events.
 
 ### Separate from telemetry
 
 | Surface | Module | Table | Audience |
 | --- | --- | --- | --- |
-| `GET /telemetry/report` | Telemetry report code (`services/telemetry/` path in the engineering stack) | `telemetry_events` | Nicolás — traffic, error types, auth failure rate |
-| `GET /reporting/pipeline-runs/latest`, `POST /reporting/pipeline-runs`, `GET /reporting/weekly-location-performance` | `services/reporting/` | `reporting.pipeline_runs` and `reporting.weekly_location_performance` | Mariana, Felipe, Lucía — run status and location-week KPIs |
+| `GET /telemetry/report` | Telemetry report code (`services/telemetry/` path in the engineering stack) | `telemetry_events` | Nicolás Park — traffic, error types, auth failure rate |
+| `GET /reporting/pipeline-runs/latest`, `POST /reporting/pipeline-runs`, `GET /reporting/weekly-location-performance` | `services/reporting/` | `reporting.pipeline_runs` and `reporting.weekly_location_performance` | Mariana Restrepo, Felipe Guerrero, Lucía Fernández — run status and location-week KPIs |
 
 The reporting routes do not read or write `telemetry_events`. `GET /telemetry/report` does not read `reporting.weekly_location_performance`.
