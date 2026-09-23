@@ -4,5 +4,6 @@ This folder holds **cross-cutting documentation** for the monorepo: architecture
 
 - **Main purpose**: provide a single place for “global” project documentation (not tied to one app or agent only).
 - **Recommendation**: organize docs by topic (architecture, deployment, data, security, observability, etc.) and keep links from each component’s README to these guides.
+- **Observability**: [Brasaland telemetry plan](telemetry/telemetry-plan.md), [event schemas](telemetry/event-schemas.json), and [property allowlists](telemetry/property-allowlists.md).
 
 > _Spanish version: [README.es.md](./README.es.md)._
