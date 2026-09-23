@@ -14,7 +14,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
-| Technology: telemetry + pipeline to dashboards | **Partial** — 34 mandatory metrics from `CONTEXT.md` with `definitions.mandatoryMetricSet`, 18 mandatory + 23 opportunity events on the `entity_action` taxonomy, a standard event envelope, and per-event property allowlists (`additionalProperties: false`). Weekly cost/waste pipeline and Celery path exist. Live emitters are not wired |
+| Technology: telemetry + pipeline to dashboards | **Partial** — 34 mandatory metrics, stream/batch delivery by decision urgency (Phase 3), property allowlists, draft-07 schemas, envelope. Weekly cost/waste pipeline and Celery path exist. Live emitters are not wired |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Not done** as product UI; pipeline design targets cost/waste for Mariana + Felipe |
 | Procurement: supplier price history, consolidated spend | **Not done** (supplier docs may exist on other branches; not claimed here) |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
@@ -182,6 +182,22 @@ Department served: **Technology** (structured HTTP, no env names in 503s) + **Op
 uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py tests/test_users_api.py -q → 33 passed
 cd uis/backoffice && npm run build → green
 ```
+
+## Latest delivery strategy Phase 3 (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology** (with Operations/Procurement urgency for stream paths). Every catalog event is classified stream or batch from the urgency of the decision it feeds. Throttle/debounce covers silence episodes, protein-cover alerts, latency sampling, and navigation chatter. Risks and exclusions list discarded events plus privacy/cost data that will not be captured.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+mandatory events classified = 18
+opportunity events classified = 23
+stream examples: sale_completed, location_sales_silence_detected, stock_threshold_triggered, api_error_raised
+batch examples: weekly_report_dispatched, employee_hired, stock_waste_registered, api_latency_recorded
+throttle rows documented = 12
+discarded + privacy/cost exclusions section present in telemetry-plan.md
+```
+
+Emitters are still not wired. Menus, sales, customers, and suppliers remain missing on the central API.
 
 ## Latest draft-07 schema export (`cursor/telemetry-plan-ff8d`)
 

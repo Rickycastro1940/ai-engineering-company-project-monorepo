@@ -458,10 +458,12 @@ We capture `direct_stock_edit_rejected` because we need to know a direct quantit
 
 ### Discarded
 
-- `session_check_failed`. Whether the session check could not reach the API or the API returned 5xx is already `api_latency_recorded` on `GET /auth/me`. A second event does not change the decision of which side to fix.
-- Backoffice `page_viewed`. Which staff screen was shown is `section_viewed`. `page_viewed` stays for the public home only.
-- Section ids `suppliers`, `people`, `training`, and `reporting`. Those screens are not in the staff app, so there is no visit to capture and no decision the row would change.
-- Flows `inventory_inbound` and `inventory_outbound`. There is no order form to abandon. Purchase and consumption decisions are `inbound_order_created` and `outbound_order_created`.
+Discarded candidates and the privacy/cost exclusions are normative in **Phase 3 — Risks and exclusions**. Short list:
+
+- `session_check_failed`. Covered by `api_latency_recorded` on `GET /auth/me`.
+- Backoffice `page_viewed`. Staff visits are `section_viewed`.
+- Section ids `suppliers`, `people`, `training`, and `reporting`. Not in the staff app.
+- Flows `inventory_inbound` and `inventory_outbound`. No order form to abandon.
 
 `data/pipelines/pipeline.py` `extract_telemetry_events` filters exactly these four types: `inbound_order_created`, `stock_waste_registered`, `stock_threshold_triggered`, `ingredient_price_variance_detected`. `scripts/nightly_export.py` copies only the first three. When that export is next edited, add `ingredient_price_variance_detected` so the CSV matches the extractor. The extractor reads Supabase itself; the CSV is not the aggregation input.
 
@@ -557,6 +559,136 @@ emit(event):
 Retries reuse the same `eventID`. Consumers dedupe on `eventID`. A silence episode reuses one `eventID` for the life of that episode (`silence_started_at` + `location_id`). A new episode (after a `sale_completed`, or after the local close) gets a new `eventID`.
 
 The outbox directory is `data/uploads/` because that path is already gitignored. A dedicated telemetry path needs a `.gitignore` edit, which this repo treats as a confirmed change.
+
+## Phase 3 — Delivery strategy
+
+Delivery mode is chosen from the **urgency of the decision** the event feeds, or from the **operational need to detect it quickly**. It is not chosen from transport preference. Two modes:
+
+| Mode | Meaning in this plan |
+| --- | --- |
+| **Stream** | The row is available to the alert or live dashboard path within minutes of `timestamp`. Used when someone must act during service, before the next order, or before the next staff attempt. |
+| **Batch** | The row is rolled on a clock (hourly, end of shift / nightly, or Monday 07:00). Used when the decision is a weekly negotiation, a monthly HR rate, or a campaign / migration review. |
+
+Emit still validates and writes the producer document when the business fact happens. **Stream vs batch is how consumers process that row**, not whether the emitter waits.
+
+### Mandatory events — delivery
+
+| `Event_type` | Mode | Urgency justification |
+| --- | --- | --- |
+| `sale_completed` | Stream | `CONTEXT.md` requires a real-time sales dashboard per location in COP and USD, and answers covers today and Florida week sales while service is running. |
+| `location_sales_silence_detected` | Stream | Felipe must call an open location during service when sales stop. Waiting for a nightly batch leaves guests unserved. |
+| `stock_count_adjusted` | Stream | Suggested orders use current on-hand. A stale count drives overstock or stockouts before the next delivery. |
+| `product_created` | Stream | A new ingredient must appear in ordering before the next purchase cycle includes or omits it by mistake. |
+| `inbound_order_created` | Stream | Lucía and finance need the line as soon as it commits so consolidated spend and price history are not waiting on the invoice. Weekly negotiation still reads the same rows in batch rollups. |
+| `ingredient_price_variance_detected` | Stream | The need is an alert before the invoice is the only notice. Same-day challenge of the supplier requires a live path. |
+| `customer_preference_recorded` | Batch (nightly) | Preference coverage and personalisation readiness are campaign decisions, not in-service interventions. |
+| `recommendation_shown` | Batch (hourly) | Accept rate is judged across a service window. Same-hour rollups are enough to pull a weak surface; per-impression paging is not required for that decision. |
+| `recommendation_accepted` | Batch (hourly) | Joined to shown for the same accept-rate decision. Hourly matches the shown clock. |
+| `employee_hired` | Batch (nightly) | Turnover and onboarding denominators are monthly country rates. Ashley does not change hiring mid-shift from a single hire row. |
+| `employee_separated` | Batch (nightly) | Same monthly turnover decision. |
+| `absence_recorded` | Batch (nightly) | Absenteeism is a monthly country rate; absences also feed the weekly HR packet. |
+| `roster_day_scheduled` | Batch (nightly) | Denominator for absenteeism; schedules land before the rate is published. |
+| `vacancy_opened` | Batch (nightly) | Fill-time clocks are monthly. Opening starts the clock; it does not page Ashley in real time. |
+| `vacancy_filled` | Batch (nightly) | Closes the fill-time clock for the monthly KPI. |
+| `recipe_update_published` | Stream | Jake must know the push left HQ so the 14-location coverage clock starts the same day the recipe changes. |
+| `recipe_update_acknowledged` | Batch (nightly) | Coverage is “all 14 locations acknowledged.” Nightly is enough to chase stragglers the next morning. |
+| `weekly_report_dispatched` | Batch (Monday 07:00) | Mariana’s need is the automated weekly report at Monday 7am. The event records that send. |
+
+### Identified opportunity events — delivery
+
+| `Event_type` | Mode | Urgency justification |
+| --- | --- | --- |
+| `stock_threshold_crossed` | Stream | Chain CSV under 10 means a purchase must move before a location runs out during service. |
+| `stock_threshold_cleared` | Stream | Cancels a top-up that would otherwise overstock; same purchase window as the crossed alert. |
+| `stock_threshold_triggered` | Stream | Location stockout or protein cover under three days must trigger reorder before the next delivery, not after the week closes. |
+| `outbound_order_created` | Stream | Kitchen consumption updates cover in time to reorder before the next drop. |
+| `direct_stock_edit_rejected` | Stream | The operator is still on the screen; correcting the product or delta before the next count keeps the order book clean. |
+| `inventory_validation_failed` | Stream | Same screen, same shift: fix the payload before a bad body is retried into a write. |
+| `stock_waste_registered` | Batch (end of shift → weekly) | Waste feeds the weekly cost/waste ratio and the monthly 4%/6% plan. Shift-close capture is enough; the improvement-plan decision is not mid-ticket. |
+| `loyalty_points_redeemed` | Batch (nightly) | Points liability and redeem rules are finance/campaign reviews, not table-side pages. |
+| `loyalty_card_transferred` | Batch (nightly) | Migration success is judged across days of counter transfers. |
+| `user_login_succeeded` | Batch (hourly) | Success volume frames failure rate; the urgent half is the failure and session events below. |
+| `user_login_failed` | Stream | Credential failures during open must surface so Technology can tell an outage from a password problem before the lunch rush is locked out. |
+| `session_expired` | Stream | A 30-minute token dying mid-task interrupts Felipe’s inventory work during service; refresh/lifetime decisions need same-day signal. |
+| `session_rejected` | Stream | Broken token, inactive subject, or missing token blocks the console now. |
+| `session_ended` | Batch (hourly) | Logout vs kick mix is a daily ops-hygiene review, not a pager. |
+| `auth_form_rejected` | Stream | The operator is blocked on submit; form fixes belong in the same shift when login/register is broken. |
+| `account_updated` | Batch (nightly) | Register/profile/password outcomes inform People and Technology the next day unless the form is already failing via `auth_form_rejected`. |
+| `api_error_raised` | Stream | 500/503 during service can hold a deploy or force a hotfix before the next ticket wave. |
+| `client_exception_caught` | Stream | A crashing staff or public route must be hotfixed before the next service peak. |
+| `api_latency_recorded` | Batch (hourly, throttled) | Which route to fix is a p95 decision over a window. Per-request paging would drown the signal. |
+| `ui_latency_recorded` | Batch (hourly, throttled) | Panel and form spin time is judged across attempts, not on every paint. |
+| `section_viewed` | Batch (hourly, throttled) | Required-reach and placeholder-seen are daily navigation decisions. |
+| `flow_step_recorded` | Batch (hourly, throttled) | Abandon rate is judged per flow over a window; step spam is not an alert. |
+| `page_viewed` | Batch (hourly, throttled) | Whether the 2019 home is a live channel is a marketing daily/weekly call. |
+
+### Throttle and debounce
+
+High-frequency producers below would flood storage and bury the decision if every raw occurrence were processed as its own alert. Throttle/debounce applies **after** schema validation, on the delivery path named here. Business facts that `CONTEXT.md` needs live (`sale_completed`, stock edges, silence) are not sampled away.
+
+| `Event_type` | Strategy | Why this limit |
+| --- | --- | --- |
+| `location_sales_silence_detected` | **Debounce by episode.** Reuse one `eventID` for `(location_id, silence_started_at)` while the gap stays open. Monitor still evaluates every 5 minutes; it does not insert a new id each tick. | Felipe needs one open alert per dark dining room, not twelve duplicate pages an hour. |
+| `stock_threshold_triggered` (protein cover, `services.telemetry.cover_monitor`) | **Throttle:** at most one emit per `(location_id, product_id)` per 24 hours while cover stays under 3 days. | Reorder once; repeating the same cover breach every hour does not change the purchase decision. |
+| `stock_threshold_crossed` / `stock_threshold_cleared` | **Edge only.** Emit when quantity crosses 10, not on every adjust that stays on the same side of 10. | The decision is the crossing, not the chatter under the line. |
+| `api_latency_recorded` | **Client sample + hourly batch.** Emit at most 1 in 5 successful `ok` calls per `(route_template, method)` per session; always emit `http_error`, `network`, and `parse_error`. Hourly consumer builds p95 from retained rows. | Slow-route decisions need a representative sample; full success traffic is cost without new urgency. |
+| `ui_latency_recorded` | **Debounce:** one row per `(kind, name, outcome)` per page mount / form submit. Ignore repeat timers from React Strict Mode double-mount in development. | One spin measurement per attempt answers whether the panel is slow. |
+| `section_viewed` | **Debounce:** one emit per `section` per `sessionID` per local calendar day (re-emit if `ready` flips). | Required-reach is “did they open it today,” not every sidebar click. |
+| `flow_step_recorded` | **Keep** `started` / `completed` / `abandoned`. **Throttle** `advanced`: at most one per `(flow_instance, step)`. | Abandon decisions need the open and close; step spam does not change which step to fix. |
+| `page_viewed` | **Debounce:** one emit per browser tab session for path `/` (remount after a full navigation may emit again). | Channel health is visit volume at hour grain, not every React remount. |
+| `recommendation_shown` | **Throttle:** at most one row per `(recommendation_id, customer_id or session)` per hour on the same `surface`. | Accept rate needs shown denominators; repeating the same card every scroll does not change whether Camila keeps the surface. |
+| `api_error_raised` | **Stream with burst collapse:** same `(code, route_template, http_status)` within 60 seconds reuses the first `eventID` and bumps an in-memory count only in logs (count is not a schema field). | One outage page per minute is enough to hold a deploy; thousands of identical 500s are cost. |
+| `client_exception_caught` | **Debounce:** one emit per `(app, path, error_name, catch_site)` per `sessionID` per 5 minutes. | Hotfix triage needs the first crash signature, not every repeat from the same stuck screen. |
+| `user_login_failed` / `auth_form_rejected` | **No success-path throttle.** Cap identical `(failure_reason or form+reason)` at 20 emits per `requestID`/`sessionID` per minute (client must stop retry storms). | Credential and form failures stay visible; automated hammering must not fill the table. |
+
+`sale_completed`, `inbound_order_created`, `outbound_order_created`, `stock_count_adjusted`, and `ingredient_price_variance_detected` have **no sampling**. Losing rows would corrupt real-time sales, ordering, and price-alert decisions.
+
+### Risks and exclusions
+
+#### Events considered and discarded
+
+| Candidate | Why it was discarded |
+| --- | --- |
+| `session_check_failed` | Whether `GET /auth/me` timed out or returned 5xx is already `api_latency_recorded`. A second type does not change which side to fix. |
+| Backoffice `page_viewed` | Staff surfaces are `section_viewed`. A second page event would double-count visits without a new decision. `page_viewed` remains website `/` only. |
+| Section ids `suppliers`, `people`, `training`, `reporting` | Those screens are not in the staff app. There is no visit to capture and no decision the row would change. |
+| Flows `inventory_inbound` / `inventory_outbound` | No order form exists to abandon. Purchase and consumption decisions are `inbound_order_created` and `outbound_order_created`. |
+| Per-keystroke / per-mousemove analytics | No department decision in `CONTEXT.md` or in the live console needs cursor paths. Cost and privacy both exclude them. |
+| Raw POS heartbeat every few seconds | `tech.locations.live` is satisfied by recent `sale_completed` or silence evaluation (15-minute rule). Continuous heartbeats add cost without a new Operations decision. |
+| Guest chat transcripts / call recordings | Not required for any named dashboard need; high privacy risk. |
+| Full request/response bodies on `api_latency_recorded` or `api_error_raised` | Latency and status are enough to choose which route to fix. Bodies carry credentials and PII. |
+| `mkt.loyalty.points_earned` / `mkt.loyalty.redeem_value` as floor metrics | Knowledge-base rates, not `CONTEXT.md` needs. Earn/redeem stay opportunity events/metrics; participation (`mkt.loyalty.attach_rate`) remains mandatory. |
+
+#### Data that will not be captured (privacy)
+
+Never stored in the envelope, `properties`, `tags`, or logs of `properties`:
+
+- Email, phone, postal address, legal name, display name, national id
+- Password, password hash, JWT, refresh token, cookie value
+- Raw exception message, stack trace, component stack
+- Request body, query string, connection string, API key
+- Free-text guest notes or biographies (preference values stay closed vocabulary; waste `note` is operational code only or omitted)
+
+If the only available identifier is a real-world identity, **omit the event** (see property allowlists). Pseudonymous ids (`cus_…`, `emp_…`, `loy_…`) and decimal `UserID` are the allowed identity forms.
+
+#### Data that will not be captured (cost)
+
+- Successful `GET /inventory` and successful `GET /inventory/alerts` list traffic (no stock decision)
+- Full-fidelity success samples beyond the `api_latency_recorded` 1-in-5 rule
+- Duplicate silence ticks, duplicate protein-cover alerts inside 24 hours, and duplicate section views in the same session-day
+- Client debug noise (React Strict Mode double mounts, verbose console mirrors)
+- App-store scrape streams for the 2.8 rating baseline (record the baseline beside digital share; do not poll stores in this pack)
+- Holiday-request, onboarding-completion, catalogue-search, and training-path **placeholder events** invented only to fill a metric (mandatory metrics publish `null` until a real writer exists)
+
+#### Delivery risks to manage
+
+| Risk | Mitigation in this plan |
+| --- | --- |
+| Stream lag hides a silent dining room | Silence monitor every 5 minutes; stream consumer SLA for silence and sales is minutes, not hours. |
+| Throttling hides a real outage | Always retain `http_error` / `network` / `parse_error` on `api_latency_recorded`; burst-collapse on `api_error_raised` still keeps the first row. |
+| Batch HR data arrives too late for a same-day schedule change | Absenteeism and fill time are monthly KPIs in `CONTEXT.md`; same-day roster edits stay in the HR product, not in telemetry paging. |
+| Outbox growth when Supabase is down | `data/uploads/telemetry_outbox.jsonl` with reuse of `eventID` on retry; consumers dedupe. |
+| Weekly pipeline missing a price alert | `extract_telemetry_events` already includes `ingredient_price_variance_detected`; `scripts/nightly_export.py` must add that type when next edited. |
 
 ## Inventory flow and instrumentation points
 
@@ -856,3 +988,5 @@ For each property the allowlist records:
 10. Confirm a COP `inbound_order_created` for `co-med-centro` does not land in the USD weekly total.
 11. Keep every mandatory id from the `CONTEXT.md` table in the plan. `weekly_report_dispatched.floor_metric_ids` must contain each of them. A null value stays on the dashboard. Identified opportunities, including the `bo.*` questions, stay out of that list.
 12. Emit a backoffice event only when its sentence in “Why we capture each event” names the decision. That set is login and session outcomes, `api_latency_recorded` durations, panel `ui_latency_recorded`, `client_exception_caught` with no stack, `section_viewed` only for a surface that is on screen, and `flow_step_recorded` when one of the six live flows closes unfinished.
+13. Honour Phase 3 delivery: stream consumers for sales, silence, stock edges, price variance, and hard failures; batch clocks for HR, waste rollups, and throttled navigation/latency.
+14. Apply the Phase 3 throttle/debounce table before inserting high-frequency rows. Never sample away `sale_completed` or stock/price edges.
