@@ -495,7 +495,7 @@ We capture `api_latency_recorded` because we need to know which staff route was 
 
 We capture `ui_latency_recorded` because we need to know how long the panel or form spun and whether the operator left mid-load, which allows us to make the decision, to fix the screen when the API call was fast, or to shorten the wait when the outcome is cancelled.
 
-We capture `client_exception_caught` because we need to know which pathname threw and the error name, which allows us to make the decision, to hotfix that route before the next service or to leave a single account page for later.
+We capture `client_exception_caught` because we need to know which pathname threw and the error name, which allows us to make the decision, to hotfix that route before the next service or to defer a single account-page crash until after peak.
 
 We capture `section_viewed` because we need to know which live staff surface was actually shown, including executive sales while it still has no numbers, which allows us to make the decision, to fix navigation when the roster or inventory never appears, and to withhold the sales dashboard from Mariana until that panel is ready.
 
@@ -504,6 +504,18 @@ We capture `flow_step_recorded` because we need to know which live staff flow wa
 We capture `inventory_validation_failed` because we need to know a stock or order body was rejected before any write, which allows us to make the decision, to fix the client payload.
 
 We capture `direct_stock_edit_rejected` because we need to know a direct quantity change was refused and the file did not change, which allows us to make the decision, to correct the product or the delta.
+
+### Evaluation — justification, envelope, allowlists, schema consistency
+
+**Verdict: PASS.**
+
+| Criterion | Result |
+| --- | --- |
+| Every event has a hypothesis and a decision | All **41** catalog `Event_type` values have a “We capture … because we need to know … which allows us to make the decision …” sentence. None are retained “just in case.” Discarded candidates are listed under Phase 3 Risks. |
+| Envelope consistent on every event | `$defs`/`definitions.envelope` requires `eventID`, `timestamp` (ISO 8601 UTC `…Z`), `sessionID`, `UserID`, `Event_type`, `SchemaVersion`, `requestID`, `properties` (plus `source` and `tags`). All 41 examples validate and carry those keys. |
+| `Event_type` is `entity_action` | Every type uses the closed verb list (`created`, `rejected`, `expired`, `recorded`, …). |
+| Property allowlist per event | [`property-allowlists.md`](property-allowlists.md) / [`.json`](property-allowlists.json) document every event. Schema `additionalProperties: false` on each `properties` object; allowlist keys match schema keys with zero mismatches. |
+| `event-schemas.json` valid and aligned with the plan | JSON Schema draft-07; `Draft7Validator.check_schema` passes; plan catalog = schema `oneOf` = 41 types; floor metrics in the plan match `floor_metric_ids`. |
 
 ### Discarded
 
