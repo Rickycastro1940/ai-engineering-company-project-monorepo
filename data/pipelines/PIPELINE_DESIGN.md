@@ -128,7 +128,7 @@ Answering it needs a dedicated pipeline: read those events for one chain week, j
 
 ### Purpose
 
-Produce the Weekly Location Cost & Waste Report: purchase cost, waste cost, waste ratio, stockout frequency, and price alert frequency for each location and chain week.
+This pipeline produces the Weekly Location Cost & Waste rollup in `reporting.weekly_location_performance` that feeds Mariana Restrepo’s executive report every Monday at 07:00 America/Bogota, computing purchase cost, waste cost, waste ratio, stockout frequency, and price-alert frequency from the telemetry metrics `inbound_order_created`, `stock_waste_registered`, `stock_threshold_triggered`, and `ingredient_price_variance_detected`.
 
 ### Extraction
 
