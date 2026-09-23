@@ -183,6 +183,21 @@ uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py te
 cd uis/backoffice && npm run build → green
 ```
 
+## Latest instrumentability evaluation (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology**. Audit of stream/batch urgency, PII handling, risks/exclusions, and whether another developer can instrument without clarification. **Verdict: PASS.**
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+delivery rows = 41; technical-preference justifications = none
+sensitive/pseudonymous/sanitized property rows = 30
+discarded candidates with reasoned why = 9
+privacy + cost exclusions + delivery risk mitigations = present
+checklist >= 12, IP-1..IP-8, instrumentation map, emit algorithm = present
+```
+
+Emitters are still not wired. Menus, sales, customers, and suppliers remain missing on the central API.
+
 ## Latest event quality evaluation (`cursor/telemetry-plan-ff8d`)
 
 Department served: **Technology**. Audit of justification, envelope, allowlists, and schema–plan consistency. **Verdict: PASS.**
