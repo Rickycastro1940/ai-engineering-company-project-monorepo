@@ -14,7 +14,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
-| Technology: telemetry + pipeline to dashboards | **Partial** — `data/pipelines/` weekly location cost/waste; Celery async path |
+| Technology: telemetry + pipeline to dashboards | **Partial** — design in `data/pipelines/PIPELINE_DESIGN.md` writes `reporting.weekly_location_performance` (purchase, waste, waste ratio, stockouts, price alerts); Celery async path. Engineering `GET /telemetry/report` stays separate |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Not done** as product UI; pipeline design targets cost/waste for Mariana + Felipe |
 | Procurement: supplier price history, consolidated spend | **Not done** (supplier docs may exist on other branches; not claimed here) |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
@@ -182,6 +182,22 @@ Department served: **Technology** (structured HTTP, no env names in 503s) + **Op
 uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py tests/test_users_api.py -q → 33 passed
 cd uis/backoffice && npm run build → green
 ```
+
+## Latest pipeline design (`cursor/pipeline-design-part1-c69e`)
+
+Department served: **Technology** (Nicolás Park — pipeline into ops/finance dashboards, destination outside `telemetry_events`) + **Operations** (Felipe Guerrero — location purchase, waste, stockouts) + **Procurement** (Lucía Fernández — purchase cost and price alerts) + **Executive** (Mariana Restrepo — Monday 07:00 America/Bogota chain week).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+data/pipelines/PIPELINE_DESIGN.md names reporting.weekly_location_performance
+KPIs: total_purchase_cost, total_waste_cost, waste_ratio, stockout_events_count, price_alert_events_count
+Events: inbound_order_created, stock_waste_registered, stock_threshold_triggered, ingredient_price_variance_detected
+HTTP: services/reporting GET /reporting/weekly-location-performance and POST /reporting/pipeline-runs
+pytest tests/pipelines/test_pipeline.py → 4 passed; hand-calculated row 1000 / 150 / 0.15 / 1 / 1
+test_aggregate_location_kpis_non_dict_payload failed: null location_id is dropped by groupby (pre-existing; design records that omission)
+```
+
+Technology’s central API nouns menus/sales/customers/suppliers remain **missing**. The design does not claim those routers exist.
 
 ## Planned next steps (order)
 
