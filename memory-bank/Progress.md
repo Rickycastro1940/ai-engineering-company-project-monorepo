@@ -201,6 +201,7 @@ Phase 2 extract: telemetry_events plus locations, both JSON row snapshots. Stage
 Destination: reporting.weekly_location_performance. services/reporting endpoints: GET /reporting/weekly-location-performance (KPI query), POST /reporting/pipeline-runs (manual trigger), GET /reporting/pipeline-runs/latest (status). Separate from telemetry_events and GET /telemetry/report.
 Phase 3: load failure reruns by replacing (location_id, week_start) with the full recomputed totals, not by adding. reporting.pipeline_runs records started_at, finished_at, records_processed, status, error_message.
 Phase 4: one Prefect flow brasaland_weekly_performance_pipeline; tasks extract_weekly_inputs, aggregate_location_kpis, upsert_to_reporting_table; states Running, Completed, Failed. Backfill flow optional. Supabase URL and key in Prefect block brasaland-supabase. Subflows deferred to Part 3.
+Phase 5 design: services/reporting status GET /reporting/pipeline-runs/latest → get_latest_pipeline_run(); trigger POST /reporting/pipeline-runs → run_pipeline(); KPI query GET /reporting/weekly-location-performance → get_weekly_location_performance(). No ETL in services/. Separate from GET /telemetry/report.
 ```
 
 Technology’s central API nouns menus/sales/customers/suppliers remain **missing**. The design does not claim those routers exist.

@@ -265,27 +265,40 @@ The flow loads `brasaland-supabase` at the start of extract and load. Local runs
 
 ## Phase 5 — Application integration
 
-### Destination table
+Design only. `services/reporting/` is an HTTP shell. Every route imports a function or flow from `data/pipelines/`. No extract, no transform, and no load code belongs in `services/`. Part 3’s dashboard consumes the KPI query only.
 
-The new KPI table is `reporting.weekly_location_performance` in the `reporting` schema. That is the destination named for this pipeline. The load writes purchase cost, waste cost, waste ratio, stockout frequency, and price-alert frequency there, one row per `location_id` and `week_start`.
+### Module boundary
 
-The run log is a second table in the same schema, `reporting.pipeline_runs`. It stores `run_id`, window, `status`, `records_processed`, and `error_message`. It is not the KPI table.
-
-Neither table is `telemetry_events`. The pipeline reads `telemetry_events` and does not insert or update it.
-
-### Endpoints in `services/reporting/`
-
-All three live in `services/reporting/main.py`. That module imports the flow from `data/pipelines/`. The flow does not import this module.
-
-| Role | Endpoint | What it touches |
+| Layer | Owns | Does not own |
 | --- | --- | --- |
-| KPI query | `GET /reporting/weekly-location-performance` | Reads `reporting.weekly_location_performance` only. Optional query `week_start`. Returns `{week_start, locations[]}` with `location_id`, `country`, `currency`, `total_purchase_cost`, `total_waste_cost`, `waste_ratio`, `stockout_events_count`, and `price_alert_events_count`. |
-| Manual trigger | `POST /reporting/pipeline-runs` | Body `{start_date, end_date}`. Enqueues `run_pipeline` through `services.tasks.run_weekly_pipeline` and returns `202` with `task_id`. The route does not query `telemetry_events` and does not compute KPIs. |
-| Status | `GET /reporting/pipeline-runs/latest` | Reads the latest `reporting.pipeline_runs` row (mirrored in `data/pipelines/last_run.json`): window, `records_processed`, `status`. |
-| Status of one trigger | `GET /tasks/{task_id}` | Celery status for the `task_id` returned by the manual trigger: `pending`, `started`, `success`, or `failure`. |
+| `services/reporting/main.py` | HTTP status codes, request validation, JSON response shape | Summing `cost`, filtering event types, joining `locations`, upserting KPIs |
+| `data/pipelines/pipeline.py` | `run_pipeline` flow; read helpers that query the reporting schema or the run log | FastAPI routes |
+
+`services/reporting/` imports from `data/pipelines/`. `data/pipelines/` does not import `services/reporting/`.
+
+This module is not `services/telemetry/`. It does not mount `GET /telemetry/report`.
+
+### Three endpoints
+
+| Role | Endpoint | Request | Response | Calls in `data/pipelines/` |
+| --- | --- | --- | --- | --- |
+| Status | `GET /reporting/pipeline-runs/latest` | None | Latest run: `started_at`, `finished_at`, `window_start`, `window_end`, `records_processed`, `status`, `error_message` | `get_latest_pipeline_run()` — returns the newest `reporting.pipeline_runs` row (mirrored in `data/pipelines/last_run.json`). No ETL. |
+| Manual trigger | `POST /reporting/pipeline-runs` | Body `{ "start_date": "...", "end_date": "..." }` | `202` with `{ "task_id": "..." }` | Enqueues `run_pipeline(start_date, end_date)` — the Prefect flow `brasaland_weekly_performance_pipeline`. The worker runs extract, transform, and load. The route does not call those tasks itself. |
+| KPI query | `GET /reporting/weekly-location-performance` | Optional query `week_start` | `{ "week_start": "...", "locations": [ { location_id, country, currency, total_purchase_cost, total_waste_cost, waste_ratio, stockout_events_count, price_alert_events_count } ] }` | `get_weekly_location_performance(week_start=None)` — `SELECT` from `reporting.weekly_location_performance` only. Part 3’s dashboard consumes this payload. No ETL. |
+
+`GET /tasks/{task_id}` may sit beside the manual trigger so the client can poll the Celery enqueue until `run_pipeline` finishes. It is not one of the three business endpoints and it does not run ETL.
+
+### What each call does, and what it must not do
+
+1. **Status — `get_latest_pipeline_run()`.** Reads the run log written by `run_pipeline`. Answers whether the Monday job (or the last manual trigger) is `Running`, `Success`, or `Failed`. Does not open `telemetry_events`.
+2. **Manual trigger — `run_pipeline(start_date, end_date)`.** The only path that starts extract → transform → load. `services/reporting/` passes the window and returns `202`. It does not sum purchase cost, count stockouts, or upsert rows.
+3. **KPI query — `get_weekly_location_performance(week_start)`.** Reads the destination table after a successful load. That is the feed Part 3’s dashboard will consume for Mariana and Felipe. It does not recompute waste ratio from events.
 
 ### Separate from telemetry
 
-`telemetry_events` is the raw event log. `GET /telemetry/report` is the engineering reader over that log (events per day, error rate by type, auth failure rate). It is implemented with the telemetry report code, not in `services/reporting/`.
+| Surface | Module | Table | Audience |
+| --- | --- | --- | --- |
+| `GET /telemetry/report` | Telemetry report code (`services/telemetry/` path in the engineering stack) | `telemetry_events` | Nicolás — traffic, error types, auth failure rate |
+| `GET /reporting/pipeline-runs/latest`, `POST /reporting/pipeline-runs`, `GET /reporting/weekly-location-performance` | `services/reporting/` | `reporting.pipeline_runs` and `reporting.weekly_location_performance` | Mariana, Felipe, Lucía — run status and location-week KPIs |
 
-`GET /reporting/weekly-location-performance`, `POST /reporting/pipeline-runs`, and `GET /reporting/pipeline-runs/latest` do not read or write `telemetry_events`, and `GET /telemetry/report` does not read `reporting.weekly_location_performance`.
+The reporting routes do not read or write `telemetry_events`. `GET /telemetry/report` does not read `reporting.weekly_location_performance`.
