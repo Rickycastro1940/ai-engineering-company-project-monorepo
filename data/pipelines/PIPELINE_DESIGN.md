@@ -349,4 +349,4 @@ This module is not `services/telemetry/`. It does not mount `GET /telemetry/repo
 | `GET /telemetry/report` | Telemetry report code (`services/telemetry/` path in the engineering stack) | `telemetry_events` | Nicolás Park — traffic, error types, auth failure rate |
 | `GET /reporting/pipeline-runs/latest`, `POST /reporting/pipeline-runs`, `GET /reporting/weekly-location-performance` | `services/reporting/` | `reporting.pipeline_runs` and `reporting.weekly_location_performance` | Mariana Restrepo, Felipe Guerrero, Lucía Fernández — run status and location-week KPIs |
 
-This design does not modify `services/telemetry/analysis.py` or `GET /telemetry/report`. Those remain the engineering path.
+This design does not modify `services/telemetry/analysis.py` or `GET /telemetry/report`. Those remain the engineering path. The reporting routes do not read or write `telemetry_events`. `GET /telemetry/report` does not read `reporting.weekly_location_performance`.
