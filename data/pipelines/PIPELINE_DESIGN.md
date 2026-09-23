@@ -223,15 +223,27 @@ Extract and load tasks retry. The aggregation task is a pure function of its inp
 
 ## Phase 5 — Application integration
 
-`services/reporting/main.py` is the only HTTP surface for this table.
+### Destination table
 
-| Method and path | Behavior |
-| --- | --- |
-| `GET /reporting/weekly-location-performance` | Reads `reporting.weekly_location_performance`. Optional `week_start`. Returns `{week_start, locations[]}` with the five KPI columns plus `location_id`, `country`, and `currency`. Does not scan `telemetry_events`. |
-| `POST /reporting/pipeline-runs` | Body `{start_date, end_date}`. Enqueues the flow and returns `202` with `task_id`. The route does not sum costs. |
-| `GET /tasks/{task_id}` | Celery status for that enqueue. |
-| `GET /reporting/pipeline-runs/latest` | Latest run log (`window`, `records_processed`, `status`). |
+The new KPI table is `reporting.weekly_location_performance` in the `reporting` schema. That is the destination named for this pipeline. The load writes purchase cost, waste cost, waste ratio, stockout frequency, and price-alert frequency there, one row per `location_id` and `week_start`.
 
-`POST /reporting/pipeline-runs` reaches `data.pipelines.pipeline.run_pipeline` through the worker (`services.tasks.run_weekly_pipeline`). The pipeline module does not import the FastAPI app.
+The run log is a second table in the same schema, `reporting.pipeline_runs`. It stores `run_id`, window, `status`, `records_processed`, and `error_message`. It is not the KPI table.
 
-`GET /telemetry/report` remains the engineering window over `telemetry_events` (events per day, error rate by type, auth failure rate). It does not return purchase cost, waste cost, waste ratio, stockout frequency, or price alert frequency.
+Neither table is `telemetry_events`. The pipeline reads `telemetry_events` and does not insert or update it.
+
+### Endpoints in `services/reporting/`
+
+All three live in `services/reporting/main.py`. That module imports the flow from `data/pipelines/`. The flow does not import this module.
+
+| Role | Endpoint | What it touches |
+| --- | --- | --- |
+| KPI query | `GET /reporting/weekly-location-performance` | Reads `reporting.weekly_location_performance` only. Optional query `week_start`. Returns `{week_start, locations[]}` with `location_id`, `country`, `currency`, `total_purchase_cost`, `total_waste_cost`, `waste_ratio`, `stockout_events_count`, and `price_alert_events_count`. |
+| Manual trigger | `POST /reporting/pipeline-runs` | Body `{start_date, end_date}`. Enqueues `run_pipeline` through `services.tasks.run_weekly_pipeline` and returns `202` with `task_id`. The route does not query `telemetry_events` and does not compute KPIs. |
+| Status | `GET /reporting/pipeline-runs/latest` | Reads the latest `reporting.pipeline_runs` row (mirrored in `data/pipelines/last_run.json`): window, `records_processed`, `status`. |
+| Status of one trigger | `GET /tasks/{task_id}` | Celery status for the `task_id` returned by the manual trigger: `pending`, `started`, `success`, or `failure`. |
+
+### Separate from telemetry
+
+`telemetry_events` is the raw event log. `GET /telemetry/report` is the engineering reader over that log (events per day, error rate by type, auth failure rate). It is implemented with the telemetry report code, not in `services/reporting/`.
+
+`GET /reporting/weekly-location-performance`, `POST /reporting/pipeline-runs`, and `GET /reporting/pipeline-runs/latest` do not read or write `telemetry_events`, and `GET /telemetry/report` does not read `reporting.weekly_location_performance`.

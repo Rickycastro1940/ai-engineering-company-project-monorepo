@@ -198,6 +198,7 @@ test_aggregate_location_kpis_non_dict_payload failed: null location_id is droppe
 Phase 1 current state: GET /telemetry/report answers traffic, api_error/user_login_failed counts, and auth failure rate from telemetry_events. Gap question is location-week purchase cost, waste cost, waste ratio, stockouts, and price alerts in COP or USD.
 Phase 2 purpose: one sentence — Monday 07:00 America/Bogota rollup in reporting.weekly_location_performance; KPIs purchase cost, waste cost, waste ratio, stockout frequency, price-alert frequency; built on inbound_order_created, stock_waste_registered, stock_threshold_triggered, ingredient_price_variance_detected.
 Phase 2 extract: telemetry_events plus locations, both JSON row snapshots. Stages: extraction, transformation, load. Duplicate strategy: dedupe telemetry_events.id, recompute the week, upsert on (location_id, week_start).
+Destination: reporting.weekly_location_performance. services/reporting endpoints: GET /reporting/weekly-location-performance (KPI query), POST /reporting/pipeline-runs (manual trigger), GET /reporting/pipeline-runs/latest (status). Separate from telemetry_events and GET /telemetry/report.
 ```
 
 Technology’s central API nouns menus/sales/customers/suppliers remain **missing**. The design does not claim those routers exist.
