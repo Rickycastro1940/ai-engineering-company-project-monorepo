@@ -163,6 +163,55 @@ The Monday report (`weekly_report_dispatched`) lists every mandatory id in `floo
 
 `customer_id` on `sale_completed` matches `^cus_[A-Za-z0-9]{8,}$`. Staff and customer names, emails, phones, and national ids stay off the event. `employee_id` matches `^emp_[A-Za-z0-9]{6,}$`.
 
+### Evaluation — every `CONTEXT.md` need is on the floor
+
+Source file is root [`CONTEXT.md`](../../CONTEXT.md) (“Welcome to Brasaland”). There is no separate `context-company.md` in this monorepo; that briefing is `CONTEXT.md`.
+
+**Verdict:** every mandatory metric above is present, labeled mandatory, listed in `weekly_report_dispatched.floor_metric_ids`, and matched in `definitions.mandatoryMetricSet`. Plan ids, schema enum, and floor example are the same 34 strings. Four floor ids publish `null` until a writer exists (`people.holiday.requests`, `people.onboarding.completion`, `train.catalogue.search_hit_rate`, `train.onboarding.path_completion`); omitting them would be a plan violation.
+
+| `CONTEXT.md` need (department) | Mandatory metric ids | Correctly identified? |
+| --- | --- | --- |
+| Real-time sales dashboard per location in COP and USD (Operations) | `ops.sales.gross_native` | Yes — native currency per location, minutes freshness |
+| Covers today at Medellín downtown (Operations question) | `ops.sales.covers` | Yes — bound to `co-med-centro` |
+| Slow week at the Miami restaurant (Operations question) | `ops.sales.slow_week` | Yes — bound to `us-mia-downtown`, runs for all 14 |
+| Intelligent ingredient ordering from historical sales and current stock (Operations) | `ops.ordering.on_hand`, `ops.ordering.suggested_qty` | Yes — stock plus sales→BOM demand; null without BOM |
+| No-sales alert during opening hours (Operations) | `ops.sales.silence` | Yes — stream silence episode |
+| Supplier price history and alerts (Procurement) | `proc.price.history`, `proc.price.alerts` | Yes |
+| Consolidated purchasing across both markets (Procurement) | `proc.purchase.consolidated` | Yes — COP and USD kept separate |
+| Who customers are; CRM order history and preferences (Marketing) | `mkt.customers.identified_rate`, `mkt.customers.order_history`, `mkt.customers.preference_coverage` | Yes |
+| Personalisation from behaviour (Marketing) | `mkt.personalisation.accept_rate` | Yes |
+| Digital loyalty and ordering app (Marketing) | `mkt.loyalty.attach_rate`, `mkt.orders.digital_share` | Yes — participation and digital channel share; stamp-card earn rates stay opportunities |
+| Holiday requests and absence management (People) | `people.holiday.requests`, `people.absenteeism` | Yes — holiday portal null until built; absences via `absence_recorded` |
+| Automated onboarding (People) | `people.onboarding.completion` | Yes — null until completion writer exists |
+| Turnover, absenteeism, vacancy fill times by country (People) | `people.turnover`, `people.absenteeism`, `people.time_to_fill` | Yes — country grain |
+| Searchable recipe catalogue (Training) | `train.catalogue.search_hit_rate` | Yes — null until search writer exists |
+| Structured onboarding path for new staff (Training) | `train.onboarding.path_completion` | Yes — null until step writer exists; distinct from People onboarding |
+| Push recipe updates to all 14 locations (Training) | `train.update.coverage` | Yes — acknowledgements / 14 |
+| Central API: locations, menus, sales, customers, suppliers (Technology) | `tech.api.noun_coverage` | Yes — five nouns; inventory does not substitute |
+| Real-time telemetry from each location (Technology) | `tech.locations.live` | Yes |
+| Pipeline into operations, marketing, and finance dashboards (Technology) | `tech.dashboards.fed`, `finance.sales.native`, `finance.purchases.native` | Yes |
+| Chain sales in USD and COP (Executive) | `exec.chain.sales` | Yes — two currency totals |
+| Florida week sales; highest average ticket (Executive questions) | `exec.florida.week_sales`, `ops.sales.average_ticket`, `exec.ticket.top_location` | Yes |
+| AI assistant in natural language (Executive) | `exec.assistant.named_questions` | Yes — those two questions |
+| Weekly report Monday 7am (Executive) | `exec.report.on_time` | Yes — `weekly_report_dispatched` |
+
+Optional multilingual support in Training is **not** a mandatory need (`CONTEXT.md` says optional). It is opportunity metric `train.locale.coverage`.
+
+### Evaluation — opportunity catalog is broad (business + technical)
+
+The opportunity set is not a token minimum. Counts that must stay above a checklist:
+
+| Lens | What the plan covers | Evidence |
+| --- | --- | --- |
+| Business / inventory | Stockouts, overstock, waste bands, protein cover, emergency purchase, delivery lateness, supplier active count, kitchen ticket minutes, shift close | Opportunity metrics `ops.stockout.*`, `ops.waste.*`, `ops.protein.*`, `proc.*`; events `stock_threshold_*`, `stock_waste_registered`, `outbound_order_created`, `direct_stock_edit_rejected` |
+| Marketing beyond the floor | Earn/redeem rates, tiers, card transfer, site traffic, 2.8 rating baseline | `mkt.loyalty.*` opportunity metrics; `loyalty_points_redeemed`, `loyalty_card_transferred`, `page_viewed` |
+| Authentication | Login success/failure, form rejects, expiry, invalid/missing token, logout vs kick, restore | Events `user_login_*`, `auth_form_rejected`, `session_*`, `account_updated`; questions `bo.auth.*` |
+| Performance | Staff API duration and panel/form clocks | Events `api_latency_recorded`, `ui_latency_recorded`; questions `bo.perf.*` |
+| Errors | API 500/503, client exceptions, inventory validation and refused stock edits | Events `api_error_raised`, `client_exception_caught`, `inventory_validation_failed`, `direct_stock_edit_rejected`; `tech.errors.by_type`, `bo.ui.uncaught` |
+| Navigation | Required ops sections, abandon rates, placeholder executive sales, public home | Events `section_viewed`, `flow_step_recorded`, `page_viewed`; questions `bo.nav.*` |
+
+Floor size is 34 mandatory metrics. Beside that, the plan keeps **34** identified-opportunity metrics, **11** `bo.*` console questions (explicitly off the floor), **18** mandatory events, and **23** opportunity events. That is the broad catalog expected for Brasaland Digital, not a five-item formality list.
+
 ### Identified opportunity metrics
 
 These are not in the “What they need” lines. They come from a problem sentence, the knowledge base, or the running application. They stay in the catalog. They are not listed in `floor_metric_ids`.
