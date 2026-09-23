@@ -643,12 +643,12 @@ Emit still validates and writes the producer document when the business fact hap
 | `inbound_order_created` | Stream | Lucía and finance need the line as soon as it commits so consolidated spend and price history are not waiting on the invoice. Weekly negotiation still reads the same rows in batch rollups. |
 | `ingredient_price_variance_detected` | Stream | The need is an alert before the invoice is the only notice. Same-day challenge of the supplier requires a live path. |
 | `customer_preference_recorded` | Batch (nightly) | Preference coverage and personalisation readiness are campaign decisions, not in-service interventions. |
-| `recommendation_shown` | Batch (hourly) | Accept rate is judged across a service window. Same-hour rollups are enough to pull a weak surface; per-impression paging is not required for that decision. |
-| `recommendation_accepted` | Batch (hourly) | Joined to shown for the same accept-rate decision. Hourly matches the shown clock. |
+| `recommendation_shown` | Batch (hourly) | Camila judges accept rate across a service window before she pulls a weak suggestion surface. Hourly rollups answer that campaign decision; paging on every impression does not. |
+| `recommendation_accepted` | Batch (hourly) | Joined to shown for the same accept-rate campaign decision. Hourly matches the shown clock. |
 | `employee_hired` | Batch (nightly) | Turnover and onboarding denominators are monthly country rates. Ashley does not change hiring mid-shift from a single hire row. |
 | `employee_separated` | Batch (nightly) | Same monthly turnover decision. |
 | `absence_recorded` | Batch (nightly) | Absenteeism is a monthly country rate; absences also feed the weekly HR packet. |
-| `roster_day_scheduled` | Batch (nightly) | Denominator for absenteeism; schedules land before the rate is published. |
+| `roster_day_scheduled` | Batch (nightly) | Absenteeism is a monthly country KPI; roster days are the denominator published with that rate, not a mid-shift page. |
 | `vacancy_opened` | Batch (nightly) | Fill-time clocks are monthly. Opening starts the clock; it does not page Ashley in real time. |
 | `vacancy_filled` | Batch (nightly) | Closes the fill-time clock for the monthly KPI. |
 | `recipe_update_published` | Stream | Jake must know the push left HQ so the 14-location coverage clock starts the same day the recipe changes. |
@@ -660,28 +660,28 @@ Emit still validates and writes the producer document when the business fact hap
 | `Event_type` | Mode | Urgency justification |
 | --- | --- | --- |
 | `stock_threshold_crossed` | Stream | Chain CSV under 10 means a purchase must move before a location runs out during service. |
-| `stock_threshold_cleared` | Stream | Cancels a top-up that would otherwise overstock; same purchase window as the crossed alert. |
+| `stock_threshold_cleared` | Stream | Cancels a top-up that would otherwise overstock during the same purchase window as the crossed alert, before the order leaves for the supplier. |
 | `stock_threshold_triggered` | Stream | Location stockout or protein cover under three days must trigger reorder before the next delivery, not after the week closes. |
 | `outbound_order_created` | Stream | Kitchen consumption updates cover in time to reorder before the next drop. |
 | `direct_stock_edit_rejected` | Stream | The operator is still on the screen; correcting the product or delta before the next count keeps the order book clean. |
 | `inventory_validation_failed` | Stream | Same screen, same shift: fix the payload before a bad body is retried into a write. |
 | `stock_waste_registered` | Batch (end of shift → weekly) | Waste feeds the weekly cost/waste ratio and the monthly 4%/6% plan. Shift-close capture is enough; the improvement-plan decision is not mid-ticket. |
 | `loyalty_points_redeemed` | Batch (nightly) | Points liability and redeem rules are finance/campaign reviews, not table-side pages. |
-| `loyalty_card_transferred` | Batch (nightly) | Migration success is judged across days of counter transfers. |
-| `user_login_succeeded` | Batch (hourly) | Success volume frames failure rate; the urgent half is the failure and session events below. |
-| `user_login_failed` | Stream | Credential failures during open must surface so Technology can tell an outage from a password problem before the lunch rush is locked out. |
+| `loyalty_card_transferred` | Batch (nightly) | Camila judges stamp-card→app migration success across days of counter transfers, not per transfer page. |
+| `user_login_succeeded` | Batch (hourly) | Success volume frames the failure rate for Technology; the urgent half is `user_login_failed` and the session events, which stay stream. |
+| `user_login_failed` | Stream | Credential failures during open must surface so Technology can tell an outage from a password problem before the lunch rush is locked out of the console. |
 | `session_expired` | Stream | A 30-minute token dying mid-task interrupts Felipe’s inventory work during service; refresh/lifetime decisions need same-day signal. |
-| `session_rejected` | Stream | Broken token, inactive subject, or missing token blocks the console now. |
-| `session_ended` | Batch (hourly) | Logout vs kick mix is a daily ops-hygiene review, not a pager. |
+| `session_rejected` | Stream | Broken token, inactive subject, or missing token blocks the staff console during the shift; fix or offboard before the next attempt. |
+| `session_ended` | Batch (hourly) | Logout versus kick is a daily ops-hygiene review for token lifetime, not a pager during service. |
 | `auth_form_rejected` | Stream | The operator is blocked on submit; form fixes belong in the same shift when login/register is broken. |
-| `account_updated` | Batch (nightly) | Register/profile/password outcomes inform People and Technology the next day unless the form is already failing via `auth_form_rejected`. |
+| `account_updated` | Batch (nightly) | Register/profile/password outcomes inform People and Technology the next working day. Same-shift form breakage is already `auth_form_rejected` on the stream path. |
 | `api_error_raised` | Stream | 500/503 during service can hold a deploy or force a hotfix before the next ticket wave. |
 | `client_exception_caught` | Stream | A crashing staff or public route must be hotfixed before the next service peak. |
-| `api_latency_recorded` | Batch (hourly, throttled) | Which route to fix is a p95 decision over a window. Per-request paging would drown the signal. |
-| `ui_latency_recorded` | Batch (hourly, throttled) | Panel and form spin time is judged across attempts, not on every paint. |
-| `section_viewed` | Batch (hourly, throttled) | Required-reach and placeholder-seen are daily navigation decisions. |
-| `flow_step_recorded` | Batch (hourly, throttled) | Abandon rate is judged per flow over a window; step spam is not an alert. |
-| `page_viewed` | Batch (hourly, throttled) | Whether the 2019 home is a live channel is a marketing daily/weekly call. |
+| `api_latency_recorded` | Batch (hourly, throttled) | Technology chooses which staff API to fix from p95 over an hour of operator work before Felipe is asked to trust the console. Per-request paging would drown that signal. |
+| `ui_latency_recorded` | Batch (hourly, throttled) | Panel and form spin time is judged across attempts in a service window, not on every paint. |
+| `section_viewed` | Batch (hourly, throttled) | Required-reach and placeholder-seen are daily navigation decisions for which ops panels Felipe’s team actually opens. |
+| `flow_step_recorded` | Batch (hourly, throttled) | Abandon rate is judged per staff flow over a window so Technology knows which step to fix before training. |
+| `page_viewed` | Batch (hourly, throttled) | Whether the 2019 home is a live channel is Camila’s daily or weekly marketing call. |
 
 ### Throttle and debounce
 
@@ -750,6 +750,17 @@ If the only available identifier is a real-world identity, **omit the event** (s
 | Batch HR data arrives too late for a same-day schedule change | Absenteeism and fill time are monthly KPIs in `CONTEXT.md`; same-day roster edits stay in the HR product, not in telemetry paging. |
 | Outbox growth when Supabase is down | `data/uploads/telemetry_outbox.jsonl` with reuse of `eventID` on retry; consumers dedupe. |
 | Weekly pipeline missing a price alert | `extract_telemetry_events` already includes `ingredient_price_variance_detected`; `scripts/nightly_export.py` must add that type when next edited. |
+
+### Evaluation — urgency, PII, exclusions, instrumentability
+
+**Verdict: PASS.**
+
+| Criterion | Result |
+| --- | --- |
+| Stream / batch by urgency | All **41** delivery rows justify mode from a business or operational decision (call during service, reorder before delivery, Monday 07:00 report, monthly HR KPI, campaign accept rate). Intro forbids transport preference. No Kafka/queue/throughput rationale appears in the justification column. |
+| Sensitive data / PII documented | Every allowlisted property is labeled `No`, `Pseudonymous`, or `Sanitized` with handling text in [`property-allowlists.md`](property-allowlists.md). Pseudonymous ids (`cus_…`, `emp_…`, `loy_…`); sanitized fragments (`Error.name`, public `error_body`, path without query). Forbidden PII list and “omit the event” rule are in Phase 3 privacy. |
+| Risks and exclusions show critical thought | Nine discarded candidates each name a reason (duplicate signal, no UI, privacy, cost, or not a `CONTEXT.md` need). Privacy and cost exclusion lists are separate. Delivery risks include mitigations (silence SLA, error retention under throttle, outbox dedupe). |
+| Precise enough to instrument without clarification | Checklist (14 steps), IP-1–IP-8 inventory path, per-file instrumentation map, emit algorithm, envelope + draft-07 schema, property allowlists, roster ids (`co-med-centro`, `us-mia-downtown`), headers (`X-Brasaland-Session`, `X-Request-ID`), outbox path, and throttle table. A developer implements against those artifacts; open product gaps (missing menus/sales routers) are named as future writers, not unspecified events. |
 
 ## Inventory flow and instrumentation points
 
