@@ -1,7 +1,8 @@
 """Unit tests for Brasaland weekly location KPI transform (Part 2).
 
-Fixtures and expected values follow data/pipelines/PIPELINE_DESIGN.md and
-data/eval/weekly_location_performance_fixtures.json (CONTEXT.md roster ids).
+Fixtures and expected values follow CONTEXT-company.md (KPIs to Measure),
+data/pipelines/PIPELINE_DESIGN.md, and
+data/eval/weekly_location_performance_fixtures.json.
 """
 from __future__ import annotations
 
@@ -11,10 +12,12 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from data.pipelines.pipeline import _supabase_client
+from data.pipelines.pipeline import _supabase_client, write_validation_output
 from data.process.location_kpis import aggregate_location_kpis
 
 _EVAL = Path(__file__).resolve().parents[2] / "data" / "eval" / "weekly_location_performance_fixtures.json"
+_EVAL_OUTPUT = Path(__file__).resolve().parents[2] / "data" / "eval" / "last_validation.json"
+_RAW = Path(__file__).resolve().parents[2] / "data" / "raw"
 
 
 def _load_eval() -> dict:
@@ -120,3 +123,54 @@ def test_missing_supabase_credentials_fail_clearly(monkeypatch):
     monkeypatch.delenv("SUPABASE_KEY", raising=False)
     with pytest.raises(RuntimeError, match="SUPABASE_URL"):
         _supabase_client()
+
+
+def test_write_validation_output_lands_in_data_eval():
+    fixture = _load_eval()
+    events = []
+    locations = []
+    for loc in fixture["locations"]:
+        events.extend(loc["events"])
+        locations.append(
+            {
+                "id": loc["location_id"],
+                "country": loc["country"],
+                "currency": loc["currency"],
+            }
+        )
+    kpis = aggregate_location_kpis(
+        pd.DataFrame(events),
+        pd.DataFrame(locations),
+        fixture["week_start"],
+    )
+    report = write_validation_output(kpis, fixture["week_start"])
+    assert report["passed"] is True
+    assert _EVAL_OUTPUT.exists()
+    saved = json.loads(_EVAL_OUTPUT.read_text(encoding="utf-8"))
+    assert saved["passed"] is True
+    assert saved["row_count"] == 2
+
+
+def test_land_raw_extracts_writes_data_raw(tmp_path, monkeypatch):
+    from data.pipelines import pipeline as pipeline_mod
+
+    monkeypatch.setattr(pipeline_mod, "_RAW_DIR", tmp_path)
+    telemetry = pd.DataFrame(
+        [
+            {
+                "id": "1",
+                "event_type": "inbound_order_created",
+                "created_at": "2026-09-21T12:00:00Z",
+                "event_payload": {"location_id": "us-mia-downtown", "cost": 10},
+            }
+        ]
+    )
+    locations = pd.DataFrame(
+        [{"id": "us-mia-downtown", "country": "United States", "currency": "USD"}]
+    )
+    paths = pipeline_mod._land_raw_extracts(
+        telemetry, locations, "2026-09-21", "2026-09-28"
+    )
+    assert Path(paths["telemetry_events"]).exists()
+    assert Path(paths["locations"]).exists()
+    assert (tmp_path / "telemetry_events_2026-09-21_2026-09-28.json").exists()

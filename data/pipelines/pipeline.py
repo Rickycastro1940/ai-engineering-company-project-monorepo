@@ -1,15 +1,22 @@
 """Brasaland weekly location cost & waste pipeline (Part 2).
 
-Orchestration only — KPI arithmetic lives in ``data/process/location_kpis.py``.
-Contract: ``data/pipelines/PIPELINE_DESIGN.md``.
-Does not touch ``GET /telemetry/report`` or engineering telemetry analysis.
+Main entry: ``data/pipelines/pipeline.py`` (this file).
+Contracts: root ``CONTEXT-company.md`` (KPIs / schema / endpoints) and
+``data/pipelines/PIPELINE_DESIGN.md``.
+
+Placement:
+- ``data/raw/`` — extract snapshots and intermediate KPI frames
+- ``data/process/location_kpis.py`` — reusable transform
+- ``data/eval/`` — fixtures and validation outputs
+
+Does not write ``telemetry_events`` and does not touch engineering telemetry analysis.
 """
 from __future__ import annotations
 
 import json
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -17,16 +24,21 @@ import pandas as pd
 from dotenv import load_dotenv
 from prefect import flow, task
 from prefect.tasks import task_input_hash
-from datetime import timedelta
 from supabase import Client, create_client
 
 from data.process.location_kpis import KPI_EVENT_TYPES, aggregate_location_kpis as _aggregate_kpis
 from services.safe_errors import ExternalServiceError, call_external, public_error_text
 
-env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+env_path = _REPO_ROOT / ".env"
 load_dotenv(dotenv_path=env_path)
 
 _LAST_RUN_PATH = Path(__file__).resolve().parent / "last_run.json"
+_RAW_DIR = _REPO_ROOT / "data" / "raw"
+_EVAL_DIR = _REPO_ROOT / "data" / "eval"
+_EVAL_FIXTURES = _EVAL_DIR / "weekly_location_performance_fixtures.json"
+_EVAL_OUTPUT = _EVAL_DIR / "last_validation.json"
+
 _REPORTING_SCHEMA = "reporting"
 _PERFORMANCE_TABLE = "weekly_location_performance"
 _RUNS_TABLE = "pipeline_runs"
@@ -55,6 +67,22 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _safe_window_token(value: str) -> str:
+    return "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in value)[:64]
+
+
+def _write_json(path: Path, payload: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2, default=str)
+
+
+def _dataframe_records(df: pd.DataFrame) -> list:
+    if df is None or df.empty:
+        return []
+    return json.loads(df.to_json(orient="records", date_format="iso"))
+
+
 def _write_last_run(metadata: dict) -> None:
     with open(_LAST_RUN_PATH, "w", encoding="utf-8") as handle:
         json.dump(metadata, handle, indent=2, default=str)
@@ -71,7 +99,6 @@ def _mirror_run(row: dict) -> None:
         "records_processed": row.get("records_processed"),
         "status": row.get("status"),
         "error_message": row.get("error_message"),
-        # Compat aliases used by older callers / dashboards
         "start_date": row.get("window_start"),
         "end_date": row.get("window_end"),
     }
@@ -101,7 +128,6 @@ def _insert_run_start(run_id: str, window_start: str, window_end: str) -> dict:
             .execute(),
         )
     except ExternalServiceError:
-        # Still mirror locally so status endpoint can report the attempt.
         pass
     _mirror_run(row)
     return row
@@ -138,6 +164,7 @@ def _finish_run(row: dict, *, status: str, records_processed: int, error_message
 
 
 def extract_telemetry_events(start_date: str, end_date: str) -> pd.DataFrame:
+    """Read-only extract from telemetry_events (four KPI event types)."""
     response = call_external(
         "reporting store",
         lambda: _supabase_client()
@@ -152,6 +179,7 @@ def extract_telemetry_events(start_date: str, end_date: str) -> pd.DataFrame:
 
 
 def extract_domain_data() -> pd.DataFrame:
+    """Read-only extract of the locations dimension."""
     response = call_external(
         "reporting store",
         lambda: _supabase_client()
@@ -162,10 +190,115 @@ def extract_domain_data() -> pd.DataFrame:
     return pd.DataFrame(response.data or [])
 
 
+def _land_raw_extracts(
+    telemetry_df: pd.DataFrame,
+    locations_df: pd.DataFrame,
+    start_date: str,
+    end_date: str,
+) -> dict[str, str]:
+    """Persist extract snapshots under data/raw/ for audit / reprocessing."""
+    token = f"{_safe_window_token(start_date)}_{_safe_window_token(end_date)}"
+    telemetry_path = _RAW_DIR / f"telemetry_events_{token}.json"
+    locations_path = _RAW_DIR / f"locations_{token}.json"
+    _write_json(
+        telemetry_path,
+        {
+            "window_start": start_date,
+            "window_end": end_date,
+            "event_types": list(KPI_EVENT_TYPES),
+            "rows": _dataframe_records(telemetry_df),
+        },
+    )
+    _write_json(
+        locations_path,
+        {"rows": _dataframe_records(locations_df)},
+    )
+    return {
+        "telemetry_events": str(telemetry_path),
+        "locations": str(locations_path),
+    }
+
+
+def _land_kpi_intermediate(kpis_df: pd.DataFrame, week_start: str) -> str:
+    path = _RAW_DIR / f"weekly_location_performance_{_safe_window_token(week_start)}.json"
+    _write_json(
+        path,
+        {
+            "week_start": week_start,
+            "destination_table": f"{_REPORTING_SCHEMA}.{_PERFORMANCE_TABLE}",
+            "rows": _dataframe_records(kpis_df),
+        },
+    )
+    return str(path)
+
+
+def write_validation_output(kpis_df: pd.DataFrame, week_start: str) -> dict[str, Any]:
+    """Compare a KPI frame to data/eval fixtures when week_start matches; always land output."""
+    checks: list[dict[str, Any]] = []
+    passed = True
+    if _EVAL_FIXTURES.exists():
+        fixtures = json.loads(_EVAL_FIXTURES.read_text(encoding="utf-8"))
+        if fixtures.get("week_start") == week_start and kpis_df is not None and not kpis_df.empty:
+            for loc in fixtures.get("locations", []):
+                location_id = loc["location_id"]
+                expected = loc["expected"]
+                match = kpis_df[kpis_df["location_id"] == location_id]
+                if match.empty:
+                    checks.append(
+                        {
+                            "location_id": location_id,
+                            "ok": False,
+                            "reason": "missing_location_row",
+                        }
+                    )
+                    passed = False
+                    continue
+                row = match.iloc[0]
+                location_ok = True
+                diffs = {}
+                for key, want in expected.items():
+                    got = row.get(key)
+                    if got != want:
+                        location_ok = False
+                        diffs[key] = {"expected": want, "actual": got}
+                checks.append(
+                    {
+                        "location_id": location_id,
+                        "ok": location_ok,
+                        "diffs": diffs,
+                    }
+                )
+                passed = passed and location_ok
+        else:
+            checks.append(
+                {
+                    "ok": True,
+                    "note": "fixture week_start does not match this run; skipped fixture asserts",
+                }
+            )
+    else:
+        checks.append({"ok": True, "note": "no fixtures file present"})
+
+    report = {
+        "validated_at": _utc_now_iso(),
+        "week_start": week_start,
+        "passed": passed,
+        "row_count": 0 if kpis_df is None or kpis_df.empty else int(len(kpis_df)),
+        "checks": checks,
+        "kpis": _dataframe_records(kpis_df) if kpis_df is not None else [],
+    }
+    _write_json(_EVAL_OUTPUT, report)
+    return report
+
+
 @task(retries=3, retry_delay_seconds=5, name="extract_weekly_inputs")
 def extract_weekly_inputs(start_date: str, end_date: str) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Read telemetry_events (four KPI types) and locations for the chain week."""
-    return extract_telemetry_events(start_date, end_date), extract_domain_data()
+    """Read telemetry_events + locations; land JSON copies in data/raw/."""
+    telemetry_df = extract_telemetry_events(start_date, end_date)
+    locations_df = extract_domain_data()
+    paths = _land_raw_extracts(telemetry_df, locations_df, start_date, end_date)
+    print(f"Landed extract snapshots: {paths}")
+    return telemetry_df, locations_df
 
 
 @task(
@@ -178,8 +311,12 @@ def aggregate_location_kpis(
     locations_df: pd.DataFrame,
     week_start: str,
 ) -> pd.DataFrame:
-    """Prefect task wrapper around the pure transform in ``data/process``."""
-    return _aggregate_kpis(telemetry_df, locations_df, week_start)
+    """Prefect task wrapper around the pure transform in data/process."""
+    kpis_df = _aggregate_kpis(telemetry_df, locations_df, week_start)
+    intermediate = _land_kpi_intermediate(kpis_df, week_start)
+    print(f"Landed KPI intermediate: {intermediate}")
+    write_validation_output(kpis_df, week_start)
+    return kpis_df
 
 
 @task(retries=3, retry_delay_seconds=5, name="upsert_to_reporting_table")

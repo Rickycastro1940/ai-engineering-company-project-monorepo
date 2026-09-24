@@ -187,19 +187,19 @@ cd uis/backoffice && npm run build → green
 
 Department served: **Technology** (Nicolás — pipeline into ops/finance dashboards) + **Restaurant Operations** (Felipe — purchase/waste/stockouts) + **Procurement** (Lucía — purchase cost + price alerts) + **Executive** (Mariana — Monday location-week numbers).
 
-Implemented against approved `data/pipelines/PIPELINE_DESIGN.md`:
+Implemented against `CONTEXT-company.md` (KPIs to Measure / destination schema / endpoints) and approved `data/pipelines/PIPELINE_DESIGN.md`:
 
 - Pure transform in `data/process/location_kpis.py` (dedupe on `telemetry_events.id`, five KPIs, roster `location_id`s).
-- Prefect flow `brasaland_weekly_performance_pipeline` with tasks `extract_weekly_inputs` → `aggregate_location_kpis` → `upsert_to_reporting_table`.
+- Prefect **3** flow `brasaland_weekly_performance_pipeline` (`uv add "prefect>=3"`) with tasks `extract_weekly_inputs` → `aggregate_location_kpis` → `upsert_to_reporting_table`.
+- Extract lands in `data/raw/`; validation output in `data/eval/last_validation.json`.
 - Destination `reporting.weekly_location_performance` + run log `reporting.pipeline_runs` (SQL in `data/pipelines/reporting_schema.sql`); mirror `data/pipelines/last_run.json`.
-- HTTP shell in `services/reporting/`: `GET /reporting/weekly-location-performance`, `POST /reporting/pipeline-runs` (202 + Celery), `GET /reporting/pipeline-runs/latest` — no KPI math in routes; engineering telemetry left alone.
-- Eval fixtures: `data/eval/weekly_location_performance_fixtures.json`.
+- HTTP shell in `services/reporting/` only — engineering telemetry left alone.
 
 ```text
 head -n 5 CONTEXT.md → # Welcome to Brasaland
-python3 -m pytest tests/pipelines/ -q → 9 passed
-Hand-calc demo: us-mia-downtown purchase 1000 / waste 150 / ratio 0.15; co-med-centro 18500000 COP / 920000 / 0.0497
-Dedupe same event id 1000→1200 → total_purchase_cost 1200 (not 2200)
+uv run python -c "import prefect; print(prefect.__version__)" → 3.4.25
+uv run python -m pytest tests/pipelines/ -q → 11 passed
+PYTHONPATH=. uv run python data/eval/validate_weekly_kpis.py → {"passed": true, "row_count": 2}
 ```
 
 ## Planned next steps (order)
