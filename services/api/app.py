@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 from typing import Literal
- 
 
 from analyzer import IncidentAnalyzer
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -18,6 +18,13 @@ from pydantic import BaseModel, Field
 from users import router as users_router
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+# Reporting shell (Phase 5) — own module under services/reporting/, mounted here so
+# Bearer JWT + error envelopes match the rest of the central API.
+from services.reporting.routes import router as reporting_router  # noqa: E402
+
 UI_ROOT = REPO_ROOT / "uis" / "web"
 UPLOAD_DIR = REPO_ROOT / "data" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -126,6 +133,7 @@ app.add_middleware(
 app.include_router(locations_router)
 app.include_router(inventory_router)
 app.include_router(users_router)
+app.include_router(reporting_router)
 _register_analyze_routes(app, "anylayze")
 _register_analyze_routes(app, "analyze")
 

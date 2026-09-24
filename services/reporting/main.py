@@ -3,7 +3,11 @@
 Own FastAPI app under ``services/reporting/``, separate from
 ``services/telemetry`` and from the engineering ``GET /telemetry/report``.
 
-Run from the monorepo root::
+Uses the same Bearer JWT auth and error envelope as the central API.
+Routes are also mounted on ``services/api/app.py`` so
+``uvicorn api.app:app`` exposes them at the same paths.
+
+Run standalone::
 
     uvicorn services.reporting.main:app --reload --port 8002
 """
@@ -27,7 +31,7 @@ app = FastAPI(
     description=(
         "Weekly location cost & waste reporting shell. "
         "Status, manual trigger, and KPI query for reporting.weekly_location_performance. "
-        "Not the engineering telemetry reader."
+        "Not the engineering telemetry reader. Bearer JWT required."
     ),
     version="1.0.0",
     debug=False,

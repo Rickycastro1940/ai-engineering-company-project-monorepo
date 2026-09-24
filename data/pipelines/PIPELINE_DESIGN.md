@@ -401,7 +401,7 @@ The flow loads `brasaland-supabase` at the start of extract and load. Local runs
 
 ## Phase 5 — Application integration
 
-Implemented in ``services/reporting/`` (own FastAPI app, **not** `services/telemetry/`). Each route imports one function or Celery wrapper that ultimately calls `data/pipelines/`. No ETL logic belongs in `services/`: no extract, no transform, no load, no sum of `cost`, no event-type filter, no join to `locations`, and no upsert. `data/pipelines/` does not import `services/reporting/`.
+Implemented in ``services/reporting/`` (own module, **not** `services/telemetry/`) and mounted on the central FastAPI app so **Bearer JWT** and the `{status, code, message, detail}` error envelope match `/locations` and the rest of the API. Each route imports one function or Celery wrapper that ultimately calls `data/pipelines/`. No ETL logic belongs in `services/`: no extract, no transform, no load, no sum of `cost`, no event-type filter, no join to `locations`, and no upsert. `data/pipelines/` does not import `services/reporting/`.
 
 These routes are not in `services/telemetry/`. They are not `GET /telemetry/report`. They do not read or write `telemetry_events`. `GET /telemetry/report` does not read `reporting.weekly_location_performance`.
 
@@ -411,7 +411,7 @@ These routes are not in `services/telemetry/`. They are not `GET /telemetry/repo
 | Manual trigger | `POST /reporting/pipeline-runs` | Celery `run_weekly_pipeline` → `run_pipeline(start_date, end_date)` — Prefect flow `brasaland_weekly_performance_pipeline` |
 | KPI query | `GET /reporting/weekly-location-performance` | `get_weekly_location_performance(week_start=None)` |
 
-Run the shell: `uvicorn services.reporting.main:app --reload --port 8002`.
+Auth: `Depends(get_current_user)` (same OAuth2 Bearer as locations). Run via `uvicorn api.app:app` (or standalone `uvicorn services.reporting.main:app --port 8002`).
 
 ### Status query
 

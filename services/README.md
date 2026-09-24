@@ -32,16 +32,19 @@ Task logs (every attempt): `task_id`, `attempt`, `status`, `duration_ms`; failur
 
 ### API endpoints
 
-Reporting shell (`services/reporting/`, separate from telemetry):
+Reporting shell (`services/reporting/`, separate from telemetry; mounted on the central API):
 
+- Auth: **Bearer JWT** (same as `/locations`)
+- Errors: `{status, code, message, detail}` (same envelope as the rest of the API)
 - `GET /reporting/pipeline-runs/latest` → last run metadata (`get_latest_pipeline_run`)
 - `POST /reporting/pipeline-runs` → enqueues `run_weekly_pipeline`, returns **202** `{"task_id": "..."}`
-- `GET /reporting/weekly-location-performance` → KPI rows from `reporting.weekly_location_performance`
+- `GET /reporting/weekly-location-performance` → KPI rows shaped per `CONTEXT-company.md`
 - `GET /tasks/{task_id}` → Redis/Celery status as
   `{"task_id": "...", "status": "pending|started|success|failure", "result": ...}`
 
 ```bash
-uvicorn services.reporting.main:app --reload --port 8002
+uvicorn api.app:app --reload --port 8000
+# or: uvicorn services.reporting.main:app --reload --port 8002
 ```
 
 > _Spanish version: [README.es.md](./README.es.md)._

@@ -627,7 +627,26 @@ def get_weekly_location_performance(week_start: Optional[str] = None) -> dict[st
 
 
 def get_latest_pipeline_run() -> dict[str, Any]:
-    """Newest reporting.pipeline_runs row, falling back to last_run.json."""
+    """Newest reporting.pipeline_runs row, falling back to last_run.json.
+
+    Returns CONTEXT-company.md columns only:
+    ``run_id``, ``started_at``, ``finished_at``, ``window_start``, ``window_end``,
+    ``records_processed``, ``status``, ``error_message``.
+    """
+    _CONTEXT_RUN_FIELDS = (
+        "run_id",
+        "started_at",
+        "finished_at",
+        "window_start",
+        "window_end",
+        "records_processed",
+        "status",
+        "error_message",
+    )
+
+    def _project(row: dict) -> dict[str, Any]:
+        return {key: row.get(key) for key in _CONTEXT_RUN_FIELDS}
+
     if _supabase_configured():
         try:
             response = call_external(
@@ -643,16 +662,7 @@ def get_latest_pipeline_run() -> dict[str, Any]:
             if rows:
                 row = rows[0]
                 _mirror_run(row)
-                return {
-                    "run_id": row.get("run_id"),
-                    "started_at": row.get("started_at"),
-                    "finished_at": row.get("finished_at"),
-                    "window_start": row.get("window_start"),
-                    "window_end": row.get("window_end"),
-                    "records_processed": row.get("records_processed"),
-                    "status": row.get("status"),
-                    "error_message": row.get("error_message"),
-                }
+                return _project(row)
         except (RuntimeError, ExternalServiceError):
             pass
 
@@ -663,13 +673,15 @@ def get_latest_pipeline_run() -> dict[str, Any]:
             payload = json.load(handle)
     except (OSError, json.JSONDecodeError):
         return {"message": "No pipeline runs recorded yet."}
-    if isinstance(payload, dict) and payload.get("error_message"):
+    if not isinstance(payload, dict):
+        return {"message": "No pipeline runs recorded yet."}
+    if payload.get("error_message"):
         payload["error_message"] = public_error_text(
             payload.get("error_message"), "Pipeline failed."
         )
-    if isinstance(payload, dict) and payload.get("error"):
-        payload["error"] = public_error_text(payload.get("error"), "Pipeline failed.")
-    return payload
+    if payload.get("message") and payload.get("status") is None and payload.get("run_id") is None:
+        return {"message": payload["message"]}
+    return _project(payload)
 
 
 # ---------------------------------------------------------------------------

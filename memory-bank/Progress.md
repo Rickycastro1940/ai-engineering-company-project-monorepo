@@ -223,18 +223,19 @@ Department served: **Executive** (Mariana — Monday 07:00 America/Bogota report
 
 Department served: **Technology** (Nicolás — reporting shell separate from telemetry) + **Executive / Operations / Procurement** (Part 3 dashboard KPI feed).
 
-- `services/reporting/routes.py` + `main.py`: own FastAPI module (not `services/telemetry/`).
-- `GET /reporting/pipeline-runs/latest` → `get_latest_pipeline_run()`
-- `POST /reporting/pipeline-runs` → Celery enqueue → 202 `{task_id}` (503 if Redis down)
-- `GET /reporting/weekly-location-performance` → `get_weekly_location_performance()` (Supabase or local upsert store)
-- Companion `GET /tasks/{task_id}` for poll. No ETL in routes.
+- `services/reporting/routes.py` + schemas: own module (not `services/telemetry/`); **mounted on central API**.
+- Imports only `get_latest_pipeline_run` / `get_weekly_location_performance` (+ Celery → `run_pipeline`) from `data/pipelines/` — no ETL in routes.
+- **Bearer JWT** + `{status, code, message, detail}` error envelope (same as `/locations`).
+- KPI body matches `CONTEXT-company.md` (`week_start` + location KPI fields).
 
 ```text
-uvicorn services.reporting.main:app --port 8002
-GET /reporting/pipeline-runs/latest → 200 status=Success
+uvicorn api.app:app --port 8000
+GET /reporting/pipeline-runs/latest without token → 401 unauthorized
+POST /auth/login → 200 access_token
+GET /reporting/pipeline-runs/latest Bearer → 200 CONTEXT run fields
 GET /reporting/weekly-location-performance?week_start=2026-09-21 → 200 COP+USD KPI rows
-POST /reporting/pipeline-runs → 202 with Redis / 503 without
-.venv/bin/python -m pytest tests/pipelines/ -q → 26 passed
+POST /reporting/pipeline-runs → 202 with Redis / 503 envelope without
+.venv/bin/python -m pytest tests/pipelines/test_reporting_routes.py -q → 8 passed
 ```
 
 ## Planned next steps (order)
