@@ -20,10 +20,17 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
+
+# Allow ``python data/pipelines/pipeline.py`` from the monorepo root without
+# requiring the caller to set PYTHONPATH.
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -35,7 +42,6 @@ from supabase import Client, create_client
 from data.process.location_kpis import KPI_EVENT_TYPES, aggregate_location_kpis as _aggregate_kpis
 from services.safe_errors import ExternalServiceError, call_external, public_error_text
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 env_path = _REPO_ROOT / ".env"
 load_dotenv(dotenv_path=env_path)
 
@@ -78,6 +84,10 @@ def _supabase_client() -> Client:
         raise
     except Exception as error:
         raise ExternalServiceError("reporting store") from error
+
+
+def _supabase_configured() -> bool:
+    return bool(os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_KEY"))
 
 
 def _reporting(client: Client):
@@ -185,16 +195,17 @@ def _insert_run_start(run_id: str, window_start: str, window_end: str) -> dict:
         "status": "Running",
         "error_message": None,
     }
-    try:
-        call_external(
-            "reporting store",
-            lambda: _reporting(_supabase_client())
-            .table(_RUNS_TABLE)
-            .insert(row)
-            .execute(),
-        )
-    except ExternalServiceError:
-        pass
+    if _supabase_configured():
+        try:
+            call_external(
+                "reporting store",
+                lambda: _reporting(_supabase_client())
+                .table(_RUNS_TABLE)
+                .insert(row)
+                .execute(),
+            )
+        except ExternalServiceError:
+            pass
     _mirror_run(row)
     return row
 
@@ -207,24 +218,25 @@ def _finish_run(row: dict, *, status: str, records_processed: int, error_message
         "records_processed": records_processed,
         "error_message": error_message,
     }
-    try:
-        call_external(
-            "reporting store",
-            lambda: _reporting(_supabase_client())
-            .table(_RUNS_TABLE)
-            .update(
-                {
-                    "finished_at": finished["finished_at"],
-                    "status": status,
-                    "records_processed": records_processed,
-                    "error_message": error_message,
-                }
+    if _supabase_configured():
+        try:
+            call_external(
+                "reporting store",
+                lambda: _reporting(_supabase_client())
+                .table(_RUNS_TABLE)
+                .update(
+                    {
+                        "finished_at": finished["finished_at"],
+                        "status": status,
+                        "records_processed": records_processed,
+                        "error_message": error_message,
+                    }
+                )
+                .eq("run_id", row["run_id"])
+                .execute(),
             )
-            .eq("run_id", row["run_id"])
-            .execute(),
-        )
-    except ExternalServiceError:
-        pass
+        except ExternalServiceError:
+            pass
     _mirror_run(finished)
     return finished
 
@@ -331,16 +343,17 @@ def write_validation_output(kpis_df: pd.DataFrame, week_start: str) -> dict[str,
 
 
 # ---------------------------------------------------------------------------
-# Stage 1 — Extraction tasks (explicit I/O) + subflow
+# Store backends (swappable for offline CLI — Phase 4)
 # ---------------------------------------------------------------------------
+#
+# Tasks call these module-level functions. The Monday 07:00 live job keeps the
+# Supabase implementations below. ``_install_offline_backends`` rebinds them to
+# eval-fixture / local-store callables so ``python data/pipelines/pipeline.py``
+# can run the full Prefect flow without SUPABASE_* credentials.
 
 
-# Retries=3, delay=5s: covers transient Supabase/PostgREST blips (timeouts, 502/503)
-# without stretching the Monday 07:00 window. Three attempts ≈ 15s of backoff headroom
-# before the stage fails; more retries mostly delay a true outage signal.
-@task(retries=3, retry_delay_seconds=5, name="extract_telemetry_events")
-def extract_telemetry_events(start_date: str, end_date: str):
-    """Input: chain-week bounds. Output: telemetry_events rows (four KPI types)."""
+def fetch_telemetry_events(start_date: str, end_date: str) -> pd.DataFrame:
+    """Read-only extract of KPI telemetry_events for [start_date, end_date)."""
     response = call_external(
         "reporting store",
         lambda: _supabase_client()
@@ -354,11 +367,8 @@ def extract_telemetry_events(start_date: str, end_date: str):
     return pd.DataFrame(response.data or [])
 
 
-# Retries=3, delay=5s: same store as telemetry; locations is 14 small rows, so three
-# short retries are enough for a dropped connection without masking a missing table.
-@task(retries=3, retry_delay_seconds=5, name="extract_domain_data")
-def extract_domain_data():
-    """Input: none. Output: locations dimension (id, country, currency)."""
+def fetch_domain_locations() -> pd.DataFrame:
+    """Read-only extract of the locations dimension (id, country, currency)."""
     response = call_external(
         "reporting store",
         lambda: _supabase_client()
@@ -367,6 +377,42 @@ def extract_domain_data():
         .execute(),
     )
     return pd.DataFrame(response.data or [])
+
+
+def persist_kpi_records(records: list[dict]) -> int:
+    """Idempotent upsert into reporting.weekly_location_performance."""
+    if not records:
+        return 0
+    call_external(
+        "reporting store",
+        lambda: _reporting(_supabase_client())
+        .table(_PERFORMANCE_TABLE)
+        .upsert(records, on_conflict=_UPSERT_CONFLICT)
+        .execute(),
+    )
+    return len(records)
+
+
+# ---------------------------------------------------------------------------
+# Stage 1 — Extraction tasks (explicit I/O) + subflow
+# ---------------------------------------------------------------------------
+
+
+# Retries=3, delay=5s: covers transient Supabase/PostgREST blips (timeouts, 502/503)
+# without stretching the Monday 07:00 window. Three attempts ≈ 15s of backoff headroom
+# before the stage fails; more retries mostly delay a true outage signal.
+@task(retries=3, retry_delay_seconds=5, name="extract_telemetry_events")
+def extract_telemetry_events(start_date: str, end_date: str):
+    """Input: chain-week bounds. Output: telemetry_events rows (four KPI types)."""
+    return fetch_telemetry_events(start_date, end_date)
+
+
+# Retries=3, delay=5s: same store as telemetry; locations is 14 small rows, so three
+# short retries are enough for a dropped connection without masking a missing table.
+@task(retries=3, retry_delay_seconds=5, name="extract_domain_data")
+def extract_domain_data():
+    """Input: none. Output: locations dimension (id, country, currency)."""
+    return fetch_domain_locations()
 
 
 @task(name="land_raw_extracts")
@@ -465,19 +511,13 @@ def upsert_to_reporting_table(kpis_df) -> int:
     if not records:
         print("No data to upsert.")
         return 0
-    call_external(
-        "reporting store",
-        lambda: _reporting(_supabase_client())
-        .table(_PERFORMANCE_TABLE)
-        .upsert(records, on_conflict=_UPSERT_CONFLICT)
-        .execute(),
-    )
+    count = persist_kpi_records(records)
     print(
-        f"Idempotent upsert of {len(records)} rows "
+        f"Idempotent upsert of {count} rows "
         f"on_conflict={_UPSERT_CONFLICT} into "
         f"{_REPORTING_SCHEMA}.{_PERFORMANCE_TABLE}"
     )
-    return len(records)
+    return count
 
 
 @flow(name="load_brasaland_reporting_flow", log_prints=True)
@@ -656,7 +696,184 @@ def run_pipeline(start_date: str, end_date: str) -> dict[str, Any]:
     return finished
 
 
+# ---------------------------------------------------------------------------
+# CLI — script-based execution (Phase 4)
+# ---------------------------------------------------------------------------
+#
+# Intended schedule (Brasaland reporting cycle):
+#   Every Monday at 07:00 America/Bogota — previous chain week
+#   [Monday 00:00, next Monday 00:00) America/Bogota.
+#
+# Run from the monorepo root:
+#   python data/pipelines/pipeline.py
+#   # or with an explicit window:
+#   python data/pipelines/pipeline.py --start-date 2026-09-21 --end-date 2026-09-28
+#
+
+
+def previous_chain_week_bounds(now: Optional[datetime] = None) -> tuple[str, str]:
+    """Return (window_start, window_end) for the closed chain week in America/Bogota.
+
+    Chain week = [Monday 00:00, next Monday 00:00). The Monday 07:00 job reports
+    the week that just closed (same rule as PIPELINE_DESIGN.md).
+    """
+    try:
+        from zoneinfo import ZoneInfo
+    except ImportError:  # pragma: no cover — py<3.9 fallback not expected here
+        from backports.zoneinfo import ZoneInfo  # type: ignore
+
+    bogota = ZoneInfo("America/Bogota")
+    current = now.astimezone(bogota) if now is not None else datetime.now(bogota)
+    # Monday=0 … Sunday=6
+    days_since_monday = current.weekday()
+    this_monday = (current - timedelta(days=days_since_monday)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    # At or after Monday 07:00, report the week that ended this Monday;
+    # before 07:00 Monday, still report the prior closed week (same bounds).
+    window_end = this_monday
+    window_start = this_monday - timedelta(days=7)
+    return window_start.date().isoformat(), window_end.date().isoformat()
+
+
+def _fixture_frames_for_window(week_start: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Build telemetry + locations frames from data/eval fixtures (offline CLI)."""
+    if not _EVAL_FIXTURES.exists():
+        raise FileNotFoundError(
+            f"Offline CLI needs {_EVAL_FIXTURES} when SUPABASE credentials are unset."
+        )
+    fixtures = json.loads(_EVAL_FIXTURES.read_text(encoding="utf-8"))
+    events: list[dict] = []
+    locations: list[dict] = []
+    for loc in fixtures.get("locations", []):
+        for event in loc.get("events", []):
+            row = dict(event)
+            row.setdefault("created_at", f"{week_start}T12:00:00+00:00")
+            events.append(row)
+        locations.append(
+            {
+                "id": loc["location_id"],
+                "country": loc["country"],
+                "currency": loc["currency"],
+            }
+        )
+    return pd.DataFrame(events), pd.DataFrame(locations)
+
+
+def _offline_upsert(records: list[dict]) -> int:
+    """Local idempotent upsert into data/raw (same PK as CONTEXT destination)."""
+    store_path = _RAW_DIR / "weekly_location_performance_store.json"
+    existing: dict[tuple[str, str], dict] = {}
+    if store_path.exists():
+        try:
+            prior = json.loads(store_path.read_text(encoding="utf-8"))
+            for row in prior.get("rows", []):
+                existing[(str(row["location_id"]), str(row["week_start"]))] = row
+        except (OSError, json.JSONDecodeError, KeyError, TypeError):
+            existing = {}
+    for row in records:
+        existing[(str(row["location_id"]), str(row["week_start"]))] = row
+    rows = sorted(existing.values(), key=lambda r: (r["location_id"], r["week_start"]))
+    _write_json(
+        store_path,
+        {
+            "destination_table": f"{_REPORTING_SCHEMA}.{_PERFORMANCE_TABLE}",
+            "on_conflict": _UPSERT_CONFLICT,
+            "rows": rows,
+        },
+    )
+    return len(records)
+
+
+def _install_offline_backends(week_start: str) -> None:
+    """Rebind store backends so the Prefect flow runs without Supabase.
+
+    Tasks keep calling ``fetch_telemetry_events`` / ``fetch_domain_locations`` /
+    ``persist_kpi_records`` by name; rebinding those module attributes is enough
+    for both Prefect task execution and direct ``.fn`` unit tests.
+    """
+    telemetry_df, locations_df = _fixture_frames_for_window(week_start)
+    this_module = sys.modules[__name__]
+
+    def _fetch_telemetry(start_date: str, end_date: str) -> pd.DataFrame:
+        print(
+            f"[offline] fetch_telemetry_events using eval fixtures "
+            f"for window [{start_date}, {end_date})"
+        )
+        return telemetry_df.copy()
+
+    def _fetch_locations() -> pd.DataFrame:
+        print("[offline] fetch_domain_locations using eval fixture locations")
+        return locations_df.copy()
+
+    def _persist(records: list[dict]) -> int:
+        if not records:
+            print("[offline] No data to upsert.")
+            return 0
+        count = _offline_upsert(records)
+        print(
+            f"[offline] Idempotent upsert of {count} rows "
+            f"on_conflict={_UPSERT_CONFLICT} into local data/raw store"
+        )
+        return count
+
+    this_module.fetch_telemetry_events = _fetch_telemetry
+    this_module.fetch_domain_locations = _fetch_locations
+    this_module.persist_kpi_records = _persist
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    """CLI entry for ``python data/pipelines/pipeline.py``."""
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description=(
+            "Brasaland weekly location cost & waste pipeline. "
+            "Scheduled Monday 07:00 America/Bogota for the previous chain week."
+        )
+    )
+    parser.add_argument(
+        "--start-date",
+        help="Chain-week start (YYYY-MM-DD). Defaults to previous Monday in America/Bogota.",
+    )
+    parser.add_argument(
+        "--end-date",
+        help="Chain-week end exclusive (YYYY-MM-DD). Defaults to this Monday in America/Bogota.",
+    )
+    parser.add_argument(
+        "--offline",
+        action="store_true",
+        help="Force fixture-backed offline run (also used automatically without Supabase env).",
+    )
+    args = parser.parse_args(argv)
+
+    if args.start_date and args.end_date:
+        start_date, end_date = args.start_date, args.end_date
+    else:
+        start_date, end_date = previous_chain_week_bounds()
+
+    offline = args.offline or not _supabase_configured()
+    mode = "offline (eval fixtures)" if offline else "live (Supabase)"
+    print(
+        f"Executing brasaland_weekly_performance_pipeline [{start_date}, {end_date}) "
+        f"mode={mode}"
+    )
+    print(
+        "Schedule: Monday 07:00 America/Bogota — previous chain week "
+        "(see data/pipelines/PIPELINE_DESIGN.md)."
+    )
+
+    if offline:
+        # Align fixture week_start with the CLI window so eval snapshot can assert.
+        _install_offline_backends(start_date)
+
+    result = run_pipeline(start_date, end_date)
+    print(
+        "Pipeline execution completed successfully: "
+        f"status={result.get('status')} records_processed={result.get('records_processed')}"
+    )
+    return 0
+
+
 if __name__ == "__main__":
-    print("Executing pipeline directly...")
-    run_pipeline("2026-07-01", "2026-08-01")
-    print("Pipeline execution completed successfully.")
+    raise SystemExit(main())

@@ -201,6 +201,22 @@ uv run python -c "import prefect; print(prefect.__version__)" → 3.4.25
 uv run python -m pytest tests/pipelines/ -q → 23 passed
 Idempotent load: upsert on_conflict=location_id,week_start (CONTEXT PK); identical re-run payloads
 Run metadata: started_at, finished_at, records_processed, status, error_message → pipeline_runs + last_run.json + pipeline_run_log.jsonl
+Phase 4 CLI: python data/pipelines/pipeline.py → status=Success (offline fixtures when SUPABASE_* unset); schedule Monday 07:00 America/Bogota documented in PIPELINE_DESIGN.md
+```
+
+## Latest Phase 4 — script-based execution (`cursor/pipeline-phase4-cli-4f14`)
+
+Department served: **Executive** (Mariana — Monday 07:00 America/Bogota reporting cycle) + **Technology** (Nicolás — runnable Prefect entry without HTTP).
+
+- `data/pipelines/pipeline.py` is executable as a CLI (`if __name__ == "__main__"` → `main()` → `run_pipeline`).
+- Default window = previous chain week in America/Bogota; `--offline` / missing Supabase uses eval fixtures + local upsert store.
+- Schedule + run command documented in `data/pipelines/PIPELINE_DESIGN.md` (Script-based execution / Intended reporting schedule).
+
+```text
+.venv/bin/python data/pipelines/pipeline.py --offline --start-date 2026-09-21 --end-date 2026-09-28
+→ status=Success records_processed=9; eval last_validation.json passed=true
+.venv/bin/python data/pipelines/pipeline.py → previous chain week window, status=Success
+.venv/bin/python -m pytest tests/pipelines/ -q → 23 passed
 ```
 
 ## Planned next steps (order)
