@@ -557,20 +557,10 @@ def write_eval_snapshot(kpis_df, week_start: str):
 # ---------------------------------------------------------------------------
 
 
-def get_weekly_location_performance(week_start: Optional[str] = None) -> dict[str, Any]:
-    """Read reporting.weekly_location_performance for the KPI query endpoint."""
-    client = _supabase_client()
-    query = _reporting(client).table(_PERFORMANCE_TABLE).select("*")
-    if week_start:
-        query = query.eq("week_start", week_start)
-    response = call_external(
-        "reporting store",
-        lambda: query.order("week_start", desc=True).execute(),
-    )
-    rows = response.data or []
+def _format_kpi_locations(rows: list[dict], week_start: Optional[str]) -> dict[str, Any]:
+    """Project destination rows into the KPI query response shape."""
     if not rows:
         return {"week_start": week_start, "locations": []}
-
     actual_week_start = week_start or rows[0].get("week_start")
     locations = [row for row in rows if row.get("week_start") == actual_week_start]
     formatted = [
@@ -589,34 +579,82 @@ def get_weekly_location_performance(week_start: Optional[str] = None) -> dict[st
     return {"week_start": actual_week_start, "locations": formatted}
 
 
+def _read_local_kpi_store(week_start: Optional[str] = None) -> dict[str, Any]:
+    """Read offline upsert store under data/raw/ (same PK as CONTEXT destination)."""
+    store_path = _RAW_DIR / "weekly_location_performance_store.json"
+    rows: list[dict] = []
+    if store_path.exists():
+        try:
+            payload = json.loads(store_path.read_text(encoding="utf-8"))
+            rows = list(payload.get("rows") or [])
+        except (OSError, json.JSONDecodeError, TypeError):
+            rows = []
+    if week_start:
+        rows = [row for row in rows if str(row.get("week_start")) == week_start]
+    else:
+        # Newest week_start first when no filter is given.
+        weeks = sorted(
+            {str(row.get("week_start")) for row in rows if row.get("week_start")},
+            reverse=True,
+        )
+        if weeks:
+            rows = [row for row in rows if str(row.get("week_start")) == weeks[0]]
+    return _format_kpi_locations(rows, week_start)
+
+
+def get_weekly_location_performance(week_start: Optional[str] = None) -> dict[str, Any]:
+    """Read reporting.weekly_location_performance for the KPI query endpoint.
+
+    Live path: Supabase ``reporting.weekly_location_performance``.
+    Offline path (no SUPABASE_* or store unreachable): local upsert store from
+    ``data/raw/weekly_location_performance_store.json`` so Part 3's dashboard
+    can still consume CLI / fixture runs.
+    """
+    if _supabase_configured():
+        try:
+            client = _supabase_client()
+            query = _reporting(client).table(_PERFORMANCE_TABLE).select("*")
+            if week_start:
+                query = query.eq("week_start", week_start)
+            response = call_external(
+                "reporting store",
+                lambda: query.order("week_start", desc=True).execute(),
+            )
+            return _format_kpi_locations(response.data or [], week_start)
+        except (RuntimeError, ExternalServiceError):
+            pass
+    return _read_local_kpi_store(week_start)
+
+
 def get_latest_pipeline_run() -> dict[str, Any]:
     """Newest reporting.pipeline_runs row, falling back to last_run.json."""
-    try:
-        response = call_external(
-            "reporting store",
-            lambda: _reporting(_supabase_client())
-            .table(_RUNS_TABLE)
-            .select("*")
-            .order("started_at", desc=True)
-            .limit(1)
-            .execute(),
-        )
-        rows = response.data or []
-        if rows:
-            row = rows[0]
-            _mirror_run(row)
-            return {
-                "run_id": row.get("run_id"),
-                "started_at": row.get("started_at"),
-                "finished_at": row.get("finished_at"),
-                "window_start": row.get("window_start"),
-                "window_end": row.get("window_end"),
-                "records_processed": row.get("records_processed"),
-                "status": row.get("status"),
-                "error_message": row.get("error_message"),
-            }
-    except (RuntimeError, ExternalServiceError):
-        pass
+    if _supabase_configured():
+        try:
+            response = call_external(
+                "reporting store",
+                lambda: _reporting(_supabase_client())
+                .table(_RUNS_TABLE)
+                .select("*")
+                .order("started_at", desc=True)
+                .limit(1)
+                .execute(),
+            )
+            rows = response.data or []
+            if rows:
+                row = rows[0]
+                _mirror_run(row)
+                return {
+                    "run_id": row.get("run_id"),
+                    "started_at": row.get("started_at"),
+                    "finished_at": row.get("finished_at"),
+                    "window_start": row.get("window_start"),
+                    "window_end": row.get("window_end"),
+                    "records_processed": row.get("records_processed"),
+                    "status": row.get("status"),
+                    "error_message": row.get("error_message"),
+                }
+        except (RuntimeError, ExternalServiceError):
+            pass
 
     if not _LAST_RUN_PATH.exists():
         return {"message": "No pipeline runs recorded yet."}

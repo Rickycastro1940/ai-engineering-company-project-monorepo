@@ -401,15 +401,17 @@ The flow loads `brasaland-supabase` at the start of extract and load. Local runs
 
 ## Phase 5 — Application integration
 
-Design only. This phase does not add route code. `services/reporting/` is an HTTP shell. Each route below imports one function or flow from `data/pipelines/`. No ETL logic belongs in `services/`: no extract, no transform, no load, no sum of `cost`, no event-type filter, no join to `locations`, and no upsert. `data/pipelines/` does not import `services/reporting/`.
+Implemented in ``services/reporting/`` (own FastAPI app, **not** `services/telemetry/`). Each route imports one function or Celery wrapper that ultimately calls `data/pipelines/`. No ETL logic belongs in `services/`: no extract, no transform, no load, no sum of `cost`, no event-type filter, no join to `locations`, and no upsert. `data/pipelines/` does not import `services/reporting/`.
 
 These routes are not in `services/telemetry/`. They are not `GET /telemetry/report`. They do not read or write `telemetry_events`. `GET /telemetry/report` does not read `reporting.weekly_location_performance`.
 
 | Business role | Endpoint in `services/reporting/` | Calls in `data/pipelines/` |
 | --- | --- | --- |
 | Status query | `GET /reporting/pipeline-runs/latest` | `get_latest_pipeline_run()` |
-| Manual trigger | `POST /reporting/pipeline-runs` | `run_pipeline(start_date, end_date)` — Prefect flow `brasaland_weekly_performance_pipeline` |
+| Manual trigger | `POST /reporting/pipeline-runs` | Celery `run_weekly_pipeline` → `run_pipeline(start_date, end_date)` — Prefect flow `brasaland_weekly_performance_pipeline` |
 | KPI query | `GET /reporting/weekly-location-performance` | `get_weekly_location_performance(week_start=None)` |
+
+Run the shell: `uvicorn services.reporting.main:app --reload --port 8002`.
 
 ### Status query
 
@@ -417,11 +419,11 @@ These routes are not in `services/telemetry/`. They are not `GET /telemetry/repo
 
 ### Manual trigger
 
-`POST /reporting/pipeline-runs` accepts `{ "start_date": "...", "end_date": "..." }` and calls `run_pipeline(start_date, end_date)` in `data/pipelines/pipeline.py`, the flow `brasaland_weekly_performance_pipeline`. The route returns `202` with `{ "task_id": "..." }`. The worker inside that flow runs extract, transform, and load. The route does not call `extract_telemetry_events`, `aggregate_location_kpis`, or `upsert_to_reporting_table` itself.
+`POST /reporting/pipeline-runs` accepts `{ "start_date": "...", "end_date": "..." }` and enqueues `run_weekly_pipeline`, which calls `run_pipeline(start_date, end_date)` in `data/pipelines/pipeline.py`, the flow `brasaland_weekly_performance_pipeline`. The route returns `202` with `{ "task_id": "..." }`. The worker inside that flow runs extract, transform, and load. The route does not call `extract_telemetry_events`, `aggregate_location_kpis`, or `upsert_to_reporting_table` itself.
 
 ### KPI query
 
-`GET /reporting/weekly-location-performance` calls `get_weekly_location_performance(week_start=None)` in `data/pipelines/pipeline.py`. That function selects from `reporting.weekly_location_performance` only. Optional query `week_start` filters one chain week. This is the feed Part 3’s dashboard will consume for Mariana Restrepo, Felipe Guerrero, and Lucía Fernández. Example body:
+`GET /reporting/weekly-location-performance` calls `get_weekly_location_performance(week_start=None)` in `data/pipelines/pipeline.py`. That function selects from `reporting.weekly_location_performance` only (with a local upsert-store fallback when Supabase is unset). Optional query `week_start` filters one chain week. This is the feed Part 3’s dashboard will consume for Mariana Restrepo, Felipe Guerrero, and Lucía Fernández. Example body:
 
 ```json
 {
