@@ -238,7 +238,8 @@ POST /auth/login → 200 access_token
 GET /reporting/pipeline-runs/latest Bearer → 200 CONTEXT run fields
 GET /reporting/weekly-location-performance?week_start=2026-09-21 → 200 COP+USD KPI rows
 POST /reporting/pipeline-runs → 202 with Redis / 503 envelope without
-.venv/bin/python -m pytest tests/pipelines/test_reporting_routes.py -q → 8 passed
+.venv/bin/python -m pytest tests/pipelines/ -q → 36 passed
+Name contract: flow brasaland_weekly_performance_pipeline; tables reporting.weekly_location_performance + reporting.pipeline_runs; events inbound_order_created / stock_waste_registered / stock_threshold_triggered / ingredient_price_variance_detected; roster ids co-med-centro / us-mia-downtown
 ```
 
 ## Planned next steps (order)
