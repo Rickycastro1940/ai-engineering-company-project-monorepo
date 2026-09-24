@@ -14,7 +14,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
-| Technology: telemetry + pipeline to dashboards | **Partial** — `data/pipelines/` weekly location cost/waste; Celery async path |
+| Technology: telemetry + pipeline to dashboards | **Partial** — design in `data/pipelines/PIPELINE_DESIGN.md` writes `reporting.weekly_location_performance` (purchase, waste, waste ratio, stockouts, price alerts) for Mariana, Felipe, and Lucía; engineering metrics stay on `GET /telemetry/report` |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Not done** as product UI; pipeline design targets cost/waste for Mariana + Felipe |
 | Procurement: supplier price history, consolidated spend | **Not done** (supplier docs may exist on other branches; not claimed here) |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
@@ -182,6 +182,29 @@ Department served: **Technology** (structured HTTP, no env names in 503s) + **Op
 uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py tests/test_users_api.py -q → 33 passed
 cd uis/backoffice && npm run build → green
 ```
+
+## Latest pipeline design (`cursor/pipeline-design-part1-0ca1`)
+
+Department served: **Technology** (Nicolás Park — pipeline into operations and finance dashboards, separate from engineering telemetry) + **Restaurant Operations** (Felipe Guerrero — purchase, waste, stockouts per location in COP or USD) + **Procurement** (Lucía Fernández — purchase cost and price-alert frequency) + **Executive Direction** (Mariana Restrepo — Monday 07:00 America/Bogota location-week report).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+Phase 1 headings → Current State (what we have, events captured, storage, engineering answers) + Business Gap
+Unanswered CONTEXT.md question → per-location chain-week purchase cost, waste cost, waste ratio, stockouts, price alerts in COP or USD
+Phase 2 → one purpose sentence; Monday roll-up; five KPIs; JSON extract of telemetry_events + locations; mermaid extract/transform/load; corrected InboundOrder for product_id 1 at us-mia-downtown (telemetry id 7c2e9a14-6b0d-4f3a-9e21-0b8d4c1a55f6) stays one row (1200 USD, not 2200) via id dedupe and upsert on (location_id, week_start)
+Domain vocabulary → Location.id roster (co-med-centro … us-jacksonville); country Colombia|United States; currency COP|USD; region Florida not stored on the rollup; products.csv product_id 1 Tomatoes kg, 2 Mozzarella kg, 3 Napkins boxes; OrderType INBOUND|OUTBOUND; waste reason expiration|kitchen error|unexplained shrinkage. No invented supplier id.
+Destination tables → reporting.weekly_location_performance (KPI) and reporting.pipeline_runs (run log)
+services/reporting endpoints → GET /reporting/pipeline-runs/latest (status), POST /reporting/pipeline-runs (manual trigger), GET /reporting/weekly-location-performance (KPI query); separate from telemetry_events and GET /telemetry/report
+Phase 3 → partial load of co-med-centro (18500000 COP) then crash; rerun upserts the same key so the total stays 18500000 and us-mia-downtown is inserted once. Run log fields: started_at, finished_at, records_processed, status, error_message
+Phase 5 (design only) → GET /reporting/pipeline-runs/latest calls get_latest_pipeline_run(); POST /reporting/pipeline-runs calls run_pipeline(); GET /reporting/weekly-location-performance calls get_weekly_location_performance(). No ETL in services/. Separate from services/telemetry and GET /telemetry/report.
+Destination table in PIPELINE_DESIGN.md → reporting.weekly_location_performance
+KPI columns → total_purchase_cost, total_waste_cost, waste_ratio, stockout_events_count, price_alert_events_count
+Source events → inbound_order_created, stock_waste_registered, stock_threshold_triggered, ingredient_price_variance_detected
+HTTP module → services/reporting/ (GET /reporting/weekly-location-performance, POST /reporting/pipeline-runs, GET /reporting/pipeline-runs/latest)
+Engineering path left unchanged → GET /telemetry/report
+```
+
+The design document does not write into `telemetry_events`. It does not use `reporting.business_metrics` or `reporting.weekly_location_metrics`.
 
 ## Planned next steps (order)
 
