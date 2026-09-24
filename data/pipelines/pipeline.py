@@ -40,6 +40,7 @@ env_path = _REPO_ROOT / ".env"
 load_dotenv(dotenv_path=env_path)
 
 _LAST_RUN_PATH = Path(__file__).resolve().parent / "last_run.json"
+_RUN_LOG_PATH = Path(__file__).resolve().parent / "pipeline_run_log.jsonl"
 _RAW_DIR = _REPO_ROOT / "data" / "raw"
 _EVAL_DIR = _REPO_ROOT / "data" / "eval"
 _EVAL_FIXTURES = _EVAL_DIR / "weekly_location_performance_fixtures.json"
@@ -48,6 +49,20 @@ _EVAL_OUTPUT = _EVAL_DIR / "last_validation.json"
 _REPORTING_SCHEMA = "reporting"
 _PERFORMANCE_TABLE = "weekly_location_performance"
 _RUNS_TABLE = "pipeline_runs"
+
+# CONTEXT-company.md unique constraint / upsert conflict target.
+_UPSERT_CONFLICT = "location_id,week_start"
+_KPI_LOAD_COLUMNS = (
+    "location_id",
+    "week_start",
+    "total_purchase_cost",
+    "total_waste_cost",
+    "waste_ratio",
+    "stockout_events_count",
+    "price_alert_events_count",
+    "country",
+    "currency",
+)
 
 
 def _supabase_client() -> Client:
@@ -94,23 +109,68 @@ def _write_last_run(metadata: dict) -> None:
         json.dump(metadata, handle, indent=2, default=str)
 
 
-def _mirror_run(row: dict) -> None:
-    """Mirror the latest pipeline_runs row for GET /reporting/pipeline-runs/latest."""
-    payload = {
+def _append_run_log(metadata: dict) -> None:
+    """Append-only local control log (one JSON object per line).
+
+    Always written even when ``reporting.pipeline_runs`` is unreachable so every
+    attempt still records start/end, records_processed, status, and errors.
+    """
+    _RUN_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(_RUN_LOG_PATH, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps(metadata, default=str) + "\n")
+
+
+def _execution_metadata(row: dict) -> dict:
+    """Minimum execution metadata required by Phase 3 (CONTEXT + design)."""
+    return {
         "run_id": row.get("run_id"),
-        "started_at": row.get("started_at"),
-        "finished_at": row.get("finished_at"),
+        "started_at": row.get("started_at"),  # start time
+        "finished_at": row.get("finished_at"),  # end time
         "window_start": row.get("window_start"),
         "window_end": row.get("window_end"),
         "records_processed": row.get("records_processed"),
-        "status": row.get("status"),
-        "error_message": row.get("error_message"),
+        "status": row.get("status"),  # final status (or Running mid-flight)
+        "error_message": row.get("error_message"),  # captured errors
+        # Compat aliases for older status consumers
         "start_date": row.get("window_start"),
         "end_date": row.get("window_end"),
     }
+
+
+def _mirror_run(row: dict) -> None:
+    """Mirror the latest pipeline_runs row for GET /reporting/pipeline-runs/latest."""
+    payload = _execution_metadata(row)
     if payload.get("error_message"):
         payload["error"] = payload["error_message"]
     _write_last_run(payload)
+    _append_run_log(payload)
+
+
+def normalize_kpi_records(kpis_df: pd.DataFrame) -> list[dict]:
+    """Project the KPI frame onto the CONTEXT destination columns only.
+
+    Used by the idempotent load so a second run sends the same key + values
+    (never a delta) for ``ON CONFLICT (location_id, week_start) DO UPDATE``.
+    """
+    if kpis_df is None or getattr(kpis_df, "empty", True):
+        return []
+    frame = kpis_df.copy()
+    for column in _KPI_LOAD_COLUMNS:
+        if column not in frame.columns:
+            if column in ("total_purchase_cost", "total_waste_cost", "waste_ratio"):
+                frame[column] = 0.0
+            elif column in ("stockout_events_count", "price_alert_events_count"):
+                frame[column] = 0
+            elif column == "country":
+                frame[column] = "Unknown"
+            elif column == "currency":
+                frame[column] = "USD"
+            else:
+                frame[column] = None
+    records = frame.loc[:, list(_KPI_LOAD_COLUMNS)].to_dict(orient="records")
+    # Stable order by PK so two identical runs produce byte-stable payloads.
+    records.sort(key=lambda row: (str(row.get("location_id")), str(row.get("week_start"))))
+    return records
 
 
 def _insert_run_start(run_id: str, window_start: str, window_end: str) -> dict:
@@ -392,19 +452,31 @@ def transform_brasaland_kpis_flow(telemetry_df, locations_df, week_start: str):
 # Three tries match extract — enough for transient API errors, not an indefinite loop.
 @task(retries=3, retry_delay_seconds=5, name="upsert_to_reporting_table")
 def upsert_to_reporting_table(kpis_df) -> int:
-    """Input: KPI frame. Output: count of upserted rows into reporting table."""
-    if kpis_df is None or getattr(kpis_df, "empty", True):
+    """Idempotent load into reporting.weekly_location_performance (Phase 3).
+
+    Strategy (CONTEXT-company.md + PIPELINE_DESIGN.md):
+    - Recompute the full location-week frame upstream (no deltas).
+    - Upsert on the unique constraint ``(location_id, week_start)``.
+    - Conflict clause assigns EXCLUDED KPI totals (replace, never add).
+
+    Two runs over the same window therefore leave identical destination rows.
+    """
+    records = normalize_kpi_records(kpis_df)
+    if not records:
         print("No data to upsert.")
         return 0
-    records = kpis_df.to_dict(orient="records")
     call_external(
         "reporting store",
         lambda: _reporting(_supabase_client())
         .table(_PERFORMANCE_TABLE)
-        .upsert(records, on_conflict="location_id,week_start")
+        .upsert(records, on_conflict=_UPSERT_CONFLICT)
         .execute(),
     )
-    print(f"Successfully upserted {len(records)} records!")
+    print(
+        f"Idempotent upsert of {len(records)} rows "
+        f"on_conflict={_UPSERT_CONFLICT} into "
+        f"{_REPORTING_SCHEMA}.{_PERFORMANCE_TABLE}"
+    )
     return len(records)
 
 
@@ -537,6 +609,11 @@ def run_pipeline(start_date: str, end_date: str) -> dict[str, Any]:
       handled in-flow with ``return_state=True`` (fallback or explicit raise).
     - ``write_eval_snapshot`` is optional and also uses ``return_state=True``.
     - ``aggregate_location_kpis`` is cached (task_input_hash, 1 day).
+
+    Idempotency (Phase 3):
+    - Load upserts on CONTEXT unique key ``(location_id, week_start)``.
+    - Each attempt logs start/end, records_processed, status, and errors to
+      ``reporting.pipeline_runs``, ``last_run.json``, and ``pipeline_run_log.jsonl``.
     """
     run_id = str(uuid.uuid4())
     run_row = _insert_run_start(run_id, start_date, end_date)

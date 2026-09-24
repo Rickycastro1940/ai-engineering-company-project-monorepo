@@ -1,9 +1,11 @@
 -- Brasaland reporting schema for the weekly location cost & waste pipeline.
--- Source of truth: data/pipelines/PIPELINE_DESIGN.md
+-- Source of truth: CONTEXT-company.md (destination schema) + PIPELINE_DESIGN.md
 -- Apply in Supabase SQL editor (or any Postgres that backs the project).
 
 create schema if not exists reporting;
 
+-- Unique constraint / upsert key: (location_id, week_start)
+-- Load assigns EXCLUDED totals on conflict (replace, never add deltas).
 create table if not exists reporting.weekly_location_performance (
     location_id text not null,
     week_start date not null,
@@ -17,6 +19,7 @@ create table if not exists reporting.weekly_location_performance (
     primary key (location_id, week_start)
 );
 
+-- Execution control / audit log (start, end, records, status, errors).
 create table if not exists reporting.pipeline_runs (
     run_id uuid primary key,
     started_at timestamptz not null,
