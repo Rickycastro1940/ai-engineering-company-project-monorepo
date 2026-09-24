@@ -14,7 +14,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
-| Technology: telemetry + pipeline to dashboards | **Partial** — `data/pipelines/` weekly location cost/waste; Celery async path |
+| Technology: telemetry + pipeline to dashboards | **Partial** — design in `data/pipelines/PIPELINE_DESIGN.md` writes `reporting.weekly_location_performance` (purchase, waste, waste ratio, stockouts, price alerts) for Mariana, Felipe, and Lucía; engineering metrics stay on `GET /telemetry/report` |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Not done** as product UI; pipeline design targets cost/waste for Mariana + Felipe |
 | Procurement: supplier price history, consolidated spend | **Not done** (supplier docs may exist on other branches; not claimed here) |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
@@ -182,6 +182,21 @@ Department served: **Technology** (structured HTTP, no env names in 503s) + **Op
 uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py tests/test_users_api.py -q → 33 passed
 cd uis/backoffice && npm run build → green
 ```
+
+## Latest pipeline design (`cursor/pipeline-design-part1-0ca1`)
+
+Department served: **Technology** (Nicolás Park — pipeline into operations and finance dashboards, separate from engineering telemetry) + **Restaurant Operations** (Felipe Guerrero — purchase, waste, stockouts per location in COP or USD) + **Procurement** (Lucía Fernández — purchase cost and price-alert frequency) + **Executive Direction** (Mariana Restrepo — Monday 07:00 America/Bogota location-week report).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+Destination table in PIPELINE_DESIGN.md → reporting.weekly_location_performance
+KPI columns → total_purchase_cost, total_waste_cost, waste_ratio, stockout_events_count, price_alert_events_count
+Source events → inbound_order_created, stock_waste_registered, stock_threshold_triggered, ingredient_price_variance_detected
+HTTP module → services/reporting/ (GET /reporting/weekly-location-performance, POST /reporting/pipeline-runs, GET /reporting/pipeline-runs/latest)
+Engineering path left unchanged → GET /telemetry/report
+```
+
+The design document does not write into `telemetry_events`. It does not use `reporting.business_metrics` or `reporting.weekly_location_metrics`.
 
 ## Planned next steps (order)
 
