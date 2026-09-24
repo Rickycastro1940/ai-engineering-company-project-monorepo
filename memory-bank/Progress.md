@@ -191,7 +191,8 @@ Department served: **Technology** (Nicolás Park — pipeline into operations an
 head -n 5 CONTEXT.md → # Welcome to Brasaland
 Phase 1 headings → Current State (what we have, events captured, storage, engineering answers) + Business Gap
 Unanswered CONTEXT.md question → per-location chain-week purchase cost, waste cost, waste ratio, stockouts, price alerts in COP or USD
-Phase 2 → one purpose sentence; Monday roll-up; five KPIs; JSON extract of telemetry_events + locations; mermaid extract/transform/load; corrected receipt id 3f2a stays one row (1200, not 2200) via id dedupe and upsert on (location_id, week_start)
+Phase 2 → one purpose sentence; Monday roll-up; five KPIs; JSON extract of telemetry_events + locations; mermaid extract/transform/load; corrected InboundOrder for product_id 1 at us-mia-downtown (telemetry id 7c2e9a14-6b0d-4f3a-9e21-0b8d4c1a55f6) stays one row (1200 USD, not 2200) via id dedupe and upsert on (location_id, week_start)
+Domain vocabulary → Location.id roster (co-med-centro … us-jacksonville); country Colombia|United States; currency COP|USD; region Florida not stored on the rollup; products.csv product_id 1 Tomatoes kg, 2 Mozzarella kg, 3 Napkins boxes; OrderType INBOUND|OUTBOUND; waste reason expiration|kitchen error|unexplained shrinkage. No invented supplier id.
 Destination tables → reporting.weekly_location_performance (KPI) and reporting.pipeline_runs (run log)
 services/reporting endpoints → GET /reporting/pipeline-runs/latest (status), POST /reporting/pipeline-runs (manual trigger), GET /reporting/weekly-location-performance (KPI query); separate from telemetry_events and GET /telemetry/report
 Phase 3 → partial load of co-med-centro (18500000 COP) then crash; rerun upserts the same key so the total stays 18500000 and us-mia-downtown is inserted once. Run log fields: started_at, finished_at, records_processed, status, error_message

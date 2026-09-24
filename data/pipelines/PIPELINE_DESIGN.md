@@ -61,15 +61,18 @@ Eight Colombia ids, six Florida ids. Emitters must not use fixture labels such a
 
 ### Inventory entities
 
-| Entity | Monorepo meaning | How this pipeline sees it |
-| --- | --- | --- |
-| `Product` | Ingredient or supply (`product_id`, `name`, `quantity`, `unit` on `products.csv` / `GET /inventory`) | `product_id` (integer ≥ 1) may sit on the event payload; the weekly rollup does not group by product |
-| `InboundOrder` | Goods received from a supplier at a location (`OrderType` `INBOUND`) | Emits `inbound_order_created` per line; `event_payload.cost` feeds `total_purchase_cost` |
-| `OutboundOrder` | Kitchen consumption or transfer (`OrderType` `OUTBOUND`) | Emits `outbound_order_created`; out of this weekly table |
-| `Location` | One of the 14 rows above | Join key `locations.id` = `event_payload.location_id` |
-| Supplier | ~20 suppliers across the two markets (`supplier_id` like `sup_…`) | Price alerts fire when an inbound unit cost moves; counted as `ingredient_price_variance_detected` |
+Names below are the fields in this checkout. The live inventory file is `products.csv` (`product_id`, `name`, `quantity`, `unit`), read by `GET /inventory` in `services/api/inventory.py`. The declared order models are `Product`, `InboundOrder`, and `OutboundOrder` in `services/api/models.py`. `OrderType` in `services/api/schemas.py` is `INBOUND` or `OUTBOUND`.
 
-Waste `reason` on `stock_waste_registered` is one of `expired`, `kitchen_error`, or `theft_suspected`. Amounts stay in the location currency. The telemetry layer does not convert COP to USD.
+| Entity | Fields in the monorepo | How this pipeline uses them |
+| --- | --- | --- |
+| `Product` (live row) | `product_id` integer ≥ 1, `name`, `quantity`, `unit`. Current rows: `1` Tomatoes `kg`, `2` Mozzarella `kg`, `3` Napkins `boxes` | `event_payload.product_id` is that integer. The weekly rollup does not group by `product_id`. It does not use `sku`. |
+| `Product` (declared SQLModel) | `id`, `name`, `sku`, `unit` | Not the live writer. Do not switch the event id to `sku`. |
+| `InboundOrder` | `id`, `product_id` (FK to `product.id`), `quantity`, `created_at`, `user_uuid`. `OrderType` `INBOUND` | One `inbound_order_created` per line. `event_payload.cost` feeds `total_purchase_cost`. `user_uuid` stays off the reporting row. |
+| `OutboundOrder` | `id`, `product_id`, `quantity`, `created_at`, `user_uuid`. `OrderType` `OUTBOUND` | Emits `outbound_order_created`. Out of `reporting.weekly_location_performance`. |
+| `Location` | `id`, `name`, `city`, `country` (`Colombia` \| `United States`), `currency` (`COP` \| `USD`), `region` (`Colombia` \| `Florida`) | Join `locations.id` = `event_payload.location_id`. The reporting row stores `country` and `currency`. It does not store `region` or `city`. |
+| Supplier | `CONTEXT.md`: about 20 suppliers (meat, vegetables, sauces, beverages, packaging, cleaning products). No `supplier_id` column in this checkout | `ingredient_price_variance_detected` is counted per `location_id`. This table does not mint a supplier key. |
+
+`stock_waste_registered.reason` uses the three categories in `docs/company-knowledge-base/brasaland-waste-protocol.en.md`: `expiration`, `kitchen error`, and `unexplained shrinkage`. Amounts stay in `Location.currency`. The telemetry layer does not convert COP to USD.
 
 ### People and departments (`CONTEXT.md`)
 
@@ -112,7 +115,7 @@ These five numbers are the weekly location grain of the telemetry floor. The eng
 | Stockout frequency | `stockout_events_count` | Count of rows | `stock_threshold_triggered` |
 | Price alert frequency | `price_alert_events_count` | Count of rows | `ingredient_price_variance_detected` |
 
-`payload.cost` is a number in the location currency. Purchase and waste events always carry `cost`. Stockout and price-alert events omit `cost`; the transform treats a missing or non-numeric cost as `0` and only counts the row. A non-dict payload does not raise. It contributes cost `0` and no `location_id`, so the location group-by leaves it out of the rollup.
+`event_payload.cost` is a number in `Location.currency` (`COP` or `USD`). Purchase and waste events always carry `cost`. Stockout and price-alert events omit `cost`; the transform treats a missing or non-numeric cost as `0` and only counts the row. A non-dict `event_payload` does not raise. It contributes cost `0` and no `location_id`, so the location group-by leaves it out of the rollup. `location_id` must be a `Location.id` from `services/api/locations.py`, not a fixture label such as `miami-downtown`.
 
 The extract filters exactly those four `event_type` values. Other telemetry (`sale_completed`, `page_view`, `user_login_succeeded`, `user_login_failed`, `api_error`, chain-scoped inventory deltas) is out of this table.
 
@@ -163,13 +166,13 @@ Operational events already defined for kitchens and suppliers. `GET /telemetry/r
 | `event_type` | Fires when | KPI it feeds |
 | --- | --- | --- |
 | `inbound_order_created` | An `InboundOrder` line (`OrderType` `INBOUND`) is committed at a location | Purchase cost (`event_payload.cost`) |
-| `stock_waste_registered` | Waste is logged; `reason` is `expired`, `kitchen_error`, or `theft_suspected` | Waste cost (`event_payload.cost`) |
+| `stock_waste_registered` | Waste is logged. `reason` is `expiration`, `kitchen error`, or `unexplained shrinkage` (waste protocol) | Waste cost (`event_payload.cost`) |
 | `stock_threshold_triggered` | Stock for a `Product` falls below the configured minimum at a location | Stockout frequency (row count) |
 | `ingredient_price_variance_detected` | An inbound unit cost for a `Product` / supplier jumps versus history | Price-alert frequency (row count) |
 | `outbound_order_created` | An `OutboundOrder` line (`OrderType` `OUTBOUND`) is committed | None. Out of this weekly table |
 | `direct_stock_edit_rejected` | A direct stock edit is blocked (stock changes only via inbound/outbound orders) | None. Out of this weekly table |
 
-Purchase, waste, stockout, and price-alert events carry `location_id` (a roster id such as `co-med-centro` or `us-mia-downtown`), `country` (`Colombia` or `United States`), `product_id` (integer inventory id), `quantity`, `unit`, and `currency` (`COP` or `USD`). Waste also carries `reason`. Amounts stay in the location currency. The telemetry layer does not convert COP to USD.
+Purchase, waste, stockout, and price-alert events carry `location_id` (a `Location.id` such as `co-med-centro` or `us-mia-downtown`), `country` (`Colombia` or `United States`), `product_id` (the integer from `products.csv`, for example `1` for Tomatoes), `quantity`, `unit` (`kg` or `boxes` on the current file), and `currency` (`COP` or `USD`). Waste also carries `reason`. Amounts stay in `Location.currency`. The telemetry layer does not convert COP to USD. `InboundOrder.user_uuid` is not a reporting column.
 
 #### Where they are stored
 
@@ -267,17 +270,17 @@ flowchart LR
 
 ### Source rows that are updated, and how duplicates are avoided
 
-`telemetry_events` does not only insert. A corrected supplier receipt keeps `telemetry_events.id` and changes `event_payload.cost` on that same row. `locations.id` is the same kind of key: an edit changes `country` or `currency` on the existing site row.
+`telemetry_events` does not only insert. A corrected `InboundOrder` keeps `telemetry_events.id` and changes `event_payload.cost` on that same row. `locations.id` is the same kind of key: an edit changes `country` or `currency` on the existing `Location` row.
 
 An append-only strategy would treat the corrected receipt as new money and add it to the cost already stored for the week. This pipeline does not do that. Every run is a fresh snapshot of the current rows for the whole chain week. It does not keep a high-water mark of inserts since the last run, and it does not add this run’s costs onto the costs already stored for that week.
 
-Concrete case. Week `2026-09-21`, location `us-mia-downtown`. Event `id` `3f2a` is `inbound_order_created` with `cost` 1000 USD. The supplier later corrects the receipt: the same `id` `3f2a` now has `cost` 1200 USD. There is still one source row.
+Concrete case. Chain week `week_start = 2026-09-21`. `Location.id` `us-mia-downtown` (Miami Downtown, `country` `United States`, `currency` `USD`, `region` `Florida`). `InboundOrder` for `product_id` `1` (Tomatoes, `unit` `kg`, `OrderType` `INBOUND`). `telemetry_events.id` `7c2e9a14-6b0d-4f3a-9e21-0b8d4c1a55f6`, `event_type` `inbound_order_created`, `event_payload.cost` `1000` USD. A correction updates that same `id` to `cost` `1200`. It does not insert a second event. `user_uuid` on the order is not written to the reporting row.
 
-| Step | What happens to `3f2a` | Purchase cost for `us-mia-downtown` / `2026-09-21` |
+| Step | What happens to `7c2e9a14-6b0d-4f3a-9e21-0b8d4c1a55f6` | `total_purchase_cost` for `us-mia-downtown` / `2026-09-21` |
 | --- | --- | --- |
-| Extract | The week snapshot contains `3f2a` once, with `cost` 1200. The old 1000 is gone because the row was updated, not copied. | — |
-| If the JSON lists `3f2a` twice | Drop duplicates on `id` before any sum, keeping one copy. | The 1200 is not added to itself. |
-| Transform | Sum `cost` on the remaining `inbound_order_created` rows. | `total_purchase_cost` = 1200, not 1000 + 1200. |
+| Extract | The week snapshot contains that `id` once, with `event_payload.cost` 1200 and `event_payload.location_id` `us-mia-downtown`. The old 1000 is gone because the row was updated. | — |
+| If the JSON lists that `id` twice | Drop duplicates on `telemetry_events.id` before any sum, keeping one copy. | The 1200 is not added to itself. |
+| Transform | Sum `event_payload.cost` on the remaining `inbound_order_created` rows. Join `locations.id` for `country` and `currency`. | `total_purchase_cost` = 1200 USD, not 1000 + 1200. `currency` is `USD`. |
 | Load | `INSERT ... ON CONFLICT (location_id, week_start) DO UPDATE` sets `total_purchase_cost = EXCLUDED.total_purchase_cost`. | The existing location-week row is replaced with 1200. A second Monday run does not insert another row and does not add 1200 to the stored total. |
 
 The same three rules apply to waste cost, stockout count, and price-alert count: dedupe on `telemetry_events.id`, recompute the week from that snapshot, then replace the destination key `(location_id, week_start)`. The conflict clause assigns the new total. It is not `total_purchase_cost = weekly_location_performance.total_purchase_cost + EXCLUDED.total_purchase_cost`.
