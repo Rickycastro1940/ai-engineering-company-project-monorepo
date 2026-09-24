@@ -189,6 +189,8 @@ Department served: **Technology** (Nicolás Park — pipeline into operations an
 
 ```text
 head -n 5 CONTEXT.md → # Welcome to Brasaland
+Phase 1 headings → Current State (what we have, events captured, storage, engineering answers) + Business Gap
+Unanswered CONTEXT.md question → per-location chain-week purchase cost, waste cost, waste ratio, stockouts, price alerts in COP or USD
 Destination table in PIPELINE_DESIGN.md → reporting.weekly_location_performance
 KPI columns → total_purchase_cost, total_waste_cost, waste_ratio, stockout_events_count, price_alert_events_count
 Source events → inbound_order_created, stock_waste_registered, stock_threshold_triggered, ingredient_price_variance_detected
