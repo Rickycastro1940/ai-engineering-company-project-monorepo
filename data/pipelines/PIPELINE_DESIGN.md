@@ -9,6 +9,29 @@
 **Destination table:** `reporting.weekly_location_performance`
 **Source (read-only):** `telemetry_events`, plus the `locations` dimension
 
+## Destination tables
+
+New analytical tables for this pipeline live in the `reporting` schema. They are not written into `telemetry_events`.
+
+| Schema | Table | What it is |
+| --- | --- | --- |
+| `reporting` | `weekly_location_performance` | The destination table. Full name: `reporting.weekly_location_performance`. One row per location per chain week, with purchase cost, waste cost, waste ratio, stockout frequency, and price-alert frequency. |
+| `reporting` | `pipeline_runs` | Run log for that load (`reporting.pipeline_runs`). Not the KPI destination. |
+
+`reporting.weekly_location_performance` is the name in the destination table contract. It is not `reporting.business_metrics`. It is not `reporting.weekly_location_metrics`. `GET /telemetry/report` does not read or write either table.
+
+## Endpoints in `services/reporting/`
+
+These three routes live in `services/reporting/`. That module is not `services/telemetry/`. None of the routes is `GET /telemetry/report`. None of them returns rows from `telemetry_events`.
+
+| Role | Endpoint | Table it exposes |
+| --- | --- | --- |
+| Status | `GET /reporting/pipeline-runs/latest` | `reporting.pipeline_runs` |
+| Manual trigger | `POST /reporting/pipeline-runs` | Starts the load into `reporting.weekly_location_performance`. Returns `202` and a `task_id`. |
+| KPI query | `GET /reporting/weekly-location-performance` | `reporting.weekly_location_performance` |
+
+`services/reporting/` imports the orchestrator in `data/pipelines/`. `data/pipelines/` does not import `services/reporting/`. The engineering reader stays on `GET /telemetry/report` over `telemetry_events`.
+
 ## Brasaland domain vocabulary
 
 Field names and values below match the monorepo. They are not generic retail placeholders.
