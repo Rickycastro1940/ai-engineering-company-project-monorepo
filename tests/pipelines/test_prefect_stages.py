@@ -131,3 +131,65 @@ def test_optional_eval_success_path(monkeypatch):
     monkeypatch.setattr(mod, "write_eval_snapshot", _ok_eval)
     result = mod.run_pipeline.fn("2026-09-21", "2026-09-28")
     assert result["status"] == "Success"
+
+
+def test_extract_domain_failure_uses_return_state_fallback(monkeypatch):
+    """locations extract Failed → empty frame; telemetry still returned."""
+    from data.pipelines import pipeline as mod
+
+    telemetry = pd.DataFrame(
+        [
+            {
+                "id": "1",
+                "event_type": "inbound_order_created",
+                "event_payload": {"location_id": "us-mia-downtown", "cost": 10},
+            }
+        ]
+    )
+
+    monkeypatch.setattr(
+        mod, "extract_telemetry_events", MagicMock(return_value=telemetry)
+    )
+
+    def _fail_locations(*args, **kwargs):
+        assert kwargs.get("return_state") is True
+        return Failed(message="locations down")
+
+    monkeypatch.setattr(mod, "extract_domain_data", _fail_locations)
+    monkeypatch.setattr(mod, "land_raw_extracts", MagicMock(return_value={}))
+
+    telemetry_out, locations_out = mod.extract_brasaland_data_flow.fn(
+        "2026-09-21", "2026-09-28"
+    )
+    assert len(telemetry_out) == 1
+    assert list(locations_out.columns) == ["id", "country", "currency"]
+    assert locations_out.empty
+
+
+def test_load_flow_handles_upsert_failure_with_return_state(monkeypatch):
+    from data.pipelines import pipeline as mod
+
+    def _fail_upsert(*args, **kwargs):
+        assert kwargs.get("return_state") is True
+        return Failed(message="upsert down")
+
+    monkeypatch.setattr(mod, "upsert_to_reporting_table", _fail_upsert)
+    with pytest.raises(RuntimeError, match="upsert failed after retries"):
+        mod.load_brasaland_reporting_flow.fn(pd.DataFrame())
+
+
+def test_external_tasks_declare_retries():
+    from data.pipelines import pipeline as mod
+
+    for task_fn in (
+        mod.extract_telemetry_events,
+        mod.extract_domain_data,
+        mod.upsert_to_reporting_table,
+    ):
+        assert task_fn.retries == 3
+        assert task_fn.retry_delay_seconds == 5
+
+    assert mod.aggregate_location_kpis.cache_expiration == __import__(
+        "datetime"
+    ).timedelta(days=1)
+    assert mod.aggregate_location_kpis.cache_key_fn is not None

@@ -275,6 +275,9 @@ def write_validation_output(kpis_df: pd.DataFrame, week_start: str) -> dict[str,
 # ---------------------------------------------------------------------------
 
 
+# Retries=3, delay=5s: covers transient Supabase/PostgREST blips (timeouts, 502/503)
+# without stretching the Monday 07:00 window. Three attempts ≈ 15s of backoff headroom
+# before the stage fails; more retries mostly delay a true outage signal.
 @task(retries=3, retry_delay_seconds=5, name="extract_telemetry_events")
 def extract_telemetry_events(start_date: str, end_date: str):
     """Input: chain-week bounds. Output: telemetry_events rows (four KPI types)."""
@@ -291,6 +294,8 @@ def extract_telemetry_events(start_date: str, end_date: str):
     return pd.DataFrame(response.data or [])
 
 
+# Retries=3, delay=5s: same store as telemetry; locations is 14 small rows, so three
+# short retries are enough for a dropped connection without masking a missing table.
 @task(retries=3, retry_delay_seconds=5, name="extract_domain_data")
 def extract_domain_data():
     """Input: none. Output: locations dimension (id, country, currency)."""
@@ -306,7 +311,7 @@ def extract_domain_data():
 
 @task(name="land_raw_extracts")
 def land_raw_extracts(telemetry_df, locations_df, start_date: str, end_date: str):
-    """Input: extract frames + window. Output: paths under data/raw/."""
+    """Input: extract frames + window. Output: paths under data/raw/ (local FS only)."""
     paths = _land_raw_extracts(telemetry_df, locations_df, start_date, end_date)
     print(f"Landed extract snapshots: {paths}")
     return paths
@@ -318,8 +323,22 @@ def extract_brasaland_data_flow(start_date: str, end_date: str):
 
     Returns ``(telemetry_df, locations_df)``.
     """
+    # Telemetry is required — let failures propagate after task retries.
     telemetry_df = extract_telemetry_events(start_date, end_date)
-    locations_df = extract_domain_data()
+
+    # Domain dimension is useful but not fatal: handle failure explicitly with
+    # return_state=True so a locations outage does not abort the week extract.
+    # Transform falls back to country=Unknown / currency=USD for unmatched ids.
+    locations_state = extract_domain_data(return_state=True)
+    if locations_state.is_failed():
+        print(
+            "extract_domain_data failed after retries; "
+            "continuing with an empty locations frame (dimension fallbacks apply)."
+        )
+        locations_df = pd.DataFrame(columns=["id", "country", "currency"])
+    else:
+        locations_df = locations_state.result()
+
     land_raw_extracts(telemetry_df, locations_df, start_date, end_date)
     return telemetry_df, locations_df
 
@@ -330,18 +349,26 @@ def extract_brasaland_data_flow(start_date: str, end_date: str):
 
 
 @task(
+    # Cache key: task_input_hash over (telemetry_df, locations_df, week_start) —
+    # same week + same extract inputs reuse the KPI frame without re-aggregating.
+    # Expiration: 1 day — covers re-runs / audits on Monday after the 07:00 job
+    # without serving stale KPIs into the next chain week.
     cache_key_fn=task_input_hash,
     cache_expiration=timedelta(days=1),
     name="aggregate_location_kpis",
 )
 def aggregate_location_kpis(telemetry_df, locations_df, week_start: str):
-    """Input: extract frames + week_start. Output: one KPI row per location."""
+    """Input: extract frames + week_start. Output: one KPI row per location.
+
+    Expensive relative to I/O-light landings: pandas groupby + join over the
+    full week snapshot. Cached so a same-day rerun with identical inputs skips work.
+    """
     return _aggregate_kpis(telemetry_df, locations_df, week_start)
 
 
 @task(name="land_kpi_intermediate")
 def land_kpi_intermediate(kpis_df, week_start: str) -> str:
-    """Input: KPI frame. Output: intermediate JSON path under data/raw/."""
+    """Input: KPI frame. Output: intermediate JSON path under data/raw/ (local FS)."""
     path = _land_kpi_intermediate(kpis_df, week_start)
     print(f"Landed KPI intermediate: {path}")
     return path
@@ -360,6 +387,9 @@ def transform_brasaland_kpis_flow(telemetry_df, locations_df, week_start: str):
 # ---------------------------------------------------------------------------
 
 
+# Retries=3, delay=5s: upsert must survive a brief Supabase blip; the load is
+# idempotent on (location_id, week_start), so repeating the same payload is safe.
+# Three tries match extract — enough for transient API errors, not an indefinite loop.
 @task(retries=3, retry_delay_seconds=5, name="upsert_to_reporting_table")
 def upsert_to_reporting_table(kpis_df) -> int:
     """Input: KPI frame. Output: count of upserted rows into reporting table."""
@@ -380,8 +410,19 @@ def upsert_to_reporting_table(kpis_df) -> int:
 
 @flow(name="load_brasaland_reporting_flow", log_prints=True)
 def load_brasaland_reporting_flow(kpis_df) -> int:
-    """Load stage: idempotent upsert into reporting.weekly_location_performance."""
-    return upsert_to_reporting_table(kpis_df)
+    """Load stage: idempotent upsert into reporting.weekly_location_performance.
+
+    Upsert failures are inspected via ``return_state=True`` (not left to bubble
+    as an unhandled task exception) so the flow can log a clear load failure.
+    """
+    load_state = upsert_to_reporting_table(kpis_df, return_state=True)
+    if load_state.is_failed():
+        print(
+            "upsert_to_reporting_table failed after retries; "
+            "handling explicitly in load_brasaland_reporting_flow."
+        )
+        raise RuntimeError("reporting store upsert failed after retries")
+    return load_state.result()
 
 
 # ---------------------------------------------------------------------------
@@ -393,8 +434,8 @@ def load_brasaland_reporting_flow(kpis_df) -> int:
 def write_eval_snapshot(kpis_df, week_start: str):
     """Optional secondary report: fixture validation under data/eval/.
 
-    Non-critical: the parent flow must call this with ``return_state=True`` so a
-    failure here does not interrupt extract → transform → load.
+    Local FS only — no external-service retries. Non-critical: the parent flow
+    calls this with ``return_state=True`` so a failure never interrupts ETL.
     """
     return write_validation_output(kpis_df, week_start)
 
@@ -490,8 +531,12 @@ def get_latest_pipeline_run() -> dict[str, Any]:
 def run_pipeline(start_date: str, end_date: str) -> dict[str, Any]:
     """Monday chain-week ETL: extract → transform → load (+ optional eval).
 
-    Stage subflows carry the critical path. The eval snapshot is invoked with
-    ``return_state=True`` so a failure there never fails the main run.
+    Resilience (Phase 2):
+    - External Supabase tasks use retries=3 / retry_delay_seconds=5.
+    - ``extract_domain_data`` and ``upsert_to_reporting_table`` failures are
+      handled in-flow with ``return_state=True`` (fallback or explicit raise).
+    - ``write_eval_snapshot`` is optional and also uses ``return_state=True``.
+    - ``aggregate_location_kpis`` is cached (task_input_hash, 1 day).
     """
     run_id = str(uuid.uuid4())
     run_row = _insert_run_start(run_id, start_date, end_date)
