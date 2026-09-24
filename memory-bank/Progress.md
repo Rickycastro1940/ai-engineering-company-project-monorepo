@@ -190,7 +190,10 @@ Department served: **Technology** (Nicolás — pipeline into ops/finance dashbo
 Implemented against `CONTEXT-company.md` (KPIs to Measure / destination schema / endpoints) and approved `data/pipelines/PIPELINE_DESIGN.md`:
 
 - Pure transform in `data/process/location_kpis.py` (dedupe on `telemetry_events.id`, five KPIs, roster `location_id`s).
-- Prefect **3** flow `brasaland_weekly_performance_pipeline` (`uv add "prefect>=3"`) with tasks `extract_weekly_inputs` → `aggregate_location_kpis` → `upsert_to_reporting_table`.
+- Prefect **3** flow `brasaland_weekly_performance_pipeline` with stage subflows
+  `extract_brasaland_data_flow` → `transform_brasaland_kpis_flow` → `load_brasaland_reporting_flow`
+  and tasks `extract_telemetry_events` / `extract_domain_data` / `aggregate_location_kpis` /
+  `upsert_to_reporting_table` into `reporting.weekly_location_performance`.
 - Extract lands in `data/raw/`; validation output in `data/eval/last_validation.json`.
 - Destination `reporting.weekly_location_performance` + run log `reporting.pipeline_runs` (SQL in `data/pipelines/reporting_schema.sql`); mirror `data/pipelines/last_run.json`.
 - HTTP shell in `services/reporting/` only — engineering telemetry left alone.

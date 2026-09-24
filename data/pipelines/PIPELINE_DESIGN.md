@@ -325,24 +325,40 @@ Minimum fields on every run:
 
 Part 1 is one main flow and three tasks. A second flow for backfill is optional here. Part 3 is where extract, transform, and load become their own subflows.
 
-### Main flow
+### Tasks and stage subflows (Part 3)
+
+Part 1 was one main flow and three tasks. Part 3 splits extract, transform, and load into named subflows. Prefect `name=` values below are the contract — they must match `data/pipelines/pipeline.py`.
+
+#### Main flow
 
 | Prefect concept | Brasaland object |
 | --- | --- |
 | Flow | `brasaland_weekly_performance_pipeline` (`run_pipeline(start_date, end_date)` in `data/pipelines/pipeline.py`) |
-| Parameters | `start_date`, `end_date`: the chain-week bounds passed to extract and stored on the run log |
-| Schedule | Deployment cron Monday 07:00 America/Bogota. The parameters are the previous chain week. |
-| What it does | Calls extract, then transform, then load, in that order. Writes `reporting.pipeline_runs` around the call. |
+| Parameters | `start_date`, `end_date`: the chain-week bounds passed to extract and stored on `reporting.pipeline_runs` |
+| Schedule | Deployment cron Monday 07:00 America/Bogota (previous chain week), or `python data/pipelines/pipeline.py` |
+| What it does | Calls the three stage subflows in order, then optional eval. Writes `reporting.pipeline_runs` around the call. |
 
-### Tasks
+#### Stage subflows
 
-| Task | Stage | What it does |
+| Subflow `name=` | Stage | Calls |
 | --- | --- | --- |
-| `extract_weekly_inputs` | Extract | Reads the JSON snapshots: `telemetry_events` for the four KPI event types in the window, and `locations` (`id`, `country`, `currency`). Returns both frames. Retries on a store timeout. |
-| `aggregate_location_kpis` | Transform | Dedupes on event `id`, sums purchase and waste cost, counts stockouts and price alerts, joins `locations`, and returns one row per `location_id` for `week_start`. No database write. |
-| `upsert_to_reporting_table` | Load | Upserts that frame into `reporting.weekly_location_performance` on `(location_id, week_start)`, assigning the recomputed totals. Retries on a store timeout. |
+| `extract_brasaland_data_flow` | Extract | `extract_telemetry_events`, `extract_domain_data`, `land_raw_extracts` |
+| `transform_brasaland_kpis_flow` | Transform | `aggregate_location_kpis`, `land_kpi_intermediate` |
+| `load_brasaland_reporting_flow` | Load | `upsert_to_reporting_table` |
 
-`extract_telemetry_events` and `extract_domain_data` are the two reads inside the extract task. They stay in this one task until Part 3 splits the stages into subflows.
+#### Tasks
+
+| Task `name=` | Stage | What it does |
+| --- | --- | --- |
+| `extract_telemetry_events` | Extract | Reads `telemetry_events` for the four KPI `event_type` values in `[start_date, end_date)`: `inbound_order_created`, `stock_waste_registered`, `stock_threshold_triggered`, `ingredient_price_variance_detected`. Columns: `id`, `event_type`, `created_at`, `event_payload`. Retries on store timeout. |
+| `extract_domain_data` | Extract | Reads `locations` (`id`, `country`, `currency`) for the 14 Brasaland roster ids. Retries on store timeout. |
+| `land_raw_extracts` | Extract | Writes extract snapshots under `data/raw/` (audit only). |
+| `aggregate_location_kpis` | Transform | Dedupes on event `id`, sums `event_payload.cost` for purchase/waste, counts stockouts and price alerts, joins `locations`, returns one row per `location_id` for `week_start` with columns `total_purchase_cost`, `total_waste_cost`, `waste_ratio`, `stockout_events_count`, `price_alert_events_count`, `country`, `currency`. No database write. |
+| `land_kpi_intermediate` | Transform | Writes the KPI frame under `data/raw/` before load. |
+| `upsert_to_reporting_table` | Load | Upserts into `reporting.weekly_location_performance` on `(location_id, week_start)`, assigning recomputed totals. Retries on store timeout. |
+| `write_eval_snapshot` | Optional | Fixture check under `data/eval/`; must not fail the main ETL (`return_state=True`). |
+
+Part 1’s combined extract name `extract_weekly_inputs` is superseded by the two extract tasks inside `extract_brasaland_data_flow`. Do not introduce `reporting.business_metrics` or `reporting.weekly_location_metrics`.
 
 ### States
 

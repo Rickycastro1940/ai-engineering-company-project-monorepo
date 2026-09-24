@@ -2,17 +2,19 @@
 
 Main entry: ``data/pipelines/pipeline.py`` (this file).
 Contracts: root ``CONTEXT-company.md`` (KPIs / schema / endpoints) and
-``data/pipelines/PIPELINE_DESIGN.md`` Phase 4 (flows + tasks).
+``data/pipelines/PIPELINE_DESIGN.md``.
 
-Prefect structure (Phase 1 — flows and tasks):
-- Stage subflows: extract → transform → load
-- Independent ``@task`` units with explicit inputs/outputs per stage
-- Optional non-critical eval snapshot via ``return_state=True`` (must not fail ETL)
+Prefect ``name=`` contract (must stay in sync with PIPELINE_DESIGN.md Phase 4):
+- Flow: ``brasaland_weekly_performance_pipeline``
+- Subflows: ``extract_brasaland_data_flow``, ``transform_brasaland_kpis_flow``,
+  ``load_brasaland_reporting_flow``
+- Tasks: ``extract_telemetry_events``, ``extract_domain_data``,
+  ``aggregate_location_kpis``, ``upsert_to_reporting_table`` (+ landing / eval)
 
-Placement:
-- ``data/raw/`` — extract snapshots and intermediate KPI frames
-- ``data/process/location_kpis.py`` — reusable transform
-- ``data/eval/`` — fixtures and validation outputs
+Destination: ``reporting.weekly_location_performance`` on
+``(location_id, week_start)``. Run log: ``reporting.pipeline_runs``.
+KPI event types: ``inbound_order_created``, ``stock_waste_registered``,
+``stock_threshold_triggered``, ``ingredient_price_variance_detected``.
 
 Does not write ``telemetry_events`` and does not touch engineering telemetry analysis.
 """
