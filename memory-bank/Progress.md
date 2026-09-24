@@ -198,10 +198,9 @@ Implemented against `CONTEXT-company.md` (KPIs to Measure / destination schema /
 ```text
 head -n 5 CONTEXT.md → # Welcome to Brasaland
 uv run python -c "import prefect; print(prefect.__version__)" → 3.4.25
-uv run python -m pytest tests/pipelines/ -q → 18 passed
-Stage subflows: extract → transform → load; external tasks retries=3 / delay=5s
-return_state=True: extract_domain_data fallback; upsert explicit fail; eval non-blocking
-aggregate_location_kpis cache: task_input_hash, expiration 1 day
+uv run python -m pytest tests/pipelines/ -q → 23 passed
+Idempotent load: upsert on_conflict=location_id,week_start (CONTEXT PK); identical re-run payloads
+Run metadata: started_at, finished_at, records_processed, status, error_message → pipeline_runs + last_run.json + pipeline_run_log.jsonl
 ```
 
 ## Planned next steps (order)
