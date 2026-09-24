@@ -1,92 +1,118 @@
-import os
+"""Unit tests for Brasaland weekly location KPI transform (Part 2).
+
+Fixtures and expected values follow data/pipelines/PIPELINE_DESIGN.md and
+data/eval/weekly_location_performance_fixtures.json (CONTEXT.md roster ids).
+"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
 import pandas as pd
 import pytest
-from data.pipelines.pipeline import _supabase_client, aggregate_location_kpis
 
-def test_aggregate_location_kpis_computation():
-    """Validates computed KPI values match hand-calculated inputs."""
-    # Setup test data based on CONTEXT-company.md events
-    telemetry_data = {
-        "event_type": [
-            "inbound_order_created",
-            "stock_waste_registered",
-            "stock_threshold_triggered",
-            "ingredient_price_variance_detected"
-        ],
-        "event_payload": [
-            {"location_id": "miami-downtown", "cost": 1000},  # Purchase
-            {"location_id": "miami-downtown", "cost": 150},   # Waste
-            {"location_id": "miami-downtown"},               # Stockout
-            {"location_id": "miami-downtown"}                # Price Alert
-        ]
-    }
-    telemetry_df = pd.DataFrame(telemetry_data)
-    
-    locations_data = {
-        "id": ["miami-downtown"],
-        "country": ["US"],
-        "currency": ["USD"]
-    }
-    locations_df = pd.DataFrame(locations_data)
-    
-    # Run transformation task using .fn to bypass Prefect's engine for unit testing
-    result_df = aggregate_location_kpis.fn(telemetry_df, locations_df, "2026-07-08")
-    
-    # Assertions
-    assert not result_df.empty
-    row = result_df.iloc[0]
-    
-    # Verify exact hand-calculated KPIs
-    assert row["total_purchase_cost"] == 1000.0
-    assert row["total_waste_cost"] == 150.0
-    assert row["waste_ratio"] == 0.15          # 150 / 1000
-    assert row["stockout_events_count"] == 1
-    assert row["price_alert_events_count"] == 1
-    assert row["country"] == "US"
-    assert row["currency"] == "USD"
+from data.pipelines.pipeline import _supabase_client
+from data.process.location_kpis import aggregate_location_kpis
+
+_EVAL = Path(__file__).resolve().parents[2] / "data" / "eval" / "weekly_location_performance_fixtures.json"
+
+
+def _load_eval() -> dict:
+    with open(_EVAL, encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def test_aggregate_location_kpis_from_eval_fixtures():
+    """Hand-calculated KPIs for us-mia-downtown and co-med-centro."""
+    fixture = _load_eval()
+    events = []
+    locations = []
+    for loc in fixture["locations"]:
+        events.extend(loc["events"])
+        locations.append(
+            {
+                "id": loc["location_id"],
+                "country": loc["country"],
+                "currency": loc["currency"],
+            }
+        )
+
+    result_df = aggregate_location_kpis(
+        pd.DataFrame(events),
+        pd.DataFrame(locations),
+        fixture["week_start"],
+    )
+    assert len(result_df) == 2
+
+    for loc in fixture["locations"]:
+        row = result_df[result_df["location_id"] == loc["location_id"]].iloc[0]
+        expected = loc["expected"]
+        assert row["total_purchase_cost"] == expected["total_purchase_cost"]
+        assert row["total_waste_cost"] == expected["total_waste_cost"]
+        assert row["waste_ratio"] == expected["waste_ratio"]
+        assert row["stockout_events_count"] == expected["stockout_events_count"]
+        assert row["price_alert_events_count"] == expected["price_alert_events_count"]
+        assert row["country"] == loc["country"]
+        assert row["currency"] == loc["currency"]
+        assert row["week_start"] == fixture["week_start"]
+
+
+def test_aggregate_location_kpis_dedupes_event_id():
+    """Corrected inbound cost on the same telemetry_events.id replaces, not stacks."""
+    fixture = _load_eval()
+    case = fixture["dedupe_case"]
+    locations_df = pd.DataFrame(
+        [{"id": "us-mia-downtown", "country": "United States", "currency": "USD"}]
+    )
+    result_df = aggregate_location_kpis(
+        pd.DataFrame(case["events"]),
+        locations_df,
+        fixture["week_start"],
+    )
+    assert result_df.iloc[0]["total_purchase_cost"] == case["expected_purchase_cost"]
+
 
 def test_aggregate_location_kpis_empty_input():
-    """Defensive behaviour: Handles empty input gracefully."""
-    telemetry_df = pd.DataFrame()
-    locations_df = pd.DataFrame()
-    
-    result_df = aggregate_location_kpis.fn(telemetry_df, locations_df, "2026-07-08")
-    
-    # Should return an empty DataFrame instead of crashing
+    result_df = aggregate_location_kpis(pd.DataFrame(), pd.DataFrame(), "2026-09-21")
     assert result_df.empty
 
+
 def test_aggregate_location_kpis_non_dict_payload():
-    """Non-dict payloads should not crash KPI aggregation."""
     telemetry_df = pd.DataFrame(
         {
+            "id": ["x1"],
             "event_type": ["inbound_order_created"],
             "event_payload": ["not-a-dict"],
         }
     )
-    locations_df = pd.DataFrame([{"id": "medellin-centro", "country": "CO", "currency": "COP"}])
-    result_df = aggregate_location_kpis.fn(telemetry_df, locations_df, "2026-07-08")
-    assert result_df.iloc[0]["total_purchase_cost"] == 0.0
+    locations_df = pd.DataFrame(
+        [{"id": "co-med-centro", "country": "Colombia", "currency": "COP"}]
+    )
+    result_df = aggregate_location_kpis(telemetry_df, locations_df, "2026-09-21")
+    assert result_df.empty
 
 
 def test_aggregate_location_kpis_malformed_payload():
-    """Defensive behaviour: Handles payloads missing the 'cost' key."""
-    telemetry_data = {
-        "event_type": ["inbound_order_created", "stock_waste_registered"],
-        "event_payload": [
-            {"location_id": "bogota-norte"}, # Missing cost
-            {"location_id": "bogota-norte"}  # Missing cost
-        ]
-    }
-    telemetry_df = pd.DataFrame(telemetry_data)
-    locations_df = pd.DataFrame([{"id": "bogota-norte", "country": "CO", "currency": "COP"}])
-    
-    result_df = aggregate_location_kpis.fn(telemetry_df, locations_df, "2026-07-08")
-    
-    # Missing costs should default to 0 and not throw a KeyError
+    telemetry_df = pd.DataFrame(
+        {
+            "id": ["a", "b"],
+            "event_type": ["inbound_order_created", "stock_waste_registered"],
+            "event_payload": [
+                {"location_id": "co-bog-norte"},
+                {"location_id": "co-bog-norte"},
+            ],
+        }
+    )
+    locations_df = pd.DataFrame(
+        [{"id": "co-bog-norte", "country": "Colombia", "currency": "COP"}]
+    )
+    result_df = aggregate_location_kpis(telemetry_df, locations_df, "2026-09-21")
     row = result_df.iloc[0]
     assert row["total_purchase_cost"] == 0.0
     assert row["total_waste_cost"] == 0.0
     assert row["waste_ratio"] == 0.0
+    assert row["country"] == "Colombia"
+    assert row["currency"] == "COP"
 
 
 def test_missing_supabase_credentials_fail_clearly(monkeypatch):

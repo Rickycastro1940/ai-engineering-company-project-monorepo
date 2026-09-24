@@ -14,9 +14,9 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
-| Technology: telemetry + pipeline to dashboards | **Partial** — `data/pipelines/` weekly location cost/waste; Celery async path |
-| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Not done** as product UI; pipeline design targets cost/waste for Mariana + Felipe |
-| Procurement: supplier price history, consolidated spend | **Not done** (supplier docs may exist on other branches; not claimed here) |
+| Technology: telemetry + pipeline to dashboards | **Partial** — Part 2 weekly location cost/waste ETL implemented (`data/process/location_kpis.py` + Prefect `brasaland_weekly_performance_pipeline`); engineering `GET /telemetry/report` untouched |
+| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — no sales UI yet; weekly purchase/waste/stockout KPIs per location (COP/USD) via `reporting.weekly_location_performance` |
+| Procurement: supplier price history, consolidated spend | **Partial** — `price_alert_events_count` + `total_purchase_cost` per location-week; no full supplier platform yet |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
 | People: HR portal / KPIs by country | **Not done** |
 | Training: recipe catalogue, push to 14 locations | **Not done** — knowledge docs under `docs/company-knowledge-base/` are source material only |
@@ -28,7 +28,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | --- | --- |
 | Inventory API + Groq agent | `services/api/inventory.py` (CSV-backed flat imports; no package-relative `.auth`), `agent.py` |
 | Incident analysis UI | `uis/web` |
-| Weekly cost/waste pipeline + Celery | `data/pipelines/`, `services/tasks.py`, Compose Redis/Flower/worker on this branch |
+| Weekly cost/waste pipeline + Celery | `data/process/location_kpis.py`, `data/pipelines/pipeline.py`, `services/reporting/main.py`, `services/tasks.py`; Compose Redis/Flower/worker |
 | Public corporate website | `uis/website/` — Vite/React, route `/`, brand tokens + components from `CONTEXT.md`; screenshot `docs/screenshots/website-corporate-home.png` |
 | Internal backoffice | `uis/backoffice/` — JWT session; client layout guard (`ProtectedRoute` + `useRequireAuth`) on `/`, `/accessible`, `/account/profile`, `/account/change-password`; `/accessible` loads JWT-gated locations (14 / 8 Colombia / 6 Florida, COP+USD) plus inventory |
 | Locations API | `services/api/locations.py` — 14 locations, Colombia 8 / Florida 6, COP+USD; **Bearer JWT required** |
@@ -183,12 +183,32 @@ uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py te
 cd uis/backoffice && npm run build → green
 ```
 
+## Latest business performance pipeline Part 2 (`cursor/business-performance-pipeline-part2-4f14`)
+
+Department served: **Technology** (Nicolás — pipeline into ops/finance dashboards) + **Restaurant Operations** (Felipe — purchase/waste/stockouts) + **Procurement** (Lucía — purchase cost + price alerts) + **Executive** (Mariana — Monday location-week numbers).
+
+Implemented against approved `data/pipelines/PIPELINE_DESIGN.md`:
+
+- Pure transform in `data/process/location_kpis.py` (dedupe on `telemetry_events.id`, five KPIs, roster `location_id`s).
+- Prefect flow `brasaland_weekly_performance_pipeline` with tasks `extract_weekly_inputs` → `aggregate_location_kpis` → `upsert_to_reporting_table`.
+- Destination `reporting.weekly_location_performance` + run log `reporting.pipeline_runs` (SQL in `data/pipelines/reporting_schema.sql`); mirror `data/pipelines/last_run.json`.
+- HTTP shell in `services/reporting/`: `GET /reporting/weekly-location-performance`, `POST /reporting/pipeline-runs` (202 + Celery), `GET /reporting/pipeline-runs/latest` — no KPI math in routes; engineering telemetry left alone.
+- Eval fixtures: `data/eval/weekly_location_performance_fixtures.json`.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+python3 -m pytest tests/pipelines/ -q → 9 passed
+Hand-calc demo: us-mia-downtown purchase 1000 / waste 150 / ratio 0.15; co-med-centro 18500000 COP / 920000 / 0.0497
+Dedupe same event id 1000→1200 → total_purchase_cost 1200 (not 2200)
+```
+
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).
 2. Extend the central API toward missing Technology nouns: **locations → menus → sales → customers → suppliers**, reusing `services/api` routers.
 3. Executive path: surface chain sales in **USD and COP**, wire Monday-style weekly report to the existing async pipeline, keep Mariana’s NL assistant on the documented agent loop.
-4. Do not rewrite the monorepo or invent another company.
+4. Part 3: split extract/transform/load into Prefect subflows and wire the executive dashboard consumer.
+5. Do not rewrite the monorepo or invent another company.
 
 ## How to update this file
 
