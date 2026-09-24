@@ -191,6 +191,7 @@ Department served: **Technology** (Nicolás Park — pipeline into operations an
 head -n 5 CONTEXT.md → # Welcome to Brasaland
 Phase 1 headings → Current State (what we have, events captured, storage, engineering answers) + Business Gap
 Unanswered CONTEXT.md question → per-location chain-week purchase cost, waste cost, waste ratio, stockouts, price alerts in COP or USD
+Phase 2 → one purpose sentence; Monday roll-up; five KPIs; JSON extract of telemetry_events + locations; mermaid extract/transform/load; corrected receipt id 3f2a stays one row (1200, not 2200) via id dedupe and upsert on (location_id, week_start)
 Destination table in PIPELINE_DESIGN.md → reporting.weekly_location_performance
 KPI columns → total_purchase_cost, total_waste_cost, waste_ratio, stockout_events_count, price_alert_events_count
 Source events → inbound_order_created, stock_waste_registered, stock_threshold_triggered, ingredient_price_variance_detected
