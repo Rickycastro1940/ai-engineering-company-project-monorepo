@@ -195,6 +195,7 @@ Phase 2 → one purpose sentence; Monday roll-up; five KPIs; JSON extract of tel
 Destination tables → reporting.weekly_location_performance (KPI) and reporting.pipeline_runs (run log)
 services/reporting endpoints → GET /reporting/pipeline-runs/latest (status), POST /reporting/pipeline-runs (manual trigger), GET /reporting/weekly-location-performance (KPI query); separate from telemetry_events and GET /telemetry/report
 Phase 3 → partial load of co-med-centro (18500000 COP) then crash; rerun upserts the same key so the total stays 18500000 and us-mia-downtown is inserted once. Run log fields: started_at, finished_at, records_processed, status, error_message
+Phase 5 (design only) → GET /reporting/pipeline-runs/latest calls get_latest_pipeline_run(); POST /reporting/pipeline-runs calls run_pipeline(); GET /reporting/weekly-location-performance calls get_weekly_location_performance(). No ETL in services/. Separate from services/telemetry and GET /telemetry/report.
 Destination table in PIPELINE_DESIGN.md → reporting.weekly_location_performance
 KPI columns → total_purchase_cost, total_waste_cost, waste_ratio, stockout_events_count, price_alert_events_count
 Source events → inbound_order_created, stock_waste_registered, stock_threshold_triggered, ingredient_price_variance_detected
