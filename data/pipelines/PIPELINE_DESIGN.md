@@ -286,33 +286,35 @@ The same three rules apply to waste cost, stockout count, and price-alert count:
 
 ## Phase 3 — Resilience and idempotency
 
-### Idempotency when load fails and the job is rerun
+### Idempotency strategy
 
-The grain of `reporting.weekly_location_performance` is one row per `(location_id, week_start)`. That pair is the primary key.
+The grain of `reporting.weekly_location_performance` is one row per `(location_id, week_start)`. That pair is the primary key. Load sends the full recomputed week for each location, then replaces that key. It never adds a delta onto a row that is already stored.
 
-If the load dies after some rows are written (dropped connection, statement timeout, process kill), those rows already hold the full recomputed week. The rows not yet written still hold the previous successful week, or they are absent. The rerun must replace both groups with the same full-week figures. It must not add the new totals onto the rows that already landed.
+If the load fails after some rows are written (dropped connection, statement timeout, process kill) and the job is rerun for the same chain week, already loaded rows are neither corrupted nor duplicated. The rerun uses the same `window_start` and `window_end` as the failed attempt. The Monday job and `POST /reporting/pipeline-runs` both pass that pair through.
 
 The guarantee has three steps, in this order:
 
-1. **Recompute the whole chain week before any write.** Transformation reads the current `telemetry_events` snapshot, dedupes on `id`, and builds a complete frame. Each output row already contains the final `total_purchase_cost`, `total_waste_cost`, `waste_ratio`, `stockout_events_count`, and `price_alert_events_count` for that location and week. The load never sends a delta.
+1. **Recompute the whole chain week before any write.** Transformation reads the current `telemetry_events` snapshot, dedupes on `id`, and builds a complete frame. Each output row already contains the final `total_purchase_cost`, `total_waste_cost`, `waste_ratio`, `stockout_events_count`, and `price_alert_events_count` for that location and week. The load never sends a partial sum or a delta.
 2. **Replace the key, including rows loaded before the crash.** Load is one upsert: `INSERT INTO reporting.weekly_location_performance ... ON CONFLICT (location_id, week_start) DO UPDATE SET` every KPI column, `country`, and `currency` to the excluded values (`on_conflict=location_id,week_start`). A location-week that was written in the failed attempt is overwritten with those same totals. A location-week that never landed is inserted. The primary key blocks a second row for the same location and week.
-3. **The update assigns the new total. It does not add.** The conflict clause is `total_purchase_cost = EXCLUDED.total_purchase_cost` (and the same assignment for waste cost, waste ratio, stockout count, and price-alert count). It is not `total_purchase_cost = weekly_location_performance.total_purchase_cost + EXCLUDED.total_purchase_cost`. A second run after a partial load therefore leaves one row per location, with the recomputed week, which is the same number a single successful load would have written.
+3. **The update assigns the new total. It does not add.** The conflict clause is `total_purchase_cost = EXCLUDED.total_purchase_cost` (and the same assignment for waste cost, waste ratio, stockout count, and price-alert count). It is not `total_purchase_cost = weekly_location_performance.total_purchase_cost + EXCLUDED.total_purchase_cost`.
 
-A rerun uses the same `window_start` and `window_end` as the failed attempt, recorded on that attempt’s log row. The Monday job and `POST /reporting/pipeline-runs` both pass that pair through to the flow.
+Concrete case. The Monday job for `week_start = 2026-09-21` builds 14 location rows. Load writes `co-med-centro` with `total_purchase_cost = 18500000` COP, then the connection drops before `us-mia-downtown` is written. `co-med-centro` already holds the full week, not a partial sum. `us-mia-downtown` still holds the previous week, or it is absent.
+
+The rerun recomputes the same 14 totals from the same window. The upsert sets `co-med-centro` / `2026-09-21` to `18500000` again. It does not store `37000000`, and it does not insert a second row for Medellín Centro. It inserts `us-mia-downtown` / `2026-09-21` once. After the rerun there is still one row per location for that week, with the same figures a single successful load would have written.
 
 ### Execution log
 
-Every attempt appends one row to `reporting.pipeline_runs` and mirrors the latest row in `data/pipelines/last_run.json` for `GET /reporting/pipeline-runs/latest`. The row is inserted with `status = Running` and `started_at` when the flow begins. It is updated when the flow finishes or when load raises. A failed load and the rerun that follows are two rows, so production can see both.
+Every attempt appends one row to `reporting.pipeline_runs` and mirrors the latest row in `data/pipelines/last_run.json` for `GET /reporting/pipeline-runs/latest`. The row is inserted with `status = Running` and the start time when the flow begins. It is updated when the flow finishes or when load raises. A failed load and the rerun that follows are two rows, so production can see both.
 
-Minimum fields on every run (name, data type, and production justification):
+Minimum fields on every run:
 
-| Field | Data type | What is recorded | Why production needs it |
-| --- | --- | --- | --- |
-| `started_at` | `timestamptz` (UTC) | Instant when this attempt began | Shows whether the Monday 07:00 America/Bogota job actually started, and how long the gap was after the previous success. A missing start means the scheduler never fired. |
-| `finished_at` | `timestamptz` (UTC), nullable | Instant when this attempt ended, success or failure | With `started_at`, gives duration. A run that has `started_at` and a null `finished_at` is still in load or died without closing the log. That is the row to rerun. |
-| `records_processed` | `integer` | Count of `telemetry_events` rows in the deduped extract for the window | Tells an auditor whether the week had events. A sudden zero against a normally busy week means the extract missed the window or the source was empty. A count that matches the prior success, with the same KPI totals, confirms the rerun replaced rows instead of stacking them. |
-| `status` | `text` (`Running` \| `Success` \| `Failed`) | Outcome of this attempt | Separates a finished week from a load that stopped halfway. `Failed` is the signal to rerun that window. `Success` means every location-week key from the frame was upserted. A location with zero waste can still be `Success`. |
-| `error_message` | `text`, nullable | Public failure text when `status` is `Failed`; null on success | Names the load failure (timeout, connection drop) so the rerun is aimed at the broken stage. The text stays free of connection strings, keys, and host paths. |
+| Audit name | Column | Data type | What is recorded | Why this field is necessary in production |
+| --- | --- | --- | --- | --- |
+| Start time | `started_at` | `timestamptz` (UTC) | Instant this attempt began | Shows whether the Monday 07:00 America/Bogota job actually started, and the gap after the previous success. No start time means the scheduler never fired. You cannot audit a missing week without it. |
+| End time | `finished_at` | `timestamptz` (UTC), nullable | Instant this attempt ended, success or failure | With the start time, gives duration. A start time with a null end time means the attempt is still in load or died without closing the log. That is the row to rerun. A finished failure still has an end time, so it is not confused with a run that is in progress. |
+| Records processed | `records_processed` | `integer` | Count of `telemetry_events` rows in the deduped extract for the window | Tells an auditor whether the week had events. A sudden zero against a normally busy week means the extract missed the window or the source was empty. A count that matches the prior success, with the same KPI totals, confirms the rerun replaced rows instead of stacking them. |
+| Status | `status` | `text` (`Running` \| `Success` \| `Failed`) | Outcome of this attempt | Separates a finished week from a load that stopped halfway. `Failed` is the signal to rerun that window. `Success` means every location-week key from the frame was upserted. A location with zero waste can still be `Success`. |
+| Errors | `error_message` | `text`, nullable | Public failure text when `status` is `Failed`; null on success | Names the load failure (timeout, connection drop) so the rerun is aimed at the broken stage. Without it, a `Failed` status does not say whether to retry the store or to fix the window. The text stays free of connection strings, keys, and host paths. |
 
 `window_start` and `window_end` are stored on the same row so the rerun passes the identical chain week. `run_id` distinguishes the failed attempt from the retry in the audit list.
 
