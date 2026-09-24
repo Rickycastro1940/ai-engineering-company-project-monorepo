@@ -106,26 +106,26 @@ Primary key: `(location_id, week_start)`.
 
 Colombia locations (`co-*`) stay in COP. United States / Florida locations (`us-*`) stay in USD. A chain total is two native sums. This table does not store a converted USD rollup.
 
-## Phase 1 — Current State analysis
+## Phase 1 — Current State
 
 ### Current State
 
-Brasaland Digital already has an engineering telemetry path. It is a platform health report for Nicolás Park’s team, built before this business pipeline.
+Brasaland Digital already has an engineering telemetry path. It is a platform-health report for Nicolás Park’s team. It is not the Monday purchasing report Mariana Restrepo, Felipe Guerrero, and Lucía Fernández need.
 
-What is already in the repo:
+#### What we already have
 
 | Piece | Where it lives | What it does |
 | --- | --- | --- |
 | Metric functions | `skills/data-analysis/scripts/pandas_clean.py` | `get_events_per_day`, `get_error_rate_by_type`, `get_auth_failure_rate` |
-| Report endpoint | `skills/data-analysis/scripts/services/telemetry/main.py` | `GET /telemetry/report` |
-| Engineering dashboard | `uis/backoffice/legacy/telemetry.html` | Renders traffic, errors, and authentication for the last window |
-| Cache | In-memory map on the report process | 60 seconds per `(start_date, end_date)`. Default window is the last 7 days UTC when the query omits dates |
+| Report endpoint | `skills/data-analysis/scripts/services/telemetry/main.py` | `GET /telemetry/report` reads `telemetry_events` and returns those three metrics |
+| Engineering dashboard | `uis/backoffice/legacy/telemetry.html` | Three tables: traffic volume, system errors by type, authentication failure rate. It calls `GET /telemetry/report` |
+| Cache | In-memory map on the report process | 60 seconds per `(start_date, end_date)`. If the query omits dates, the window is the last 7 days UTC |
 
-The report selects `id`, `timestamp`, `event_type`, and `tags`. It returns `{ period: { from, to }, metrics }`. It has no location, currency, or cost fields.
+The reader selects only `id`, `timestamp`, `event_type`, and `tags`. The JSON body is `{ period: { from, to }, metrics }`. It has no `location_id`, no `currency`, and no `cost`.
 
-### Telemetry events captured so far
+#### Telemetry events captured so far
 
-The technical report is written against these `event_type` values already stored for engineering:
+Engineering events the technical report is written against:
 
 | `event_type` | What it records | Which engineering metric uses it |
 | --- | --- | --- |
@@ -133,44 +133,54 @@ The technical report is written against these `event_type` values already stored
 | `user_login_failed` | A staff sign-in that failed | Daily volume, error counts, and the numerator of the auth failure rate |
 | `api_error` | A technical API failure | Daily volume and error counts by type |
 
-`get_events_per_day` counts every row in the window, so any other stored type still adds to daily traffic. The named metrics above only branch on the three types in the table.
+`get_events_per_day` counts every row in the window, so any other stored type still adds to daily traffic. The named error and auth metrics only branch on the three types above.
 
-The telemetry contract for the inventory system also names six mandatory business events. They are the raw material for operations and procurement. The engineering report does not aggregate them:
+Operational events already defined for kitchens and suppliers. `GET /telemetry/report` does not aggregate them. They are the mandatory inputs for the five location-week KPIs:
 
-| `event_type` | Fires when |
-| --- | --- |
-| `inbound_order_created` | An `InboundOrder` line (`OrderType` `INBOUND`) is committed at a location |
-| `outbound_order_created` | An `OutboundOrder` line (`OrderType` `OUTBOUND`) is committed |
-| `stock_waste_registered` | Waste is logged; `reason` is `expired`, `kitchen_error`, or `theft_suspected` |
-| `stock_threshold_triggered` | Stock for a `Product` falls below the configured minimum at a location |
-| `direct_stock_edit_rejected` | A direct stock edit is blocked (stock changes only via inbound/outbound orders) |
-| `ingredient_price_variance_detected` | An inbound unit cost for a `Product` / supplier jumps versus history |
+| `event_type` | Fires when | KPI it feeds |
+| --- | --- | --- |
+| `inbound_order_created` | An `InboundOrder` line (`OrderType` `INBOUND`) is committed at a location | Purchase cost (`event_payload.cost`) |
+| `stock_waste_registered` | Waste is logged; `reason` is `expired`, `kitchen_error`, or `theft_suspected` | Waste cost (`event_payload.cost`) |
+| `stock_threshold_triggered` | Stock for a `Product` falls below the configured minimum at a location | Stockout frequency (row count) |
+| `ingredient_price_variance_detected` | An inbound unit cost for a `Product` / supplier jumps versus history | Price-alert frequency (row count) |
+| `outbound_order_created` | An `OutboundOrder` line (`OrderType` `OUTBOUND`) is committed | None. Out of this weekly table |
+| `direct_stock_edit_rejected` | A direct stock edit is blocked (stock changes only via inbound/outbound orders) | None. Out of this weekly table |
 
-Those events carry `location_id` (roster id), `country` (`Colombia` or `United States`), `product_id` (integer inventory id), `quantity`, `unit`, and `currency` (`COP` or `USD`). Waste also carries `reason`. Amounts stay in the location currency; the telemetry layer does not convert.
+Purchase, waste, stockout, and price-alert events carry `location_id` (a roster id such as `co-med-centro` or `us-mia-downtown`), `country` (`Colombia` or `United States`), `product_id` (integer inventory id), `quantity`, `unit`, and `currency` (`COP` or `USD`). Waste also carries `reason`. Amounts stay in the location currency. The telemetry layer does not convert COP to USD.
 
-### Where they are stored
+#### Where they are stored
 
-Every captured event is one row in the Supabase table `telemetry_events`. The engineering reader filters that table with `timestamp >= start` and `timestamp < end`. There is no reporting schema and no location-week table on this path. `GET /telemetry/report` reads `telemetry_events` and returns the three engineering metrics. It does not write a second table.
+Every captured event, engineering or operational, is one row in the Supabase table `telemetry_events`. The engineering reader filters that table with `timestamp >= start` and `timestamp < end`. `GET /telemetry/report` reads `telemetry_events` and returns the three engineering metrics. It does not write a second table. It does not write `reporting.weekly_location_performance`.
 
-### What the technical report already answers for engineering
+A nightly export (`scripts/nightly_export.py`) can copy a subset of those rows (`inbound_order_created`, `stock_waste_registered`, `stock_threshold_triggered`) into a CSV under the raw landing area. That CSV is a copy of events. It is not the dashboard table and it is not an aggregation.
 
-`GET /telemetry/report` answers three engineering questions:
+#### What the technical report already answers for engineering
+
+`GET /telemetry/report` answers three engineering questions, and only these:
 
 1. **Traffic.** How many events hit the platform each UTC day? Formula: count of `id`, grouped by date (`events_per_day`).
 2. **Failures.** Which technical failures showed up in the window? Formula: count of `api_error` and `user_login_failed`, grouped by `event_type` (`error_rate_by_type`).
 3. **Sign-in health.** What share of login attempts failed each day? Formula: `user_login_failed / (user_login_failed + user_login_succeeded)`, rounded to 4 decimal places (`auth_failure_rate`).
 
-The dashboard at `uis/backoffice/legacy/telemetry.html` shows those three tables and nothing else. That is enough for Nicolás to see load, instability, and authentication trouble.
+`uis/backoffice/legacy/telemetry.html` renders those three tables. That is enough for Nicolás Park to see load, instability, and authentication trouble. It says nothing about a kitchen’s purchases, waste, stockouts, or supplier price moves.
 
 ### Business Gap
 
-The technical report leaves this business question unanswered:
+`CONTEXT.md` still has a purchasing question the technical report cannot answer.
 
-**For each of the 14 locations, in this chain week, what was the purchase cost, the waste cost, the waste ratio, the stockout frequency, and the price-alert frequency, in that location’s own currency (COP or USD)?**
+Restaurant Operations (`CONTEXT.md`): “Ingredient orders are placed by WhatsApp or phone, resulting in overstock in some locations and stockouts in others.” Felipe Guerrero has no per-location view of what a kitchen bought or threw away.
 
-That is the question Felipe Guerrero needs when a kitchen is wasting food or stocking out, the question Lucía Fernández needs when a supplier price moves before the invoice arrives, and the question Mariana Restrepo cannot answer from Tuesday PDFs or from a platform-health chart. `GET /telemetry/report` cannot answer it: its metrics never read `cost` or `location_id`, and they never group `inbound_order_created`, `stock_waste_registered`, `stock_threshold_triggered`, or `ingredient_price_variance_detected`.
+Procurement (`CONTEXT.md`): “Lucía finds out about raw material price changes when the invoice arrives. There is no consolidated purchasing data across the chain.” She needs price alerts and purchasing visibility across Colombia and Florida.
 
-Answering it needs a dedicated pipeline: read those events for one chain week, join `locations` for country and currency, aggregate one row per location, and load `reporting.weekly_location_performance`. The engineering endpoint stays the engineering endpoint.
+Executive Direction (`CONTEXT.md`): weekly PDFs arrive on Tuesday. Mariana Restrepo needs a report every Monday at 7am. The engineering dashboard is not that report.
+
+The unanswered question this pipeline exists to answer:
+
+**For each of the 14 locations, in the chain week that just closed, what was the purchase cost, the waste cost, the waste ratio, the stockout frequency, and the price-alert frequency, in that location’s own currency (COP or USD)?**
+
+`GET /telemetry/report` cannot answer it. Its select list never reads `cost` or `location_id`, and its three metrics never group `inbound_order_created`, `stock_waste_registered`, `stock_threshold_triggered`, or `ingredient_price_variance_detected`. Counting those rows inside `events_per_day` only increases a platform traffic total. It does not produce a location-week cost.
+
+That question needs a dedicated pipeline: read those four event types for one chain week, join `locations` for country and currency, aggregate one row per location, and load `reporting.weekly_location_performance`. The engineering endpoint stays the engineering endpoint. Sales questions in `CONTEXT.md` (covers today at Medellín Centro, a slow week at the Miami restaurant, Florida week sales, highest average ticket) are a different grain and are not this table.
 
 ## Phase 2 — Pipeline design
 
