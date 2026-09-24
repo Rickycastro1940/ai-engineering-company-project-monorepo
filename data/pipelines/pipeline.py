@@ -2,7 +2,12 @@
 
 Main entry: ``data/pipelines/pipeline.py`` (this file).
 Contracts: root ``CONTEXT-company.md`` (KPIs / schema / endpoints) and
-``data/pipelines/PIPELINE_DESIGN.md``.
+``data/pipelines/PIPELINE_DESIGN.md`` Phase 4 (flows + tasks).
+
+Prefect structure (Phase 1 — flows and tasks):
+- Stage subflows: extract → transform → load
+- Independent ``@task`` units with explicit inputs/outputs per stage
+- Optional non-critical eval snapshot via ``return_state=True`` (must not fail ETL)
 
 Placement:
 - ``data/raw/`` — extract snapshots and intermediate KPI frames
@@ -23,6 +28,7 @@ from typing import Any, Optional
 import pandas as pd
 from dotenv import load_dotenv
 from prefect import flow, task
+from prefect.states import State
 from prefect.tasks import task_input_hash
 from supabase import Client, create_client
 
@@ -163,33 +169,6 @@ def _finish_run(row: dict, *, status: str, records_processed: int, error_message
     return finished
 
 
-def extract_telemetry_events(start_date: str, end_date: str) -> pd.DataFrame:
-    """Read-only extract from telemetry_events (four KPI event types)."""
-    response = call_external(
-        "reporting store",
-        lambda: _supabase_client()
-        .table("telemetry_events")
-        .select("id,event_type,created_at,event_payload")
-        .in_("event_type", list(KPI_EVENT_TYPES))
-        .gte("created_at", start_date)
-        .lt("created_at", end_date)
-        .execute(),
-    )
-    return pd.DataFrame(response.data or [])
-
-
-def extract_domain_data() -> pd.DataFrame:
-    """Read-only extract of the locations dimension."""
-    response = call_external(
-        "reporting store",
-        lambda: _supabase_client()
-        .table("locations")
-        .select("id, country, currency")
-        .execute(),
-    )
-    return pd.DataFrame(response.data or [])
-
-
 def _land_raw_extracts(
     telemetry_df: pd.DataFrame,
     locations_df: pd.DataFrame,
@@ -291,14 +270,63 @@ def write_validation_output(kpis_df: pd.DataFrame, week_start: str) -> dict[str,
     return report
 
 
-@task(retries=3, retry_delay_seconds=5, name="extract_weekly_inputs")
-def extract_weekly_inputs(start_date: str, end_date: str) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Read telemetry_events + locations; land JSON copies in data/raw/."""
-    telemetry_df = extract_telemetry_events(start_date, end_date)
-    locations_df = extract_domain_data()
+# ---------------------------------------------------------------------------
+# Stage 1 — Extraction tasks (explicit I/O) + subflow
+# ---------------------------------------------------------------------------
+
+
+@task(retries=3, retry_delay_seconds=5, name="extract_telemetry_events")
+def extract_telemetry_events(start_date: str, end_date: str):
+    """Input: chain-week bounds. Output: telemetry_events rows (four KPI types)."""
+    response = call_external(
+        "reporting store",
+        lambda: _supabase_client()
+        .table("telemetry_events")
+        .select("id,event_type,created_at,event_payload")
+        .in_("event_type", list(KPI_EVENT_TYPES))
+        .gte("created_at", start_date)
+        .lt("created_at", end_date)
+        .execute(),
+    )
+    return pd.DataFrame(response.data or [])
+
+
+@task(retries=3, retry_delay_seconds=5, name="extract_domain_data")
+def extract_domain_data():
+    """Input: none. Output: locations dimension (id, country, currency)."""
+    response = call_external(
+        "reporting store",
+        lambda: _supabase_client()
+        .table("locations")
+        .select("id, country, currency")
+        .execute(),
+    )
+    return pd.DataFrame(response.data or [])
+
+
+@task(name="land_raw_extracts")
+def land_raw_extracts(telemetry_df, locations_df, start_date: str, end_date: str):
+    """Input: extract frames + window. Output: paths under data/raw/."""
     paths = _land_raw_extracts(telemetry_df, locations_df, start_date, end_date)
     print(f"Landed extract snapshots: {paths}")
+    return paths
+
+
+@flow(name="extract_brasaland_data_flow", log_prints=True)
+def extract_brasaland_data_flow(start_date: str, end_date: str):
+    """Extraction stage: read-only snapshots for the chain week.
+
+    Returns ``(telemetry_df, locations_df)``.
+    """
+    telemetry_df = extract_telemetry_events(start_date, end_date)
+    locations_df = extract_domain_data()
+    land_raw_extracts(telemetry_df, locations_df, start_date, end_date)
     return telemetry_df, locations_df
+
+
+# ---------------------------------------------------------------------------
+# Stage 2 — Transformation tasks + subflow
+# ---------------------------------------------------------------------------
 
 
 @task(
@@ -306,23 +334,36 @@ def extract_weekly_inputs(start_date: str, end_date: str) -> tuple[pd.DataFrame,
     cache_expiration=timedelta(days=1),
     name="aggregate_location_kpis",
 )
-def aggregate_location_kpis(
-    telemetry_df: pd.DataFrame,
-    locations_df: pd.DataFrame,
-    week_start: str,
-) -> pd.DataFrame:
-    """Prefect task wrapper around the pure transform in data/process."""
-    kpis_df = _aggregate_kpis(telemetry_df, locations_df, week_start)
-    intermediate = _land_kpi_intermediate(kpis_df, week_start)
-    print(f"Landed KPI intermediate: {intermediate}")
-    write_validation_output(kpis_df, week_start)
+def aggregate_location_kpis(telemetry_df, locations_df, week_start: str):
+    """Input: extract frames + week_start. Output: one KPI row per location."""
+    return _aggregate_kpis(telemetry_df, locations_df, week_start)
+
+
+@task(name="land_kpi_intermediate")
+def land_kpi_intermediate(kpis_df, week_start: str) -> str:
+    """Input: KPI frame. Output: intermediate JSON path under data/raw/."""
+    path = _land_kpi_intermediate(kpis_df, week_start)
+    print(f"Landed KPI intermediate: {path}")
+    return path
+
+
+@flow(name="transform_brasaland_kpis_flow", log_prints=True)
+def transform_brasaland_kpis_flow(telemetry_df, locations_df, week_start: str):
+    """Transformation stage: pure KPI rollup (no destination write)."""
+    kpis_df = aggregate_location_kpis(telemetry_df, locations_df, week_start)
+    land_kpi_intermediate(kpis_df, week_start)
     return kpis_df
 
 
+# ---------------------------------------------------------------------------
+# Stage 3 — Load tasks + subflow
+# ---------------------------------------------------------------------------
+
+
 @task(retries=3, retry_delay_seconds=5, name="upsert_to_reporting_table")
-def upsert_to_reporting_table(kpis_df: pd.DataFrame) -> int:
-    """Replace location-week keys in reporting.weekly_location_performance."""
-    if kpis_df is None or kpis_df.empty:
+def upsert_to_reporting_table(kpis_df) -> int:
+    """Input: KPI frame. Output: count of upserted rows into reporting table."""
+    if kpis_df is None or getattr(kpis_df, "empty", True):
         print("No data to upsert.")
         return 0
     records = kpis_df.to_dict(orient="records")
@@ -335,6 +376,32 @@ def upsert_to_reporting_table(kpis_df: pd.DataFrame) -> int:
     )
     print(f"Successfully upserted {len(records)} records!")
     return len(records)
+
+
+@flow(name="load_brasaland_reporting_flow", log_prints=True)
+def load_brasaland_reporting_flow(kpis_df) -> int:
+    """Load stage: idempotent upsert into reporting.weekly_location_performance."""
+    return upsert_to_reporting_table(kpis_df)
+
+
+# ---------------------------------------------------------------------------
+# Optional non-critical step (eval snapshot) — never blocks ETL
+# ---------------------------------------------------------------------------
+
+
+@task(name="write_eval_snapshot", retries=0)
+def write_eval_snapshot(kpis_df, week_start: str):
+    """Optional secondary report: fixture validation under data/eval/.
+
+    Non-critical: the parent flow must call this with ``return_state=True`` so a
+    failure here does not interrupt extract → transform → load.
+    """
+    return write_validation_output(kpis_df, week_start)
+
+
+# ---------------------------------------------------------------------------
+# HTTP helpers (used by services/reporting/ — no ETL in routes)
+# ---------------------------------------------------------------------------
 
 
 def get_weekly_location_performance(week_start: Optional[str] = None) -> dict[str, Any]:
@@ -414,20 +481,40 @@ def get_latest_pipeline_run() -> dict[str, Any]:
     return payload
 
 
+# ---------------------------------------------------------------------------
+# Main orchestrator flow
+# ---------------------------------------------------------------------------
+
+
 @flow(name="brasaland_weekly_performance_pipeline", log_prints=True)
 def run_pipeline(start_date: str, end_date: str) -> dict[str, Any]:
-    """Monday chain-week ETL: extract → transform → load, with run log."""
+    """Monday chain-week ETL: extract → transform → load (+ optional eval).
+
+    Stage subflows carry the critical path. The eval snapshot is invoked with
+    ``return_state=True`` so a failure there never fails the main run.
+    """
     run_id = str(uuid.uuid4())
     run_row = _insert_run_start(run_id, start_date, end_date)
     records_processed = 0
     try:
-        telemetry_data, domain_data = extract_weekly_inputs(start_date, end_date)
+        telemetry_data, domain_data = extract_brasaland_data_flow(start_date, end_date)
         if "id" in telemetry_data.columns:
             records_processed = int(telemetry_data["id"].nunique())
         else:
             records_processed = int(len(telemetry_data))
-        kpis = aggregate_location_kpis(telemetry_data, domain_data, start_date)
-        upsert_to_reporting_table(kpis)
+
+        kpis = transform_brasaland_kpis_flow(telemetry_data, domain_data, start_date)
+        load_brasaland_reporting_flow(kpis)
+
+        # Optional / non-critical: secondary eval snapshot under data/eval/.
+        eval_state: State = write_eval_snapshot(kpis, start_date, return_state=True)
+        if eval_state.is_failed():
+            print(
+                "Eval snapshot failed (non-critical); "
+                "extract/transform/load already completed successfully."
+            )
+        else:
+            print(f"Eval snapshot state: {eval_state.type}")
     except Exception as error:
         safe = public_error_text(str(error), "reporting store is unavailable")
         _finish_run(

@@ -198,7 +198,9 @@ Implemented against `CONTEXT-company.md` (KPIs to Measure / destination schema /
 ```text
 head -n 5 CONTEXT.md → # Welcome to Brasaland
 uv run python -c "import prefect; print(prefect.__version__)" → 3.4.25
-uv run python -m pytest tests/pipelines/ -q → 11 passed
+uv run python -m pytest tests/pipelines/ -q → 15 passed
+Stage subflows: extract_brasaland_data_flow → transform_brasaland_kpis_flow → load_brasaland_reporting_flow
+Optional write_eval_snapshot(..., return_state=True) — Failed eval does not fail ETL Success
 PYTHONPATH=. uv run python data/eval/validate_weekly_kpis.py → {"passed": true, "row_count": 2}
 ```
 
