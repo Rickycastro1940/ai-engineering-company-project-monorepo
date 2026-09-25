@@ -14,7 +14,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
-| Technology: telemetry + pipeline to dashboards | **Partial** — Part 2 weekly location cost/waste ETL + Phase one Prefect stage subflows (`extract`/`transform`/`load` + optional eval); engineering `GET /telemetry/report` untouched |
+| Technology: telemetry + pipeline to dashboards | **Partial** — Part 2 weekly location cost/waste ETL + Phase one Prefect stage subflows + Phase two isolated KPI transform unit tests (`tests/pipelines/test_pipeline.py`); engineering `GET /telemetry/report` untouched |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — no sales UI yet; weekly purchase/waste/stockout KPIs per location (COP/USD) via `reporting.weekly_location_performance` |
 | Procurement: supplier price history, consolidated spend | **Partial** — `price_alert_events_count` + `total_purchase_cost` per location-week; no full supplier platform yet |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
@@ -225,6 +225,17 @@ Main flow remains `brasaland_weekly_performance_pipeline`. Destination stays `re
 head -n 5 CONTEXT.md → # Welcome to Brasaland
 .venv/bin/python -m pytest tests/pipelines/test_prefect_stages.py tests/pipelines/test_name_contract.py -q → 14 passed
 .venv/bin/python -m pytest tests/pipelines/ -q → 30 passed
+```
+
+## Latest Phase two — transform unit tests (`cursor/pipeline-phase2-transform-tests-4f14`)
+
+Department served: **Technology** (Nicolás — KPI transform correctness) + **Restaurant Operations** (Felipe — purchase/waste/stockouts) + **Procurement** (Lucía — purchase cost + price alerts).
+
+Extended `tests/pipelines/test_pipeline.py` with isolated in-memory unit tests for CONTEXT-company.md "KPIs to Measure" (no DB / external APIs): `total_purchase_cost`, `total_waste_cost`, `waste_ratio` (hand-calculated 4dp + zero-purchase → 0), `stockout_events_count` / `price_alert_events_count`, Prefect task `.fn` parity, and defensive malformed payloads (non-dict, null cost/location, wrong cost type, missing columns).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+.venv/bin/python -m pytest tests/pipelines/test_pipeline.py -v → 14 passed
 ```
 
 ## Planned next steps (order)
