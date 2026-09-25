@@ -372,6 +372,35 @@ Prefect state on the flow is what operators see. The same outcome is copied to `
 
 `Scheduled` is only the deployment waiting for Monday 07:00. It is not a run-log status. Optional eval failures must not flip the main flow to `Failed`.
 
+### Script-based execution (CLI)
+
+Phase 4 ships a script entry so the same Prefect flow can run outside the deployment. From the monorepo root:
+
+```bash
+# Default window: previous chain week in America/Bogota (same bounds as the Monday job)
+python data/pipelines/pipeline.py
+
+# Explicit chain week (example matches data/eval fixtures)
+python data/pipelines/pipeline.py --start-date 2026-09-21 --end-date 2026-09-28
+
+# Force fixture-backed offline mode (also auto-selected when SUPABASE_* is unset)
+python data/pipelines/pipeline.py --offline
+```
+
+`if __name__ == "__main__"` calls `main()`, which resolves the window, optionally installs offline backends (eval fixtures → local `data/raw/` upsert store), then runs `brasaland_weekly_performance_pipeline`.
+
+### Intended reporting schedule
+
+| Field | Value |
+| --- | --- |
+| Cadence | Once per chain week |
+| Cron / wall clock | Monday **07:00** `America/Bogota` |
+| Window | Previous chain week: `[Monday 00:00, next Monday 00:00)` America/Bogota |
+| Flow | `brasaland_weekly_performance_pipeline` |
+| Entry | Deployment schedule **or** `python data/pipelines/pipeline.py` |
+
+Example: the job that fires Monday 2026-09-28 at 07:00 America/Bogota reports `[2026-09-21, 2026-09-28)`. Mariana Restrepo and Felipe Guerrero read that roll-up instead of waiting for Tuesday PDF packs.
+
 ### Optional second flow
 
 `brasaland_weekly_backfill_flow(weeks)` is optional. It would call the same three stage subflows once per chain week (a missed Monday, or a receipt corrected after the report). It does not define new KPI rules. Part 1 ships the Monday flow only.
