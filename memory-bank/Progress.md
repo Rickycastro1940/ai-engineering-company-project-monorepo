@@ -281,6 +281,7 @@ path_count=25
 GET /reporting/weekly-location-performance without token → 401
 GET /reporting/weekly-location-performance with Bearer → 200, week_start=2026-09-21, COP+USD rows, five KPI columns
 cd uis/backoffice && npm run build → tsc -b && vite build green
+.venv/bin/python -m pytest tests/pipelines/ -q → 41 passed
 ```
 
 Skill **passed** (criteria 1–4 + 6). Technology central API remains **incomplete** while menus/sales/customers/suppliers are `missing`.
