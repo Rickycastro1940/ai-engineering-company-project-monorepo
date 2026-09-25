@@ -304,6 +304,8 @@ Prefect / test vocabulary: `PIPELINE_DESIGN.md` Phase 4 `name=` contract already
 head -n 5 CONTEXT.md → # Welcome to Brasaland
 .venv/bin/python -m pytest tests/pipelines/ -q → 41 passed
 cd uis/backoffice && npm run build → tsc -b && vite build green
+Manual UI (CDP): login → Monday weekly report; audit forbidden jargon hits=[]; required KPI labels present; friendly location names; COP+USD; period America/Bogota
+Artifacts: stakeholder_ux_monday_report.webp, stakeholder_ux_kpi_table.webp, stakeholder_ux_monday_report_walkthrough.mp4
 ```
 
 ## How to update this file
