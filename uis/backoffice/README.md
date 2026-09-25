@@ -48,6 +48,6 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5174/login`. Vite proxies `/auth`, `/users`, `/profiles`, `/locations`, `/inventory`, `/reporting`, `/tasks`, and `/api` to `http://127.0.0.1:8000`.
+Open `http://localhost:5174/login`. Vite proxies `/auth`, `/users`, `/profiles`, `/locations`, `/inventory`, `/reporting/weekly-location-performance`, `/reporting/pipeline-runs`, `/tasks`, and `/api` to `http://127.0.0.1:8000` (not the SPA route `/reporting/weekly-performance`).
 
 Legacy static KPI/telemetry HTML (pre-Vite) is under `legacy/`.

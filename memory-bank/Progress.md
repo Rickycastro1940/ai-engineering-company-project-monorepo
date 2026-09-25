@@ -255,14 +255,23 @@ Part 2 pipeline already present. Part 3 closes production readiness:
 - Prefect `name=` + transform tests stay locked to CONTEXT-company.md KPIs (`total_purchase_cost`, `total_waste_cost`, `waste_ratio`, `stockout_events_count`, `price_alert_events_count`) and event types.
 
 ```text
-uv add "prefect>=3" already satisfied → prefect 3.4.25
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+verify-brasaland-api: GET /docs → 200; locations=present menus=missing sales=missing customers=missing suppliers=missing inventory=present path_count=25
+reporting routes present: /reporting/weekly-location-performance /reporting/pipeline-runs /reporting/pipeline-runs/latest
 .venv/bin/python -m pytest tests/pipelines/ -q → 36 passed
 .venv/bin/python data/pipelines/pipeline.py --offline --start-date 2026-09-21 --end-date 2026-09-28
 → status=Success records_processed=9; subflows extract→transform→load Completed
-cd uis/backoffice && npm run build → green
+cd uis/backoffice && npm run build → green (tsc -b && vite build)
 GET /reporting/weekly-location-performance without token → 401
-GET /reporting/weekly-location-performance?week_start=2026-09-21 (Bearer) → 200 KPI rows (COP+USD)
-UI http://127.0.0.1:5174/reporting/weekly-performance → 200 (SPA); API proxy without token → 401
+GET /reporting/weekly-location-performance?week_start=2026-09-21 (Bearer) → 200
+  co-med-centro COP 18500000; us-mia-downtown USD 1000
+UI route http://127.0.0.1:5174/reporting/weekly-performance → 200 (SPA not proxied)
+API via Vite proxy without token → 401; with Bearer → 200
+Browser staff login → /accessible → Weekly KPIs nav + accessible link → dashboard week 2026-09-21
+  2 location rows (Medellín Centro COP + Miami Downtown USD), stockouts 3, price alerts 2
+Artifacts: /opt/cursor/artifacts/part3_weekly_kpi_dashboard_demo.mp4
+  /opt/cursor/artifacts/part3_weekly_kpi_live.webp
+  /opt/cursor/artifacts/part3_demo_03_weekly_kpi.png
 ```
 
 ## Planned next steps (order)
