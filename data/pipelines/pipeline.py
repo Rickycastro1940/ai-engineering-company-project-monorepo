@@ -2,12 +2,21 @@
 
 Main entry: ``data/pipelines/pipeline.py`` (this file).
 Contracts: root ``CONTEXT-company.md`` (KPIs / schema / endpoints) and
-``data/pipelines/PIPELINE_DESIGN.md`` Phase 4 (flows + tasks).
+``data/pipelines/PIPELINE_DESIGN.md``.
 
-Prefect structure (Phase 1 — flows and tasks):
-- Stage subflows: extract → transform → load
-- Independent ``@task`` units with explicit inputs/outputs per stage
-- Optional non-critical eval snapshot via ``return_state=True`` (must not fail ETL)
+Prefect ``name=`` contract (PIPELINE_DESIGN.md Phase 4 / Phase one subflows):
+- Flow: ``brasaland_weekly_performance_pipeline``
+- Stage subflows (explicit I/O, no shared globals):
+  ``extract_brasaland_data_flow``, ``transform_brasaland_kpis_flow``,
+  ``load_brasaland_reporting_flow``
+- Optional subflow: ``eval_brasaland_snapshot_flow`` (``return_state=True``)
+- Tasks: ``extract_telemetry_events``, ``extract_domain_data``,
+  ``aggregate_location_kpis``, ``upsert_to_reporting_table`` (+ landing / eval)
+
+Destination: ``reporting.weekly_location_performance`` on
+``(location_id, week_start)``. Run log: ``reporting.pipeline_runs``.
+KPI event types: ``inbound_order_created``, ``stock_waste_registered``,
+``stock_threshold_triggered``, ``ingredient_price_variance_detected``.
 
 Placement:
 - ``data/raw/`` — extract snapshots and intermediate KPI frames
@@ -23,7 +32,7 @@ import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Tuple
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -378,10 +387,14 @@ def land_raw_extracts(telemetry_df, locations_df, start_date: str, end_date: str
 
 
 @flow(name="extract_brasaland_data_flow", log_prints=True)
-def extract_brasaland_data_flow(start_date: str, end_date: str):
+def extract_brasaland_data_flow(
+    start_date: str, end_date: str
+) -> Tuple[Any, Any]:
     """Extraction stage: read-only snapshots for the chain week.
 
-    Returns ``(telemetry_df, locations_df)``.
+    Inputs: chain-week bounds (``start_date``, ``end_date``).
+    Outputs: ``(telemetry_df, locations_df)`` passed explicitly to transform —
+    no module-level / global state between subflows.
     """
     # Telemetry is required — let failures propagate after task retries.
     telemetry_df = extract_telemetry_events(start_date, end_date)
@@ -435,8 +448,11 @@ def land_kpi_intermediate(kpis_df, week_start: str) -> str:
 
 
 @flow(name="transform_brasaland_kpis_flow", log_prints=True)
-def transform_brasaland_kpis_flow(telemetry_df, locations_df, week_start: str):
-    """Transformation stage: pure KPI rollup (no destination write)."""
+def transform_brasaland_kpis_flow(telemetry_df, locations_df, week_start: str) -> Any:
+    """Transformation stage: pure KPI rollup (no destination write).
+
+    Inputs: extract frames + ``week_start``. Output: KPI frame for load.
+    """
     kpis_df = aggregate_location_kpis(telemetry_df, locations_df, week_start)
     land_kpi_intermediate(kpis_df, week_start)
     return kpis_df
@@ -484,6 +500,7 @@ def upsert_to_reporting_table(kpis_df) -> int:
 def load_brasaland_reporting_flow(kpis_df) -> int:
     """Load stage: idempotent upsert into reporting.weekly_location_performance.
 
+    Input: KPI frame from transform. Output: rows upserted.
     Upsert failures are inspected via ``return_state=True`` (not left to bubble
     as an unhandled task exception) so the flow can log a clear load failure.
     """
@@ -498,18 +515,30 @@ def load_brasaland_reporting_flow(kpis_df) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Optional non-critical step (eval snapshot) — never blocks ETL
+# Optional non-critical subflow (eval snapshot) — never blocks ETL
 # ---------------------------------------------------------------------------
 
 
 @task(name="write_eval_snapshot", retries=0)
 def write_eval_snapshot(kpis_df, week_start: str):
-    """Optional secondary report: fixture validation under data/eval/.
+    """Optional secondary report task: fixture validation under data/eval/.
 
-    Local FS only — no external-service retries. Non-critical: the parent flow
-    calls this with ``return_state=True`` so a failure never interrupts ETL.
+    Local FS only — no external-service retries. Called only from
+    ``eval_brasaland_snapshot_flow`` so the main flow can treat eval as a
+    subflow invoked with ``return_state=True``.
     """
     return write_validation_output(kpis_df, week_start)
+
+
+@flow(name="eval_brasaland_snapshot_flow", log_prints=True)
+def eval_brasaland_snapshot_flow(kpis_df, week_start: str) -> Any:
+    """Optional validation subflow (Phase one): secondary report under data/eval/.
+
+    Inputs: KPI frame + ``week_start``. Output: validation payload dict.
+    The main flow must call this with ``return_state=True`` so a fixture miss
+    never marks the Monday ETL Failed.
+    """
+    return write_eval_snapshot(kpis_df, week_start)
 
 
 # ---------------------------------------------------------------------------
@@ -603,11 +632,15 @@ def get_latest_pipeline_run() -> dict[str, Any]:
 def run_pipeline(start_date: str, end_date: str) -> dict[str, Any]:
     """Monday chain-week ETL: extract → transform → load (+ optional eval).
 
+    Phase one (subflows): stage work is three Prefect ``@flow`` subflows with
+    explicit inputs/outputs. Optional eval is its own subflow invoked with
+    ``return_state=True``.
+
     Resilience (Phase 2):
     - External Supabase tasks use retries=3 / retry_delay_seconds=5.
     - ``extract_domain_data`` and ``upsert_to_reporting_table`` failures are
       handled in-flow with ``return_state=True`` (fallback or explicit raise).
-    - ``write_eval_snapshot`` is optional and also uses ``return_state=True``.
+    - ``eval_brasaland_snapshot_flow`` is optional and uses ``return_state=True``.
     - ``aggregate_location_kpis`` is cached (task_input_hash, 1 day).
 
     Idempotency (Phase 3):
@@ -628,8 +661,10 @@ def run_pipeline(start_date: str, end_date: str) -> dict[str, Any]:
         kpis = transform_brasaland_kpis_flow(telemetry_data, domain_data, start_date)
         load_brasaland_reporting_flow(kpis)
 
-        # Optional / non-critical: secondary eval snapshot under data/eval/.
-        eval_state: State = write_eval_snapshot(kpis, start_date, return_state=True)
+        # Optional / non-critical subflow: secondary eval under data/eval/.
+        eval_state: State = eval_brasaland_snapshot_flow(
+            kpis, start_date, return_state=True
+        )
         if eval_state.is_failed():
             print(
                 "Eval snapshot failed (non-critical); "
