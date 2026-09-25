@@ -439,7 +439,11 @@ Auth: `Depends(get_current_user)` (same OAuth2 Bearer as locations). Run via `uv
 
 ### KPI query
 
-`GET /reporting/weekly-location-performance` calls `get_weekly_location_performance(week_start=None)` in `data/pipelines/pipeline.py`. That function selects from `reporting.weekly_location_performance` only (with a local upsert-store fallback when Supabase is unset). Optional query `week_start` filters one chain week. This is the feed Part 3’s dashboard will consume for Mariana Restrepo, Felipe Guerrero, and Lucía Fernández. Example body:
+`GET /reporting/weekly-location-performance` calls `get_weekly_location_performance(week_start=None)` in `data/pipelines/pipeline.py`. That function selects from `reporting.weekly_location_performance` only (with a local upsert-store fallback when Supabase is unset). Optional query `week_start` filters one chain week. This is the feed Part 3’s dashboard will consume for Mariana Restrepo, Felipe Guerrero, and Lucía Fernández.
+
+**Part 3 dashboard (staff backoffice):** protected route `/reporting/weekly-performance` in `uis/backoffice/` calls that KPI endpoint (Bearer JWT) and renders one row per location for the chain week, with costs in COP or USD. It does not call `GET /telemetry/report`.
+
+Example body:
 
 ```json
 {

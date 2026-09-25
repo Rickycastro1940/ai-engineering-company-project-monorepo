@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { AsyncPanel } from "../components/AsyncState";
 import {
   fetchInventory,
@@ -248,10 +249,14 @@ export function AccessiblePage() {
         </div>
 
         <div className="accessible__panel accessible__panel--placeholder">
-          <h3>Executive sales (placeholder)</h3>
+          <h3>Weekly location cost &amp; waste</h3>
           <p>
-            Empty module for Mariana Restrepo’s chain sales in USD and COP —
-            wired later. Structure only.
+            Monday report for Mariana Restrepo, Felipe Guerrero, and Lucía
+            Fernández — purchase, waste, stockouts, and price alerts per
+            location in COP and USD.
+          </p>
+          <p>
+            <Link to="/reporting/weekly-performance">Open weekly KPI dashboard</Link>
           </p>
         </div>
       </div>

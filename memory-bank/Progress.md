@@ -14,13 +14,13 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
-| Technology: telemetry + pipeline to dashboards | **Partial** — Part 2 weekly location cost/waste ETL implemented (`data/process/location_kpis.py` + Prefect `brasaland_weekly_performance_pipeline`); engineering `GET /telemetry/report` untouched |
-| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — no sales UI yet; weekly purchase/waste/stockout KPIs per location (COP/USD) via `reporting.weekly_location_performance` |
-| Procurement: supplier price history, consolidated spend | **Partial** — `price_alert_events_count` + `total_purchase_cost` per location-week; no full supplier platform yet |
+| Technology: telemetry + pipeline to dashboards | **Partial** — Part 2/3 weekly location cost/waste ETL + Prefect subflows + staff KPI dashboard at `/reporting/weekly-performance`; engineering `GET /telemetry/report` untouched |
+| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — weekly purchase/waste/stockout KPIs per location (COP/USD) on backoffice Weekly KPIs page; no live sales UI yet |
+| Procurement: supplier price history, consolidated spend | **Partial** — `price_alert_events_count` + `total_purchase_cost` per location-week on Weekly KPIs dashboard |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
 | People: HR portal / KPIs by country | **Not done** |
 | Training: recipe catalogue, push to 14 locations | **Not done** — knowledge docs under `docs/company-knowledge-base/` are source material only |
-| Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial hooks** — inventory Groq agent; weekly pipeline + Flower; backoffice placeholder for USD+COP sales |
+| Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial** — Monday weekly location cost/waste dashboard live for Mariana; chain sales USD+COP still a separate gap |
 
 ## What already runs (engineering)
 
@@ -30,7 +30,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | Incident analysis UI | `uis/web` |
 | Weekly cost/waste pipeline + Celery | `data/process/location_kpis.py`, `data/pipelines/pipeline.py`, `services/reporting/main.py`, `services/tasks.py`; Compose Redis/Flower/worker |
 | Public corporate website | `uis/website/` — Vite/React, route `/`, brand tokens + components from `CONTEXT.md`; screenshot `docs/screenshots/website-corporate-home.png` |
-| Internal backoffice | `uis/backoffice/` — JWT session; client layout guard (`ProtectedRoute` + `useRequireAuth`) on `/`, `/accessible`, `/account/profile`, `/account/change-password`; `/accessible` loads JWT-gated locations (14 / 8 Colombia / 6 Florida, COP+USD) plus inventory |
+| Internal backoffice | `uis/backoffice/` — JWT session; `/accessible` locations+inventory; `/reporting/weekly-performance` Monday location cost/waste KPIs (COP/USD) |
 | Locations API | `services/api/locations.py` — 14 locations, Colombia 8 / Florida 6, COP+USD; **Bearer JWT required** |
 
 ## Latest auth-frontend evidence (`feature/auth-frontend`)
@@ -242,13 +242,35 @@ POST /reporting/pipeline-runs → 202 with Redis / 503 envelope without
 Name contract: flow brasaland_weekly_performance_pipeline; tables reporting.weekly_location_performance + reporting.pipeline_runs; events inbound_order_created / stock_waste_registered / stock_threshold_triggered / ingredient_price_variance_detected; roster ids co-med-centro / us-mia-downtown
 ```
 
+## Latest Part 3 — subflows, tests, CLI, KPI dashboard (`cursor/pipeline-part3-dashboard-4f14`)
+
+Department served: **Executive** (Mariana — Monday weekly numbers she can read) + **Restaurant Operations** (Felipe — purchase/waste/stockouts) + **Procurement** (Lucía — purchase + price alerts) + **Technology** (Nicolás — pipeline into dashboards).
+
+Part 2 pipeline already present. Part 3 closes production readiness:
+
+- Stage subflows already in `data/pipelines/pipeline.py`: `extract_brasaland_data_flow` → `transform_brasaland_kpis_flow` → `load_brasaland_reporting_flow`
+- Transform unit tests in `tests/pipelines/` (fixture KPIs, dedupe, empty/malformed payloads)
+- CLI: `python data/pipelines/pipeline.py`
+- Staff dashboard: `uis/backoffice` route `/reporting/weekly-performance` consumes `GET /reporting/weekly-location-performance` (Bearer JWT). Vite proxies only API paths (`/reporting/weekly-location-performance`, `/reporting/pipeline-runs`, `/tasks`) so the SPA route is not swallowed.
+- Prefect `name=` + transform tests stay locked to CONTEXT-company.md KPIs (`total_purchase_cost`, `total_waste_cost`, `waste_ratio`, `stockout_events_count`, `price_alert_events_count`) and event types.
+
+```text
+uv add "prefect>=3" already satisfied → prefect 3.4.25
+.venv/bin/python -m pytest tests/pipelines/ -q → 36 passed
+.venv/bin/python data/pipelines/pipeline.py --offline --start-date 2026-09-21 --end-date 2026-09-28
+→ status=Success records_processed=9; subflows extract→transform→load Completed
+cd uis/backoffice && npm run build → green
+GET /reporting/weekly-location-performance without token → 401
+GET /reporting/weekly-location-performance?week_start=2026-09-21 (Bearer) → 200 KPI rows (COP+USD)
+UI http://127.0.0.1:5174/reporting/weekly-performance → 200 (SPA); API proxy without token → 401
+```
+
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).
 2. Extend the central API toward missing Technology nouns: **locations → menus → sales → customers → suppliers**, reusing `services/api` routers.
-3. Executive path: surface chain sales in **USD and COP**, wire Monday-style weekly report to the existing async pipeline, keep Mariana’s NL assistant on the documented agent loop.
-4. Part 3: split extract/transform/load into Prefect subflows and wire the executive dashboard consumer.
-5. Do not rewrite the monorepo or invent another company.
+3. Executive path: surface chain sales in **USD and COP**, keep Mariana’s NL assistant on the documented agent loop.
+4. Do not rewrite the monorepo or invent another company.
 
 ## How to update this file
 

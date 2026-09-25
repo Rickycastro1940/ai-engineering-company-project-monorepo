@@ -292,3 +292,48 @@ export async function fetchInventory(): Promise<InventoryProduct[]> {
 export async function fetchLocationsOverview(): Promise<LocationsOverview> {
   return apiRequest<LocationsOverview>("/locations/overview");
 }
+
+/** CONTEXT-company.md KPI row from reporting.weekly_location_performance. */
+export type WeeklyLocationPerformanceRow = {
+  location_id: string;
+  country: string;
+  currency: "COP" | "USD" | string;
+  total_purchase_cost: number;
+  total_waste_cost: number;
+  waste_ratio: number;
+  stockout_events_count: number;
+  price_alert_events_count: number;
+};
+
+export type WeeklyLocationPerformanceResponse = {
+  week_start: string | null;
+  locations: WeeklyLocationPerformanceRow[];
+};
+
+export type PipelineRunLatest = {
+  run_id?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  window_start?: string | null;
+  window_end?: string | null;
+  records_processed?: number | null;
+  status?: string | null;
+  error_message?: string | null;
+  message?: string | null;
+};
+
+/** Part 3 dashboard feed — Mariana / Felipe / Lucía weekly location KPIs. */
+export async function fetchWeeklyLocationPerformance(
+  weekStart?: string,
+): Promise<WeeklyLocationPerformanceResponse> {
+  const query = weekStart
+    ? `?week_start=${encodeURIComponent(weekStart)}`
+    : "";
+  return apiRequest<WeeklyLocationPerformanceResponse>(
+    `/reporting/weekly-location-performance${query}`,
+  );
+}
+
+export async function fetchLatestPipelineRun(): Promise<PipelineRunLatest> {
+  return apiRequest<PipelineRunLatest>("/reporting/pipeline-runs/latest");
+}
