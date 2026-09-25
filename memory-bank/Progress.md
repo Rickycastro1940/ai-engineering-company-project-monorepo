@@ -14,7 +14,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
-| Technology: telemetry + pipeline to dashboards | **Partial** — Part 2 weekly location cost/waste ETL implemented (`data/process/location_kpis.py` + Prefect `brasaland_weekly_performance_pipeline`); engineering `GET /telemetry/report` untouched |
+| Technology: telemetry + pipeline to dashboards | **Partial** — Part 2 weekly location cost/waste ETL + Phase one Prefect stage subflows (`extract`/`transform`/`load` + optional eval); engineering `GET /telemetry/report` untouched |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — no sales UI yet; weekly purchase/waste/stockout KPIs per location (COP/USD) via `reporting.weekly_location_performance` |
 | Procurement: supplier price history, consolidated spend | **Partial** — `price_alert_events_count` + `total_purchase_cost` per location-week; no full supplier platform yet |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
@@ -190,7 +190,10 @@ Department served: **Technology** (Nicolás — pipeline into ops/finance dashbo
 Implemented against `CONTEXT-company.md` (KPIs to Measure / destination schema / endpoints) and approved `data/pipelines/PIPELINE_DESIGN.md`:
 
 - Pure transform in `data/process/location_kpis.py` (dedupe on `telemetry_events.id`, five KPIs, roster `location_id`s).
-- Prefect **3** flow `brasaland_weekly_performance_pipeline` (`uv add "prefect>=3"`) with tasks `extract_weekly_inputs` → `aggregate_location_kpis` → `upsert_to_reporting_table`.
+- Prefect **3** flow `brasaland_weekly_performance_pipeline` with stage subflows
+  `extract_brasaland_data_flow` → `transform_brasaland_kpis_flow` → `load_brasaland_reporting_flow`
+  and tasks `extract_telemetry_events` / `extract_domain_data` / `aggregate_location_kpis` /
+  `upsert_to_reporting_table` into `reporting.weekly_location_performance`.
 - Extract lands in `data/raw/`; validation output in `data/eval/last_validation.json`.
 - Destination `reporting.weekly_location_performance` + run log `reporting.pipeline_runs` (SQL in `data/pipelines/reporting_schema.sql`); mirror `data/pipelines/last_run.json`.
 - HTTP shell in `services/reporting/` only — engineering telemetry left alone.
@@ -203,12 +206,33 @@ Idempotent load: upsert on_conflict=location_id,week_start (CONTEXT PK); identic
 Run metadata: started_at, finished_at, records_processed, status, error_message → pipeline_runs + last_run.json + pipeline_run_log.jsonl
 ```
 
+## Latest Phase one — Prefect subflows (`cursor/pipeline-phase1-subflows-4f14`)
+
+Department served: **Technology** (Nicolás — pipeline structure) + **Operations/Executive** (weekly KPI stages stay readable and isolatable).
+
+Hardened `data/pipelines/pipeline.py` so Monday ETL is three stage `@flow` subflows with explicit I/O (no shared globals), plus optional eval as its own subflow:
+
+| Subflow `name=` | Inputs → Outputs |
+| --- | --- |
+| `extract_brasaland_data_flow` | `(start_date, end_date)` → `(telemetry_df, locations_df)` |
+| `transform_brasaland_kpis_flow` | `(telemetry_df, locations_df, week_start)` → `kpis_df` |
+| `load_brasaland_reporting_flow` | `kpis_df` → rows upserted |
+| `eval_brasaland_snapshot_flow` | `(kpis_df, week_start)` → validation dict (`return_state=True` from main) |
+
+Main flow remains `brasaland_weekly_performance_pipeline`. Destination stays `reporting.weekly_location_performance`. `PIPELINE_DESIGN.md` Phase 4 name contract updated.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+.venv/bin/python -m pytest tests/pipelines/test_prefect_stages.py tests/pipelines/test_name_contract.py -q → 14 passed
+.venv/bin/python -m pytest tests/pipelines/ -q → 30 passed
+```
+
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).
 2. Extend the central API toward missing Technology nouns: **locations → menus → sales → customers → suppliers**, reusing `services/api` routers.
 3. Executive path: surface chain sales in **USD and COP**, wire Monday-style weekly report to the existing async pipeline, keep Mariana’s NL assistant on the documented agent loop.
-4. Part 3: split extract/transform/load into Prefect subflows and wire the executive dashboard consumer.
+4. Later phases: CLI entry, reporting HTTP feed, and staff dashboard consumers for `reporting.weekly_location_performance`.
 5. Do not rewrite the monorepo or invent another company.
 
 ## How to update this file
