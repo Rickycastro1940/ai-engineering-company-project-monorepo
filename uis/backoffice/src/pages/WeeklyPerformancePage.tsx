@@ -67,7 +67,26 @@ function chainWeekWindowLabel(weekStart: string | null): string {
   const end = new Date(start);
   end.setDate(end.getDate() + 7);
   const endIso = end.toISOString().slice(0, 10);
-  return `${weekStart} → ${endIso} (exclusive) · America/Bogota`;
+  return `Chain week starting Monday ${weekStart} through Sunday before ${endIso} (America/Bogota)`;
+}
+
+function refreshStatusLabel(runMeta: PipelineRunLatest | null): string | null {
+  if (!runMeta?.status) {
+    return null;
+  }
+  const statusWord =
+    runMeta.status === "Success"
+      ? "ready"
+      : runMeta.status === "Failed"
+        ? "failed"
+        : runMeta.status === "Running"
+          ? "in progress"
+          : runMeta.status.toLowerCase();
+  const parts = [`Last Monday report refresh: ${statusWord}`];
+  if (runMeta.window_start) {
+    parts.push(`for the week starting ${runMeta.window_start}`);
+  }
+  return parts.join(" ");
 }
 
 export function WeeklyPerformancePage() {
@@ -109,7 +128,7 @@ export function WeeklyPerformancePage() {
           setError(
             toUserFacingMessage(
               err,
-              "Weekly location performance could not be loaded. Try again in a moment.",
+              "The Monday weekly report could not be loaded. Try again in a moment.",
             ),
           );
         }
@@ -142,32 +161,33 @@ export function WeeklyPerformancePage() {
     [rows],
   );
 
+  const refreshLabel = refreshStatusLabel(runMeta);
+
   return (
     <section className="wlp" aria-labelledby="wlp-title">
       <div className="wlp__welcome">
-        <p className="wlp__kicker">Monday weekly report · America/Bogota</p>
-        <h2 id="wlp-title">Weekly location cost &amp; waste</h2>
+        <p className="wlp__kicker">Monday 07:00 · America/Bogota</p>
+        <h2 id="wlp-title">Monday weekly ops &amp; finance report</h2>
         <p className="wlp__lead">
-          For Mariana Restrepo, Felipe Guerrero, and Lucía Fernández. Reads{" "}
-          <code>GET /reporting/weekly-location-performance</code> — Purchase cost,
-          Waste cost, Waste ratio, Stockout frequency, and Price alert frequency per
-          location, in COP or USD. Does not use engineering telemetry.
+          For Mariana Restrepo, Felipe Guerrero, and Lucía Fernández — Purchase
+          cost, Waste cost, Waste ratio, Stockout frequency, and Price alert
+          frequency for each of the 14 locations, in COP or USD.
         </p>
       </div>
 
-      <div className="wlp__dashboard" aria-label="Weekly location performance dashboard">
+      <div className="wlp__dashboard" aria-label="Monday weekly ops and finance report">
         <div className="wlp__panel wlp__panel--span">
-          <h3>Chain week period</h3>
+          <h3>Reporting period</h3>
           <AsyncPanel
             status={status}
-            loadingLabel="Loading weekly KPIs…"
+            loadingLabel="Loading the Monday weekly report…"
             error={error}
             onRetry={retry}
             skeletonRows={2}
           >
             <dl className="wlp__stats">
               <div>
-                <dt>Week start (Monday)</dt>
+                <dt>Chain week starting (Monday)</dt>
                 <dd>{weekStart ?? "—"}</dd>
               </div>
               <div className="wlp__stats-span">
@@ -175,15 +195,15 @@ export function WeeklyPerformancePage() {
                 <dd className="wlp__period">{chainWeekWindowLabel(weekStart)}</dd>
               </div>
               <div>
-                <dt>Locations with data</dt>
+                <dt>Locations with figures</dt>
                 <dd>{rows.length}</dd>
               </div>
               <div>
-                <dt>Colombia rows (COP)</dt>
+                <dt>Colombia (COP)</dt>
                 <dd>{colombia.length}</dd>
               </div>
               <div>
-                <dt>Florida rows (USD)</dt>
+                <dt>Florida (USD)</dt>
                 <dd>{florida.length}</dd>
               </div>
               <div>
@@ -195,35 +215,23 @@ export function WeeklyPerformancePage() {
                 <dd>{priceAlertTotal}</dd>
               </div>
             </dl>
-            {runMeta?.status ? (
-              <p className="wlp__run">
-                Last pipeline run: <strong>{runMeta.status}</strong>
-                {runMeta.window_start && runMeta.window_end
-                  ? ` · window [${runMeta.window_start}, ${runMeta.window_end})`
-                  : null}
-                {typeof runMeta.records_processed === "number"
-                  ? ` · ${runMeta.records_processed} events processed`
-                  : null}
-              </p>
-            ) : null}
+            {refreshLabel ? <p className="wlp__run">{refreshLabel}</p> : null}
           </AsyncPanel>
         </div>
 
         <div className="wlp__panel wlp__panel--span">
-          <h3>Location-week KPIs</h3>
+          <h3>By location</h3>
           <AsyncPanel
             status={status}
-            loadingLabel="Loading location KPI table…"
+            loadingLabel="Loading location figures…"
             error={error}
             onRetry={retry}
             skeletonRows={6}
           >
             {rows.length === 0 ? (
               <p className="wlp__empty">
-                No rows in <code>reporting.weekly_location_performance</code> yet.
-                Run{" "}
-                <code>python data/pipelines/pipeline.py</code> for the previous
-                chain week, then refresh.
+                No location figures for this chain week yet. Ask Brasaland Digital
+                to refresh the Monday report, then try again.
               </p>
             ) : (
               <div className="wlp__table-wrap">
@@ -247,7 +255,6 @@ export function WeeklyPerformancePage() {
                           <span className="wlp__loc-name">
                             {locationLabel(row.location_id)}
                           </span>
-                          <span className="wlp__loc-id">{row.location_id}</span>
                         </td>
                         <td>{row.country}</td>
                         <td>

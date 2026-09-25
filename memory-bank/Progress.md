@@ -14,13 +14,13 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
-| Technology: telemetry + pipeline to dashboards | **Partial** — Part 2 weekly location cost/waste ETL + Phase one Prefect stage subflows + Phase two isolated KPI transform unit tests + Phase three CLI (`python data/pipelines/pipeline.py --offline`) + Phase four backoffice Weekly KPIs page (`/reporting/weekly-performance`); engineering `GET /telemetry/report` untouched |
-| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — no sales UI yet; weekly purchase/waste/stockout KPIs per location (COP/USD) on backoffice Weekly KPIs page |
-| Procurement: supplier price history, consolidated spend | **Partial** — `price_alert_events_count` + `total_purchase_cost` per location-week on Weekly KPIs dashboard |
+| Technology: telemetry + pipeline to dashboards | **Partial** — Part 2 weekly location cost/waste ETL + Phase one Prefect stage subflows + Phase two isolated KPI transform unit tests + Phase three CLI (`python data/pipelines/pipeline.py --offline`) + Phase four backoffice Monday weekly report (`/reporting/weekly-performance`, stakeholder copy); engineering `GET /telemetry/report` untouched |
+| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — no sales UI yet; weekly Purchase cost / Waste cost / Waste ratio / Stockout frequency / Price alert frequency per location (COP/USD) on Monday weekly report |
+| Procurement: supplier price history, consolidated spend | **Partial** — Price alert frequency + Purchase cost per location-week on Monday weekly report |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
 | People: HR portal / KPIs by country | **Not done** |
 | Training: recipe catalogue, push to 14 locations | **Not done** — knowledge docs under `docs/company-knowledge-base/` are source material only |
-| Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial** — Monday weekly location cost/waste dashboard live for Mariana; chain sales USD+COP still a separate gap |
+| Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial** — Monday weekly ops & finance report live for Mariana / Felipe / Lucía (stakeholder labels); chain sales USD+COP still a separate gap |
 
 ## What already runs (engineering)
 
@@ -30,7 +30,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | Incident analysis UI | `uis/web` |
 | Weekly cost/waste pipeline + Celery | `data/process/location_kpis.py`, `data/pipelines/pipeline.py`, `services/reporting/main.py`, `services/tasks.py`; Compose Redis/Flower/worker |
 | Public corporate website | `uis/website/` — Vite/React, route `/`, brand tokens + components from `CONTEXT.md`; screenshot `docs/screenshots/website-corporate-home.png` |
-| Internal backoffice | `uis/backoffice/` — JWT session; `/accessible` locations+inventory; `/reporting/weekly-performance` Monday location cost/waste KPIs (COP/USD) |
+| Internal backoffice | `uis/backoffice/` — JWT session; `/accessible` locations+inventory; `/reporting/weekly-performance` Monday weekly ops & finance report (COP/USD) |
 | Locations API | `services/api/locations.py` — 14 locations, Colombia 8 / Florida 6, COP+USD; **Bearer JWT required** |
 
 ## Latest auth-frontend evidence (`feature/auth-frontend`)
@@ -285,6 +285,26 @@ cd uis/backoffice && npm run build → tsc -b && vite build green
 ```
 
 Skill **passed** (criteria 1–4 + 6). Technology central API remains **incomplete** while menus/sales/customers/suppliers are `missing`.
+
+## Latest Phase four stakeholder UX (`cursor/pipeline-phase4-stakeholder-ux-4f14`)
+
+Department served: **Executive** (Mariana) + **Restaurant Operations** (Felipe) + **Procurement** (Lucía) — Monday report must be legible without API/table jargon.
+
+Hardened `uis/backoffice` Monday weekly report copy for leadership:
+
+- Title/nav: “Monday weekly ops & finance report” / “Monday weekly report” (not “Weekly KPIs” / KPI query)
+- Lead and empty states drop endpoint paths, table names, Bearer, backticks, CLI commands, and engineering telemetry notes
+- Column labels stay CONTEXT-company.md exact: Purchase cost, Waste cost, Waste ratio, Stockout frequency, Price alert frequency
+- Period shown as chain week starting Monday YYYY-MM-DD (America/Bogota); location column shows friendly names only (no raw `location_id` as primary label)
+- Still fetches `GET /reporting/weekly-location-performance` under the hood
+
+Prefect / test vocabulary: `PIPELINE_DESIGN.md` Phase 4 `name=` contract already matches `data/pipelines/pipeline.py` and `tests/pipelines/test_name_contract.py` (`brasaland_weekly_performance_pipeline`, `extract_brasaland_data_flow`, `transform_brasaland_kpis_flow`, `load_brasaland_reporting_flow`, `eval_brasaland_snapshot_flow`, domain tasks). No renames required; no generic `extract_data` / `business_metrics` left.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+.venv/bin/python -m pytest tests/pipelines/ -q → 41 passed
+cd uis/backoffice && npm run build → tsc -b && vite build green
+```
 
 ## How to update this file
 

@@ -11,7 +11,7 @@ Internal staff console for **Brasaland Digital** (see root [`CONTEXT.md`](../../
 | `/login` | Email + password form. Success stores JWT and opens `/accessible`. Failure stays on the form. | Public |
 | `/register` | Registration form. Success: `POST /users` (optional `name`) then `POST /auth/login`, store JWT, open `/accessible`. Failure shows field-level errors. | Public |
 | `/accessible` | Welcome dashboard — `GET /locations/overview` | Protected |
-| `/reporting/weekly-performance` | Weekly location cost & waste KPIs — `GET /reporting/weekly-location-performance` (Phase four) | Protected |
+| `/reporting/weekly-performance` | Monday weekly ops & finance report (Purchase cost, Waste cost, Waste ratio, Stockout frequency, Price alert frequency; Phase four) | Protected |
 | `/account/profile` | Email plus name/phone/address from `GET /auth/me`; edit contact via `PUT /profiles/me` | Protected |
 | `/account/change-password` | Password update via `PUT /users/{id}` | Protected |
 | `/` | Redirects to `/accessible` | Protected |

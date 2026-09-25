@@ -28,10 +28,6 @@
   line-height: 1.5;
 }
 
-.wlp__lead code {
-  font-size: 0.85em;
-}
-
 .wlp__dashboard {
   display: grid;
   grid-template-columns: 1fr;
@@ -95,10 +91,6 @@
   line-height: 1.45;
 }
 
-.wlp__empty code {
-  font-size: 0.85em;
-}
-
 .wlp__table-wrap {
   overflow-x: auto;
 }
@@ -128,13 +120,6 @@
 .wlp__loc-name {
   display: block;
   font-weight: 600;
-}
-
-.wlp__loc-id {
-  display: block;
-  font-size: 0.75rem;
-  color: var(--bo-muted, #6b7280);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 @media (min-width: 900px) {

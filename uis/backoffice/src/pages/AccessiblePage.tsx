@@ -249,14 +249,14 @@ export function AccessiblePage() {
         </div>
 
         <div className="accessible__panel accessible__panel--placeholder">
-          <h3>Weekly location cost &amp; waste</h3>
+          <h3>Monday weekly ops &amp; finance report</h3>
           <p>
-            Monday report for Mariana Restrepo, Felipe Guerrero, and Lucía
-            Fernández — Purchase cost, Waste cost, Waste ratio, Stockout
-            frequency, and Price alert frequency per location (COP/USD).
+            For Mariana Restrepo, Felipe Guerrero, and Lucía Fernández —
+            Purchase cost, Waste cost, Waste ratio, Stockout frequency, and
+            Price alert frequency per location (COP/USD).
           </p>
           <p>
-            <Link to="/reporting/weekly-performance">Open weekly KPI dashboard</Link>
+            <Link to="/reporting/weekly-performance">Open Monday weekly report</Link>
           </p>
         </div>
 
