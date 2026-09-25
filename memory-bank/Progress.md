@@ -14,13 +14,13 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
-| Technology: telemetry + pipeline to dashboards | **Partial** — Part 2 weekly location cost/waste ETL + Phase one Prefect stage subflows + Phase two isolated KPI transform unit tests (`tests/pipelines/test_pipeline.py`); engineering `GET /telemetry/report` untouched |
+| Technology: telemetry + pipeline to dashboards | **Partial** — Part 2 weekly location cost/waste ETL + Phase one Prefect stage subflows + Phase two isolated KPI transform unit tests + Phase three CLI (`python data/pipelines/pipeline.py --offline`) verified after subflow refactor; engineering `GET /telemetry/report` untouched |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — no sales UI yet; weekly purchase/waste/stockout KPIs per location (COP/USD) via `reporting.weekly_location_performance` |
 | Procurement: supplier price history, consolidated spend | **Partial** — `price_alert_events_count` + `total_purchase_cost` per location-week; no full supplier platform yet |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
 | People: HR portal / KPIs by country | **Not done** |
 | Training: recipe catalogue, push to 14 locations | **Not done** — knowledge docs under `docs/company-knowledge-base/` are source material only |
-| Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial hooks** — inventory Groq agent; weekly pipeline + Flower; backoffice placeholder for USD+COP sales |
+| Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial hooks** — inventory Groq agent; weekly pipeline + Flower + Monday-runnable CLI (`pipeline.py` offline Success); backoffice placeholder for USD+COP sales |
 
 ## What already runs (engineering)
 
@@ -238,12 +238,33 @@ head -n 5 CONTEXT.md → # Welcome to Brasaland
 .venv/bin/python -m pytest tests/pipelines/test_pipeline.py -v → 14 passed
 ```
 
+## Latest Phase three — CLI after subflow refactor (`cursor/pipeline-phase3-cli-4f14`)
+
+Department served: **Technology** (Nicolás — Monday-runnable pipeline into ops/finance) + **Executive** (Mariana — Monday 07:00 America/Bogota reporting cycle).
+
+After Phase one subflow hardening, restored Part 2 / Phase 4 script entry onto the same Prefect flow (did not invent a new CLI module):
+
+- `if __name__ == "__main__"` → `main()` → `brasaland_weekly_performance_pipeline` / `run_pipeline`
+- Flags: `--start-date`, `--end-date`, `--offline` (also auto-offline when `SUPABASE_*` unset)
+- Offline rebinds `fetch_telemetry_events` / `fetch_domain_locations` / `persist_kpi_records` so extract → transform → load subflows still run with explicit I/O
+- `PIPELINE_DESIGN.md` Script-based execution / Intended reporting schedule docs kept (same commands)
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+.venv/bin/python data/pipelines/pipeline.py --offline --start-date 2026-09-21 --end-date 2026-09-28
+→ exit 0; status=Success records_processed=9
+  subflows: extract_brasaland_data_flow → transform_brasaland_kpis_flow → load_brasaland_reporting_flow (Completed)
+.venv/bin/python data/pipelines/pipeline.py --offline
+→ exit 0; status=Success records_processed=9; window=[2026-09-14, 2026-09-21)
+.venv/bin/python -m pytest tests/pipelines/ -q → 36 passed
+```
+
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).
 2. Extend the central API toward missing Technology nouns: **locations → menus → sales → customers → suppliers**, reusing `services/api` routers.
 3. Executive path: surface chain sales in **USD and COP**, wire Monday-style weekly report to the existing async pipeline, keep Mariana’s NL assistant on the documented agent loop.
-4. Later phases: CLI entry, reporting HTTP feed, and staff dashboard consumers for `reporting.weekly_location_performance`.
+4. Later phases: reporting HTTP feed and staff dashboard consumers for `reporting.weekly_location_performance`.
 5. Do not rewrite the monorepo or invent another company.
 
 ## How to update this file
