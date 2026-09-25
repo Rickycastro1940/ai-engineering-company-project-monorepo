@@ -14,13 +14,13 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
-| Technology: telemetry + pipeline to dashboards | **Partial** — Part 2 weekly location cost/waste ETL + Phase one Prefect stage subflows + Phase two isolated KPI transform unit tests + Phase three CLI (`python data/pipelines/pipeline.py --offline`) verified after subflow refactor; engineering `GET /telemetry/report` untouched |
-| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — no sales UI yet; weekly purchase/waste/stockout KPIs per location (COP/USD) via `reporting.weekly_location_performance` |
-| Procurement: supplier price history, consolidated spend | **Partial** — `price_alert_events_count` + `total_purchase_cost` per location-week; no full supplier platform yet |
+| Technology: telemetry + pipeline to dashboards | **Partial** — Part 2 weekly location cost/waste ETL + Phase one Prefect stage subflows + Phase two isolated KPI transform unit tests + Phase three CLI (`python data/pipelines/pipeline.py --offline`) + Phase four backoffice Weekly KPIs page (`/reporting/weekly-performance`); engineering `GET /telemetry/report` untouched |
+| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — no sales UI yet; weekly purchase/waste/stockout KPIs per location (COP/USD) on backoffice Weekly KPIs page |
+| Procurement: supplier price history, consolidated spend | **Partial** — `price_alert_events_count` + `total_purchase_cost` per location-week on Weekly KPIs dashboard |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
 | People: HR portal / KPIs by country | **Not done** |
 | Training: recipe catalogue, push to 14 locations | **Not done** — knowledge docs under `docs/company-knowledge-base/` are source material only |
-| Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial hooks** — inventory Groq agent; weekly pipeline + Flower + Monday-runnable CLI (`pipeline.py` offline Success); backoffice placeholder for USD+COP sales |
+| Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial** — Monday weekly location cost/waste dashboard live for Mariana; chain sales USD+COP still a separate gap |
 
 ## What already runs (engineering)
 
@@ -30,7 +30,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | Incident analysis UI | `uis/web` |
 | Weekly cost/waste pipeline + Celery | `data/process/location_kpis.py`, `data/pipelines/pipeline.py`, `services/reporting/main.py`, `services/tasks.py`; Compose Redis/Flower/worker |
 | Public corporate website | `uis/website/` — Vite/React, route `/`, brand tokens + components from `CONTEXT.md`; screenshot `docs/screenshots/website-corporate-home.png` |
-| Internal backoffice | `uis/backoffice/` — JWT session; client layout guard (`ProtectedRoute` + `useRequireAuth`) on `/`, `/accessible`, `/account/profile`, `/account/change-password`; `/accessible` loads JWT-gated locations (14 / 8 Colombia / 6 Florida, COP+USD) plus inventory |
+| Internal backoffice | `uis/backoffice/` — JWT session; `/accessible` locations+inventory; `/reporting/weekly-performance` Monday location cost/waste KPIs (COP/USD) |
 | Locations API | `services/api/locations.py` — 14 locations, Colombia 8 / Florida 6, COP+USD; **Bearer JWT required** |
 
 ## Latest auth-frontend evidence (`feature/auth-frontend`)
@@ -264,8 +264,26 @@ head -n 5 CONTEXT.md → # Welcome to Brasaland
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).
 2. Extend the central API toward missing Technology nouns: **locations → menus → sales → customers → suppliers**, reusing `services/api` routers.
 3. Executive path: surface chain sales in **USD and COP**, wire Monday-style weekly report to the existing async pipeline, keep Mariana’s NL assistant on the documented agent loop.
-4. Later phases: reporting HTTP feed and staff dashboard consumers for `reporting.weekly_location_performance`.
+4. Later phases: keep staff dashboard consumers for `reporting.weekly_location_performance` current; extend sales USD+COP for Mariana.
 5. Do not rewrite the monorepo or invent another company.
+
+## Latest Phase four — business dashboard (`cursor/pipeline-phase4-dashboard-4f14`)
+
+Department served: **Executive** (Mariana — Monday location-week numbers) + **Restaurant Operations** (Felipe — purchase/waste/stockouts) + **Procurement** (Lucía — purchase cost + price alerts) + **Technology** (Nicolás — reporting feed on central API).
+
+Backoffice page `/reporting/weekly-performance` fetches Bearer-gated `GET /reporting/weekly-location-performance` and renders every CONTEXT-company.md KPI (Purchase cost, Waste cost, Waste ratio, Stockout frequency, Price alert frequency) with chain-week period (`week_start` + `[Monday, next Monday)` America/Bogota) and COP/USD rows. Vite proxies API paths only (`/reporting/weekly-location-performance`, `/reporting/pipeline-runs`) so the SPA route is not swallowed. Reporting routes mounted on `services/api/app.py` with JWT; offline KPI store readable when Supabase unset.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+GET http://127.0.0.1:8000/docs → 200
+locations=present menus=missing sales=missing customers=missing suppliers=missing inventory=present reporting=present
+path_count=25
+GET /reporting/weekly-location-performance without token → 401
+GET /reporting/weekly-location-performance with Bearer → 200, week_start=2026-09-21, COP+USD rows, five KPI columns
+cd uis/backoffice && npm run build → tsc -b && vite build green
+```
+
+Skill **passed** (criteria 1–4 + 6). Technology central API remains **incomplete** while menus/sales/customers/suppliers are `missing`.
 
 ## How to update this file
 

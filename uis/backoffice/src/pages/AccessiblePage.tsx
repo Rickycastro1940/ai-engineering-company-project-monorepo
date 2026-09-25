@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { AsyncPanel } from "../components/AsyncState";
 import {
   fetchInventory,
@@ -245,6 +246,18 @@ export function AccessiblePage() {
               </div>
             )}
           </AsyncPanel>
+        </div>
+
+        <div className="accessible__panel accessible__panel--placeholder">
+          <h3>Weekly location cost &amp; waste</h3>
+          <p>
+            Monday report for Mariana Restrepo, Felipe Guerrero, and Lucía
+            Fernández — Purchase cost, Waste cost, Waste ratio, Stockout
+            frequency, and Price alert frequency per location (COP/USD).
+          </p>
+          <p>
+            <Link to="/reporting/weekly-performance">Open weekly KPI dashboard</Link>
+          </p>
         </div>
 
         <div className="accessible__panel accessible__panel--placeholder">

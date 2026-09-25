@@ -586,20 +586,10 @@ def eval_brasaland_snapshot_flow(kpis_df, week_start: str) -> Any:
 # ---------------------------------------------------------------------------
 
 
-def get_weekly_location_performance(week_start: Optional[str] = None) -> dict[str, Any]:
-    """Read reporting.weekly_location_performance for the KPI query endpoint."""
-    client = _supabase_client()
-    query = _reporting(client).table(_PERFORMANCE_TABLE).select("*")
-    if week_start:
-        query = query.eq("week_start", week_start)
-    response = call_external(
-        "reporting store",
-        lambda: query.order("week_start", desc=True).execute(),
-    )
-    rows = response.data or []
+def _format_kpi_locations(rows: list[dict], week_start: Optional[str]) -> dict[str, Any]:
+    """Project destination rows into the KPI query response shape."""
     if not rows:
         return {"week_start": week_start, "locations": []}
-
     actual_week_start = week_start or rows[0].get("week_start")
     locations = [row for row in rows if row.get("week_start") == actual_week_start]
     formatted = [
@@ -616,6 +606,53 @@ def get_weekly_location_performance(week_start: Optional[str] = None) -> dict[st
         for loc in locations
     ]
     return {"week_start": actual_week_start, "locations": formatted}
+
+
+def _read_local_kpi_store(week_start: Optional[str] = None) -> dict[str, Any]:
+    """Read offline upsert store under data/raw/ (same PK as CONTEXT destination)."""
+    store_path = _RAW_DIR / "weekly_location_performance_store.json"
+    rows: list[dict] = []
+    if store_path.exists():
+        try:
+            payload = json.loads(store_path.read_text(encoding="utf-8"))
+            rows = list(payload.get("rows") or [])
+        except (OSError, json.JSONDecodeError, TypeError):
+            rows = []
+    if week_start:
+        rows = [row for row in rows if str(row.get("week_start")) == week_start]
+    else:
+        # Newest week_start first when no filter is given.
+        weeks = sorted(
+            {str(row.get("week_start")) for row in rows if row.get("week_start")},
+            reverse=True,
+        )
+        if weeks:
+            rows = [row for row in rows if str(row.get("week_start")) == weeks[0]]
+    return _format_kpi_locations(rows, week_start)
+
+
+def get_weekly_location_performance(week_start: Optional[str] = None) -> dict[str, Any]:
+    """Read reporting.weekly_location_performance for the KPI query endpoint.
+
+    Live path: Supabase ``reporting.weekly_location_performance``.
+    Offline path (no SUPABASE_* or store unreachable): local upsert store from
+    ``data/raw/weekly_location_performance_store.json`` so the Phase four
+    backoffice dashboard can still consume CLI / fixture runs.
+    """
+    if _supabase_configured():
+        try:
+            client = _supabase_client()
+            query = _reporting(client).table(_PERFORMANCE_TABLE).select("*")
+            if week_start:
+                query = query.eq("week_start", week_start)
+            response = call_external(
+                "reporting store",
+                lambda: query.order("week_start", desc=True).execute(),
+            )
+            return _format_kpi_locations(response.data or [], week_start)
+        except (RuntimeError, ExternalServiceError):
+            pass
+    return _read_local_kpi_store(week_start)
 
 
 def get_latest_pipeline_run() -> dict[str, Any]:
