@@ -2,12 +2,21 @@
 
 Main entry: ``data/pipelines/pipeline.py`` (this file).
 Contracts: root ``CONTEXT-company.md`` (KPIs / schema / endpoints) and
-``data/pipelines/PIPELINE_DESIGN.md`` Phase 4 (flows + tasks).
+``data/pipelines/PIPELINE_DESIGN.md``.
 
-Prefect structure (Phase 1 — flows and tasks):
-- Stage subflows: extract → transform → load
-- Independent ``@task`` units with explicit inputs/outputs per stage
-- Optional non-critical eval snapshot via ``return_state=True`` (must not fail ETL)
+Prefect ``name=`` contract (PIPELINE_DESIGN.md Phase 4 / Phase one subflows):
+- Flow: ``brasaland_weekly_performance_pipeline``
+- Stage subflows (explicit I/O, no shared globals):
+  ``extract_brasaland_data_flow``, ``transform_brasaland_kpis_flow``,
+  ``load_brasaland_reporting_flow``
+- Optional subflow: ``eval_brasaland_snapshot_flow`` (``return_state=True``)
+- Tasks: ``extract_telemetry_events``, ``extract_domain_data``,
+  ``aggregate_location_kpis``, ``upsert_to_reporting_table`` (+ landing / eval)
+
+Destination: ``reporting.weekly_location_performance`` on
+``(location_id, week_start)``. Run log: ``reporting.pipeline_runs``.
+KPI event types: ``inbound_order_created``, ``stock_waste_registered``,
+``stock_threshold_triggered``, ``ingredient_price_variance_detected``.
 
 Placement:
 - ``data/raw/`` — extract snapshots and intermediate KPI frames
@@ -20,10 +29,17 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Tuple
+
+# Allow ``python data/pipelines/pipeline.py`` from the monorepo root without
+# requiring the caller to set PYTHONPATH.
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -35,7 +51,6 @@ from supabase import Client, create_client
 from data.process.location_kpis import KPI_EVENT_TYPES, aggregate_location_kpis as _aggregate_kpis
 from services.safe_errors import ExternalServiceError, call_external, public_error_text
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 env_path = _REPO_ROOT / ".env"
 load_dotenv(dotenv_path=env_path)
 
@@ -78,6 +93,10 @@ def _supabase_client() -> Client:
         raise
     except Exception as error:
         raise ExternalServiceError("reporting store") from error
+
+
+def _supabase_configured() -> bool:
+    return bool(os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_KEY"))
 
 
 def _reporting(client: Client):
@@ -185,16 +204,17 @@ def _insert_run_start(run_id: str, window_start: str, window_end: str) -> dict:
         "status": "Running",
         "error_message": None,
     }
-    try:
-        call_external(
-            "reporting store",
-            lambda: _reporting(_supabase_client())
-            .table(_RUNS_TABLE)
-            .insert(row)
-            .execute(),
-        )
-    except ExternalServiceError:
-        pass
+    if _supabase_configured():
+        try:
+            call_external(
+                "reporting store",
+                lambda: _reporting(_supabase_client())
+                .table(_RUNS_TABLE)
+                .insert(row)
+                .execute(),
+            )
+        except ExternalServiceError:
+            pass
     _mirror_run(row)
     return row
 
@@ -207,24 +227,25 @@ def _finish_run(row: dict, *, status: str, records_processed: int, error_message
         "records_processed": records_processed,
         "error_message": error_message,
     }
-    try:
-        call_external(
-            "reporting store",
-            lambda: _reporting(_supabase_client())
-            .table(_RUNS_TABLE)
-            .update(
-                {
-                    "finished_at": finished["finished_at"],
-                    "status": status,
-                    "records_processed": records_processed,
-                    "error_message": error_message,
-                }
+    if _supabase_configured():
+        try:
+            call_external(
+                "reporting store",
+                lambda: _reporting(_supabase_client())
+                .table(_RUNS_TABLE)
+                .update(
+                    {
+                        "finished_at": finished["finished_at"],
+                        "status": status,
+                        "records_processed": records_processed,
+                        "error_message": error_message,
+                    }
+                )
+                .eq("run_id", row["run_id"])
+                .execute(),
             )
-            .eq("run_id", row["run_id"])
-            .execute(),
-        )
-    except ExternalServiceError:
-        pass
+        except ExternalServiceError:
+            pass
     _mirror_run(finished)
     return finished
 
@@ -331,16 +352,17 @@ def write_validation_output(kpis_df: pd.DataFrame, week_start: str) -> dict[str,
 
 
 # ---------------------------------------------------------------------------
-# Stage 1 — Extraction tasks (explicit I/O) + subflow
+# Store backends (swappable for offline CLI — Phase 4)
 # ---------------------------------------------------------------------------
+#
+# Tasks call these module-level functions. The Monday 07:00 live job keeps the
+# Supabase implementations below. ``_install_offline_backends`` rebinds them to
+# eval-fixture / local-store callables so ``python data/pipelines/pipeline.py``
+# can run the full Prefect flow without SUPABASE_* credentials.
 
 
-# Retries=3, delay=5s: covers transient Supabase/PostgREST blips (timeouts, 502/503)
-# without stretching the Monday 07:00 window. Three attempts ≈ 15s of backoff headroom
-# before the stage fails; more retries mostly delay a true outage signal.
-@task(retries=3, retry_delay_seconds=5, name="extract_telemetry_events")
-def extract_telemetry_events(start_date: str, end_date: str):
-    """Input: chain-week bounds. Output: telemetry_events rows (four KPI types)."""
+def fetch_telemetry_events(start_date: str, end_date: str) -> pd.DataFrame:
+    """Read-only extract of KPI telemetry_events for [start_date, end_date)."""
     response = call_external(
         "reporting store",
         lambda: _supabase_client()
@@ -354,11 +376,8 @@ def extract_telemetry_events(start_date: str, end_date: str):
     return pd.DataFrame(response.data or [])
 
 
-# Retries=3, delay=5s: same store as telemetry; locations is 14 small rows, so three
-# short retries are enough for a dropped connection without masking a missing table.
-@task(retries=3, retry_delay_seconds=5, name="extract_domain_data")
-def extract_domain_data():
-    """Input: none. Output: locations dimension (id, country, currency)."""
+def fetch_domain_locations() -> pd.DataFrame:
+    """Read-only extract of the locations dimension (id, country, currency)."""
     response = call_external(
         "reporting store",
         lambda: _supabase_client()
@@ -367,6 +386,42 @@ def extract_domain_data():
         .execute(),
     )
     return pd.DataFrame(response.data or [])
+
+
+def persist_kpi_records(records: list[dict]) -> int:
+    """Idempotent upsert into reporting.weekly_location_performance."""
+    if not records:
+        return 0
+    call_external(
+        "reporting store",
+        lambda: _reporting(_supabase_client())
+        .table(_PERFORMANCE_TABLE)
+        .upsert(records, on_conflict=_UPSERT_CONFLICT)
+        .execute(),
+    )
+    return len(records)
+
+
+# ---------------------------------------------------------------------------
+# Stage 1 — Extraction tasks (explicit I/O) + subflow
+# ---------------------------------------------------------------------------
+
+
+# Retries=3, delay=5s: covers transient Supabase/PostgREST blips (timeouts, 502/503)
+# without stretching the Monday 07:00 window. Three attempts ≈ 15s of backoff headroom
+# before the stage fails; more retries mostly delay a true outage signal.
+@task(retries=3, retry_delay_seconds=5, name="extract_telemetry_events")
+def extract_telemetry_events(start_date: str, end_date: str):
+    """Input: chain-week bounds. Output: telemetry_events rows (four KPI types)."""
+    return fetch_telemetry_events(start_date, end_date)
+
+
+# Retries=3, delay=5s: same store as telemetry; locations is 14 small rows, so three
+# short retries are enough for a dropped connection without masking a missing table.
+@task(retries=3, retry_delay_seconds=5, name="extract_domain_data")
+def extract_domain_data():
+    """Input: none. Output: locations dimension (id, country, currency)."""
+    return fetch_domain_locations()
 
 
 @task(name="land_raw_extracts")
@@ -378,10 +433,14 @@ def land_raw_extracts(telemetry_df, locations_df, start_date: str, end_date: str
 
 
 @flow(name="extract_brasaland_data_flow", log_prints=True)
-def extract_brasaland_data_flow(start_date: str, end_date: str):
+def extract_brasaland_data_flow(
+    start_date: str, end_date: str
+) -> Tuple[Any, Any]:
     """Extraction stage: read-only snapshots for the chain week.
 
-    Returns ``(telemetry_df, locations_df)``.
+    Inputs: chain-week bounds (``start_date``, ``end_date``).
+    Outputs: ``(telemetry_df, locations_df)`` passed explicitly to transform —
+    no module-level / global state between subflows.
     """
     # Telemetry is required — let failures propagate after task retries.
     telemetry_df = extract_telemetry_events(start_date, end_date)
@@ -435,8 +494,11 @@ def land_kpi_intermediate(kpis_df, week_start: str) -> str:
 
 
 @flow(name="transform_brasaland_kpis_flow", log_prints=True)
-def transform_brasaland_kpis_flow(telemetry_df, locations_df, week_start: str):
-    """Transformation stage: pure KPI rollup (no destination write)."""
+def transform_brasaland_kpis_flow(telemetry_df, locations_df, week_start: str) -> Any:
+    """Transformation stage: pure KPI rollup (no destination write).
+
+    Inputs: extract frames + ``week_start``. Output: KPI frame for load.
+    """
     kpis_df = aggregate_location_kpis(telemetry_df, locations_df, week_start)
     land_kpi_intermediate(kpis_df, week_start)
     return kpis_df
@@ -465,25 +527,20 @@ def upsert_to_reporting_table(kpis_df) -> int:
     if not records:
         print("No data to upsert.")
         return 0
-    call_external(
-        "reporting store",
-        lambda: _reporting(_supabase_client())
-        .table(_PERFORMANCE_TABLE)
-        .upsert(records, on_conflict=_UPSERT_CONFLICT)
-        .execute(),
-    )
+    count = persist_kpi_records(records)
     print(
-        f"Idempotent upsert of {len(records)} rows "
+        f"Idempotent upsert of {count} rows "
         f"on_conflict={_UPSERT_CONFLICT} into "
         f"{_REPORTING_SCHEMA}.{_PERFORMANCE_TABLE}"
     )
-    return len(records)
+    return count
 
 
 @flow(name="load_brasaland_reporting_flow", log_prints=True)
 def load_brasaland_reporting_flow(kpis_df) -> int:
     """Load stage: idempotent upsert into reporting.weekly_location_performance.
 
+    Input: KPI frame from transform. Output: rows upserted.
     Upsert failures are inspected via ``return_state=True`` (not left to bubble
     as an unhandled task exception) so the flow can log a clear load failure.
     """
@@ -498,18 +555,30 @@ def load_brasaland_reporting_flow(kpis_df) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Optional non-critical step (eval snapshot) — never blocks ETL
+# Optional non-critical subflow (eval snapshot) — never blocks ETL
 # ---------------------------------------------------------------------------
 
 
 @task(name="write_eval_snapshot", retries=0)
 def write_eval_snapshot(kpis_df, week_start: str):
-    """Optional secondary report: fixture validation under data/eval/.
+    """Optional secondary report task: fixture validation under data/eval/.
 
-    Local FS only — no external-service retries. Non-critical: the parent flow
-    calls this with ``return_state=True`` so a failure never interrupts ETL.
+    Local FS only — no external-service retries. Called only from
+    ``eval_brasaland_snapshot_flow`` so the main flow can treat eval as a
+    subflow invoked with ``return_state=True``.
     """
     return write_validation_output(kpis_df, week_start)
+
+
+@flow(name="eval_brasaland_snapshot_flow", log_prints=True)
+def eval_brasaland_snapshot_flow(kpis_df, week_start: str) -> Any:
+    """Optional validation subflow (Phase one): secondary report under data/eval/.
+
+    Inputs: KPI frame + ``week_start``. Output: validation payload dict.
+    The main flow must call this with ``return_state=True`` so a fixture miss
+    never marks the Monday ETL Failed.
+    """
+    return write_eval_snapshot(kpis_df, week_start)
 
 
 # ---------------------------------------------------------------------------
@@ -517,20 +586,10 @@ def write_eval_snapshot(kpis_df, week_start: str):
 # ---------------------------------------------------------------------------
 
 
-def get_weekly_location_performance(week_start: Optional[str] = None) -> dict[str, Any]:
-    """Read reporting.weekly_location_performance for the KPI query endpoint."""
-    client = _supabase_client()
-    query = _reporting(client).table(_PERFORMANCE_TABLE).select("*")
-    if week_start:
-        query = query.eq("week_start", week_start)
-    response = call_external(
-        "reporting store",
-        lambda: query.order("week_start", desc=True).execute(),
-    )
-    rows = response.data or []
+def _format_kpi_locations(rows: list[dict], week_start: Optional[str]) -> dict[str, Any]:
+    """Project destination rows into the KPI query response shape."""
     if not rows:
         return {"week_start": week_start, "locations": []}
-
     actual_week_start = week_start or rows[0].get("week_start")
     locations = [row for row in rows if row.get("week_start") == actual_week_start]
     formatted = [
@@ -547,6 +606,53 @@ def get_weekly_location_performance(week_start: Optional[str] = None) -> dict[st
         for loc in locations
     ]
     return {"week_start": actual_week_start, "locations": formatted}
+
+
+def _read_local_kpi_store(week_start: Optional[str] = None) -> dict[str, Any]:
+    """Read offline upsert store under data/raw/ (same PK as CONTEXT destination)."""
+    store_path = _RAW_DIR / "weekly_location_performance_store.json"
+    rows: list[dict] = []
+    if store_path.exists():
+        try:
+            payload = json.loads(store_path.read_text(encoding="utf-8"))
+            rows = list(payload.get("rows") or [])
+        except (OSError, json.JSONDecodeError, TypeError):
+            rows = []
+    if week_start:
+        rows = [row for row in rows if str(row.get("week_start")) == week_start]
+    else:
+        # Newest week_start first when no filter is given.
+        weeks = sorted(
+            {str(row.get("week_start")) for row in rows if row.get("week_start")},
+            reverse=True,
+        )
+        if weeks:
+            rows = [row for row in rows if str(row.get("week_start")) == weeks[0]]
+    return _format_kpi_locations(rows, week_start)
+
+
+def get_weekly_location_performance(week_start: Optional[str] = None) -> dict[str, Any]:
+    """Read reporting.weekly_location_performance for the KPI query endpoint.
+
+    Live path: Supabase ``reporting.weekly_location_performance``.
+    Offline path (no SUPABASE_* or store unreachable): local upsert store from
+    ``data/raw/weekly_location_performance_store.json`` so the Phase four
+    backoffice dashboard can still consume CLI / fixture runs.
+    """
+    if _supabase_configured():
+        try:
+            client = _supabase_client()
+            query = _reporting(client).table(_PERFORMANCE_TABLE).select("*")
+            if week_start:
+                query = query.eq("week_start", week_start)
+            response = call_external(
+                "reporting store",
+                lambda: query.order("week_start", desc=True).execute(),
+            )
+            return _format_kpi_locations(response.data or [], week_start)
+        except (RuntimeError, ExternalServiceError):
+            pass
+    return _read_local_kpi_store(week_start)
 
 
 def get_latest_pipeline_run() -> dict[str, Any]:
@@ -603,11 +709,15 @@ def get_latest_pipeline_run() -> dict[str, Any]:
 def run_pipeline(start_date: str, end_date: str) -> dict[str, Any]:
     """Monday chain-week ETL: extract → transform → load (+ optional eval).
 
+    Phase one (subflows): stage work is three Prefect ``@flow`` subflows with
+    explicit inputs/outputs. Optional eval is its own subflow invoked with
+    ``return_state=True``.
+
     Resilience (Phase 2):
     - External Supabase tasks use retries=3 / retry_delay_seconds=5.
     - ``extract_domain_data`` and ``upsert_to_reporting_table`` failures are
       handled in-flow with ``return_state=True`` (fallback or explicit raise).
-    - ``write_eval_snapshot`` is optional and also uses ``return_state=True``.
+    - ``eval_brasaland_snapshot_flow`` is optional and uses ``return_state=True``.
     - ``aggregate_location_kpis`` is cached (task_input_hash, 1 day).
 
     Idempotency (Phase 3):
@@ -628,8 +738,10 @@ def run_pipeline(start_date: str, end_date: str) -> dict[str, Any]:
         kpis = transform_brasaland_kpis_flow(telemetry_data, domain_data, start_date)
         load_brasaland_reporting_flow(kpis)
 
-        # Optional / non-critical: secondary eval snapshot under data/eval/.
-        eval_state: State = write_eval_snapshot(kpis, start_date, return_state=True)
+        # Optional / non-critical subflow: secondary eval under data/eval/.
+        eval_state: State = eval_brasaland_snapshot_flow(
+            kpis, start_date, return_state=True
+        )
         if eval_state.is_failed():
             print(
                 "Eval snapshot failed (non-critical); "
@@ -656,7 +768,184 @@ def run_pipeline(start_date: str, end_date: str) -> dict[str, Any]:
     return finished
 
 
+# ---------------------------------------------------------------------------
+# CLI — script-based execution (Phase 4)
+# ---------------------------------------------------------------------------
+#
+# Intended schedule (Brasaland reporting cycle):
+#   Every Monday at 07:00 America/Bogota — previous chain week
+#   [Monday 00:00, next Monday 00:00) America/Bogota.
+#
+# Run from the monorepo root:
+#   python data/pipelines/pipeline.py
+#   # or with an explicit window:
+#   python data/pipelines/pipeline.py --start-date 2026-09-21 --end-date 2026-09-28
+#
+
+
+def previous_chain_week_bounds(now: Optional[datetime] = None) -> tuple[str, str]:
+    """Return (window_start, window_end) for the closed chain week in America/Bogota.
+
+    Chain week = [Monday 00:00, next Monday 00:00). The Monday 07:00 job reports
+    the week that just closed (same rule as PIPELINE_DESIGN.md).
+    """
+    try:
+        from zoneinfo import ZoneInfo
+    except ImportError:  # pragma: no cover — py<3.9 fallback not expected here
+        from backports.zoneinfo import ZoneInfo  # type: ignore
+
+    bogota = ZoneInfo("America/Bogota")
+    current = now.astimezone(bogota) if now is not None else datetime.now(bogota)
+    # Monday=0 … Sunday=6
+    days_since_monday = current.weekday()
+    this_monday = (current - timedelta(days=days_since_monday)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    # At or after Monday 07:00, report the week that ended this Monday;
+    # before 07:00 Monday, still report the prior closed week (same bounds).
+    window_end = this_monday
+    window_start = this_monday - timedelta(days=7)
+    return window_start.date().isoformat(), window_end.date().isoformat()
+
+
+def _fixture_frames_for_window(week_start: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Build telemetry + locations frames from data/eval fixtures (offline CLI)."""
+    if not _EVAL_FIXTURES.exists():
+        raise FileNotFoundError(
+            f"Offline CLI needs {_EVAL_FIXTURES} when SUPABASE credentials are unset."
+        )
+    fixtures = json.loads(_EVAL_FIXTURES.read_text(encoding="utf-8"))
+    events: list[dict] = []
+    locations: list[dict] = []
+    for loc in fixtures.get("locations", []):
+        for event in loc.get("events", []):
+            row = dict(event)
+            row.setdefault("created_at", f"{week_start}T12:00:00+00:00")
+            events.append(row)
+        locations.append(
+            {
+                "id": loc["location_id"],
+                "country": loc["country"],
+                "currency": loc["currency"],
+            }
+        )
+    return pd.DataFrame(events), pd.DataFrame(locations)
+
+
+def _offline_upsert(records: list[dict]) -> int:
+    """Local idempotent upsert into data/raw (same PK as CONTEXT destination)."""
+    store_path = _RAW_DIR / "weekly_location_performance_store.json"
+    existing: dict[tuple[str, str], dict] = {}
+    if store_path.exists():
+        try:
+            prior = json.loads(store_path.read_text(encoding="utf-8"))
+            for row in prior.get("rows", []):
+                existing[(str(row["location_id"]), str(row["week_start"]))] = row
+        except (OSError, json.JSONDecodeError, KeyError, TypeError):
+            existing = {}
+    for row in records:
+        existing[(str(row["location_id"]), str(row["week_start"]))] = row
+    rows = sorted(existing.values(), key=lambda r: (r["location_id"], r["week_start"]))
+    _write_json(
+        store_path,
+        {
+            "destination_table": f"{_REPORTING_SCHEMA}.{_PERFORMANCE_TABLE}",
+            "on_conflict": _UPSERT_CONFLICT,
+            "rows": rows,
+        },
+    )
+    return len(records)
+
+
+def _install_offline_backends(week_start: str) -> None:
+    """Rebind store backends so the Prefect flow runs without Supabase.
+
+    Tasks keep calling ``fetch_telemetry_events`` / ``fetch_domain_locations`` /
+    ``persist_kpi_records`` by name; rebinding those module attributes is enough
+    for both Prefect task execution and direct ``.fn`` unit tests.
+    """
+    telemetry_df, locations_df = _fixture_frames_for_window(week_start)
+    this_module = sys.modules[__name__]
+
+    def _fetch_telemetry(start_date: str, end_date: str) -> pd.DataFrame:
+        print(
+            f"[offline] fetch_telemetry_events using eval fixtures "
+            f"for window [{start_date}, {end_date})"
+        )
+        return telemetry_df.copy()
+
+    def _fetch_locations() -> pd.DataFrame:
+        print("[offline] fetch_domain_locations using eval fixture locations")
+        return locations_df.copy()
+
+    def _persist(records: list[dict]) -> int:
+        if not records:
+            print("[offline] No data to upsert.")
+            return 0
+        count = _offline_upsert(records)
+        print(
+            f"[offline] Idempotent upsert of {count} rows "
+            f"on_conflict={_UPSERT_CONFLICT} into local data/raw store"
+        )
+        return count
+
+    this_module.fetch_telemetry_events = _fetch_telemetry
+    this_module.fetch_domain_locations = _fetch_locations
+    this_module.persist_kpi_records = _persist
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    """CLI entry for ``python data/pipelines/pipeline.py``."""
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description=(
+            "Brasaland weekly location cost & waste pipeline. "
+            "Scheduled Monday 07:00 America/Bogota for the previous chain week."
+        )
+    )
+    parser.add_argument(
+        "--start-date",
+        help="Chain-week start (YYYY-MM-DD). Defaults to previous Monday in America/Bogota.",
+    )
+    parser.add_argument(
+        "--end-date",
+        help="Chain-week end exclusive (YYYY-MM-DD). Defaults to this Monday in America/Bogota.",
+    )
+    parser.add_argument(
+        "--offline",
+        action="store_true",
+        help="Force fixture-backed offline run (also used automatically without Supabase env).",
+    )
+    args = parser.parse_args(argv)
+
+    if args.start_date and args.end_date:
+        start_date, end_date = args.start_date, args.end_date
+    else:
+        start_date, end_date = previous_chain_week_bounds()
+
+    offline = args.offline or not _supabase_configured()
+    mode = "offline (eval fixtures)" if offline else "live (Supabase)"
+    print(
+        f"Executing brasaland_weekly_performance_pipeline [{start_date}, {end_date}) "
+        f"mode={mode}"
+    )
+    print(
+        "Schedule: Monday 07:00 America/Bogota — previous chain week "
+        "(see data/pipelines/PIPELINE_DESIGN.md)."
+    )
+
+    if offline:
+        # Align fixture week_start with the CLI window so eval snapshot can assert.
+        _install_offline_backends(start_date)
+
+    result = run_pipeline(start_date, end_date)
+    print(
+        "Pipeline execution completed successfully: "
+        f"status={result.get('status')} records_processed={result.get('records_processed')}"
+    )
+    return 0
+
+
 if __name__ == "__main__":
-    print("Executing pipeline directly...")
-    run_pipeline("2026-07-01", "2026-08-01")
-    print("Pipeline execution completed successfully.")
+    raise SystemExit(main())

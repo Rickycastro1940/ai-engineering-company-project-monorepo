@@ -14,7 +14,13 @@ def test_stage_subflows_exist_and_are_callable():
     assert hasattr(mod.extract_brasaland_data_flow, "fn")
     assert hasattr(mod.transform_brasaland_kpis_flow, "fn")
     assert hasattr(mod.load_brasaland_reporting_flow, "fn")
+    assert hasattr(mod.eval_brasaland_snapshot_flow, "fn")
     assert hasattr(mod.run_pipeline, "fn")
+    assert mod.extract_brasaland_data_flow.name == "extract_brasaland_data_flow"
+    assert mod.transform_brasaland_kpis_flow.name == "transform_brasaland_kpis_flow"
+    assert mod.load_brasaland_reporting_flow.name == "load_brasaland_reporting_flow"
+    assert mod.eval_brasaland_snapshot_flow.name == "eval_brasaland_snapshot_flow"
+    assert mod.run_pipeline.name == "brasaland_weekly_performance_pipeline"
 
 
 def test_transform_subflow_returns_kpi_frame():
@@ -48,7 +54,7 @@ def test_transform_subflow_returns_kpi_frame():
 
 
 def test_optional_eval_failure_does_not_fail_main_etl(monkeypatch):
-    """write_eval_snapshot is invoked with return_state=True; ETL still Success."""
+    """eval_brasaland_snapshot_flow is invoked with return_state=True; ETL still Success."""
     from data.pipelines import pipeline as mod
 
     telemetry = pd.DataFrame(
@@ -96,7 +102,7 @@ def test_optional_eval_failure_does_not_fail_main_etl(monkeypatch):
         assert kwargs.get("return_state") is True
         return Failed(message="eval boom")
 
-    monkeypatch.setattr(mod, "write_eval_snapshot", _failing_eval)
+    monkeypatch.setattr(mod, "eval_brasaland_snapshot_flow", _failing_eval)
 
     result = mod.run_pipeline.fn("2026-09-21", "2026-09-28")
     assert result["status"] == "Success"
@@ -128,7 +134,7 @@ def test_optional_eval_success_path(monkeypatch):
         assert kwargs.get("return_state") is True
         return Completed(message="ok", data={"passed": True})
 
-    monkeypatch.setattr(mod, "write_eval_snapshot", _ok_eval)
+    monkeypatch.setattr(mod, "eval_brasaland_snapshot_flow", _ok_eval)
     result = mod.run_pipeline.fn("2026-09-21", "2026-09-28")
     assert result["status"] == "Success"
 
