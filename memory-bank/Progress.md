@@ -318,7 +318,8 @@ Added `data/notebooks/churn-model-tuning/`:
 - Minimal cleaning only (blanks→NaN, target encode, drop id); impute + one-hot **inside** the Pipeline
 - Stratified train/test split **before** any model work
 - Baseline = `RandomForestClassifier` defaults (+ `random_state`); test scored once → `baseline_metrics.json`
-- `RandomizedSearchCV` on train folds only; final test score only at the end
+- Search scoring = `recall` (catch churners); `RandomizedSearchCV` (`n_jobs=1`) → narrowed `GridSearchCV` (`n_jobs=1`, `refit=True`); no manual refit
+- Final test score only at the end
 - Notebook `streamloop_churn_tuning.ipynb` + headless `run_churn_tuning.py`
 - Local venv deps in folder `requirements.txt` (root `requirements.txt` / `pyproject.toml` untouched)
 
