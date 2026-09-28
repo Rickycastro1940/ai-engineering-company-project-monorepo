@@ -259,7 +259,7 @@ head -n 5 CONTEXT.md → # Welcome to Brasaland
 .venv/bin/python -m pytest tests/pipelines/ -q → 36 passed
 ```
 
-## Latest central API nouns (`cursor/central-api-nouns-2c91`)
+## Latest central API nouns (`cursor/central-api-nouns-fdaa`)
 
 Department served: **Technology** (Nicolás Park — locations, menus, sales, customers, suppliers) + **Operations/Executive** (sales COP/USD) + **Marketing** (CRM, physical Brasa Points) + **Procurement** (~20 suppliers, price alerts) + **Training** (same chain menu).
 
@@ -307,7 +307,7 @@ cd uis/backoffice && npm run build → tsc -b && vite build green
 .venv/bin/python -m pytest tests/pipelines/ -q → 41 passed
 ```
 
-Skill **passed** (criteria 1–4 + 6). Technology central API remains **incomplete** while menus/sales/customers/suppliers are `missing`.
+Skill **passed** (criteria 1–4 + 6) for reporting on that branch; Technology nouns menus/sales/customers/suppliers are completed on `cursor/central-api-nouns-fdaa`.
 
 ## Latest Phase four stakeholder UX (`cursor/pipeline-phase4-stakeholder-ux-4f14`)
 
