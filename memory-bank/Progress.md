@@ -308,6 +308,26 @@ Manual UI (CDP): login → Monday weekly report; audit forbidden jargon hits=[];
 Artifacts: stakeholder_ux_03_monday_report.png, stakeholder_ux_04_kpi_table.png, stakeholder_ux_monday_report_walkthrough.mp4
 ```
 
+## Latest StreamLoop churn model tuning (`cursor/streamloop-churn-tuning-fdaa`)
+
+Department served: **Marketing** (Camila — customer retention / CRM signal) via a public telco-proxy churn dataset (assignment stand-in for StreamLoop account, service, and billing attributes). Does **not** change Brasaland `CONTEXT.md` or claim a live Brasa Points churn model.
+
+Added `data/notebooks/churn-model-tuning/`:
+
+- Load IBM Telco Customer Churn CSV from URL (no manual download)
+- Baseline `RandomForestClassifier` + `RandomizedSearchCV` ROC-AUC tuning
+- Notebook `streamloop_churn_tuning.ipynb` + headless `run_churn_tuning.py`
+- Local venv deps in folder `requirements.txt` (root `requirements.txt` / `pyproject.toml` untouched)
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+cd data/notebooks/churn-model-tuning && .venv/bin/python run_churn_tuning.py
+rows=7043 features=19 churn_rate=0.265
+baseline roc_auc≈0.817 → tuned holdout roc_auc≈0.843 (best CV roc_auc≈0.847)
+recall Yes: 0.636 → 0.794
+.venv/bin/jupyter nbconvert --execute streamloop_churn_tuning.ipynb → green
+```
+
 ## How to update this file
 
 After a verified change, append evidence (command + result) and update the coverage table. Do not log plans that were not run.
