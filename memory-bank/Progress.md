@@ -326,8 +326,10 @@ Added `data/notebooks/churn-model-tuning/`:
 head -n 5 CONTEXT.md → # Welcome to Brasaland
 cd data/notebooks/churn-model-tuning && .venv/bin/python run_churn_tuning.py
 shape=(7043, 21); TotalCharges_na=11; train=5634 test=1409
-baseline (test): accuracy≈0.778 precision≈0.603 recall≈0.476 f1≈0.532 roc_auc≈0.817
-best CV roc_auc≈0.847; tuned_final (test) roc_auc≈0.843
+baseline (test): recall≈0.476 roc_auc≈0.817
+RandomizedSearchCV scoring=recall n_jobs=1 → best CV recall≈0.794
+narrowed GridSearchCV n_jobs=1 refit=True → best CV recall≈0.804
+tuned_final (test): recall≈0.799 (no manual refit of best_estimator_)
 .venv/bin/jupyter nbconvert --execute streamloop_churn_tuning.ipynb → green
 ```
 

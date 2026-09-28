@@ -7,10 +7,14 @@ Customer churn notebook for **StreamLoop**, using the public IBM Telco Customer 
 1. **Load** the CSV from URL (no manual download)
 2. **Minimal cleaning** — blank/`TotalCharges` → NaN, encode target, drop `customerID`
 3. **Train/test split** before any model work
-4. **Pipeline** = impute + one-hot + classifier (**preprocessing inside the pipeline**)
-5. **Baseline** — sklearn default hyperparameters; score the test set once
-6. **Tune** on training folds only (`RandomizedSearchCV`)
-7. **Final** test score only at the end
+4. **Pipeline** = impute + one-hot + `RandomForestClassifier` (**preprocessing inside**)
+5. **Baseline** — sklearn defaults; score the test set once
+6. **Search** (train folds only, `n_jobs=1`, `refit=True`):
+   - `RandomizedSearchCV` over RF-supported hyperparameters
+   - Narrow the space from those results
+   - `GridSearchCV` to refine
+7. **Scoring:** `recall` (catch churners for retention — not accuracy)
+8. **Final** test score only at the end — never manually refit `best_estimator_`
 
 ## Data
 
