@@ -13,7 +13,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
-| Technology: central API (locations, menus, sales, customers, suppliers) | **Present (seeded)** — `locations`/`menus`/`sales`/`customers`/`suppliers`/`inventory=present` plus `knowledge=present` (`POST /knowledge/query`) and `realtime=present` (`GET /realtime/ops-alerts/stream`) on `uvicorn api.app:app` (`:8000`). Not a live POS or invoice feed |
+| Technology: central API (locations, menus, sales, customers, suppliers) | **Present (SQLite)** — nouns + inventory on `uvicorn api.app:app`; rows in `data/company_api.db` via `central_store.py` (seed on first read; `POST /sales` persists). Also `knowledge` + `realtime` ops-alerts. Not a live POS or invoice feed |
 | Technology: telemetry + pipeline to dashboards | **Partial** — live no-sales SSE on `GET /realtime/ops-alerts/stream` plus Part 2 weekly location cost/waste ETL, Prefect stage subflows, KPI unit tests, CLI, and backoffice Monday weekly report; engineering `GET /telemetry/report` untouched |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — seeded `GET /sales` tickets and `/sales/overview` (COP and USD, 14 locations) plus `/sales/alerts`; `POST /sales` stores a ticket and calls `record_sale` so the live no-sales alert on backoffice `/accessible` sees that location; Next.js `uis/portal` `/ops/sales` shows per-location sales in COP and USD. Smart ordering still open |
 | Procurement: supplier price history, consolidated spend | **Partial** — seeded `GET /suppliers` (20 suppliers, Colombia and Florida, price history and alerts); Monday weekly purchase cost / price-alert frequency still separate; invoices are not live |
@@ -514,7 +514,7 @@ NO_SALES_MONITOR=0 python -m pytest -q → 128 passed
 
 Department served: **Restaurant Operations** (Felipe Guerrero — a real ticket clears a quiet location) + **Technology** (Nicolás Park — `POST /sales` on the central API calls `record_sale`).
 
-`GET /sales` was read-only. `POST /sales` appends the ticket to the same in-memory list and calls `record_sale` in `services/api/sales_events.py`. Unknown locations are 404. A currency that is not the location's COP or USD is 400.
+`GET /sales` was read-only. `POST /sales` appends the ticket to the same in-memory list and calls `record_sale` in `services/api/sales_events.py`. Unknown locations are 404. A currency that is not the location's COP or USD is 400. Merged to `main` as PR #94.
 
 ```text
 head -n 5 CONTEXT.md → # Welcome to Brasaland
@@ -523,6 +523,20 @@ node --experimental-strip-types --test uis/backoffice/tests/noSalesAlerts.test.t
 POST /sales co-med-centro 48000 COP during an open alert → 201, active alerts cleared, ticket on GET /sales
 POST /sales before evaluate → no alert raised
 POST unknown location → 404; Colombia location with USD → 400; EUR → 422; amount 0 → 400
+```
+
+## Latest SQLite persistence for central API nouns (`cursor/central-api-sqlite-fdaa`)
+
+Department served: **Technology** (Nicolás Park — locations, menus, sales, customers, suppliers must not wipe on restart) + **Restaurant Operations** (Felipe Guerrero — `POST /sales` tickets that clear no-sales alerts must survive a process restart).
+
+The five Technology nouns used module-level Python lists. They now seed into and read from SQLite tables in `data/company_api.db` (same file as staff users) through `services/api/central_store.py`. `POST /sales` inserts a ticket row; empty tables seed on first read.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+NO_SALES_MONITOR=0 .venv/bin/python -m pytest tests/test_central_api_domains.py tests/test_no_sales_alerts.py tests/test_users_api.py tests/test_error_handling.py -q → 55 passed
+OpenAPI /sales methods get+post; path_count=43; locations/menus/sales/customers/suppliers/inventory=present
+POST /sales co-med-centro 9900 COP → 201 id=sal-co-med-centro-4; SQLite sales amount=9900
+sqlite locations=14 menu_items=6 sales=43 customers=10 suppliers=20
 ```
 
 ## How to update this file

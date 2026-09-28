@@ -3,6 +3,7 @@
 Lucía Fernández needs about 20 suppliers across Colombia and Florida, price
 history, and consolidated visibility. Categories follow the briefing plus
 the kitchen ordering procedure (proteins, produce, beverages, packaging, sauces, cleaning).
+Supplier rows live in SQLite (`central_store`) so they survive process restarts.
 """
 from __future__ import annotations
 
@@ -11,6 +12,8 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from users import get_current_user
+
+import central_store
 
 router = APIRouter(
     prefix="/suppliers",
@@ -101,7 +104,7 @@ def _supplier(
 
 
 # Twenty suppliers split across Colombia and Florida (CONTEXT.md: around 20).
-_SUPPLIERS: list[Supplier] = [
+_SEED_SUPPLIERS: list[Supplier] = [
     _supplier("sup-001", "Carnes del Valle", "Colombia", ["proteins"], 18_500, 19_200, "kg"),
     _supplier("sup-002", "Avícola Antioquia", "Colombia", ["proteins"], 12_400, 12_400, "kg"),
     _supplier("sup-003", "Verde Andina Produce", "Colombia", ["vegetables_and_fruit"], 3_200, 3_850, "kg"),
@@ -125,12 +128,29 @@ _SUPPLIERS: list[Supplier] = [
 ]
 
 
+def _ensure_seeded() -> None:
+    central_store.seed_suppliers(
+        [
+            {
+                **row.model_dump(),
+                "price_history": [point.model_dump() for point in row.price_history],
+            }
+            for row in _SEED_SUPPLIERS
+        ]
+    )
+
+
+def _suppliers() -> list[Supplier]:
+    _ensure_seeded()
+    return [Supplier(**row) for row in central_store.list_suppliers()]
+
+
 def _filtered(
     country: Country | None,
     category: Category | None,
     status: str | None,
 ) -> list[Supplier]:
-    rows = list(_SUPPLIERS)
+    rows = _suppliers()
     if country is not None:
         rows = [row for row in rows if row.country == country]
     if category is not None:
@@ -151,13 +171,14 @@ def list_suppliers(
 
 @router.get("/overview", response_model=SuppliersOverview)
 def suppliers_overview() -> SuppliersOverview:
-    colombia = [row for row in _SUPPLIERS if row.country == "Colombia"]
-    florida = [row for row in _SUPPLIERS if row.country == "United States"]
+    suppliers = _suppliers()
+    colombia = [row for row in suppliers if row.country == "Colombia"]
+    florida = [row for row in suppliers if row.country == "United States"]
     return SuppliersOverview(
-        total_suppliers=len(_SUPPLIERS),
+        total_suppliers=len(suppliers),
         colombia_count=len(colombia),
         florida_count=len(florida),
-        price_alerts=sum(1 for row in _SUPPLIERS if row.price_alert),
+        price_alerts=sum(1 for row in suppliers if row.price_alert),
         categories=[
             "proteins",
             "vegetables_and_fruit",
@@ -166,13 +187,14 @@ def suppliers_overview() -> SuppliersOverview:
             "packaging",
             "cleaning",
         ],
-        suppliers=list(_SUPPLIERS),
+        suppliers=suppliers,
     )
 
 
 @router.get("/{supplier_id}", response_model=Supplier)
 def get_supplier(supplier_id: str) -> Supplier:
-    for row in _SUPPLIERS:
-        if row.id == supplier_id:
-            return row
-    raise HTTPException(status_code=404, detail="Supplier was not found.")
+    _ensure_seeded()
+    row = central_store.get_supplier(supplier_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Supplier was not found.")
+    return Supplier(**row)

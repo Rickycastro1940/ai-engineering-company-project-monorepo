@@ -219,13 +219,13 @@ def _staff_token(client) -> str:
 def test_post_sale_clears_no_sales_alert() -> None:
     import sales
 
-    snapshot = list(sales._SALES)
     moment = _at(BOGOTA, 18, 0)
     set_clock(lambda: moment)
     _anchor("co-med-centro", moment - timedelta(minutes=60), source="simulator")
     _cover_other_locations("co-med-centro", moment)
     raised = evaluate(moment)
     assert raised[0]["kind"] == "raised"
+    sale_id: str | None = None
     try:
         from fastapi.testclient import TestClient
 
@@ -243,6 +243,7 @@ def test_post_sale_clears_no_sales_alert() -> None:
             )
             assert response.status_code == 201, response.text
             body = response.json()
+            sale_id = body["id"]
             assert body["location_id"] == "co-med-centro"
             assert body["currency"] == "COP"
             assert body["amount"] == 48000
@@ -252,17 +253,18 @@ def test_post_sale_clears_no_sales_alert() -> None:
         assert active_alerts() == []
         assert get_sales_source().latest("co-med-centro").source == "sales"
     finally:
-        sales._SALES[:] = snapshot
+        if sale_id is not None:
+            sales.delete_sale(sale_id)
 
 
 def test_post_sale_prevents_no_sales_alert() -> None:
     import sales
 
-    snapshot = list(sales._SALES)
     moment = _at(BOGOTA, 18, 0)
     set_clock(lambda: moment)
     _anchor("co-med-centro", moment - timedelta(minutes=60), source="simulator")
     _cover_other_locations("co-med-centro", moment)
+    sale_id: str | None = None
     try:
         from fastapi.testclient import TestClient
 
@@ -279,59 +281,58 @@ def test_post_sale_prevents_no_sales_alert() -> None:
                 },
             )
             assert response.status_code == 201, response.text
+            sale_id = response.json()["id"]
         assert evaluate(moment) == []
         assert active_alerts() == []
     finally:
-        sales._SALES[:] = snapshot
+        if sale_id is not None:
+            sales.delete_sale(sale_id)
 
 
 def test_post_sale_rejects_unknown_location_and_wrong_currency() -> None:
     import sales
 
-    snapshot = list(sales._SALES)
+    before_ids = {row.id for row in sales.all_sales()}
     before = get_sales_source().last_sale_at("co-med-centro")
-    try:
-        from fastapi.testclient import TestClient
+    from fastapi.testclient import TestClient
 
-        with TestClient(app) as client:
-            headers = {"Authorization": f"Bearer {_staff_token(client)}"}
-            anonymous = client.post(
-                "/sales",
-                json={"location_id": "co-med-centro", "amount": "10", "currency": "COP"},
-            )
-            assert anonymous.status_code == 401
+    with TestClient(app) as client:
+        headers = {"Authorization": f"Bearer {_staff_token(client)}"}
+        anonymous = client.post(
+            "/sales",
+            json={"location_id": "co-med-centro", "amount": "10", "currency": "COP"},
+        )
+        assert anonymous.status_code == 401
 
-            missing = client.post(
-                "/sales",
-                headers=headers,
-                json={"location_id": "not-a-site", "amount": "10", "currency": "COP"},
-            )
-            assert missing.status_code == 404
+        missing = client.post(
+            "/sales",
+            headers=headers,
+            json={"location_id": "not-a-site", "amount": "10", "currency": "COP"},
+        )
+        assert missing.status_code == 404
 
-            wrong_currency = client.post(
-                "/sales",
-                headers=headers,
-                json={"location_id": "co-med-centro", "amount": "10", "currency": "USD"},
-            )
-            assert wrong_currency.status_code == 400
+        wrong_currency = client.post(
+            "/sales",
+            headers=headers,
+            json={"location_id": "co-med-centro", "amount": "10", "currency": "USD"},
+        )
+        assert wrong_currency.status_code == 400
 
-            not_a_currency = client.post(
-                "/sales",
-                headers=headers,
-                json={"location_id": "co-med-centro", "amount": "10", "currency": "EUR"},
-            )
-            assert not_a_currency.status_code == 422
+        not_a_currency = client.post(
+            "/sales",
+            headers=headers,
+            json={"location_id": "co-med-centro", "amount": "10", "currency": "EUR"},
+        )
+        assert not_a_currency.status_code == 422
 
-            zero = client.post(
-                "/sales",
-                headers=headers,
-                json={"location_id": "co-med-centro", "amount": "0", "currency": "COP"},
-            )
-            assert zero.status_code == 400
-        assert get_sales_source().last_sale_at("co-med-centro") == before
-        assert sales._SALES == snapshot
-    finally:
-        sales._SALES[:] = snapshot
+        zero = client.post(
+            "/sales",
+            headers=headers,
+            json={"location_id": "co-med-centro", "amount": "0", "currency": "COP"},
+        )
+        assert zero.status_code == 400
+    assert get_sales_source().last_sale_at("co-med-centro") == before
+    assert {row.id for row in sales.all_sales()} == before_ids
 
 
 def test_openapi_lists_ops_alerts_and_the_sales_noun() -> None:
