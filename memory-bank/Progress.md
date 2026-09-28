@@ -331,6 +331,7 @@ python scripts/simulate_no_sales.py resume --location co-med-centro --amount 480
 NO_SALES_MONITOR=0 .venv/bin/python -m pytest tests/test_no_sales_alerts.py tests/test_users_api.py -q → 34 passed
 node --experimental-strip-types --test uis/backoffice/tests/noSalesAlerts.test.ts → 8 passed
 cd uis/backoffice && npm run build → tsc -b && vite build green
+Browser http://127.0.0.1:5174/accessible (grader.ops@brasaland.test): Live → Simulate no sales → banner + list Medellín Centro COP, no reload → Record a sale (48000 COP) → row gone, “No open location is quiet right now.” Same flow at 390px width.
 ```
 
 Skill **passed** (criteria 1–4 + 6). Technology central API remains **incomplete** while menus/sales/customers/suppliers are `missing`.
