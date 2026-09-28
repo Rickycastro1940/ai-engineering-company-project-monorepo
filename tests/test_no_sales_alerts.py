@@ -207,11 +207,13 @@ def test_currency_must_match_the_location() -> None:
         record_sale("not-a-site", "10", "COP", occurred_at=moment)
 
 
-def test_openapi_paths_do_not_pretend_the_sales_noun_exists() -> None:
-    paths = " ".join(app.openapi()["paths"])
-    assert "/realtime/ops-alerts" in paths
-    assert "/sales" not in paths
-    assert "sales" not in paths.lower()
+def test_openapi_lists_ops_alerts_and_the_sales_noun() -> None:
+    """SSE stays on /realtime. The seeded /sales router from the central API stays mounted too."""
+    paths = app.openapi()["paths"]
+    joined = " ".join(paths)
+    assert "/realtime/ops-alerts" in joined
+    assert "/realtime/ops-alerts/stream" in paths
+    assert "/sales" in paths
 
 
 def test_alerts_snapshot_requires_jwt() -> None:

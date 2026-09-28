@@ -13,14 +13,14 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
-| Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
+| Technology: central API (locations, menus, sales, customers, suppliers) | **Present (seeded)** — `locations`/`menus`/`sales`/`customers`/`suppliers`/`inventory=present` plus `knowledge=present` (`POST /knowledge/query`) and `realtime=present` (`GET /realtime/ops-alerts/stream`) on `uvicorn api.app:app` (`:8000`). Not a live POS or invoice feed |
 | Technology: telemetry + pipeline to dashboards | **Partial** — live no-sales SSE on `GET /realtime/ops-alerts/stream` plus Part 2 weekly location cost/waste ETL, Prefect stage subflows, KPI unit tests, CLI, and backoffice Monday weekly report; engineering `GET /telemetry/report` untouched |
-| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — live no-sales alert on `/accessible` (banner, toast, list; clears when a sale is recorded; COP for Colombia, USD for Florida). Chain sales UI and smart ordering still open |
-| Procurement: supplier price history, consolidated spend | **Partial** — Price alert frequency + Purchase cost per location-week on Monday weekly report |
-| Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
+| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — seeded `GET /sales` tickets and `/sales/overview` (COP and USD, 14 locations) plus `/sales/alerts`; live no-sales alert on `/accessible` (banner, toast, list; clears when a sale is recorded; COP for Colombia, USD for Florida). No sales UI; smart ordering still open |
+| Procurement: supplier price history, consolidated spend | **Partial** — seeded `GET /suppliers` (20 suppliers, Colombia and Florida, price history and alerts); Monday weekly purchase cost / price-alert frequency still separate; invoices are not live |
+| Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `GET /customers` CRM seed with `brasa_points_balance` on physical stamp cards; digital wallet not built; `uis/website/` corporate home (`/`) live |
 | People: HR portal / KPIs by country | **Not done** |
-| Training: recipe catalogue, push to 14 locations | **Not done** — knowledge docs under `docs/company-knowledge-base/` are source material only |
-| Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial** — Monday weekly ops & finance report live for Mariana / Felipe / Lucía (stakeholder labels); chain sales USD+COP still a separate gap |
+| Training: recipe catalogue, push to 14 locations | **Partial** — `POST /knowledge/query` searches the four English standards (allergens, waste, ordering, Brasa Points) and returns cited chunks. Not a full recipe catalogue and not a push to all 14 kitchens |
+| Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial** — seeded `GET /sales/overview` chain totals in COP and USD; Monday weekly ops & finance report still the staff UI; standards questions can go to `POST /knowledge/query`; a sales NL assistant remains open |
 
 ## What already runs (engineering)
 
@@ -262,7 +262,7 @@ head -n 5 CONTEXT.md → # Welcome to Brasaland
 ## Planned next steps (order)
 
 1. Keep every product change traceable to a `CONTEXT.md` department need (name the section in the PR/commit).
-2. Extend the central API toward missing Technology nouns: **locations → menus → sales → customers → suppliers**, reusing `services/api` routers.
+2. Central API nouns **locations, menus, sales, customers, and suppliers** are seeded on `uvicorn api.app:app`. A live POS, live invoices, and a digital Brasa Points wallet are still open.
 3. Executive path: surface chain sales in **USD and COP**, wire Monday-style weekly report to the existing async pipeline, keep Mariana’s NL assistant on the documented agent loop.
 4. Later phases: keep staff dashboard consumers for `reporting.weekly_location_performance` current; extend sales USD+COP for Mariana.
 5. Do not rewrite the monorepo or invent another company.
@@ -308,6 +308,87 @@ Manual UI (CDP): login → Monday weekly report; audit forbidden jargon hits=[];
 Artifacts: stakeholder_ux_03_monday_report.png, stakeholder_ux_04_kpi_table.png, stakeholder_ux_monday_report_walkthrough.mp4
 ```
 
+## Latest central API nouns (`cursor/central-api-nouns-5989`)
+
+Department served: **Technology** (Nicolás Park — locations, menus, sales, customers, suppliers on one server) + **Operations** (Felipe — per-location COP/USD tickets and a no-sales alert list) + **Procurement** (Lucía — ~20 suppliers and price history) + **Marketing** (Camila — CRM with a Brasa Points stamp-card balance) + **Executive** (Mariana — chain totals in COP and USD) + **Training** (Jake — same menu in all 14 kitchens).
+
+Built on `main` (`a7c9bf9`), not draft PR #64. Routers: `services/api/menus.py`, `sales.py`, `customers.py`, `suppliers.py`. `app.py` only mounts them; reporting stays mounted. Seeded snapshot, not a live POS. Brasa Points stay physical stamp cards (`digital_loyalty=false`).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+GET http://127.0.0.1:8000/docs → 200
+locations=present
+menus=present
+sales=present
+customers=present
+suppliers=present
+inventory=present
+path_count=39
+reporting paths still present
+python3 -m pytest tests/test_central_api_domains.py -q → 7 passed
+python3 -m pytest tests/test_users_api.py tests/test_error_handling.py -q → 27 passed
+GET /menus/catalogue → 6 items, currencies COP+USD, location_count 14
+GET /sales/overview without token → 401
+GET /sales/overview with Bearer → 14 locations, 42 tickets, chain_total_cop=476340000, chain_total_usd=119085, florida_total_usd=53460
+GET /customers/cus-001 → Brasa Points, brasa_points_balance=32, loyalty_tier=silver, digital_loyalty=false
+GET /suppliers/overview → total_suppliers=20, colombia_count=10, florida_count=10, price_alerts=8
+```
+
+Skill **passed** (criteria 1–4 and 6). Criterion 5: locations, menus, sales, customers, and suppliers are **present**. That does not make POS integration, telemetry, or a digital loyalty wallet complete.
+
+## Latest knowledge RAG (`cursor/knowledge-rag-query-34a7`)
+
+Department served: **Training** (Jake Morrison — searchable standards) + **Technology** (Nicolás Park — one route on the central API) + **Executive** (Mariana can ask a standards question; this is not the chain-sales assistant).
+
+Kept `data/process/rag.py` + `data/pipelines/rag.py` (collection `brasaland_kb`, allergen and COP/USD rules). Retired `scripts/rag.py` (it searched `company_knowledge_base`) by making it delegate here. `services/api/main.py` no longer imports a missing router; it starts the same central app. `POST /knowledge/query` is `services/knowledge/routes.py`, included from `services/api/app.py`.
+
+Default path needs no API key: local hashed embeddings and an extractive answer with cited chunks. `BRASALAND_RAG_BACKEND=qdrant` and `BRASALAND_RAG_LLM=openai` enable the vector store and chat model. Loyalty copy now matches `CONTEXT.md` (physical stamp cards; digital app not available yet).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+GET http://127.0.0.1:8000/docs → 200
+locations=present
+menus=missing
+sales=missing
+customers=missing
+suppliers=missing
+inventory=present
+knowledge=present
+path_count=26
+/knowledge/query in OpenAPI → True
+POST /knowledge/query House Sauce → 200, soy + sulfites, source brasaland-menu-allergens.en.md
+POST unrelated question → not enough information, sources=[]
+python data/eval/eval_knowledge_qa.py → n=28 retrieval_hit_rate=1.000 answer_pass_rate=1.000
+python -m pytest tests/test_knowledge_query.py -q → 14 passed
+```
+
+Skill **passed** (criteria 1–4 + 6). At the time of that run, Technology’s menus/sales/customers/suppliers were still `missing`. Those nouns are mounted together with `/knowledge/query` after the merge from `origin/main` (`#89`).
+
+## Latest merge of #89 into knowledge query (`cursor/knowledge-rag-query-34a7`)
+
+Department served: **Technology** (Nicolás Park — menus, sales, customers, suppliers, and `POST /knowledge/query` on one server) + **Training** (Jake Morrison — searchable standards stay mounted).
+
+Merged `origin/main` (`5751231`, PR #89) into this branch. `services/api/app.py` includes `menus`, `sales`, `customers`, `suppliers`, and `services.knowledge.routes`. Both Progress entries above are kept.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+GET http://127.0.0.1:8000/docs → 200
+locations=present
+menus=present
+sales=present
+customers=present
+suppliers=present
+inventory=present
+knowledge=present
+path_count=40
+/menus /sales /customers /suppliers GET present
+/knowledge/query POST present
+python -m pytest tests/test_knowledge_query.py tests/test_central_api_domains.py -q → 21 passed
+python -m pytest -q → 110 passed
+```
+
+Skill **passed** (criteria 1–4 and 6). Criterion 5: locations, menus, sales, customers, and suppliers are **present**, and `/knowledge/query` is present. That does not make POS integration, telemetry, or a digital loyalty wallet complete.
+
 ## Latest live no-sales alert (`cursor/realtime-no-sales-alert-198b`)
 
 Department served: **Restaurant Operations** (Felipe Guerrero — alert when a location has no sales during opening hours) + **Technology** (Nicolás Park — real-time telemetry on the central API).
@@ -334,9 +415,27 @@ cd uis/backoffice && npm run build → tsc -b && vite build green
 Browser http://127.0.0.1:5174/accessible (grader.ops@brasaland.test): Live → Simulate no sales → banner + list Medellín Centro COP, no reload → Record a sale (48000 COP) → row gone, “No open location is quiet right now.” Same flow at 390px width.
 ```
 
-Skill **passed** (criteria 1–4 + 6). Technology central API remains **incomplete** while menus/sales/customers/suppliers are `missing`.
+Skill **passed** (criteria 1–4 + 6). At the time of that run, Technology’s menus/sales/customers/suppliers were still `missing`. Those nouns, `POST /knowledge/query`, and the realtime router are mounted together after the merge from `origin/main` (`0813179`).
 
 Draft PRs **#53** (SSE tickets) and **#54** (WebSocket knowledge chat) can be closed. This branch reuses the SSE shape (named events, JWT via fetch, Last-Event-ID, reconnect backoff) on current `main` for the no-sales alert. Those drafts target other features and have diverged from `main`.
+
+## Latest merge of main into the no-sales alert (`cursor/realtime-no-sales-alert-198b`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — live no-sales alert stays mounted) + **Technology** (Nicolás Park — locations, menus, sales, customers, suppliers, inventory, users, reporting, knowledge, and realtime on one server).
+
+Merged `origin/main` (`0813179`, PR #93) into this branch. `services/api/app.py` includes the #89 routers, `services.knowledge.routes`, and `register_ops_alerts`. `locations.py` keeps `location_roster`, `all_locations`, and `get_location`. Progress keeps the central-API, knowledge, and no-sales entries.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+/locations /menus /sales /customers /suppliers /inventory /users present
+/reporting/weekly-location-performance present
+/knowledge/query present
+/realtime/ops-alerts/stream present
+path_count=43
+NO_SALES_MONITOR=0 python -m pytest -q → 127 passed
+cd uis/backoffice && npm run build → tsc -b && vite build green
+node --experimental-strip-types --test uis/backoffice/tests/noSalesAlerts.test.ts → 8 passed
+```
 
 ## How to update this file
 
