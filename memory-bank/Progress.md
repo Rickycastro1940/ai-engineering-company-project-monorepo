@@ -319,7 +319,8 @@ Department served: **Marketing** (Camila Ospina — digital Brasa Points) + **Re
 
 ```text
 head -n 5 CONTEXT.md → # Welcome to Brasaland
-cd uis/portal && npm test → 14 passed (loyalty, COP/USD conversion, payload shapes, env switch, fixture fallback)
+Live mode matches draft central API shapes on `cursor/central-api-nouns-5989` (PR #89): `brasa_points_balance` + `loyalty_tier` + `order_history` without spend; `GET /sales` tickets (`amount`, `currency`, `location_id`, `occurred_at`) rolled up per location. `GET /sales/overview` location rows still accepted.
+cd uis/portal && npm test → 16 passed (loyalty, COP/USD conversion, ticket rollup, stamp-card balance, env switch, fixture fallback)
 cd uis/portal && npm run build → Next.js 15.5.26 compiled; routes / , /points , /points/[customerId] , /ops/sales
 npm start → :3000
 Browser: unknown email → not-found alert; ana.morales@guest.brasaland.example → balance 23, Silver, history, rewards

@@ -45,11 +45,12 @@ Points use the programme rules in `docs/company-knowledge-base/brasaland-loyalty
 
 Default is **fixtures**, so the portal runs without the API. The client understands:
 
-- `GET /customers` — array, or `{ customers: [...] }`
-- `GET /customers/{id}`
-- `GET /sales` — array of rows with `location_id` and `currency`, or `{ locations: [...] }`
+Live mode targets the central API on draft PR #89 (`cursor/central-api-nouns-5989`):
 
-Amounts may be `amount_local` or `amount`. If `amount_cop` / `amount_usd` are missing, the portal converts at **4,000 COP = 1 USD** (illustrative, not a live FX feed).
+- `GET /customers` and `GET /customers/{id}` — `brasa_points_balance`, `loyalty_tier` (`bronze` / `silver` / `gold`), `uses_stamp_card`, and `order_history[]` with `menu_item_id`, `location_id`, `ordered_on` (no spend on the order). The portal shows that stamp-card balance and does not invent points from those orders.
+- `GET /sales` — ticket rows with `location_id`, `currency`, `amount`, `amount_cop`, `amount_usd`, `covers`, and `occurred_at`. The portal rolls tickets up to one row per location. `GET /sales/overview` (`{ locations: [...] }` with `amount_local`) is accepted as-is.
+
+If `amount_cop` / `amount_usd` are missing, the portal converts at **4,000 COP = 1 USD** (illustrative, not a live FX feed). The seeded sales week is **2026-09-14**.
 
 Switch to the central API (the app `uvicorn api.app:app` loads):
 

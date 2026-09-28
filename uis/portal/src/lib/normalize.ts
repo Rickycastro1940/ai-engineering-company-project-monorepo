@@ -1,5 +1,5 @@
 import { pointsFromSpend, redeemablePoints, redemptionValue, tierFor } from "./loyalty";
-import { formatMoney, isCurrency, toCop, toUsd, type Currency } from "./money";
+import { formatMoney, isCurrency, roundMoney, toCop, toUsd, type Currency } from "./money";
 import { locationName } from "./locations";
 import type {
   CustomerAccount,
@@ -98,8 +98,19 @@ export function normalizeCustomer(raw: unknown): CustomerAccount | null {
   const visits = readVisits(raw, currency);
   const redemptions = readRedemptions(raw);
   const amountsPresent = visits.length > 0 && visits.every((visit) => visit.amountLocal !== null);
-  const explicitBalance = asNumber(raw.points_balance);
-  const spendKnown = amountsPresent || (visits.length === 0 && explicitBalance !== null);
+  const stampBalance = asNumber(raw.brasa_points_balance) ?? asNumber(raw.points_balance);
+  const usesStampCard =
+    typeof raw.uses_stamp_card === "boolean"
+      ? raw.uses_stamp_card
+      : typeof raw.usesStampCard === "boolean"
+        ? raw.usesStampCard
+        : null;
+  const balanceSource = amountsPresent
+    ? "visits"
+    : stampBalance !== null
+      ? "stamp_card"
+      : "unknown";
+  const spendKnown = balanceSource !== "unknown";
 
   const email =
     asString(raw.email) ?? `${id}@guest.brasaland.example`;
@@ -122,11 +133,42 @@ export function normalizeCustomer(raw: unknown): CustomerAccount | null {
     visits,
     redemptions,
     spendKnown,
+    balanceSource,
+    stampBalance,
+    usesStampCard,
   };
 }
 
 export function summarizePoints(account: CustomerAccount): PointsSummary {
-  if (!account.spendKnown) {
+  const balanceSource = account.balanceSource ?? (account.spendKnown ? "visits" : "unknown");
+
+  if (balanceSource === "stamp_card" && account.stampBalance !== null) {
+    const balance = account.stampBalance;
+    const tier = tierFor(balance);
+    const ledger: LedgerEntry[] = account.visits.map((visit) => ({
+      id: visit.id,
+      occurredOn: visit.occurredOn,
+      locationId: visit.locationId,
+      kind: "earn",
+      points: null,
+      detail: visit.menuItemId
+        ? `Order ${visit.menuItemId.replaceAll("-", " ")} · stamp-card visit`
+        : "Stamp-card visit",
+    }));
+    return {
+      spendKnown: true,
+      balanceSource: "stamp_card",
+      earned: null,
+      redeemed: null,
+      balance,
+      tier: tier.name,
+      reward: tier.reward,
+      redeemablePoints: redeemablePoints(balance),
+      ledger,
+    };
+  }
+
+  if (balanceSource !== "visits") {
     const ledger: LedgerEntry[] = account.visits.map((visit) => ({
       id: visit.id,
       occurredOn: visit.occurredOn,
@@ -139,6 +181,7 @@ export function summarizePoints(account: CustomerAccount): PointsSummary {
     }));
     return {
       spendKnown: false,
+      balanceSource: "unknown",
       earned: null,
       redeemed: null,
       balance: null,
@@ -181,6 +224,7 @@ export function summarizePoints(account: CustomerAccount): PointsSummary {
 
   return {
     spendKnown: true,
+    balanceSource: "visits",
     earned,
     redeemed,
     balance,
@@ -200,43 +244,102 @@ function regionFrom(raw: Record<string, unknown>, currency: Currency): string {
   return currency === "USD" ? "Florida" : "Colombia";
 }
 
-/** Accepts GET /sales as an array or `{ locations: [...] }`, requiring location_id and currency. */
+type ParsedSale = LocationSales & { ticket: boolean; occurredAt?: string };
+
+function isTicket(item: Record<string, unknown>): boolean {
+  return (
+    asString(item.occurred_at) !== undefined ||
+    asString(item.occurredAt) !== undefined ||
+    asString(item.menu_item_id) !== undefined ||
+    asString(item.menuItemId) !== undefined
+  );
+}
+
+/** Opening window used by the central sales router (11:00–22:00 local). */
+function duringOpenHours(occurredAt: string | undefined): boolean {
+  if (!occurredAt) return true;
+  const match = occurredAt.match(/T(\d{2})/);
+  if (!match) return true;
+  const hour = Number(match[1]);
+  return hour >= 11 && hour < 22;
+}
+
+function parseSale(item: unknown): ParsedSale | null {
+  if (!isRecord(item)) return null;
+  const locationId = asString(item.location_id) ?? asString(item.locationId);
+  const currency = isCurrency(item.currency) ? item.currency : null;
+  if (!locationId || !currency) return null;
+  const amountLocal =
+    asNumber(item.amount_local) ?? asNumber(item.amountLocal) ?? asNumber(item.amount) ?? 0;
+  const covers = asNumber(item.covers) ?? 0;
+  const amountCop = asNumber(item.amount_cop) ?? asNumber(item.amountCop) ?? toCop(amountLocal, currency);
+  const amountUsd = asNumber(item.amount_usd) ?? asNumber(item.amountUsd) ?? toUsd(amountLocal, currency);
+  const quietFlag = item.no_sales_during_open_hours ?? item.noSalesDuringOpenHours;
+  const ticket = isTicket(item);
+  return {
+    locationId,
+    locationName: asString(item.location_name) ?? asString(item.locationName) ?? locationName(locationId),
+    country: asString(item.country) ?? (currency === "USD" ? "United States" : "Colombia"),
+    region: regionFrom(item, currency),
+    currency,
+    covers,
+    amountLocal,
+    amountCop,
+    amountUsd,
+    openHours: asString(item.open_hours) ?? asString(item.openHours) ?? "11:00-22:00 local",
+    noSalesDuringOpenHours: typeof quietFlag === "boolean" ? quietFlag : covers === 0 || amountLocal === 0,
+    ticket,
+    occurredAt: asString(item.occurred_at) ?? asString(item.occurredAt),
+  };
+}
+
+function rollupTickets(tickets: ParsedSale[]): LocationSales[] {
+  const groups = new Map<string, ParsedSale[]>();
+  for (const ticket of tickets) {
+    const group = groups.get(ticket.locationId) ?? [];
+    group.push(ticket);
+    groups.set(ticket.locationId, group);
+  }
+  return [...groups.values()].map((group) => {
+    const first = group[0];
+    const amountLocal = group.reduce((sum, row) => sum + row.amountLocal, 0);
+    const amountCop = group.reduce((sum, row) => sum + row.amountCop, 0);
+    const amountUsd = group.reduce((sum, row) => sum + row.amountUsd, 0);
+    return {
+      locationId: first.locationId,
+      locationName: first.locationName,
+      country: first.country,
+      region: first.region,
+      currency: first.currency,
+      covers: group.reduce((sum, row) => sum + row.covers, 0),
+      amountLocal: roundMoney(amountLocal, first.currency === "USD" ? 2 : 0),
+      amountCop: roundMoney(amountCop, 2),
+      amountUsd: roundMoney(amountUsd, 2),
+      openHours: first.openHours,
+      noSalesDuringOpenHours: !group.some((row) => duringOpenHours(row.occurredAt)),
+    };
+  });
+}
+
+/**
+ * Accepts GET /sales (ticket list: location_id, currency, amount, occurred_at)
+ * or GET /sales/overview `{ locations: [...] }` with one row per location.
+ * Ticket lists are rolled up so the staff view stays one row per location.
+ */
 export function normalizeSales(body: unknown): LocationSales[] {
   const rows = Array.isArray(body)
     ? body
     : isRecord(body) && Array.isArray(body.locations)
       ? body.locations
       : [];
-
-  return rows.flatMap((item) => {
-    if (!isRecord(item)) return [];
-    const locationId = asString(item.location_id) ?? asString(item.locationId);
-    const currency = isCurrency(item.currency) ? item.currency : null;
-    if (!locationId || !currency) return [];
-    const amountLocal =
-      asNumber(item.amount_local) ?? asNumber(item.amountLocal) ?? asNumber(item.amount) ?? 0;
-    const covers = asNumber(item.covers) ?? 0;
-    const amountCop = asNumber(item.amount_cop) ?? asNumber(item.amountCop) ?? toCop(amountLocal, currency);
-    const amountUsd = asNumber(item.amount_usd) ?? asNumber(item.amountUsd) ?? toUsd(amountLocal, currency);
-    const quietFlag = item.no_sales_during_open_hours ?? item.noSalesDuringOpenHours;
-    return [
-      {
-        locationId,
-        locationName:
-          asString(item.location_name) ?? asString(item.locationName) ?? locationName(locationId),
-        country: asString(item.country) ?? (currency === "USD" ? "United States" : "Colombia"),
-        region: regionFrom(item, currency),
-        currency,
-        covers,
-        amountLocal,
-        amountCop,
-        amountUsd,
-        openHours: asString(item.open_hours) ?? asString(item.openHours) ?? "11:00-22:00 local",
-        noSalesDuringOpenHours:
-          typeof quietFlag === "boolean" ? quietFlag : covers === 0 || amountLocal === 0,
-      },
-    ];
+  const parsed = rows.flatMap((item) => {
+    const sale = parseSale(item);
+    return sale ? [sale] : [];
   });
+  if (parsed.some((row) => row.ticket)) {
+    return rollupTickets(parsed.filter((row) => row.ticket));
+  }
+  return parsed.map(({ ticket: _ticket, occurredAt: _occurredAt, ...row }) => row);
 }
 
 export function chainTotals(rows: LocationSales[]): {

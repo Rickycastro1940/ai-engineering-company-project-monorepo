@@ -49,7 +49,7 @@ function saleFromSeed(seed: SaleSeed): LocationSales {
 
 export const FIXTURE_SALES: LocationSales[] = SALE_SEEDS.map(saleFromSeed);
 
-export const FIXTURE_WEEK = "2026-09-15";
+export const FIXTURE_WEEK = "2026-09-14";
 
 /**
  * Guest accounts for the Brasa Points portal.
@@ -67,6 +67,9 @@ export const FIXTURE_CUSTOMERS: CustomerAccount[] = [
     loyaltyProgram: "Brasa Points",
     currency: "COP",
     spendKnown: true,
+    balanceSource: "visits",
+    stampBalance: null,
+    usesStampCard: true,
     visits: [
       { id: "cus-001-v1", occurredOn: "2026-06-02", locationId: "co-med-centro", amountLocal: 120_000, currency: "COP", menuItemId: "grilled-sirloin" },
       { id: "cus-001-v2", occurredOn: "2026-07-14", locationId: "co-med-elpoblado", amountLocal: 80_000, currency: "COP", menuItemId: "corn-arepa" },
@@ -87,6 +90,9 @@ export const FIXTURE_CUSTOMERS: CustomerAccount[] = [
     loyaltyProgram: "Brasa Points",
     currency: "COP",
     spendKnown: true,
+    balanceSource: "visits",
+    stampBalance: null,
+    usesStampCard: true,
     visits: [
       { id: "cus-002-v1", occurredOn: "2026-09-16", locationId: "co-bog-chapinero", amountLocal: 90_000, currency: "COP", menuItemId: "bbq-ribs" },
     ],
@@ -102,6 +108,9 @@ export const FIXTURE_CUSTOMERS: CustomerAccount[] = [
     loyaltyProgram: "Brasa Points",
     currency: "USD",
     spendKnown: true,
+    balanceSource: "visits",
+    stampBalance: null,
+    usesStampCard: true,
     visits: [
       { id: "cus-005-v1", occurredOn: "2026-05-10", locationId: "us-mia-brickell", amountLocal: 180, currency: "USD", menuItemId: "grilled-sirloin" },
       { id: "cus-005-v2", occurredOn: "2026-06-22", locationId: "us-mia-downtown", amountLocal: 150, currency: "USD", menuItemId: "tropical-salad" },
@@ -122,6 +131,9 @@ export const FIXTURE_CUSTOMERS: CustomerAccount[] = [
     loyaltyProgram: "Brasa Points",
     currency: "USD",
     spendKnown: true,
+    balanceSource: "visits",
+    stampBalance: null,
+    usesStampCard: true,
     visits: [
       { id: "cus-006-v1", occurredOn: "2026-07-04", locationId: "us-orlando", amountLocal: 80, currency: "USD", menuItemId: "bbq-ribs" },
       { id: "cus-006-v2", occurredOn: "2026-08-12", locationId: "us-orlando", amountLocal: 70, currency: "USD", menuItemId: "bbq-ribs" },

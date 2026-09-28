@@ -30,8 +30,15 @@ export type CustomerAccount = {
   currency: Currency;
   visits: Visit[];
   redemptions: Redemption[];
-  /** False when the API recorded orders but not spend, so points must not be invented. */
+  /** False when the API recorded orders but not spend or a stamp-card balance. */
   spendKnown: boolean;
+  /**
+   * `visits` — balance from spend on each visit (portal fixtures).
+   * `stamp_card` — `brasa_points_balance` from the central customers API.
+   */
+  balanceSource: "visits" | "stamp_card" | "unknown";
+  stampBalance: number | null;
+  usesStampCard: boolean | null;
 };
 
 export type LedgerKind = "earn" | "redeem";
@@ -47,6 +54,7 @@ export type LedgerEntry = {
 
 export type PointsSummary = {
   spendKnown: boolean;
+  balanceSource: "visits" | "stamp_card" | "unknown";
   earned: number | null;
   redeemed: number | null;
   balance: number | null;

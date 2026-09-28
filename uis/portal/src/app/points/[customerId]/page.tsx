@@ -45,8 +45,14 @@ export default async function CustomerPointsPage({
             <>
               <p className="balance">{summary.balance}</p>
               <p>
-                {summary.tier} · {summary.reward} Earned {summary.earned}, redeemed {summary.redeemed}.
+                {summary.tier} · {summary.reward}{" "}
+                {summary.balanceSource === "stamp_card"
+                  ? "Stamp-card tally from the central API (brasa_points_balance). Visit rows do not include spend, so points are not recalculated per order."
+                  : `Earned ${summary.earned}, redeemed ${summary.redeemed}.`}
               </p>
+              {account.usesStampCard === false ? (
+                <p>This guest is not using a stamp card.</p>
+              ) : null}
               <p>
                 {redeemValue
                   ? `You can redeem up to ${summary.redeemablePoints} points (${redeemValue} off the bill).`
