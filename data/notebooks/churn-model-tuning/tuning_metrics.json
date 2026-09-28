@@ -1,6 +1,10 @@
 {
-  "data_url": "https://raw.githubusercontent.com/IBM/telco-customer-churn-on-icp4d/master/data/Telco-Customer-Churn.csv",
   "scoring": "recall",
+  "search_fit_on": "X_train_only",
+  "test_touches": [
+    "baseline",
+    "tuned_final"
+  ],
   "baseline": {
     "accuracy": 0.7778566359119943,
     "precision": 0.6033898305084746,
@@ -8,53 +12,8 @@
     "f1": 0.5321375186846039,
     "roc_auc": 0.8169831305381177
   },
-  "random_search": {
-    "best_params": {
-      "model__n_estimators": 100,
-      "model__min_samples_split": 10,
-      "model__min_samples_leaf": 8,
-      "model__max_features": "log2",
-      "model__max_depth": 8,
-      "model__criterion": "log_loss",
-      "model__class_weight": "balanced",
-      "model__bootstrap": true
-    },
-    "best_cv_score": 0.7939799331103679,
-    "n_jobs": 1
-  },
-  "narrowed_param_grid": {
-    "model__criterion": [
-      "log_loss"
-    ],
-    "model__class_weight": [
-      "balanced"
-    ],
-    "model__bootstrap": [
-      true
-    ],
-    "model__max_features": [
-      "log2"
-    ],
-    "model__min_samples_split": [
-      10
-    ],
-    "model__max_depth": [
-      6,
-      8,
-      12
-    ],
-    "model__n_estimators": [
-      50,
-      100,
-      200
-    ],
-    "model__min_samples_leaf": [
-      4,
-      8
-    ]
-  },
-  "grid_search": {
-    "best_params": {
+  "selection": {
+    "final_params": {
       "model__bootstrap": true,
       "model__class_weight": "balanced",
       "model__criterion": "log_loss",
@@ -64,10 +23,8 @@
       "model__min_samples_split": 10,
       "model__n_estimators": 50
     },
-    "best_cv_score": 0.8040133779264215,
-    "n_jobs": 1,
-    "refit": true,
-    "manual_refit": false
+    "reason": "Highest mean CV recall (0.8040 \u00b1 0.0244). No nearby candidate offered a clear stability gain for a small mean trade-off.",
+    "fitted_via": "grid_search.best_estimator_ (refit=True on train)"
   },
   "tuned_final": {
     "accuracy": 0.7366926898509581,

@@ -13,8 +13,11 @@ Customer churn notebook for **StreamLoop**, using the public IBM Telco Customer 
    - `RandomizedSearchCV` over RF-supported hyperparameters
    - Narrow the space from those results
    - `GridSearchCV` to refine
-7. **Scoring:** `recall` (catch churners for retention — not accuracy)
-8. **Final** test score only at the end — never manually refit `best_estimator_`
+7. **Inspect** `cv_results_` top candidates (mean vs fold std); pick final model
+8. **Scoring:** `recall` (catch churners for retention — not accuracy)
+9. **Final** test score once at the end; write `tuning_report.md`
+
+Searches never see the test set or the full dataset. Test is touched exactly twice.
 
 ## Data
 
