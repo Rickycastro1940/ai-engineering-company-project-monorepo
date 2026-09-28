@@ -41,4 +41,4 @@ python run_churn_tuning.py
 jupyter notebook streamloop_churn_tuning.ipynb
 ```
 
-Artifacts: `baseline_metrics.json`, `tuning_metrics.json`.
+Artifacts: `baseline_metrics.json`, `tuning_metrics.json`, `cv_top_candidates.json`, `tuning_report.md`.

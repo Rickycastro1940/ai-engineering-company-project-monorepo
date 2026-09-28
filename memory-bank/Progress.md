@@ -318,19 +318,19 @@ Added `data/notebooks/churn-model-tuning/`:
 - Minimal cleaning only (blanks→NaN, target encode, drop id); impute + one-hot **inside** the Pipeline
 - Stratified train/test split **before** any model work
 - Baseline = `RandomForestClassifier` defaults (+ `random_state`); test scored once → `baseline_metrics.json`
-- Search scoring = `recall` (catch churners); `RandomizedSearchCV` (`n_jobs=1`) → narrowed `GridSearchCV` (`n_jobs=1`, `refit=True`); no manual refit
-- Final test score only at the end
+- Search scoring = `recall` (catch churners); `RandomizedSearchCV` (`n_jobs=1`) → narrowed `GridSearchCV` (`n_jobs=1`, `refit=True`) on **train only**
+- Inspect `cv_results_` mean vs fold std; final model justified in `tuning_report.md`
+- Test set touched exactly twice (baseline + tuned final)
 - Notebook `streamloop_churn_tuning.ipynb` + headless `run_churn_tuning.py`
 - Local venv deps in folder `requirements.txt` (root `requirements.txt` / `pyproject.toml` untouched)
 
 ```text
 head -n 5 CONTEXT.md → # Welcome to Brasaland
 cd data/notebooks/churn-model-tuning && .venv/bin/python run_churn_tuning.py
-shape=(7043, 21); TotalCharges_na=11; train=5634 test=1409
-baseline (test): recall≈0.476 roc_auc≈0.817
-RandomizedSearchCV scoring=recall n_jobs=1 → best CV recall≈0.794
-narrowed GridSearchCV n_jobs=1 refit=True → best CV recall≈0.804
-tuned_final (test): recall≈0.799 (no manual refit of best_estimator_)
+shape=(7043, 21); train=5634 test=1409; search_fit_on=X_train_only
+baseline recall≈0.476 → tuned_final recall≈0.799 (Δ +0.324)
+top CV: mean 0.8040 ± 0.0244 (chosen: highest mean; also lowest std among ties)
+wrote tuning_report.md + cv_top_candidates.json
 .venv/bin/jupyter nbconvert --execute streamloop_churn_tuning.ipynb → green
 ```
 
