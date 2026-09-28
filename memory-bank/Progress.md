@@ -15,12 +15,12 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
 | Technology: telemetry + pipeline to dashboards | **Partial** — Part 2 weekly location cost/waste ETL + Phase one Prefect stage subflows + Phase two isolated KPI transform unit tests + Phase three CLI (`python data/pipelines/pipeline.py --offline`) + Phase four backoffice Monday weekly report (`/reporting/weekly-performance`, stakeholder copy); engineering `GET /telemetry/report` untouched |
-| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — no sales UI yet; weekly Purchase cost / Waste cost / Waste ratio / Stockout frequency / Price alert frequency per location (COP/USD) on Monday weekly report |
+| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — Next.js `/ops/sales` shows per-location sales in COP and USD (illustrative conversion) plus a no-sales flag when the payload says so; weekly Purchase cost / Waste cost / Waste ratio / Stockout frequency / Price alert frequency per location (COP/USD) remain on the Monday weekly report |
 | Procurement: supplier price history, consolidated spend | **Partial** — Price alert frequency + Purchase cost per location-week on Monday weekly report |
-| Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
+| Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Next.js `uis/portal` `/points` looks up a guest and shows Brasa Points balance, history, and tier rewards (fixtures, or `GET /customers` when `BRASALAND_DATA_SOURCE=live`). `CONTEXT.md` still describes stamp cards as today’s in-restaurant programme |
 | People: HR portal / KPIs by country | **Not done** |
 | Training: recipe catalogue, push to 14 locations | **Not done** — knowledge docs under `docs/company-knowledge-base/` are source material only |
-| Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial** — Monday weekly ops & finance report live for Mariana / Felipe / Lucía (stakeholder labels); chain sales USD+COP still a separate gap |
+| Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial** — portal `/ops/sales` totals chain sales in COP and USD; Monday weekly ops & finance report still separate; NL assistant and Monday 07:00 send still open |
 
 ## What already runs (engineering)
 
@@ -307,6 +307,27 @@ cd uis/backoffice && npm run build → tsc -b && vite build green
 Manual UI (CDP): login → Monday weekly report; audit forbidden jargon hits=[]; required KPI labels present; friendly location names; COP+USD; period America/Bogota
 Artifacts: stakeholder_ux_03_monday_report.png, stakeholder_ux_04_kpi_table.png, stakeholder_ux_monday_report_walkthrough.mp4
 ```
+
+## Latest Next.js portal (`cursor/nextjs-brasaland-portal-9a60`)
+
+Department served: **Marketing** (Camila Ospina — digital Brasa Points) + **Restaurant Operations** (Felipe Guerrero — sales per location in COP and USD) + **Executive** (Mariana Restrepo — chain totals in both currencies). The portal calls Technology’s customers and sales nouns when `BRASALAND_DATA_SOURCE=live`; those routers are still **missing** on this branch’s central API, so the default is a typed fixture client. This does not complete the central API.
+
+- App: `uis/portal` (Next.js App Router, TypeScript). Routes `/`, `/points`, `/points/[customerId]`, `/ops/sales`.
+- Client: `GET /customers`, `GET /customers/{id}`, `GET /sales` (`location_id` + `currency`). Fallback when the live call fails. Staff JWT via `BRASALAND_API_TOKEN` (not committed).
+- Points math from `docs/company-knowledge-base/brasaland-loyalty-program.en.md` (10,000 COP or 10 USD = 1 point; Bronze/Silver/Gold; redeem from 15 in steps of 5).
+- Brand tokens match `uis/website` (charcoal, ember, Outfit, Source Sans 3).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+cd uis/portal && npm test → 14 passed (loyalty, COP/USD conversion, payload shapes, env switch, fixture fallback)
+cd uis/portal && npm run build → Next.js 15.5.26 compiled; routes / , /points , /points/[customerId] , /ops/sales
+npm start → :3000
+Browser: unknown email → not-found alert; ana.morales@guest.brasaland.example → balance 23, Silver, history, rewards
+/ops/sales → chain COP $476,340,000 and chain USD $119,085.00; Florida filter → 6 Florida rows, Colombia hidden
+Narrow viewport still shows the sales heading; console clear
+```
+
+Technology central API remains **incomplete** while menus/sales/customers/suppliers are `missing` on `services/api/app.py`.
 
 ## How to update this file
 
