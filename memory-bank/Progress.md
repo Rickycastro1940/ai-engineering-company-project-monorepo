@@ -14,8 +14,8 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Partial** — `locations=present`; `auth`/`users=present`; `menus`/`sales`/`customers`/`suppliers=missing`; `inventory=present` on `:8000` |
-| Technology: telemetry + pipeline to dashboards | **Partial** — Part 2 weekly location cost/waste ETL + Phase one Prefect stage subflows + Phase two isolated KPI transform unit tests + Phase three CLI (`python data/pipelines/pipeline.py --offline`) + Phase four backoffice Monday weekly report (`/reporting/weekly-performance`, stakeholder copy); engineering `GET /telemetry/report` untouched |
-| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — no sales UI yet; weekly Purchase cost / Waste cost / Waste ratio / Stockout frequency / Price alert frequency per location (COP/USD) on Monday weekly report |
+| Technology: telemetry + pipeline to dashboards | **Partial** — live no-sales SSE on `GET /realtime/ops-alerts/stream` plus Part 2 weekly location cost/waste ETL, Prefect stage subflows, KPI unit tests, CLI, and backoffice Monday weekly report; engineering `GET /telemetry/report` untouched |
+| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — live no-sales alert on `/accessible` (banner, toast, list; clears when a sale is recorded; COP for Colombia, USD for Florida). Chain sales UI and smart ordering still open |
 | Procurement: supplier price history, consolidated spend | **Partial** — Price alert frequency + Purchase cost per location-week on Monday weekly report |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `uis/website/` corporate home (`/`) live; Brasa Points still stamp cards per `CONTEXT.md` |
 | People: HR portal / KPIs by country | **Not done** |
@@ -307,6 +307,35 @@ cd uis/backoffice && npm run build → tsc -b && vite build green
 Manual UI (CDP): login → Monday weekly report; audit forbidden jargon hits=[]; required KPI labels present; friendly location names; COP+USD; period America/Bogota
 Artifacts: stakeholder_ux_03_monday_report.png, stakeholder_ux_04_kpi_table.png, stakeholder_ux_monday_report_walkthrough.mp4
 ```
+
+## Latest live no-sales alert (`cursor/realtime-no-sales-alert-198b`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — alert when a location has no sales during opening hours) + **Technology** (Nicolás Park — real-time telemetry on the central API).
+
+SSE on `GET /realtime/ops-alerts/stream` (Bearer JWT, `fetch` + `ReadableStream`). Detection lives in `services/api/no_sales.py`; the router is `services/api/no_sales_router.py`. Sales enter through `sales_events.record_sale` so a future `/sales` router can hook in without this channel owning that noun. OpenAPI paths do not contain `sales`, so the coverage script still reports `sales=missing`.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+GET http://127.0.0.1:8000/docs → 200
+locations=present
+menus=missing
+sales=missing
+customers=missing
+suppliers=missing
+inventory=present
+path_count=28
+/realtime/ops-alerts /realtime/ops-alerts/stream /realtime/ops-alerts/simulate present
+GET /realtime/ops-alerts/stream without token → 401
+python scripts/simulate_no_sales.py quiet --location co-med-centro → alert COP, quiet_minutes=31
+python scripts/simulate_no_sales.py resume --location co-med-centro --amount 48000 --currency COP → status=cleared
+NO_SALES_MONITOR=0 .venv/bin/python -m pytest tests/test_no_sales_alerts.py tests/test_users_api.py -q → 34 passed
+node --experimental-strip-types --test uis/backoffice/tests/noSalesAlerts.test.ts → 8 passed
+cd uis/backoffice && npm run build → tsc -b && vite build green
+```
+
+Skill **passed** (criteria 1–4 + 6). Technology central API remains **incomplete** while menus/sales/customers/suppliers are `missing`.
+
+Draft PRs **#53** (SSE tickets) and **#54** (WebSocket knowledge chat) can be closed. This branch reuses the SSE shape (named events, JWT via fetch, Last-Event-ID, reconnect backoff) on current `main` for the no-sales alert. Those drafts target other features and have diverged from `main`.
 
 ## How to update this file
 

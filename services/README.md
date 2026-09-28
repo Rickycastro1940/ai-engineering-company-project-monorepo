@@ -36,4 +36,8 @@ Task logs (every attempt): `task_id`, `attempt`, `status`, `duration_ms`; failur
 - `GET /tasks/{task_id}` → Redis/Celery status as
   `{"task_id": "...", "status": "pending|started|success|failure", "result": ...}`
 
+## Live operations alerts
+
+`services/api/no_sales_router.py` mounts `GET /realtime/ops-alerts/stream` on the central FastAPI app (`uvicorn api.app:app`). It tells Restaurant Operations when an open location has no sales during business hours. Details: [`docs/realtime-no-sales.md`](../docs/realtime-no-sales.md).
+
 > _Spanish version: [README.es.md](./README.es.md)._

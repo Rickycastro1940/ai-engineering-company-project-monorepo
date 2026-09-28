@@ -24,6 +24,7 @@ if str(REPO_ROOT) not in sys.path:
 # Reporting shell — own module under services/reporting/, mounted here so
 # Bearer JWT + error envelopes match the rest of the central API.
 from services.reporting.routes import router as reporting_router  # noqa: E402
+from no_sales_router import register as register_ops_alerts  # noqa: E402
 
 UI_ROOT = REPO_ROOT / "uis" / "web"
 UPLOAD_DIR = REPO_ROOT / "data" / "uploads"
@@ -134,6 +135,7 @@ app.include_router(locations_router)
 app.include_router(inventory_router)
 app.include_router(users_router)
 app.include_router(reporting_router)
+register_ops_alerts(app)
 _register_analyze_routes(app, "anylayze")
 _register_analyze_routes(app, "analyze")
 

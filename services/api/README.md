@@ -124,6 +124,10 @@ curl "http://127.0.0.1:8000/inventory/alerts?threshold=20"
 
 Interactive docs: `http://127.0.0.1:8000/docs`
 
+## Live no-sales alerts
+
+Restaurant Operations (Felipe Guerrero): when an open location has no sale for a configurable window, `GET /realtime/ops-alerts/stream` pushes an SSE alert. A recorded sale clears it. The `/sales` HTTP noun is separate; call `record_sale` from `services/api/sales_events.py` when that router lands. Grader steps: [`docs/realtime-no-sales.md`](../../docs/realtime-no-sales.md).
+
 ## Auth endpoints (previous JSON delivery)
 
 SQLite user store: `data/company_api.db`. Set `JWT_SECRET_KEY` so tokens survive reloads.

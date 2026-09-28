@@ -161,6 +161,11 @@ _LOCATIONS: list[Location] = [
 ]
 
 
+def location_roster() -> list[Location]:
+    """14 company-owned restaurants from CONTEXT.md (Colombia + Florida)."""
+    return list(_LOCATIONS)
+
+
 @router.get("", response_model=list[Location])
 def list_locations() -> list[Location]:
     return list(_LOCATIONS)
