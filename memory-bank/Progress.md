@@ -315,16 +315,19 @@ Department served: **Marketing** (Camila — customer retention / CRM signal) vi
 Added `data/notebooks/churn-model-tuning/`:
 
 - Load IBM Telco Customer Churn CSV from URL (no manual download)
-- Baseline `RandomForestClassifier` + `RandomizedSearchCV` ROC-AUC tuning
+- Minimal cleaning only (blanks→NaN, target encode, drop id); impute + one-hot **inside** the Pipeline
+- Stratified train/test split **before** any model work
+- Baseline = `RandomForestClassifier` defaults (+ `random_state`); test scored once → `baseline_metrics.json`
+- `RandomizedSearchCV` on train folds only; final test score only at the end
 - Notebook `streamloop_churn_tuning.ipynb` + headless `run_churn_tuning.py`
 - Local venv deps in folder `requirements.txt` (root `requirements.txt` / `pyproject.toml` untouched)
 
 ```text
 head -n 5 CONTEXT.md → # Welcome to Brasaland
 cd data/notebooks/churn-model-tuning && .venv/bin/python run_churn_tuning.py
-rows=7043 features=19 churn_rate=0.265
-baseline roc_auc≈0.817 → tuned holdout roc_auc≈0.843 (best CV roc_auc≈0.847)
-recall Yes: 0.636 → 0.794
+shape=(7043, 21); TotalCharges_na=11; train=5634 test=1409
+baseline (test): accuracy≈0.778 precision≈0.603 recall≈0.476 f1≈0.532 roc_auc≈0.817
+best CV roc_auc≈0.847; tuned_final (test) roc_auc≈0.843
 .venv/bin/jupyter nbconvert --execute streamloop_churn_tuning.ipynb → green
 ```
 
