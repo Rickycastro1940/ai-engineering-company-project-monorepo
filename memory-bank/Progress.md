@@ -263,6 +263,8 @@ head -n 5 CONTEXT.md → # Welcome to Brasaland
 
 Department served: **Technology** (Nicolás Park — locations, menus, sales, customers, suppliers) + **Operations/Executive** (sales COP/USD) + **Marketing** (CRM, physical Brasa Points) + **Procurement** (~20 suppliers, price alerts) + **Training** (same chain menu).
 
+Rebased PR #64 work onto `main` (API routers only; no unrelated uis Docker commits).
+
 ```text
 head -n 5 CONTEXT.md → # Welcome to Brasaland
 GET http://127.0.0.1:8000/docs → 200
@@ -272,12 +274,12 @@ sales=present
 customers=present
 suppliers=present
 inventory=present
-path_count=34
-PYTHONPATH=/workspace python3 -m pytest tests/test_central_api_domains.py tests/test_users_api.py -q → 22 passed
-GET /menus/catalogue → 6 items, COP+USD, 14 kitchens
-GET /sales/overview without token → 401; with JWT → 14 locations, chain COP+USD
-GET /customers/overview → digital_loyalty=false, Brasa Points physical
-GET /suppliers/overview → 20 suppliers, 10 Colombia / 10 Florida, price alerts
+path_count=38
+PYTHONPATH=/workspace .venv/bin/python -m pytest tests/test_central_api_domains.py tests/test_users_api.py -q → 22 passed
+GET /menus/catalogue → 200, 6 items, COP+USD
+GET /sales/overview anonymous → 401; JWT → 200, 14 locations, chain_total_cop + chain_total_usd
+GET /customers/overview → digital_loyalty=false, stamp_card_users present
+GET /suppliers/overview → 20 suppliers (colombia_count=10, florida_count=10)
 ```
 
 Skill **passed**. Seeded snapshots; POS is still not integrated (`CONTEXT.md`).
