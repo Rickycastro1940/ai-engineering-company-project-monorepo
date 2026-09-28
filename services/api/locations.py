@@ -2,6 +2,7 @@
 
 CONTEXT.md: 14 company-owned restaurants in Colombia and Florida (US).
 Operations needs sales visibility per location in COP and USD.
+Roster rows live in SQLite (`central_store`) so they survive process restarts.
 """
 from __future__ import annotations
 
@@ -10,6 +11,8 @@ from typing import Literal
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from users import get_current_user
+
+import central_store
 
 router = APIRouter(
     prefix="/locations",
@@ -45,7 +48,7 @@ class LocationsOverview(BaseModel):
 
 # Seeded roster aligned with CONTEXT.md (14 locations, two markets, two currencies).
 # Named cities are illustrative operational anchors; count and markets are briefing facts.
-_LOCATIONS: list[Location] = [
+_SEED_LOCATIONS: list[Location] = [
     Location(
         id="co-med-centro",
         name="Medellín Centro",
@@ -161,38 +164,42 @@ _LOCATIONS: list[Location] = [
 ]
 
 
+def _ensure_seeded() -> None:
+    central_store.seed_locations([row.model_dump() for row in _SEED_LOCATIONS])
+
+
 def location_roster() -> list[Location]:
     """14 company-owned restaurants from CONTEXT.md (Colombia + Florida)."""
-    return list(_LOCATIONS)
+    _ensure_seeded()
+    return [Location(**row) for row in central_store.list_locations()]
 
 
 def all_locations() -> list[Location]:
     """Roster other central-API routers join against (sales, customers)."""
-    return list(_LOCATIONS)
+    return location_roster()
 
 
 def get_location(location_id: str) -> Location | None:
-    for location in _LOCATIONS:
-        if location.id == location_id:
-            return location
-    return None
-
+    _ensure_seeded()
+    row = central_store.get_location(location_id)
+    return Location(**row) if row is not None else None
 
 
 @router.get("", response_model=list[Location])
 def list_locations() -> list[Location]:
-    return list(_LOCATIONS)
+    return location_roster()
 
 
 @router.get("/overview", response_model=LocationsOverview)
 def locations_overview() -> LocationsOverview:
-    colombia = [loc for loc in _LOCATIONS if loc.country == "Colombia"]
-    florida = [loc for loc in _LOCATIONS if loc.region == "Florida"]
+    locations = location_roster()
+    colombia = [loc for loc in locations if loc.country == "Colombia"]
+    florida = [loc for loc in locations if loc.region == "Florida"]
     return LocationsOverview(
-        total_locations=len(_LOCATIONS),
-        countries=sorted({loc.country for loc in _LOCATIONS}),
+        total_locations=len(locations),
+        countries=sorted({loc.country for loc in locations}),
         currencies=["COP", "USD"],
         colombia_count=len(colombia),
         florida_count=len(florida),
-        locations=list(_LOCATIONS),
+        locations=locations,
     )

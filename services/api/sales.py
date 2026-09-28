@@ -3,7 +3,8 @@
 Felipe needs per-location sales in COP and USD. Mariana needs chain totals
 in both currencies. Each ticket carries location, currency, amount, and a
 timestamp. POS systems are not integrated; this is a seeded snapshot for the
-week of 2026-09-14 (America/Bogota).
+week of 2026-09-14 (America/Bogota). Tickets persist in SQLite (`central_store`)
+so POST /sales survives a process restart.
 """
 from __future__ import annotations
 
@@ -14,6 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from users import get_current_user
 
+import central_store
 from locations import all_locations, get_location
 from sales_events import parse_amount, record_sale
 
@@ -154,7 +156,7 @@ def during_open_hours(occurred_at: str) -> bool:
     return OPEN_HOUR_START <= moment.hour < OPEN_HOUR_END
 
 
-def _build_sales() -> list[Sale]:
+def _build_seed_sales() -> list[Sale]:
     sales: list[Sale] = []
     for location_id, covers, amount_local in _WEEKLY_LOCAL:
         location = get_location(location_id)
@@ -196,6 +198,24 @@ def _build_sales() -> list[Sale]:
     return sales
 
 
+def _ensure_seeded() -> None:
+    # Locations must exist before sales seed joins the roster.
+    all_locations()
+    central_store.seed_sales([row.model_dump() for row in _build_seed_sales()])
+
+
+def all_sales() -> list[Sale]:
+    """All tickets currently in the SQLite sales table (seed + POST /sales)."""
+    _ensure_seeded()
+    return [Sale(**row) for row in central_store.list_sales()]
+
+
+def delete_sale(sale_id: str) -> None:
+    """Remove one ticket (test cleanup after POST /sales)."""
+    _ensure_seeded()
+    central_store.delete_sale(sale_id)
+
+
 def build_location_rollups(sales: list[Sale]) -> list[LocationSales]:
     """One row per roster location. A location with no in-hours ticket is an alert."""
     grouped: dict[str, list[Sale]] = {}
@@ -230,15 +250,13 @@ def build_location_rollups(sales: list[Sale]) -> list[LocationSales]:
     return rows
 
 
-_SALES: list[Sale] = _build_sales()
-
-
 def _rollups() -> list[LocationSales]:
-    return build_location_rollups(_SALES)
+    return build_location_rollups(all_sales())
 
 
 def _overview() -> SalesOverview:
-    locations = _rollups()
+    sales = all_sales()
+    locations = build_location_rollups(sales)
     colombia = [row for row in locations if row.region == "Colombia"]
     florida = [row for row in locations if row.region == "Florida"]
     alerts = [row.location_id for row in locations if row.no_sales_during_open_hours]
@@ -246,10 +264,10 @@ def _overview() -> SalesOverview:
         reporting_week_start=REPORTING_WEEK_START,
         reporting_week_end=REPORTING_WEEK_END,
         total_locations=len(locations),
-        sale_count=len(_SALES),
+        sale_count=len(sales),
         currencies=["COP", "USD"],
-        chain_total_cop=round(sum(sale.amount_cop for sale in _SALES), 2),
-        chain_total_usd=round(sum(sale.amount_usd for sale in _SALES), 2),
+        chain_total_cop=round(sum(sale.amount_cop for sale in sales), 2),
+        chain_total_usd=round(sum(sale.amount_usd for sale in sales), 2),
         colombia_total_cop=round(sum(row.amount_cop for row in colombia), 2),
         florida_total_usd=round(sum(row.amount_usd for row in florida), 2),
         no_sales_alerts=alerts,
@@ -258,21 +276,11 @@ def _overview() -> SalesOverview:
 
 
 def _filtered(location_id: str | None, currency: Currency | None) -> list[Sale]:
-    rows = list(_SALES)
-    if location_id is not None:
-        rows = [row for row in rows if row.location_id == location_id]
-    if currency is not None:
-        rows = [row for row in rows if row.currency == currency]
-    return rows
-
-
-def _next_sale_id(location_id: str) -> str:
-    prefix = f"sal-{location_id}-"
-    taken = {row.id for row in _SALES if row.id.startswith(prefix)}
-    index = 1
-    while f"{prefix}{index}" in taken:
-        index += 1
-    return f"{prefix}{index}"
+    _ensure_seeded()
+    return [
+        Sale(**row)
+        for row in central_store.list_sales(location_id=location_id, currency=currency)
+    ]
 
 
 def _aware_moment(moment: datetime) -> datetime:
@@ -292,7 +300,8 @@ def list_sales(
 
 @router.post("", response_model=Sale, status_code=201)
 def create_sale(payload: SaleCreate) -> Sale:
-    """Store a ticket on the same list GET /sales reads, then notify the no-sales monitor."""
+    """Persist a ticket to SQLite (same store GET /sales reads), then notify the no-sales monitor."""
+    _ensure_seeded()
     location = get_location(payload.location_id.strip())
     if location is None:
         raise HTTPException(status_code=404, detail="Sales for that location were not found.")
@@ -308,7 +317,7 @@ def create_sale(payload: SaleCreate) -> Sale:
     moment = _aware_moment(payload.occurred_at or datetime.now(timezone.utc))
     local_amount = float(amount)
     sale = Sale(
-        id=_next_sale_id(location.id),
+        id=central_store.next_sale_id(location.id),
         location_id=location.id,
         location_name=location.name,
         country=location.country,
@@ -322,7 +331,7 @@ def create_sale(payload: SaleCreate) -> Sale:
         channel="dine_in",
         menu_item_id="grilled-sirloin",
     )
-    _SALES.append(sale)
+    central_store.insert_sale(sale.model_dump())
     try:
         record_sale(
             location.id,
@@ -332,7 +341,7 @@ def create_sale(payload: SaleCreate) -> Sale:
             source="sales",
         )
     except ValueError as error:
-        _SALES.pop()
+        central_store.delete_sale(sale.id)
         text = str(error)
         status_code = 404 if "Unknown Brasaland location" in text else 400
         raise HTTPException(status_code=status_code, detail=text) from error
@@ -363,7 +372,8 @@ def get_location_sales(location_id: str) -> LocationSales:
 
 @router.get("/{sale_id}", response_model=Sale)
 def get_sale(sale_id: str) -> Sale:
-    for row in _SALES:
-        if row.id == sale_id:
-            return row
-    raise HTTPException(status_code=404, detail="Sale was not found.")
+    _ensure_seeded()
+    row = central_store.get_sale(sale_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Sale was not found.")
+    return Sale(**row)

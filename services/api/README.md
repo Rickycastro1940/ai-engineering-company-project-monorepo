@@ -142,13 +142,14 @@ Interactive docs: `http://127.0.0.1:8000/docs`
 
 ## Central API nouns (Technology)
 
-Seeded Brasaland data on this same app. Detail and curl examples: [`docs/central-api.md`](../../docs/central-api.md).
+Seeded Brasaland data on this same app, stored in SQLite (`data/company_api.db` via `central_store.py`) so roster/catalogue/CRM/supplier rows and `POST /sales` tickets survive a restart. Detail and curl examples: [`docs/central-api.md`](../../docs/central-api.md).
 
 | Method | Endpoint | Auth | Description |
 | --- | --- | --- | --- |
+| `GET` | `/locations`, `/locations/overview` | Bearer | 14 sites Colombia + Florida (SQLite) |
 | `GET` | `/menus`, `/menus/catalogue`, `/menus/{item_id}` | Public | Chain menu, COP and USD list prices |
 | `GET` | `/sales`, `/sales/overview`, `/sales/alerts`, `/sales/locations/{location_id}`, `/sales/{sale_id}` | Bearer | Tickets with location, currency, timestamp; chain COP and USD |
-| `POST` | `/sales` | Bearer | Record a ticket (location, amount, COP or USD) and notify the no-sales monitor |
+| `POST` | `/sales` | Bearer | Persist a ticket (location, amount, COP or USD) and notify the no-sales monitor |
 | `GET` | `/customers`, `/customers/overview`, `/customers/{customer_id}` | Bearer | CRM; `brasa_points_balance` on the stamp card |
 | `GET` | `/suppliers`, `/suppliers/overview`, `/suppliers/{supplier_id}` | Bearer | About 20 suppliers, two markets, price history |
 

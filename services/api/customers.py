@@ -3,6 +3,7 @@
 Camila Ospina needs customer identity, order history, and preferences.
 Brasa Points still runs on physical stamp cards (CONTEXT.md). Each customer
 carries a stamp-card balance. A digital wallet is not live.
+CRM rows live in SQLite (`central_store`) so they survive process restarts.
 """
 from __future__ import annotations
 
@@ -12,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from users import get_current_user
 
+import central_store
 from locations import get_location
 
 router = APIRouter(
@@ -110,7 +112,7 @@ def _customer(
 
 
 # Sample CRM. 6 of 10 do not use a stamp card (CONTEXT.md: about 60%).
-_CUSTOMERS: list[Customer] = [
+_SEED_CUSTOMERS: list[Customer] = [
     _customer(
         "cus-001",
         "Ana Morales",
@@ -266,24 +268,45 @@ _CUSTOMERS: list[Customer] = [
 ]
 
 
+def _ensure_seeded() -> None:
+    # Preferred locations must exist before CRM seed validation above runs again
+    # from an empty DB; seed data was already validated at import via get_location.
+    get_location("co-med-centro")
+    central_store.seed_customers(
+        [
+            {
+                **row.model_dump(),
+                "order_history": [item.model_dump() for item in row.order_history],
+            }
+            for row in _SEED_CUSTOMERS
+        ]
+    )
+
+
+def _customers() -> list[Customer]:
+    _ensure_seeded()
+    return [Customer(**row) for row in central_store.list_customers()]
+
+
 def _overview() -> CustomersOverview:
-    colombia = [row for row in _CUSTOMERS if row.market == "Colombia"]
-    florida = [row for row in _CUSTOMERS if row.market == "Florida"]
-    stamp_users = [row for row in _CUSTOMERS if row.uses_stamp_card]
+    customers = _customers()
+    colombia = [row for row in customers if row.market == "Colombia"]
+    florida = [row for row in customers if row.market == "Florida"]
+    stamp_users = [row for row in customers if row.uses_stamp_card]
     return CustomersOverview(
-        total_customers=len(_CUSTOMERS),
+        total_customers=len(customers),
         colombia_count=len(colombia),
         florida_count=len(florida),
         stamp_card_users=len(stamp_users),
-        customers_without_stamp_card=len(_CUSTOMERS) - len(stamp_users),
-        brasa_points_outstanding=sum(row.brasa_points_balance for row in _CUSTOMERS),
-        customers=list(_CUSTOMERS),
+        customers_without_stamp_card=len(customers) - len(stamp_users),
+        brasa_points_outstanding=sum(row.brasa_points_balance for row in customers),
+        customers=customers,
     )
 
 
 @router.get("", response_model=list[Customer])
 def list_customers() -> list[Customer]:
-    return list(_CUSTOMERS)
+    return _customers()
 
 
 @router.get("/overview", response_model=CustomersOverview)
@@ -293,7 +316,8 @@ def customers_overview() -> CustomersOverview:
 
 @router.get("/{customer_id}", response_model=Customer)
 def get_customer(customer_id: str) -> Customer:
-    for row in _CUSTOMERS:
-        if row.id == customer_id:
-            return row
-    raise HTTPException(status_code=404, detail="Customer was not found.")
+    _ensure_seeded()
+    row = central_store.get_customer(customer_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Customer was not found.")
+    return Customer(**row)

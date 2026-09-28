@@ -3,6 +3,7 @@
 Jake Morrison needs the same recipes and presentation in every kitchen.
 This catalogue is the chain menu (Medellín and Miami), with list prices in COP and USD.
 Public read: the menu is not staff-only. Sales, customers, and suppliers require JWT.
+Catalogue rows live in SQLite (`central_store`) so they survive process restarts.
 """
 from __future__ import annotations
 
@@ -10,6 +11,8 @@ from typing import Literal
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+
+import central_store
 
 router = APIRouter(prefix="/menus", tags=["menus"])
 
@@ -43,7 +46,7 @@ class MenuCatalogue(BaseModel):
     items: list[MenuItem]
 
 
-_ITEMS: list[MenuItem] = [
+_SEED_ITEMS: list[MenuItem] = [
     MenuItem(
         id="grilled-sirloin",
         name="Grilled Sirloin",
@@ -125,18 +128,27 @@ _ITEMS: list[MenuItem] = [
 ]
 
 
+def _ensure_seeded() -> None:
+    central_store.seed_menu_items([row.model_dump() for row in _SEED_ITEMS])
+
+
+def _items() -> list[MenuItem]:
+    _ensure_seeded()
+    return [MenuItem(**row) for row in central_store.list_menu_items()]
+
+
 def menu_item_ids() -> set[str]:
-    return {item.id for item in _ITEMS}
+    return {item.id for item in _items()}
 
 
 def _catalogue() -> MenuCatalogue:
-    return MenuCatalogue(currencies=["COP", "USD"], items=list(_ITEMS))
+    return MenuCatalogue(currencies=["COP", "USD"], items=_items())
 
 
 @router.get("", response_model=list[MenuItem])
 def list_menu_items() -> list[MenuItem]:
     """Chain menu. Same dishes in Colombia and Florida, priced in COP and USD."""
-    return list(_ITEMS)
+    return _items()
 
 
 @router.get("/catalogue", response_model=MenuCatalogue)
@@ -146,7 +158,8 @@ def menu_catalogue() -> MenuCatalogue:
 
 @router.get("/{item_id}", response_model=MenuItem)
 def get_menu_item(item_id: str) -> MenuItem:
-    for item in _ITEMS:
-        if item.id == item_id:
-            return item
-    raise HTTPException(status_code=404, detail="Menu item was not found.")
+    _ensure_seeded()
+    row = central_store.get_menu_item(item_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Menu item was not found.")
+    return MenuItem(**row)

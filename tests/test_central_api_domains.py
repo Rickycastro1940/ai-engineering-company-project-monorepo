@@ -158,12 +158,63 @@ def test_sales_require_jwt_and_carry_currency_location_and_timestamp(client: Tes
 
 
 def test_quiet_location_is_a_no_sales_alert() -> None:
-    sample = sales._SALES[0]
+    sample = sales.all_sales()[0]
     after_close = sample.model_copy(update={"occurred_at": "2026-09-16T23:10:00-05:00", "location_id": sample.location_id})
     rollups = sales.build_location_rollups([after_close])
     quiet = [row.location_id for row in rollups if row.no_sales_during_open_hours]
     assert sample.location_id in quiet
     assert len(quiet) == 14
+
+
+def test_central_api_nouns_persist_in_sqlite(client: TestClient) -> None:
+    """Technology nouns share data/company_api.db; writes survive a fresh read."""
+    headers = _headers(client)
+
+    locations = client.get("/locations", headers=headers)
+    assert locations.status_code == 200
+    assert len(locations.json()) == 14
+
+    menus = client.get("/menus")
+    assert menus.status_code == 200
+    assert len(menus.json()) >= 6
+
+    customers = client.get("/customers", headers=headers)
+    assert customers.status_code == 200
+    assert len(customers.json()) == 10
+
+    suppliers = client.get("/suppliers", headers=headers)
+    assert suppliers.status_code == 200
+    assert len(suppliers.json()) == 20
+
+    before = len(client.get("/sales", headers=headers).json())
+    created = client.post(
+        "/sales",
+        headers=headers,
+        json={
+            "location_id": "co-med-centro",
+            "amount": "12500",
+            "currency": "COP",
+            "occurred_at": "2026-09-28T18:05:00-05:00",
+        },
+    )
+    assert created.status_code == 201, created.text
+    sale_id = created.json()["id"]
+
+    # Fresh SQLite read (same DB file, no process-memory list).
+    from central_store import get_sale as store_get_sale
+
+    persisted = store_get_sale(sale_id)
+    assert persisted is not None
+    assert persisted["amount"] == 12500
+    assert persisted["location_id"] == "co-med-centro"
+
+    after = client.get("/sales", headers=headers)
+    assert after.status_code == 200
+    assert len(after.json()) == before + 1
+    assert any(row["id"] == sale_id for row in after.json())
+
+    sales.delete_sale(sale_id)
+    assert store_get_sale(sale_id) is None
 
 
 def test_customers_require_jwt_and_expose_brasa_points_balance(client: TestClient) -> None:

@@ -10,6 +10,8 @@ uvicorn api.app:app --reload --host 127.0.0.1 --port 8000
 
 This is a **seeded snapshot** for Brasaland (14 company-owned restaurants, Colombia and Florida). It is not a live POS, invoice feed, or digital loyalty wallet. Brasa Points balances are physical stamp-card tallies.
 
+Locations, menus, sales tickets, customers, and suppliers persist in SQLite at `data/company_api.db` (same file as staff users), via `services/api/central_store.py`. Empty tables are seeded on first read; `POST /sales` appends tickets that survive a process restart.
+
 ## Who can call what
 
 | Noun | Auth | Why |
