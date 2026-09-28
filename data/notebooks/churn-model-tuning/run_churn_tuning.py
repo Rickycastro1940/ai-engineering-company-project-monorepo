@@ -4,7 +4,7 @@ Assignment flow:
 1. Load the public Telco churn CSV from URL
 2. Minimal cleaning only (blank→NaN, target encoding, drop id)
 3. Stratified train/test split *before* any model work
-4. Pipeline = preprocessing (impute + encode) + classifier (defaults)
+4. Pipeline = imputer + scaler + encoder + classifier (defaults; nothing fit before split)
 5. Fit on train; score the test set once for the baseline
 6. RandomizedSearchCV / GridSearchCV see **training data only** (n_jobs=1)
 7. Inspect grid cv_results_ for mean vs fold stability; pick final params
@@ -39,7 +39,7 @@ from sklearn.model_selection import (
     train_test_split,
 )
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 DATA_URL = (
     "https://raw.githubusercontent.com/IBM/telco-customer-churn-on-icp4d/"
@@ -92,8 +92,18 @@ def feature_columns(X: pd.DataFrame) -> tuple[list[str], list[str]]:
 
 
 def build_pipeline(X: pd.DataFrame, **model_kwargs) -> Pipeline:
+    """Single sklearn Pipeline: imputer + scaler + encoder + classifier.
+
+    No OneHotEncoder / StandardScaler is fit outside this Pipeline or before the
+    train/test split — only column typing / blank→NaN happens in minimal_clean.
+    """
     cat_cols, num_cols = feature_columns(X)
-    numeric = Pipeline(steps=[("imputer", SimpleImputer(strategy="median"))])
+    numeric = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="median")),
+            ("scaler", StandardScaler()),
+        ]
+    )
     categorical = Pipeline(
         steps=[
             ("imputer", SimpleImputer(strategy="most_frequent")),
@@ -272,6 +282,10 @@ def write_tuning_report(
         "## Search protocol (train only)",
         "",
         "- Stratified 80/20 split **before** any model work.",
+        "- Preprocessing is **inside** one sklearn `Pipeline` "
+        "(`SimpleImputer` → `StandardScaler` on numerics; "
+        "`SimpleImputer` → `OneHotEncoder` on categoricals; then the classifier). "
+        "No one-hot or scaler is fit before the split or outside the Pipeline.",
         "- `RandomizedSearchCV` then narrowed `GridSearchCV` fit on **`X_train` only** "
         "(`n_jobs=1`, `refit=True`).",
         "- Searches never see the test set or the full dataset.",
@@ -283,7 +297,12 @@ def write_tuning_report(
         "",
         "## Stability review (`cv_results_`)",
         "",
-        "Top GridSearchCV candidates by mean CV recall (with fold std):",
+        "Inspected top GridSearchCV candidates on **mean** CV recall **and fold std** "
+        "(not face-value `best_params_` alone). Trade-off rule: prefer a slightly lower "
+        "mean when std drops by ≥25% and ≥0.005 absolute within a 0.01 mean window; "
+        "otherwise keep the highest mean.",
+        "",
+        "Top candidates:",
         "",
         "| rank | mean recall | std | mean−std | max_depth | n_estimators | min_samples_leaf |",
         "| ---: | ---: | ---: | ---: | ---: | ---: | ---: |",

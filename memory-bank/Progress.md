@@ -315,7 +315,7 @@ Department served: **Marketing** (Camila — customer retention / CRM signal) vi
 Added `data/notebooks/churn-model-tuning/`:
 
 - Load IBM Telco Customer Churn CSV from URL (no manual download)
-- Minimal cleaning only (blanks→NaN, target encode, drop id); impute + one-hot **inside** the Pipeline
+- Minimal cleaning only (blanks→NaN, target encode, drop id); imputer + StandardScaler + one-hot **inside** one Pipeline (nothing fit before split)
 - Stratified train/test split **before** any model work
 - Baseline = `RandomForestClassifier` defaults (+ `random_state`); test scored once → `baseline_metrics.json`
 - Search scoring = `recall` (catch churners); `RandomizedSearchCV` (`n_jobs=1`) → narrowed `GridSearchCV` (`n_jobs=1`, `refit=True`) on **train only**
