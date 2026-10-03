@@ -50,3 +50,18 @@ src/
 - Theme colors and fonts live under `@theme` in `src/styles/index.css` (`brasa-*` utilities).
 - Layout and typography use utility classes; grill-atmosphere gradients stay in `@layer components` (`.hero-glow`, `.hero-grill`).
 - Motion: `animate-ember-pulse`, `animate-fade-up`, `animate-fade-in` (respects `prefers-reduced-motion`).
+
+## Academy checklist — Web UI Fundamentals with Tailwind
+
+| Checkpoint | Evidence |
+| --- | --- |
+| Tailwind installed | `package.json` → `tailwindcss`, `@tailwindcss/vite` |
+| Vite plugin wired | `vite.config.ts` |
+| Theme / design tokens | `@theme` in `src/styles/index.css` |
+| Utility-first components | Header, Hero, pillars, markets, loyalty, footer |
+| Multi-page routing | `/`, `/locations`, `/brasa-points` |
+| Responsive layout | `sm:` / `md:` / `lg:` grids; mobile nav hides links |
+| Build green | `npm run build` |
+| Screenshots | `docs/screenshots/website-tailwind-*.png` |
+
+After this branch is merged (or the PR is submitted to graders), refresh the 4Geeks academy progress row for **Web UI Fundamentals with Tailwind** until it shows 100% delivered.
