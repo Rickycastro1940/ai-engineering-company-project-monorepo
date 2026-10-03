@@ -88,11 +88,27 @@ agent  | We have Tomatoes, Mozzarella... |              | 2026-...
 
 The root-level `api/` package is a compatibility shim that re-exports this service's FastAPI app so `uvicorn api.app:app` works from the repo root.
 
+## Knowledge query
+
+`POST /knowledge/query` answers from `docs/company-knowledge-base/` and returns the cited chunks. The router is `services/knowledge/routes.py`. Design and env vars: [`docs/knowledge-rag.md`](../../docs/knowledge-rag.md).
+
+```bash
+curl -sS -X POST http://127.0.0.1:8000/knowledge/query \
+  -H 'Content-Type: application/json' \
+  -d '{"question":"What allergens are in the House Sauce?"}'
+```
+
+No API key is required. The default path uses local embeddings. `BRASALAND_RAG_BACKEND=qdrant` and `BRASALAND_RAG_LLM=openai` turn on the vector store and chat model.
+
 ## Alternative run command
+
+`services/api/main.py` is deprecated (it used to import a missing knowledge router). It now starts the same central app:
 
 ```bash
 python services/api/main.py
 ```
+
+Prefer `uvicorn api.app:app`.
 
 ## Inventory endpoints
 
@@ -123,6 +139,26 @@ curl "http://127.0.0.1:8000/inventory/alerts?threshold=20"
 ```
 
 Interactive docs: `http://127.0.0.1:8000/docs`
+
+## Central API nouns (Technology)
+
+Seeded Brasaland data on this same app. Detail and curl examples: [`docs/central-api.md`](../../docs/central-api.md).
+
+| Method | Endpoint | Auth | Description |
+| --- | --- | --- | --- |
+| `GET` | `/menus`, `/menus/catalogue`, `/menus/{item_id}` | Public | Chain menu, COP and USD list prices |
+| `GET` | `/sales`, `/sales/overview`, `/sales/alerts`, `/sales/locations/{location_id}`, `/sales/{sale_id}` | Bearer | Tickets with location, currency, timestamp; chain COP and USD |
+| `POST` | `/sales` | Bearer | Record a ticket (location, amount, COP or USD) and notify the no-sales monitor |
+| `GET` | `/customers`, `/customers/overview`, `/customers/{customer_id}` | Bearer | CRM; `brasa_points_balance` on the stamp card |
+| `GET` | `/suppliers`, `/suppliers/overview`, `/suppliers/{supplier_id}` | Bearer | About 20 suppliers, two markets, price history |
+
+```bash
+python -m pytest tests/test_central_api_domains.py -q
+```
+
+## Live no-sales alerts
+
+Restaurant Operations (Felipe Guerrero): when an open location has no sale for a configurable window, `GET /realtime/ops-alerts/stream` pushes an SSE alert. `POST /sales` stores the ticket and calls `record_sale` in `services/api/sales_events.py`, which clears that location. Grader steps: [`docs/realtime-no-sales.md`](../../docs/realtime-no-sales.md).
 
 ## Auth endpoints (previous JSON delivery)
 
