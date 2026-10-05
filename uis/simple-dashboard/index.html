@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simple Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" type="text/css" href="styles.css" />
+    <style type="text/tailwindcss">
+      @theme {
+        --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+        --color-ink: #0f172a;
+        --color-muted: #64748b;
+        --color-surface: #f8fafc;
+        --color-brand: #0f766e;
+        --color-brand-soft: #ccfbf1;
+      }
+    </style>
+  </head>
+  <body class="min-h-screen bg-surface font-sans text-ink">
+    <div class="dashboard-shell">
+      <aside class="dashboard-sidebar" aria-label="Primary">
+        <div class="border-b border-slate-200 px-6 py-5">
+          <p class="text-lg font-semibold tracking-tight">Northwind Ops</p>
+          <p class="text-sm text-muted">Operations dashboard</p>
+        </div>
+        <nav class="flex flex-1 flex-col gap-1 p-4 text-sm">
+          <a class="rounded-lg bg-brand-soft px-3 py-2 font-medium text-brand" href="#kpis">Overview</a>
+          <a class="rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-50" href="#drivers">Drivers</a>
+          <a class="rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-50" href="#orders">Orders</a>
+          <a class="rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-50" href="#">Customers</a>
+          <a class="rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-50" href="#">Inventory</a>
+        </nav>
+        <div class="border-t border-slate-200 p-4 text-sm text-muted">Signed in as Alex Chen</div>
+      </aside>
+
+      <div class="dashboard-main">
+        <header class="dashboard-header border-b border-slate-200 bg-white">
+          <div>
+            <h1 class="text-xl font-semibold tracking-tight">Overview</h1>
+            <p class="text-sm text-muted">Today’s activity across sales and fulfillment</p>
+          </div>
+          <button class="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-teal-800">
+            Export report
+          </button>
+        </header>
+
+        <main class="dashboard-content">
+          <!-- 1) Top block: KPIs -->
+          <section id="kpis" class="section-block" aria-labelledby="kpi-heading">
+            <div>
+              <h2 id="kpi-heading" class="section-heading text-lg font-semibold tracking-tight">
+                Key performance indicators
+              </h2>
+              <p class="section-subheading text-sm text-muted">
+                Main outcome metrics for this week’s operations
+              </p>
+            </div>
+
+            <div class="kpi-grid">
+              <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <p class="text-sm text-muted">Revenue</p>
+                <p class="mt-2 text-2xl font-semibold">$48,290</p>
+                <p class="mt-1 text-sm text-teal-700">+12.4% vs last week</p>
+              </article>
+              <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <p class="text-sm text-muted">Orders</p>
+                <p class="mt-2 text-2xl font-semibold">312</p>
+                <p class="mt-1 text-sm text-teal-700">+8.1% vs last week</p>
+              </article>
+              <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <p class="text-sm text-muted">Active customers</p>
+                <p class="mt-2 text-2xl font-semibold">1,284</p>
+                <p class="mt-1 text-sm text-amber-700">-1.2% vs last week</p>
+              </article>
+              <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <p class="text-sm text-muted">Fulfillment rate</p>
+                <p class="mt-2 text-2xl font-semibold">96.8%</p>
+                <p class="mt-1 text-sm text-teal-700">On target</p>
+              </article>
+            </div>
+          </section>
+
+          <!-- 2) Middle block: performance drivers -->
+          <section id="drivers" class="section-block" aria-labelledby="drivers-heading">
+            <div>
+              <h2 id="drivers-heading" class="section-heading text-lg font-semibold tracking-tight">
+                Performance drivers
+              </h2>
+              <p class="section-subheading text-sm text-muted">
+                Factors that explain this week’s outcomes
+              </p>
+            </div>
+
+            <div class="driver-grid">
+              <article class="driver-widget rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h3 class="font-semibold">Sales by channel</h3>
+                <p class="mt-1 text-sm text-muted">Share of revenue by acquisition source</p>
+                <div class="driver-bars" role="list">
+                  <div class="driver-bar-row" role="listitem">
+                    <span class="text-sm font-medium">Online</span>
+                    <div class="driver-bar-track" aria-hidden="true">
+                      <span class="driver-bar-fill" style="width: 54%"></span>
+                    </div>
+                    <span class="text-sm text-muted">54%</span>
+                  </div>
+                  <div class="driver-bar-row" role="listitem">
+                    <span class="text-sm font-medium">Retail</span>
+                    <div class="driver-bar-track" aria-hidden="true">
+                      <span class="driver-bar-fill" style="width: 31%"></span>
+                    </div>
+                    <span class="text-sm text-muted">31%</span>
+                  </div>
+                  <div class="driver-bar-row" role="listitem">
+                    <span class="text-sm font-medium">Wholesale</span>
+                    <div class="driver-bar-track" aria-hidden="true">
+                      <span class="driver-bar-fill" style="width: 15%"></span>
+                    </div>
+                    <span class="text-sm text-muted">15%</span>
+                  </div>
+                </div>
+              </article>
+
+              <article class="driver-widget rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h3 class="font-semibold">Top products</h3>
+                <p class="mt-1 text-sm text-muted">Units sold and conversion contribution</p>
+                <div class="driver-bars" role="list">
+                  <div class="driver-bar-row" role="listitem">
+                    <span class="text-sm font-medium">Trail Pack</span>
+                    <div class="driver-bar-track" aria-hidden="true">
+                      <span class="driver-bar-fill" style="width: 78%"></span>
+                    </div>
+                    <span class="text-sm text-muted">128</span>
+                  </div>
+                  <div class="driver-bar-row" role="listitem">
+                    <span class="text-sm font-medium">Desk Lamp</span>
+                    <div class="driver-bar-track" aria-hidden="true">
+                      <span class="driver-bar-fill" style="width: 61%"></span>
+                    </div>
+                    <span class="text-sm text-muted">97</span>
+                  </div>
+                  <div class="driver-bar-row" role="listitem">
+                    <span class="text-sm font-medium">Canvas Tote</span>
+                    <div class="driver-bar-track" aria-hidden="true">
+                      <span class="driver-bar-fill" style="width: 44%"></span>
+                    </div>
+                    <span class="text-sm text-muted">71</span>
+                  </div>
+                </div>
+              </article>
+
+              <article class="driver-widget rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h3 class="font-semibold">Fulfillment funnel</h3>
+                <p class="mt-1 text-sm text-muted">Orders progressing through warehouse stages</p>
+                <div class="funnel-steps">
+                  <div class="funnel-step">
+                    <div class="flex items-center justify-between gap-3 text-sm">
+                      <span class="font-medium">Received</span>
+                      <span class="text-muted">312 · 100%</span>
+                    </div>
+                    <div class="funnel-meter" aria-hidden="true"><span style="width: 100%"></span></div>
+                  </div>
+                  <div class="funnel-step">
+                    <div class="flex items-center justify-between gap-3 text-sm">
+                      <span class="font-medium">Picked</span>
+                      <span class="text-muted">289 · 93%</span>
+                    </div>
+                    <div class="funnel-meter" aria-hidden="true"><span style="width: 93%"></span></div>
+                  </div>
+                  <div class="funnel-step">
+                    <div class="flex items-center justify-between gap-3 text-sm">
+                      <span class="font-medium">Packed</span>
+                      <span class="text-muted">274 · 88%</span>
+                    </div>
+                    <div class="funnel-meter" aria-hidden="true"><span style="width: 88%"></span></div>
+                  </div>
+                  <div class="funnel-step">
+                    <div class="flex items-center justify-between gap-3 text-sm">
+                      <span class="font-medium">Shipped</span>
+                      <span class="text-muted">256 · 82%</span>
+                    </div>
+                    <div class="funnel-meter" aria-hidden="true"><span style="width: 82%"></span></div>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <!-- 3) Bottom block: operational details -->
+          <section id="orders" class="section-block" aria-labelledby="ops-heading">
+            <div>
+              <h2 id="ops-heading" class="section-heading text-lg font-semibold tracking-tight">
+                Operational details
+              </h2>
+              <p class="section-subheading text-sm text-muted">
+                Recent orders and team follow-ups
+              </p>
+            </div>
+
+            <div class="ops-grid">
+              <article class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div class="border-b border-slate-200 px-5 py-4">
+                  <h3 class="font-semibold">Recent orders</h3>
+                </div>
+                <div class="table-scroll">
+                  <table class="text-left text-sm">
+                    <thead class="bg-slate-50 text-muted">
+                      <tr>
+                        <th class="px-5 py-3 font-medium">Order</th>
+                        <th class="px-5 py-3 font-medium">Customer</th>
+                        <th class="px-5 py-3 font-medium">Status</th>
+                        <th class="px-5 py-3 font-medium">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                      <tr>
+                        <td class="px-5 py-3 font-medium">#1042</td>
+                        <td class="px-5 py-3">Maya Patel</td>
+                        <td class="px-5 py-3">
+                          <span class="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-800">Shipped</span>
+                        </td>
+                        <td class="px-5 py-3">$214.00</td>
+                      </tr>
+                      <tr>
+                        <td class="px-5 py-3 font-medium">#1041</td>
+                        <td class="px-5 py-3">Luis Romero</td>
+                        <td class="px-5 py-3">
+                          <span class="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">Pending</span>
+                        </td>
+                        <td class="px-5 py-3">$89.50</td>
+                      </tr>
+                      <tr>
+                        <td class="px-5 py-3 font-medium">#1040</td>
+                        <td class="px-5 py-3">Elena Rossi</td>
+                        <td class="px-5 py-3">
+                          <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">Delivered</span>
+                        </td>
+                        <td class="px-5 py-3">$432.10</td>
+                      </tr>
+                      <tr>
+                        <td class="px-5 py-3 font-medium">#1039</td>
+                        <td class="px-5 py-3">Jordan Lee</td>
+                        <td class="px-5 py-3">
+                          <span class="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-800">Shipped</span>
+                        </td>
+                        <td class="px-5 py-3">$156.75</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+
+              <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h3 class="font-semibold">Team notes</h3>
+                <ul class="mt-4 space-y-4 text-sm">
+                  <li class="rounded-xl bg-slate-50 p-4">
+                    <p class="font-medium">Warehouse A is at 82% capacity</p>
+                    <p class="mt-1 text-muted">Consider moving overflow SKUs tomorrow morning.</p>
+                  </li>
+                  <li class="rounded-xl bg-slate-50 p-4">
+                    <p class="font-medium">3 orders waiting on payment</p>
+                    <p class="mt-1 text-muted">Follow up with billing before 5pm.</p>
+                  </li>
+                  <li class="rounded-xl bg-slate-50 p-4">
+                    <p class="font-medium">New supplier catalog uploaded</p>
+                    <p class="mt-1 text-muted">Review pricing before Friday’s report.</p>
+                  </li>
+                </ul>
+              </article>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>
