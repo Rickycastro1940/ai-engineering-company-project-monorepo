@@ -525,6 +525,29 @@ POST /sales before evaluate → no alert raised
 POST unknown location → 404; Colombia location with USD → 400; EUR → 422; amount 0 → 400
 ```
 
+## Latest StreamLoop churn model tuning (`cursor/streamloop-churn-pipeline-b46b`)
+
+Department served: **Marketing** (Camila — customer retention / CRM signal) via a public telco-proxy churn dataset (assignment stand-in for StreamLoop account, service, and billing attributes). Does **not** change Brasaland `CONTEXT.md` or claim a live Brasa Points churn model.
+
+Grader feedback addressed on the 4Geeks `python-hello` EDA notebook:
+
+- Imputer + `StandardScaler` + `OneHotEncoder` + classifier in **one** sklearn `Pipeline` (no `get_dummies` / external scaler before the split)
+- Kept the praised **ROC-AUC** search rationale (rank churn risk for retention)
+- Baseline defaults logged on the test set **before** search; random→grid on **train only**
+- Inspected `cv_results_` top mean **and** fold std; documented final-model trade-off in `tuning_report_eda_pipeline.md`
+- Ready copy + apply script under `python-hello-update/` (Cloud Agent cannot push `Rickycastro1940/python-hello` — 403)
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+.venv/bin/jupyter nbconvert --execute streamloop_churn_eda_pipeline_fix.ipynb → green
+CHECK OK: Pipeline + roc_auc + cv_results_ mean/std; no get_dummies / scaler.fit_transform
+baseline test ROC-AUC 0.8476 → tuned 0.8499 (accuracy 0.8008 → 0.8050)
+GridSearchCV top: mean 0.8489 ± 0.0159 (kept highest mean; no stability trade-off needed)
+wrote tuning_report_eda_pipeline.md + eda_tuning_metrics.json + python-hello-update/ready/
+```
+
+Also retained the earlier RF/`recall` Protocol (`run_churn_tuning.py`, `streamloop_churn_tuning.ipynb`) as an alternate practice path.
+
 ## How to update this file
 
 After a verified change, append evidence (command + result) and update the coverage table. Do not log plans that were not run.

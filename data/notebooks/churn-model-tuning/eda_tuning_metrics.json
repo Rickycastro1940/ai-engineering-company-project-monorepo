@@ -1,0 +1,44 @@
+{
+  "scoring": "roc_auc",
+  "baseline": {
+    "accuracy": 0.8007572172266919,
+    "precision": 0.6627906976744186,
+    "recall": 0.5080213903743316,
+    "f1": 0.5751765893037336,
+    "roc_auc": 0.8475757805465203
+  },
+  "random_best_cv": 0.8488982010743173,
+  "random_best_params": {
+    "model__learning_rate": 0.0589974509393851,
+    "model__max_depth": 2,
+    "model__max_features": null,
+    "model__min_samples_leaf": 12,
+    "model__n_estimators": 214,
+    "model__subsample": 0.7
+  },
+  "grid_best_cv": 0.8488982010743173,
+  "grid_best_params": {
+    "model__learning_rate": 0.059,
+    "model__max_depth": 2,
+    "model__max_features": null,
+    "model__min_samples_leaf": 12,
+    "model__n_estimators": 214,
+    "model__subsample": 0.7
+  },
+  "selection_reason": "Kept highest mean CV ROC-AUC (0.8489 \u00b1 0.0159); no nearby candidate offered a clear stability trade-off.",
+  "final_params": {
+    "model__learning_rate": 0.059,
+    "model__max_depth": "2",
+    "model__max_features": null,
+    "model__min_samples_leaf": "12",
+    "model__n_estimators": "214",
+    "model__subsample": 0.7
+  },
+  "tuned": {
+    "accuracy": 0.8050165641268339,
+    "precision": 0.6659242761692651,
+    "recall": 0.5329768270944741,
+    "f1": 0.592079207920792,
+    "roc_auc": 0.849924541044159
+  }
+}
