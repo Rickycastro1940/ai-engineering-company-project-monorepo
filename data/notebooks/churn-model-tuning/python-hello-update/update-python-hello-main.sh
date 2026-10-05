@@ -5,12 +5,15 @@ set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/Rickycastro1940/python-hello.git}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PATCH="${1:-$SCRIPT_DIR/streamloop-python-hello.patch}"
+READY_DIR="${READY_DIR:-$SCRIPT_DIR/ready}"
 WORKDIR="${WORKDIR:-/tmp/python-hello-main-update}"
 
-if [[ ! -f "$PATCH" ]]; then
-  echo "Patch not found: $PATCH" >&2
-  echo "Download streamloop-python-hello.patch from the Cloud Agent artifacts first." >&2
+if [[ ! -f "$READY_DIR/notebooks/streamloop_churn_eda.ipynb" ]]; then
+  echo "Ready notebook not found: $READY_DIR/notebooks/streamloop_churn_eda.ipynb" >&2
+  exit 1
+fi
+if [[ ! -f "$READY_DIR/tuning_report.md" ]]; then
+  echo "Ready report not found: $READY_DIR/tuning_report.md" >&2
   exit 1
 fi
 
@@ -20,8 +23,12 @@ cd "$WORKDIR"
 git checkout main
 git pull --ff-only origin main
 
-# 3-commit mailbox patch (format-patch); applies cleanly on current main
-git am "$PATCH"
+mkdir -p notebooks
+cp "$READY_DIR/notebooks/streamloop_churn_eda.ipynb" notebooks/streamloop_churn_eda.ipynb
+cp "$READY_DIR/tuning_report.md" tuning_report.md
+if [[ -f "$READY_DIR/notebooks/churn-requirements.txt" ]]; then
+  cp "$READY_DIR/notebooks/churn-requirements.txt" notebooks/churn-requirements.txt
+fi
 
 # Sanity: grader checklist
 python3 - <<'PY'
@@ -37,11 +44,34 @@ if "Pipeline(" not in src:
     bad.append("missing Pipeline")
 if "cv_results_" not in src or "std_test_score" not in src:
     bad.append("missing cv_results_ mean/std inspection")
+if "scoring='roc_auc'" not in src and 'scoring="roc_auc"' not in src:
+    bad.append("missing roc_auc scoring")
+if "trade-off" not in src.lower() and "Trade-off" not in open("tuning_report.md").read():
+    bad.append("missing final-model trade-off")
 if bad:
     print("CHECK FAILED:", "; ".join(bad))
     sys.exit(1)
-print("CHECK OK: Pipeline + cv_results_ mean/std; no external get_dummies/scaler")
+print("CHECK OK: Pipeline + roc_auc + cv_results_ mean/std + trade-off; no external get_dummies/scaler")
 PY
+
+git add notebooks/streamloop_churn_eda.ipynb tuning_report.md
+if [[ -f notebooks/churn-requirements.txt ]]; then
+  git add notebooks/churn-requirements.txt
+fi
+
+if git diff --cached --quiet; then
+  echo "Nothing to commit — python-hello main already has the fix."
+  exit 0
+fi
+
+git commit -m "$(cat <<'EOF'
+Fix StreamLoop churn notebook for Pipeline + CV stability resubmit
+
+Put imputer/encoder/scaler + classifier in one sklearn Pipeline, keep
+ROC-AUC search, inspect cv_results_ mean/std, and document the final
+model trade-off in tuning_report.md.
+EOF
+)"
 
 git push origin main
 echo "Done. python-hello main now has the StreamLoop fix — resubmit in 4Geeks."
