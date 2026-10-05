@@ -1,0 +1,216 @@
+/* Dashboard layout + breakpoint adaptations (mobile-first).
+   Visual styling mostly comes from Tailwind v4 utilities in index.html.
+   These media queries satisfy the submission requirement for CSS breakpoints. */
+
+:root {
+  --dashboard-gap: 1rem;
+  --dashboard-pad: 1rem;
+  --sidebar-width: 16rem;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.dashboard-shell {
+  min-height: 100vh;
+}
+
+.dashboard-sidebar {
+  display: none;
+}
+
+.dashboard-main {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+}
+
+.dashboard-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: var(--dashboard-pad);
+}
+
+.dashboard-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: var(--dashboard-pad);
+}
+
+.section-block {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.section-heading {
+  margin: 0;
+}
+
+.section-subheading {
+  margin: 0.25rem 0 0;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--dashboard-gap);
+}
+
+.driver-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--dashboard-gap);
+}
+
+.ops-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+.driver-widget {
+  min-width: 0;
+}
+
+.driver-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  margin-top: 1rem;
+}
+
+.driver-bar-row {
+  display: grid;
+  grid-template-columns: minmax(4.5rem, 7rem) 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.driver-bar-track {
+  height: 0.5rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8f0;
+}
+
+.driver-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: #0f766e;
+}
+
+.funnel-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.funnel-step {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.funnel-meter {
+  height: 0.625rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8f0;
+}
+
+.funnel-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #0f766e, #14b8a6);
+}
+
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-scroll table {
+  min-width: 28rem;
+  width: 100%;
+}
+
+/* Tablet */
+@media (min-width: 640px) {
+  :root {
+    --dashboard-gap: 1rem;
+    --dashboard-pad: 1.5rem;
+  }
+
+  .dashboard-header,
+  .dashboard-content {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .driver-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .driver-grid .driver-widget:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Desktop */
+@media (min-width: 1024px) {
+  .dashboard-shell {
+    display: grid;
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  }
+
+  .dashboard-sidebar {
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #e2e8f0;
+    background: #fff;
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .driver-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .driver-grid .driver-widget:last-child {
+    grid-column: auto;
+  }
+}
+
+/* Wide desktop */
+@media (min-width: 1280px) {
+  .ops-grid {
+    grid-template-columns: minmax(0, 2fr) minmax(16rem, 1fr);
+  }
+
+  .dashboard-content {
+    gap: 2rem;
+  }
+}
