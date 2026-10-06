@@ -14,7 +14,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Present (seeded)** — `locations`/`menus`/`sales`/`customers`/`suppliers`/`inventory=present` plus `knowledge=present` (`POST /knowledge/query`) and `realtime=present` (`GET /realtime/ops-alerts/stream`) on `uvicorn api.app:app` (`:8000`). Not a live POS or invoice feed |
-| Technology: telemetry + pipeline to dashboards | **Partial** — live no-sales SSE on `GET /realtime/ops-alerts/stream` plus Part 2 weekly location cost/waste ETL, Prefect stage subflows, KPI unit tests, CLI, and backoffice Monday weekly report; engineering `GET /telemetry/report` untouched |
+| Technology: telemetry + pipeline to dashboards | **Partial** — design contract in `docs/telemetry/` (41 events: 18 mandatory + 23 identified opportunities; draft-07 schemas; property allowlists; envelope). Live no-sales SSE on `GET /realtime/ops-alerts/stream` plus Part 2 weekly location cost/waste ETL, Prefect stage subflows, KPI unit tests, CLI, and backoffice Monday weekly report. Catalog emitters are not wired. Engineering `GET /telemetry/report` untouched |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — seeded `GET /sales` tickets and `/sales/overview` (COP and USD, 14 locations) plus `/sales/alerts`; `POST /sales` stores a ticket and calls `record_sale` so the live no-sales alert on backoffice `/accessible` sees that location; Next.js `uis/portal` `/ops/sales` shows per-location sales in COP and USD. Smart ordering still open |
 | Procurement: supplier price history, consolidated spend | **Partial** — seeded `GET /suppliers` (20 suppliers, Colombia and Florida, price history and alerts); Monday weekly purchase cost / price-alert frequency still separate; invoices are not live |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `GET /customers` CRM seed with `brasa_points_balance` on physical stamp cards; Next.js `uis/portal` `/points` looks up a guest and shows Brasa Points balance, history, and tier rewards (fixtures, or `GET /customers` when `BRASALAND_DATA_SOURCE=live`); `uis/website/` corporate home (`/`) live. `CONTEXT.md` still describes stamp cards as today’s in-restaurant programme |
@@ -30,7 +30,8 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | Incident analysis UI | `uis/web` |
 | Weekly cost/waste pipeline + Celery | `data/process/location_kpis.py`, `data/pipelines/pipeline.py`, `services/reporting/main.py`, `services/tasks.py`; Compose Redis/Flower/worker |
 | Public corporate website | `uis/website/` — Vite/React, route `/`, brand tokens + components from `CONTEXT.md`; screenshot `docs/screenshots/website-corporate-home.png` |
-| Internal backoffice | `uis/backoffice/` — JWT session; `/accessible` locations+inventory; `/reporting/weekly-performance` Monday weekly ops & finance report (COP/USD) |
+| Internal backoffice | `uis/backoffice/` — JWT session; client layout guard (`ProtectedRoute` + `useRequireAuth`) on `/`, `/accessible`, `/account/profile`, `/account/change-password`, and `/reporting/weekly-performance`; `/accessible` locations+inventory and live no-sales; Monday weekly ops & finance report (COP/USD) |
+| Telemetry design contract | `docs/telemetry/telemetry-plan.md`, `event-schemas.json`, `property-allowlists.md` — catalog and schemas only; emitters not wired |
 | Locations API | `services/api/locations.py` — 14 locations, Colombia 8 / Florida 6, COP+USD; **Bearer JWT required** |
 
 ## Latest auth-frontend evidence (`feature/auth-frontend`)
@@ -182,6 +183,248 @@ Department served: **Technology** (structured HTTP, no env names in 503s) + **Op
 uv run python -m pytest tests/test_error_handling.py tests/test_scripts_io.py tests/test_users_api.py -q → 33 passed
 cd uis/backoffice && npm run build → green
 ```
+
+## Latest instrumentability evaluation (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology**. Audit of stream/batch urgency, PII handling, risks/exclusions, and whether another developer can instrument without clarification. **Verdict: PASS.**
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+delivery rows = 41; technical-preference justifications = none
+sensitive/pseudonymous/sanitized property rows = 30
+discarded candidates with reasoned why = 9
+privacy + cost exclusions + delivery risk mitigations = present
+checklist >= 12, IP-1..IP-8, instrumentation map, emit algorithm = present
+```
+
+Emitters are still not wired. Menus, sales, customers, and suppliers remain missing on the central API.
+
+## Latest event quality evaluation (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology**. Audit of justification, envelope, allowlists, and schema–plan consistency. **Verdict: PASS.**
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+Draft7Validator.check_schema → pass
+41/41 capture sentences (hypothesis + decision); no just-in-case events
+envelope requires eventID, timestamp (ISO 8601 Z), sessionID, UserID, Event_type, SchemaVersion, requestID, properties (+ source, tags)
+entity_action taxonomy: all Event_type values pass
+41 examples validate with full envelope
+41 property allowlists; 0 key mismatches vs schema; additionalProperties false
+plan catalog == schema oneOf == 41
+```
+
+Emitters are still not wired. Menus, sales, customers, and suppliers remain missing on the central API.
+
+## Latest CONTEXT coverage evaluation (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology** (audit of the telemetry contract against every `CONTEXT.md` department need). Verdict: **PASS**. All 34 mandatory metric ids in the plan match `weekly_report_dispatched.floor_metric_ids`. Business and technical opportunity coverage includes authentication, performance, errors, navigation, and inventory/marketing/HR exploration (`bo.*` off the floor).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+CONTEXT need phrases present = 22 / 22
+mandatory metrics in plan = 34 = floor_metric_ids
+evaluation Yes rows = 23 department-need mappings
+opportunity metrics = 34; bo.* questions = 11; events = 41
+auth/perf/errors/nav/business event gaps = none
+null-pending floor ids retained (holiday, onboarding, catalogue search, training path)
+ops.stockout.count remains opportunity (not floor)
+```
+
+Emitters are still not wired. Menus, sales, customers, and suppliers remain missing on the central API.
+
+## Latest delivery strategy Phase 3 (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology** (with Operations/Procurement urgency for stream paths). Every catalog event is classified stream or batch from the urgency of the decision it feeds. Throttle/debounce covers silence episodes, protein-cover alerts, latency sampling, and navigation chatter. Risks and exclusions list discarded events plus privacy/cost data that will not be captured.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+mandatory events classified = 18
+opportunity events classified = 23
+stream examples: sale_completed, location_sales_silence_detected, stock_threshold_triggered, api_error_raised
+batch examples: weekly_report_dispatched, employee_hired, stock_waste_registered, api_latency_recorded
+throttle rows documented = 12
+discarded + privacy/cost exclusions section present in telemetry-plan.md
+```
+
+Emitters are still not wired. Menus, sales, customers, and suppliers remain missing on the central API.
+
+## Latest draft-07 schema export (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology**. `docs/telemetry/event-schemas.json` is exported as JSON Schema draft-07 (`$schema` `http://json-schema.org/draft-07/schema#`) with a root `oneOf` and `definitions` (not `$defs`), validatable with `Draft7Validator`.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+$schema = http://json-schema.org/draft-07/schema#
+Draft7Validator.check_schema → pass
+41 event examples validate
+mandatoryMetricSet example validates
+definitions present; $defs absent
+sale_completed + email → reject
+missing requestID → reject
+```
+
+Emitters are still not wired. Menus, sales, customers, and suppliers remain missing on the central API.
+
+## Latest property allowlists (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology**. Every catalog event has an explicit `properties` allowlist (name, type, required/optional, description, Sensitive/PII handling). Schemas keep `additionalProperties: false` so keys outside the list are rejected before storage.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+property-allowlists.md / .json cover all 41 Event_type values
+sale_completed + email → schema reject
+sale_completed.lines + customer_email → schema reject
+user_login_failed + password → schema reject
+client_exception_caught + stack → schema reject
+api_error_raised + token → schema reject
+```
+
+Emitters are still not wired. Menus, sales, customers, and suppliers remain missing on the central API.
+
+## Latest event taxonomy and complete schemas (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology**. Every `Event_type` follows `entity_action` with a closed verb list. `definitions.mandatoryMetricSet` is the complete observation schema for all 34 `CONTEXT.md` mandatory metrics. Opportunity schemas cover business/inventory, authentication, performance, errors, and navigation (examples: `direct_stock_edit_rejected`, `session_expired`, `api_latency_recorded`).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+Draft202012Validator.check_schema → pass
+41 event examples validate
+mandatoryMetricSet example = 34 observations
+entity_action examples present: inbound_order_created, stock_threshold_triggered, direct_stock_edit_rejected, session_expired, api_latency_recorded
+old names absent: stock_modification_rejected, api_call_completed, page_view, api_error, ui_timing
+session_expired split from session_rejected; expired reason removed from session_rejected
+mandatory metrics remain 34
+```
+
+Emitters are still not wired. Menus, sales, customers, and suppliers remain missing on the central API.
+
+## Latest event envelope (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology**. Every Brasaland telemetry document uses one envelope so a staff request, a location sale, and a Monday job can be correlated without putting a JWT or an email on the event.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+Draft202012Validator.check_schema → pass
+40 event examples validate
+envelope required keys: eventID, timestamp, sessionID, UserID, Event_type, SchemaVersion, requestID, source, tags, properties
+missing requestID → schema reject
+UserID as an email → schema reject
+null UserID on user_login_succeeded → schema reject
+timestamp with a numeric offset → schema reject
+sessionID shaped like a JWT → schema reject
+weekly report example sessionID and UserID are null
+mandatory metric ids remain 34
+```
+
+Emitters are still not wired. Menus, sales, customers, and suppliers remain missing on the central API.
+
+## Latest mandatory versus opportunity split (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology**, so the team can see which telemetry is the `CONTEXT.md` baseline and which is exploration of the application and the operating procedures.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+Draft202012Validator.check_schema → pass
+40 event examples validate
+mandatory metrics in the plan = 34 = weekly_report_dispatched.floor_metric_ids
+identified opportunity metrics = 34, no id shared with the mandatory list
+mandatory events = 18, identified opportunity events = 22, together the 40 schema events
+report missing people.holiday.requests → schema reject
+report containing ops.stockout.count → schema reject
+mkt.loyalty.points_earned is not a mandatory id
+```
+
+Earn and redeem rates, waste bands, opening hours, and the stock threshold of 10 are labeled as plan bindings or opportunities. They are not written in `CONTEXT.md`. Emitters are still not wired. Menus, sales, customers, and suppliers remain missing on the central API.
+
+## Latest capture decisions (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology**, with the decision owner named on each event (Operations, Procurement, Marketing, People, Training, or Executive). An event stays only when the sentence “We capture [event_type] because we need to know [hypothesis] which allows us to make the decision, [decision]” can be completed.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+Draft202012Validator.check_schema → pass
+40 event examples validate
+40 capture sentences, one per event_type, none missing, none extra
+floor ids = 32, example matches the schema enum
+backoffice page_view → schema reject
+section suppliers → schema reject
+flow inventory_inbound → schema reject
+```
+
+Dropped: `session_check_failed` (same decision as `api_call_completed` on `GET /auth/me`), backoffice `page_view` (staff visits are `section_viewed`), section ids `suppliers` / `people` / `training` / `reporting`, and flows `inventory_inbound` / `inventory_outbound`. Emitters are still not wired. Menus, sales, customers, and suppliers remain missing on the central API.
+
+## Latest backoffice catalog (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology** (staff-console telemetry for Nicolás Park) and **Operations** (which sections a session reaches, and which flows are left unfinished). Authentication, API timing, uncaught front-end errors, required visits, and abandoned flows are specified. The 32 Phase 1 floor ids are unchanged. `bo.*` questions are not on the weekly report list.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+Draft202012Validator.check_schema → pass
+41 event examples validate
+floor ids in weekly_report_dispatched example = 32, matching the schema enum
+bo.* ids in the plan = 11, none of them in the floor enum
+expired session from the browser → schema reject
+missing_token from services.api.auth → schema reject
+inactive_user from services.api.users → pass
+completed account_mutation with duplicate_email → schema reject
+network api_call_completed with http_status 500 → schema reject
+login form with reason mismatch → schema reject
+email property on auth_form_rejected → schema reject
+website client_exception with app backoffice → schema reject
+componentStack on client_exception → schema reject
+executive_sales ready true → schema reject
+suppliers required false → schema reject
+ui_timing kind form with name inventory → schema reject
+weekly report missing people.turnover → schema reject
+```
+
+Emitters are still not wired. Menus, sales, customers, and suppliers remain missing on the central API.
+
+## Latest inventory-flow instrumentation (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology** and **Operations**. The authenticated inventory path is mapped through inbound and outbound completion, including refused stock writes, 422 validation, and the minimum-stock crossing.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+Draft202012Validator.check_schema → pass
+31 event examples validate
+stock_modification_rejected below_zero, product_not_found, and negative_alert_threshold validate
+below_zero without quantity_before → schema reject
+```
+
+## Latest telemetry floor catalog (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology**, so every `CONTEXT.md` day-one metric for Operations, Procurement, Marketing, People, Training, and Executive stays in the telemetry plan.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+Phase 1 floor ids in telemetry-plan.md = 32
+weekly_report_dispatched example lists the same 32 ids
+Draft202012Validator.check_schema → pass
+29 event examples validate
+Dropping people.turnover from floor_metric_ids → schema reject
+```
+
+Emitters are still not wired. Menus, sales, customers, and suppliers remain missing on the central API.
+
+## Latest telemetry plan (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology** (real-time telemetry contract for Nicolás Park) so Restaurant Operations and Executive metrics in `CONTEXT.md` can be instrumented on the existing inventory API, login handlers, and weekly pipeline.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+python3 -c json load docs/telemetry/event-schemas.json
+Draft202012Validator.check_schema → pass
+17 examples validate (format checks on)
+pipeline event types present: inbound_order_created, stock_waste_registered, stock_threshold_triggered, ingredient_price_variance_detected
+locationId enum count = 14
+rejected: US location + COP, chain event with location_id, email field, protein waste > 2kg without note, balance_before 10
+```
+
+Emitters are specified in `docs/telemetry/telemetry-plan.md` and are not implemented in this change. Technology’s menus/sales/customers/suppliers nouns remain **missing**.
+
+Merge note (`origin/main` at `9d17da1`): menus, sales, customers, and suppliers are seeded on the central API, and `POST /sales` feeds the no-sales alert. Sentences in the telemetry sections above that say those nouns are missing describe this branch before that merge. Catalog emitters are still not wired.
 
 ## Latest business performance pipeline Part 2 (`cursor/business-performance-pipeline-part2-4f14`)
 
@@ -523,6 +766,19 @@ node --experimental-strip-types --test uis/backoffice/tests/noSalesAlerts.test.t
 POST /sales co-med-centro 48000 COP during an open alert → 201, active alerts cleared, ticket on GET /sales
 POST /sales before evaluate → no alert raised
 POST unknown location → 404; Colombia location with USD → 400; EUR → 422; amount 0 → 400
+```
+
+## Latest merge of main into the telemetry plan (`cursor/telemetry-plan-ff8d`)
+
+Department served: **Technology** (Nicolás Park — telemetry contract plus the central API). Merged `origin/main` (`9d17da1`) and kept every telemetry evaluation section and every later main section (pipeline, portal, RAG, n8n, live no-sales, `POST /sales`).
+
+The catalog is unchanged: 41 events (18 mandatory + 23 identified opportunities). `Draft7Validator.check_schema` passes, and the schema `oneOf` is the same 41 `Event_type` values as the plan catalog. Emitters are still not wired. Menus, sales, customers, and suppliers are seeded on `uvicorn api.app:app` (they are not missing).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+NO_SALES_MONITOR=0 python -m pytest -q → 131 passed, 5 warnings in 92.39s
+Draft7Validator.check_schema(docs/telemetry/event-schemas.json) → pass
+plan catalog == schema oneOf == 41 (18 mandatory + 23 opportunity)
 ```
 
 ## How to update this file
