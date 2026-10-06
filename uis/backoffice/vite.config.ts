@@ -29,6 +29,24 @@ export default defineConfig({
         target: apiTarget,
         changeOrigin: true,
       },
+      "/reporting/weekly-location-performance": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+      "/reporting/pipeline-runs": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+      "/tasks": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+      "/realtime": {
+        target: apiTarget,
+        changeOrigin: true,
+        timeout: 0,
+        proxyTimeout: 0,
+      },
       "/api": {
         target: apiTarget,
         changeOrigin: true,

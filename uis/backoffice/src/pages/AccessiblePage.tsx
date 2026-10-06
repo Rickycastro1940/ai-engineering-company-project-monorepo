@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { AsyncPanel } from "../components/AsyncState";
+import { NoSalesLive } from "../components/NoSalesLive";
 import {
   fetchInventory,
   fetchLocationsOverview,
@@ -133,6 +135,8 @@ export function AccessiblePage() {
         </p>
       </div>
 
+      <NoSalesLive />
+
       <div className="accessible__dashboard" aria-label="Authenticated operations dashboard">
         <div className="accessible__panel accessible__panel--span">
           <h3>Company footprint</h3>
@@ -245,6 +249,18 @@ export function AccessiblePage() {
               </div>
             )}
           </AsyncPanel>
+        </div>
+
+        <div className="accessible__panel accessible__panel--placeholder">
+          <h3>Monday weekly ops &amp; finance report</h3>
+          <p>
+            For Mariana Restrepo, Felipe Guerrero, and Lucía Fernández —
+            Purchase cost, Waste cost, Waste ratio, Stockout frequency, and
+            Price alert frequency per location (COP/USD).
+          </p>
+          <p>
+            <Link to="/reporting/weekly-performance">Open Monday weekly report</Link>
+          </p>
         </div>
 
         <div className="accessible__panel accessible__panel--placeholder">

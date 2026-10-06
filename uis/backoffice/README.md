@@ -10,14 +10,15 @@ Internal staff console for **Brasaland Digital** (see root [`CONTEXT.md`](../../
 | --- | --- | --- |
 | `/login` | Email + password form. Success stores JWT and opens `/accessible`. Failure stays on the form. | Public |
 | `/register` | Registration form. Success: `POST /users` (optional `name`) then `POST /auth/login`, store JWT, open `/accessible`. Failure shows field-level errors. | Public |
-| `/accessible` | Welcome dashboard — `GET /locations/overview` | Protected |
+| `/accessible` | Welcome dashboard — locations, inventory, and live no-sales alerts | Protected |
+| `/reporting/weekly-performance` | Monday weekly ops & finance report (Purchase cost, Waste cost, Waste ratio, Stockout frequency, Price alert frequency; Phase four) | Protected |
 | `/account/profile` | Email plus name/phone/address from `GET /auth/me`; edit contact via `PUT /profiles/me` | Protected |
 | `/account/change-password` | Password update via `PUT /users/{id}` | Protected |
 | `/` | Redirects to `/accessible` | Protected |
 
 There is **no Next.js app** in this monorepo. Staff views live in this Vite SPA. `uis/website` (public milestone one) is a separate app and must not check a token or redirect to `/login`. `uis/web` is incident HTML, not a session console.
 
-Protected staff views (all of them): `/`, `/accessible`, `/account/profile`, `/account/change-password`, and any unmatched path (`*`). Public in this app: `/login`, `/register`.
+Protected staff views (all of them): `/`, `/accessible`, `/reporting/weekly-performance`, `/account/profile`, `/account/change-password`, and any unmatched path (`*`). Public in this app: `/login`, `/register`.
 
 Unauthenticated or **invalid** sessions redirect to `/login?next=…`. Logout clears `localStorage` (`auth_token`) and returns to `/login`. `GET /locations` and `GET /locations/overview` require a Bearer token. The operations page also loads `GET /inventory` with that header.
 
@@ -47,6 +48,8 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5174/login`. Vite proxies `/auth`, `/users`, `/profiles`, `/locations`, `/inventory`, and `/api` to `http://127.0.0.1:8000`.
+Open `http://localhost:5174/login`. Vite proxies `/auth`, `/users`, `/profiles`, `/locations`, `/inventory`, `/reporting/weekly-location-performance`, `/reporting/pipeline-runs`, `/tasks`, `/realtime`, and `/api` to `http://127.0.0.1:8000` (not the SPA route `/reporting/weekly-performance`).
+
+`/accessible` subscribes to `GET /realtime/ops-alerts/stream` (SSE, Bearer JWT) and shows a banner, toast, and list when an open location has no sales. Use **Simulate no sales** / **Record a sale** on that page, or `python scripts/simulate_no_sales.py`. See [`docs/realtime-no-sales.md`](../../docs/realtime-no-sales.md).
 
 Legacy static KPI/telemetry HTML (pre-Vite) is under `legacy/`.

@@ -5,6 +5,7 @@ import "../pages/AuthPages.css";
 
 const nav = [
   { to: "/accessible", label: "Accessible entry", end: true },
+  { to: "/reporting/weekly-performance", label: "Monday weekly report", end: true },
   { to: "/account/profile", label: "Profile", end: true },
   { to: "/account/change-password", label: "Change password", end: true },
 ];
@@ -43,7 +44,7 @@ export function BackofficeLayout() {
           </button>
         </div>
         <p className="bo-sidebar__note">
-          Separate from the public site in <code>uis/website</code>.
+          Separate from the public Brasaland website.
         </p>
       </aside>
       <div className="bo-main">

@@ -1,23 +1,36 @@
 from __future__ import annotations
 
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 from typing import Literal
- 
 
 from analyzer import IncidentAnalyzer
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from customers import router as customers_router
 from inventory import router as inventory_router
 from locations import router as locations_router
+from menus import router as menus_router
+from sales import router as sales_router
+from suppliers import router as suppliers_router
 from errors import register_error_handlers
 from pydantic import BaseModel, Field
 from users import router as users_router
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+# Reporting shell — own module under services/reporting/, mounted here so
+# Bearer JWT + error envelopes match the rest of the central API.
+from services.reporting.routes import router as reporting_router  # noqa: E402
+from no_sales_router import register as register_ops_alerts  # noqa: E402
+from services.knowledge.routes import router as knowledge_router  # noqa: E402
+
 UI_ROOT = REPO_ROOT / "uis" / "web"
 UPLOAD_DIR = REPO_ROOT / "data" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -124,8 +137,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(locations_router)
+app.include_router(menus_router)
+app.include_router(sales_router)
+app.include_router(customers_router)
+app.include_router(suppliers_router)
 app.include_router(inventory_router)
 app.include_router(users_router)
+app.include_router(reporting_router)
+app.include_router(knowledge_router)
+register_ops_alerts(app)
 _register_analyze_routes(app, "anylayze")
 _register_analyze_routes(app, "analyze")
 
