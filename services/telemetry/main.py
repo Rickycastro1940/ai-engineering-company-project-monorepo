@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from services.telemetry.analysis import (
+    get_api_latency_per_day,
     get_auth_failure_rate,
     get_error_rate_by_type,
     get_events_per_day,
@@ -40,6 +41,7 @@ CACHE_TTL_SECONDS = 60
 class MetricsSchema(BaseModel):
     events_per_day: list[dict]
     error_rate_by_type: list[dict]
+    api_latency_per_day: list[dict]
     auth_failure_rate: list[dict]
 
 
@@ -76,7 +78,7 @@ def load_telemetry_from_supabase(start_date: str, end_date: str) -> pd.DataFrame
         response = (
             _supabase_client()
             .table("telemetry_events")
-            .select("id", "timestamp", "event_type", "tags")
+            .select("id", "timestamp", "event_type", "value", "tags")
             .gte("timestamp", start_date)
             .lt("timestamp", end_date)
             .execute()
@@ -113,6 +115,7 @@ def build_telemetry_report(start_date: str, end_date: str, *, use_cache: bool = 
         "metrics": {
             "events_per_day": get_events_per_day(df.copy()),
             "error_rate_by_type": get_error_rate_by_type(df.copy()),
+            "api_latency_per_day": get_api_latency_per_day(df.copy()),
             "auth_failure_rate": get_auth_failure_rate(df.copy()),
         },
     }

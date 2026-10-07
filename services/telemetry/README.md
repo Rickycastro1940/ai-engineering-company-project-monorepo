@@ -6,15 +6,19 @@ Department: **Technology** (Nicolás Park).
 `telemetry_events` — not business KPIs (sales, conversion, revenue). Those stay
 in the Data Pipelines milestone (`services/reporting/`).
 
-| Metric | Formula |
-| --- | --- |
-| `events_per_day` | Count of rows per UTC date |
-| `error_rate_by_type` | Count of `api_error` and `user_login_failed` by `event_type` |
-| `auth_failure_rate` | `user_login_failed / (failed + succeeded)` per UTC day (4 dp) |
+| Metric (pandas function) | Dimension | Formula / captured inputs |
+| --- | --- | --- |
+| `get_events_per_day` | Volume | `COUNT(id)` per UTC date (all events) |
+| `get_error_count_by_type` | Errors | Count of `api_error`, `client_exception_caught`, `user_login_failed`, … |
+| `get_api_latency_per_day` | Latency | `count` / `mean` / `sum` of `api_latency_recorded.value` (ms) |
+| `get_auth_failure_rate` | Availability | `user_login_failed / (failed + succeeded)` per UTC day (4 dp) |
+
+Functions are independent, side-effect free, and use only pandas
+(`.groupby()`, `.agg()`, `count`, `sum`, `mean`) — no row loops.
 
 ## Order of implementation
 
-1. Analysis — `analysis.py` (`get_events_per_day`, `get_error_rate_by_type`, `get_auth_failure_rate`)
+1. Analysis — `analysis.py` (phase one pandas metrics above)
 2. Report endpoint — `main.py` (`GET /telemetry/report`)
 3. Cache — in-memory map, 60s TTL per `(start_date, end_date)`
 

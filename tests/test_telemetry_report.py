@@ -44,11 +44,16 @@ def test_error_rate_by_type_only_technical_failures():
             {"id": "1", "timestamp": "2026-10-01T10:00:00Z", "event_type": "api_error"},
             {"id": "2", "timestamp": "2026-10-01T11:00:00Z", "event_type": "user_login_failed"},
             {"id": "3", "timestamp": "2026-10-01T12:00:00Z", "event_type": "user_login_failed"},
-            {"id": "4", "timestamp": "2026-10-01T13:00:00Z", "event_type": "sale_completed"},
+            {"id": "4", "timestamp": "2026-10-01T13:00:00Z", "event_type": "client_exception_caught"},
+            {"id": "5", "timestamp": "2026-10-01T14:00:00Z", "event_type": "sale_completed"},
         ]
     )
     result = {row["event_type"]: row["error_count"] for row in analysis.get_error_rate_by_type(df)}
-    assert result == {"api_error": 1, "user_login_failed": 2}
+    assert result == {
+        "user_login_failed": 2,
+        "api_error": 1,
+        "client_exception_caught": 1,
+    }
 
 
 def test_auth_failure_rate_rounded_to_4dp():
@@ -72,6 +77,7 @@ def test_empty_dataframe_returns_empty_lists():
     empty = _df([])
     assert analysis.get_events_per_day(empty) == []
     assert analysis.get_error_rate_by_type(empty) == []
+    assert analysis.get_api_latency_per_day(empty) == []
     assert analysis.get_auth_failure_rate(empty) == []
 
 

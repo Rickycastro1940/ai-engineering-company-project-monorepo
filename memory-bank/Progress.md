@@ -529,19 +529,24 @@ POST unknown location → 404; Colombia location with USD → 400; EUR → 422; 
 
 Department served: **Technology** (Nicolás Park — platform health from `telemetry_events`).
 
-Order delivered: analysis functions → `GET /telemetry/report` → 60s in-memory cache. Catalogue reviewed in `docs/telemetry/telemetry-plan.md` (technical events: `user_login_*`, `api_error`). Business metrics stay out of this reader.
+Order delivered: analysis functions → `GET /telemetry/report` → 60s in-memory cache. Catalogue reviewed in `docs/telemetry/telemetry-plan.md`. Business metrics stay out of this reader.
 
-Supabase `telemetry_events`: **62+** rows with varied `event_type`, including technical `user_login_failed`, `user_login_succeeded`, `api_error`, and `client_exception_caught`.
+Phase one pandas metrics in `services/telemetry/analysis.py` (pure, loop-free, adapted to captured types):
+
+| Function | Dimension | Captured inputs |
+| --- | --- | --- |
+| `get_events_per_day` | Volume | all events |
+| `get_error_count_by_type` | Errors | `api_error`, `client_exception_caught`, `user_login_failed`, … |
+| `get_api_latency_per_day` | Latency | `api_latency_recorded.value` (ms) — count/mean/sum |
+| `get_auth_failure_rate` | Availability | login success/fail |
+
+Supabase `telemetry_events`: **62+** rows including `api_latency_recorded` (20), technical errors, and auth events.
 
 ```text
 head -n 5 CONTEXT.md → # Welcome to Brasaland
-telemetry_events count ≥ 62; types include user_login_failed, user_login_succeeded, api_error
-python -m pytest tests/test_telemetry_report.py -q → 6 passed
+python -m pytest tests/test_telemetry_analysis.py tests/test_telemetry_report.py -q → passed
 OpenAPI paths include /telemetry/report
-GET /telemetry/report → 200
-  events_per_day: [{date: 2026-10-06, event_count: 59}]
-  error_rate_by_type: api_error=1, user_login_failed=1
-  auth_failure_rate: failure_rate=0.5 on 2026-10-06
+GET /telemetry/report → 200 with events_per_day, error_rate_by_type, api_latency_per_day, auth_failure_rate
 ```
 
 ## How to update this file
