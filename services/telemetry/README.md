@@ -16,6 +16,10 @@ in the Data Pipelines milestone (`services/reporting/`).
 Functions are independent, side-effect free, and use only pandas
 (`.groupby()`, `.agg()`, `count`, `sum`, `mean`) — no row loops.
 
+The report handler resolves `start_date` / `end_date` once, then passes
+that same window into every metric function. Metrics never invent their
+own default time window.
+
 ## Order of implementation
 
 1. Analysis — `analysis.py` (phase one pandas metrics above)

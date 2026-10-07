@@ -100,7 +100,11 @@ def clear_report_cache() -> None:
 
 
 def build_telemetry_report(start_date: str, end_date: str, *, use_cache: bool = True) -> dict:
-    """Analysis → payload → optional 60s cache for (start_date, end_date)."""
+    """Load once, then call every metric with the same resolved window.
+
+    Metric functions never invent their own default dates — they only use
+    ``start_date`` / ``end_date`` passed from this layer.
+    """
     cache_key = (start_date, end_date)
     current_time = time.time()
 
@@ -113,10 +117,10 @@ def build_telemetry_report(start_date: str, end_date: str, *, use_cache: bool = 
     report_data = {
         "period": {"from": start_date, "to": end_date},
         "metrics": {
-            "events_per_day": get_events_per_day(df.copy()),
-            "error_rate_by_type": get_error_rate_by_type(df.copy()),
-            "api_latency_per_day": get_api_latency_per_day(df.copy()),
-            "auth_failure_rate": get_auth_failure_rate(df.copy()),
+            "events_per_day": get_events_per_day(df, start_date, end_date),
+            "error_rate_by_type": get_error_rate_by_type(df, start_date, end_date),
+            "api_latency_per_day": get_api_latency_per_day(df, start_date, end_date),
+            "auth_failure_rate": get_auth_failure_rate(df, start_date, end_date),
         },
     }
 
