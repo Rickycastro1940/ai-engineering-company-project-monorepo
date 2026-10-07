@@ -33,7 +33,8 @@ try:
 except ImportError:
     pass
 
-# Key: (start_date_str, end_date_str) → {"expiry": float, "data": dict}
+# In-memory report cache: same (start_date, end_date) within TTL → no recalculation.
+# Key: (start_date_str, end_date_str) → {"expiry": unix_ts, "data": report_dict}
 REPORT_CACHE: dict[tuple[str, str], dict] = {}
 CACHE_TTL_SECONDS = 60
 
@@ -99,19 +100,36 @@ def clear_report_cache() -> None:
     REPORT_CACHE.clear()
 
 
+def _cache_get(start_date: str, end_date: str) -> dict | None:
+    """Return cached report when the (start_date, end_date) entry is still fresh."""
+    entry = REPORT_CACHE.get((start_date, end_date))
+    if entry is None:
+        return None
+    if time.time() >= entry["expiry"]:
+        REPORT_CACHE.pop((start_date, end_date), None)
+        return None
+    return entry["data"]
+
+
+def _cache_set(start_date: str, end_date: str, report_data: dict) -> None:
+    """Store report for ``CACHE_TTL_SECONDS`` (60s) under the date-window key."""
+    REPORT_CACHE[(start_date, end_date)] = {
+        "expiry": time.time() + CACHE_TTL_SECONDS,
+        "data": report_data,
+    }
+
+
 def build_telemetry_report(start_date: str, end_date: str, *, use_cache: bool = True) -> dict:
-    """Load once, then call every metric with the same resolved window.
+    """Serve from cache when possible; otherwise load + run metrics once.
 
-    Metric functions never invent their own default dates — they only use
-    ``start_date`` / ``end_date`` passed from this layer.
+    The endpoint must not recalculate on every request. A hit for the same
+    ``(start_date, end_date)`` within the 60-second TTL returns the cached
+    payload and skips Supabase + pandas work.
     """
-    cache_key = (start_date, end_date)
-    current_time = time.time()
-
-    if use_cache and cache_key in REPORT_CACHE:
-        entry = REPORT_CACHE[cache_key]
-        if current_time < entry["expiry"]:
-            return entry["data"]
+    if use_cache:
+        cached = _cache_get(start_date, end_date)
+        if cached is not None:
+            return cached
 
     df = load_telemetry_from_supabase(start_date, end_date)
     report_data = {
@@ -125,10 +143,7 @@ def build_telemetry_report(start_date: str, end_date: str, *, use_cache: bool = 
     }
 
     if use_cache:
-        REPORT_CACHE[cache_key] = {
-            "expiry": current_time + CACHE_TTL_SECONDS,
-            "data": report_data,
-        }
+        _cache_set(start_date, end_date, report_data)
     return report_data
 
 

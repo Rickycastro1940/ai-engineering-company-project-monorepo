@@ -24,7 +24,8 @@ own default time window.
 
 1. Analysis — `analysis.py` (phase one pandas metrics above)
 2. Report endpoint — `main.py` (`GET /telemetry/report`)
-3. Cache — in-memory map, 60s TTL per `(start_date, end_date)`
+3. Cache — in-memory map, **60s TTL** per `(start_date, end_date)`.  
+   Same window inside the TTL returns the cached JSON and skips Supabase + pandas.
 
 Event catalogue: [`docs/telemetry/telemetry-plan.md`](../../docs/telemetry/telemetry-plan.md).  
 UI: [`uis/backoffice/legacy/telemetry.html`](../../uis/backoffice/legacy/telemetry.html).

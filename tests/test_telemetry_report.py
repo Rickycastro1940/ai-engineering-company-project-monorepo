@@ -184,6 +184,85 @@ def test_build_report_uses_cache(monkeypatch):
     assert CACHE_TTL_SECONDS == 60
 
 
+def test_cache_expires_after_ttl_and_recalculates(monkeypatch):
+    clear_report_cache()
+    calls = {"n": 0}
+    clock = {"t": 1_000.0}
+
+    def fake_load(start: str, end: str) -> pd.DataFrame:
+        calls["n"] += 1
+        return _df(
+            [
+                {
+                    "id": str(calls["n"]),
+                    "timestamp": "2026-10-01T10:00:00Z",
+                    "event_type": "api_error",
+                    "value": None,
+                    "tags": {},
+                }
+            ]
+        )
+
+    monkeypatch.setattr(
+        "services.telemetry.main.load_telemetry_from_supabase", fake_load
+    )
+    monkeypatch.setattr("services.telemetry.main.time.time", lambda: clock["t"])
+
+    start = "2026-10-01T00:00:00+00:00"
+    end = "2026-10-08T00:00:00+00:00"
+    first = build_telemetry_report(start, end)
+    clock["t"] += 30  # still inside 60s TTL
+    second = build_telemetry_report(start, end)
+    assert calls["n"] == 1
+    assert first == second
+
+    clock["t"] += 31  # past 60s TTL
+    third = build_telemetry_report(start, end)
+    assert calls["n"] == 2
+    assert third["metrics"]["error_rate_by_type"][0]["event_type"] == "api_error"
+
+
+def test_http_same_window_hits_cache(monkeypatch):
+    clear_report_cache()
+    loads = {"n": 0}
+
+    def fake_load(start: str, end: str) -> pd.DataFrame:
+        loads["n"] += 1
+        return _df(
+            [
+                {
+                    "id": "1",
+                    "timestamp": "2026-10-05T12:00:00Z",
+                    "event_type": "api_error",
+                    "value": None,
+                    "tags": {},
+                }
+            ]
+        )
+
+    monkeypatch.setattr(
+        "services.telemetry.main.load_telemetry_from_supabase", fake_load
+    )
+
+    from fastapi import FastAPI
+
+    from services.telemetry.main import router as telemetry_router
+
+    app = FastAPI()
+    app.include_router(telemetry_router)
+    client = TestClient(app)
+    params = {
+        "start_date": "2026-10-01T00:00:00Z",
+        "end_date": "2026-10-08T00:00:00Z",
+    }
+    first = client.get("/telemetry/report", params=params)
+    second = client.get("/telemetry/report", params=params)
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json() == second.json()
+    assert loads["n"] == 1
+
+
 def test_telemetry_report_route(monkeypatch):
     clear_report_cache()
     seen: dict[str, str] = {}
