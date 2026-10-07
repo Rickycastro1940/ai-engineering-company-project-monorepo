@@ -128,18 +128,63 @@ def build_telemetry_report(start_date: str, end_date: str, *, use_cache: bool = 
     return report_data
 
 
+def _parse_iso8601_utc(value: str, *, field_name: str) -> str:
+    """Accept ISO 8601 and normalize to a UTC ISO string; 422 on bad input."""
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise HTTPException(
+            status_code=422,
+            detail=f"{field_name} must be ISO 8601 (e.g. 2026-10-01T00:00:00Z).",
+        ) from error
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).isoformat()
+
+
+def resolve_report_window(
+    start_date: str | None,
+    end_date: str | None,
+    *,
+    now: datetime | None = None,
+) -> tuple[str, str]:
+    """Default window: ``[now-7D, now)`` in UTC when params are omitted."""
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    else:
+        current = current.astimezone(timezone.utc)
+
+    resolved_end = (
+        _parse_iso8601_utc(end_date, field_name="end_date")
+        if end_date
+        else current.isoformat()
+    )
+    resolved_start = (
+        _parse_iso8601_utc(start_date, field_name="start_date")
+        if start_date
+        else (current - timedelta(days=7)).isoformat()
+    )
+    return resolved_start, resolved_end
+
+
 @router.get("/telemetry/report", response_model=TelemetryReportResponse)
 async def get_telemetry_report(
     start_date: str | None = Query(
-        None, description="ISO 8601 start (inclusive). Default: now − 7 days UTC."
+        None,
+        description="ISO 8601 start (inclusive). Default: now − 7 days UTC.",
+        examples=["2026-10-01T00:00:00Z"],
     ),
     end_date: str | None = Query(
-        None, description="ISO 8601 end (exclusive). Default: now UTC."
+        None,
+        description="ISO 8601 end (exclusive). Default: now UTC.",
+        examples=["2026-10-08T00:00:00Z"],
     ),
 ):
-    now = datetime.now(timezone.utc)
-    if not start_date:
-        start_date = (now - timedelta(days=7)).isoformat()
-    if not end_date:
-        end_date = now.isoformat()
-    return build_telemetry_report(start_date, end_date)
+    """Engineering technical report over ``telemetry_events``.
+
+    Optional query params ``start_date`` / ``end_date`` (ISO 8601). When omitted:
+    ``start_date = now - 7 days``, ``end_date = now`` (both UTC).
+    """
+    window_start, window_end = resolve_report_window(start_date, end_date)
+    return build_telemetry_report(window_start, window_end)

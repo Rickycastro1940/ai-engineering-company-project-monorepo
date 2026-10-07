@@ -109,10 +109,33 @@ def test_build_report_uses_cache(monkeypatch):
     assert CACHE_TTL_SECONDS == 60
 
 
+def test_resolve_report_window_defaults_to_last_seven_utc_days():
+    from services.telemetry.main import resolve_report_window
+
+    fixed_now = datetime(2026, 10, 8, 12, 0, 0, tzinfo=timezone.utc)
+    start, end = resolve_report_window(None, None, now=fixed_now)
+    assert start == "2026-10-01T12:00:00+00:00"
+    assert end == "2026-10-08T12:00:00+00:00"
+
+
+def test_resolve_report_window_accepts_iso_query_params():
+    from services.telemetry.main import resolve_report_window
+
+    start, end = resolve_report_window(
+        "2026-09-01T00:00:00Z",
+        "2026-09-08T00:00:00Z",
+    )
+    assert start == "2026-09-01T00:00:00+00:00"
+    assert end == "2026-09-08T00:00:00+00:00"
+
+
 def test_telemetry_report_route(monkeypatch):
     clear_report_cache()
+    seen: dict[str, str] = {}
 
     def fake_load(start: str, end: str) -> pd.DataFrame:
+        seen["start"] = start
+        seen["end"] = end
         return _df(
             [
                 {
@@ -144,12 +167,34 @@ def test_telemetry_report_route(monkeypatch):
     response = client.get(
         "/telemetry/report",
         params={
-            "start_date": "2026-10-01T00:00:00+00:00",
-            "end_date": "2026-10-08T00:00:00+00:00",
+            "start_date": "2026-10-01T00:00:00Z",
+            "end_date": "2026-10-08T00:00:00Z",
         },
     )
     assert response.status_code == 200
     body = response.json()
     assert body["period"]["from"] == "2026-10-01T00:00:00+00:00"
+    assert body["period"]["to"] == "2026-10-08T00:00:00+00:00"
+    assert seen["start"] == "2026-10-01T00:00:00+00:00"
+    assert seen["end"] == "2026-10-08T00:00:00+00:00"
     assert body["metrics"]["events_per_day"][0]["event_count"] == 2
     assert body["metrics"]["error_rate_by_type"][0]["event_type"] == "api_error"
+
+
+def test_telemetry_report_rejects_invalid_iso(monkeypatch):
+    monkeypatch.setattr(
+        "services.telemetry.main.load_telemetry_from_supabase",
+        lambda start, end: _df([]),
+    )
+    from fastapi import FastAPI
+
+    from services.telemetry.main import router as telemetry_router
+
+    app = FastAPI()
+    app.include_router(telemetry_router)
+    client = TestClient(app)
+    response = client.get(
+        "/telemetry/report",
+        params={"start_date": "not-a-date", "end_date": "2026-10-08T00:00:00Z"},
+    )
+    assert response.status_code == 422
