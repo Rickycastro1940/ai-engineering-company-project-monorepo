@@ -45,6 +45,14 @@
         </div>
 
         <div class="metric-section">
+            <h3>API Latency Per Day (ms)</h3>
+            <table id="latency-table">
+                <thead><tr><th>Date</th><th>Samples</th><th>Mean ms</th><th>Total ms</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div class="metric-section">
             <h3>Authentication Failure Rate</h3>
             <table id="auth-table">
                 <thead><tr><th>Date</th><th>Successes</th><th>Failures</th><th>Failure Rate</th></tr></thead>
@@ -61,11 +69,13 @@
             const period = document.getElementById('period-display');
             const volumeBody = document.querySelector('#volume-table tbody');
             const errorsBody = document.querySelector('#errors-table tbody');
+            const latencyBody = document.querySelector('#latency-table tbody');
             const authBody = document.querySelector('#auth-table tbody');
             period.classList.add('is-loading');
             period.innerHTML = '<span class="status"><span class="spinner" aria-hidden="true"></span>Loading time window...</span>';
             volumeBody.innerHTML = '';
             errorsBody.innerHTML = '';
+            latencyBody.innerHTML = '';
             authBody.innerHTML = '';
             try {
                 const response = await fetch(API_URL);
@@ -77,6 +87,7 @@
                 const periodTo = data?.period?.to;
                 const events = data?.metrics?.events_per_day ?? [];
                 const errorRates = data?.metrics?.error_rate_by_type ?? [];
+                const latency = data?.metrics?.api_latency_per_day ?? [];
                 const authRates = data?.metrics?.auth_failure_rate ?? [];
 
                 period.innerHTML =
@@ -91,6 +102,19 @@
                 } else {
                     errorRates.forEach(row => {
                         errorsBody.innerHTML += `<tr><td class="error">${row?.event_type ?? '—'}</td><td>${row?.error_count ?? '—'}</td></tr>`;
+                    });
+                }
+
+                if (latency.length === 0) {
+                    latencyBody.innerHTML = `<tr><td colspan="4">No api_latency_recorded samples in this period.</td></tr>`;
+                } else {
+                    latency.forEach(row => {
+                        latencyBody.innerHTML += `<tr>
+                            <td>${row?.date ?? '—'}</td>
+                            <td>${row?.sample_count ?? '—'}</td>
+                            <td>${row?.mean_ms ?? '—'}</td>
+                            <td>${row?.total_ms ?? '—'}</td>
+                        </tr>`;
                     });
                 }
 

@@ -14,7 +14,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Present (seeded)** — `locations`/`menus`/`sales`/`customers`/`suppliers`/`inventory=present` plus `knowledge=present` (`POST /knowledge/query`) and `realtime=present` (`GET /realtime/ops-alerts/stream`) on `uvicorn api.app:app` (`:8000`). Not a live POS or invoice feed |
-| Technology: telemetry + pipeline to dashboards | **Partial** — live no-sales SSE on `GET /realtime/ops-alerts/stream` plus Part 2 weekly location cost/waste ETL, Prefect stage subflows, KPI unit tests, CLI, and backoffice Monday weekly report; engineering `GET /telemetry/report` untouched |
+| Technology: telemetry + pipeline to dashboards | **Partial** — engineering `GET /telemetry/report` (events_per_day / error_rate_by_type / auth_failure_rate + 60s cache) over Supabase `telemetry_events`; live no-sales SSE; Part 2 weekly location cost/waste ETL and Monday report. Business dashboards still incomplete |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — seeded `GET /sales` tickets and `/sales/overview` (COP and USD, 14 locations) plus `/sales/alerts`; `POST /sales` stores a ticket and calls `record_sale` so the live no-sales alert on backoffice `/accessible` sees that location; Next.js `uis/portal` `/ops/sales` shows per-location sales in COP and USD. Smart ordering still open |
 | Procurement: supplier price history, consolidated spend | **Partial** — seeded `GET /suppliers` (20 suppliers, Colombia and Florida, price history and alerts); Monday weekly purchase cost / price-alert frequency still separate; invoices are not live |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `GET /customers` CRM seed with `brasa_points_balance` on physical stamp cards; Next.js `uis/portal` `/points` looks up a guest and shows Brasa Points balance, history, and tier rewards (fixtures, or `GET /customers` when `BRASALAND_DATA_SOURCE=live`); `uis/website/` corporate home (`/`) live. `CONTEXT.md` still describes stamp cards as today’s in-restaurant programme |
@@ -523,6 +523,30 @@ node --experimental-strip-types --test uis/backoffice/tests/noSalesAlerts.test.t
 POST /sales co-med-centro 48000 COP during an open alert → 201, active alerts cleared, ticket on GET /sales
 POST /sales before evaluate → no alert raised
 POST unknown location → 404; Colombia location with USD → 400; EUR → 422; amount 0 → 400
+```
+
+## Latest engineering telemetry technical report (`cursor/telemetry-technical-report-c063`)
+
+Department served: **Technology** (Nicolás Park — platform health from `telemetry_events`).
+
+Order delivered: analysis functions → `GET /telemetry/report` → 60s in-memory cache. Catalogue reviewed in `docs/telemetry/telemetry-plan.md`. Business metrics stay out of this reader.
+
+Phase one pandas metrics in `services/telemetry/analysis.py` (pure, loop-free, adapted to captured types):
+
+| Function | Dimension | Captured inputs |
+| --- | --- | --- |
+| `get_events_per_day` | Volume | all events |
+| `get_error_count_by_type` | Errors | `api_error`, `client_exception_caught`, `user_login_failed`, … |
+| `get_api_latency_per_day` | Latency | `api_latency_recorded.value` (ms) — count/mean/sum |
+| `get_auth_failure_rate` | Availability | login success/fail |
+
+Supabase `telemetry_events`: **62+** rows including `api_latency_recorded` (20), technical errors, and auth events.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+python -m pytest tests/test_telemetry_analysis.py tests/test_telemetry_report.py -q → passed
+OpenAPI paths include /telemetry/report
+GET /telemetry/report → 200 with events_per_day, error_rate_by_type, api_latency_per_day, auth_failure_rate
 ```
 
 ## How to update this file
