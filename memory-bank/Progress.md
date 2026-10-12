@@ -525,6 +525,24 @@ POST /sales before evaluate → no alert raised
 POST unknown location → 404; Colombia location with USD → 400; EUR → 422; amount 0 → 400
 ```
 
+## Latest simple Tailwind ops dashboard (`cursor/simple-dashboard-drivers-c063`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — readable ops overview with KPI / drivers / orders) + academy **Web UI Fundamentals with Tailwind** resubmission.
+
+Prior standalone submission (`Rickycastro1940/simple-dashboard-tailwind`) had four KPI cards and an orders table but no middle performance-driver block and no KPI section heading. Resubmission lives at `uis/simple-dashboard/` with:
+
+- KPI section `h2` (“Key performance indicators”)
+- Distinct middle **Performance drivers** section with three widgets (sales by channel, top products, fulfillment funnel)
+- Operational orders table retained
+- `styles.css` media queries at `640px` / `1024px` / `1280px` plus Tailwind v4 CDN utilities
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+cd uis/simple-dashboard && python3 server.py → GET / 200, GET /styles.css 200
+index.html contains kpi-heading, drivers-heading, three driver widgets, orders table
+styles.css contains @media (min-width: 640px|1024px|1280px)
+```
+
 ## How to update this file
 
 After a verified change, append evidence (command + result) and update the coverage table. Do not log plans that were not run.

@@ -11,6 +11,7 @@ Also present:
 
 - **`portal/`** — Next.js App Router portal. Guest Brasa Points (`/points`) and staff sales by location in COP and USD (`/ops/sales`). See [`portal/README.md`](./portal/README.md).
 - **`web/`** — incident-analysis HTML tool (not the public marketing site).
+- **`simple-dashboard/`** — static Tailwind v4 ops dashboard (KPI + performance drivers + orders table) for the Web UI Fundamentals homework; see [`simple-dashboard/README.md`](./simple-dashboard/README.md).
 
 Organize `uis/` by **different concerns** — each subfolder covers a distinct area of the company (for example, public web vs internal operations) and includes its own technical and functional documentation.
 
