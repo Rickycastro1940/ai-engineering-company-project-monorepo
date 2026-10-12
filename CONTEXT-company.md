@@ -1,9 +1,72 @@
-# CONTEXT-company.md — Brasaland data pipelines contract
+# CONTEXT-company.md — Brasaland inventory ORM + data pipelines
 
 **Source company briefing:** root [`CONTEXT.md`](./CONTEXT.md) (Welcome to Brasaland).
 **Pipeline design:** [`data/pipelines/PIPELINE_DESIGN.md`](./data/pipelines/PIPELINE_DESIGN.md).
 
-This file is the source of truth for the business-performance pipeline’s **KPI names**, **destination table schema**, and **reporting endpoint contract**. Engineering telemetry (`GET /telemetry/report`, `services/telemetry/analysis.py`) is out of scope here and must stay untouched.
+---
+
+## Milestone 5 — Inventory Management (ORM & Dual Database)
+
+**Department:** Restaurant Operations (Felipe Guerrero) + Technology (Nicolás Park).
+
+Dual database: **TinyDB** (`data/auth.json`) for staff users/profiles; **SQLModel** (`DATABASE_URL` or local `data/inventory.sqlite`) for kitchen ingredients. Stock changes only via entry/exit orders — never a stored quantity column or direct PATCH on `/inventory`.
+
+### Entity names (use exactly)
+
+#### `Ingredient`
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | `int` (PK) | Auto-increment |
+| `name` | `str` | e.g. `"Beef brisket"` |
+| `sku` | `str` | Unique, e.g. `"BRS-BEEF-001"` |
+| `unit` | `str` | `"kg"` \| `"litre"` \| `"unit"` |
+| `category` | `str` | meat, produce, sauce, beverage, packaging, cleaning |
+| `country` | `str` | `"CO"` or `"US"` |
+| `current_stock` | `float` | **Computed only** — SUM(entries) − SUM(exits) |
+
+#### `IngredientEntry` (supplier delivery)
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | `int` (PK) | |
+| `ingredient_id` | `int` (FK → Ingredient) | Only SQL FK |
+| `quantity` | `float` | |
+| `supplier_name` | `str` | |
+| `location_id` | `int` | 1–14, not an SQL FK |
+| `created_at` | `datetime` | |
+| `user_uuid` | `str` | TinyDB staff id from JWT |
+
+#### `IngredientExit` (consumption / waste)
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | `int` (PK) | |
+| `ingredient_id` | `int` (FK → Ingredient) | |
+| `quantity` | `float` | |
+| `reason` | `str` | `"consumption"` or `"waste"` |
+| `location_id` | `int` | 1–14 |
+| `created_at` | `datetime` | |
+| `user_uuid` | `str` | TinyDB staff id from JWT |
+
+### Six required endpoints (`services/routers/inventory.py`)
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/inventory/products` | List ingredients with `current_stock` |
+| `POST` | `/inventory/products` | Create ingredient (no stock field) |
+| `GET` | `/inventory/products/{id}` | One ingredient with stock |
+| `POST` | `/inventory/orders/inbound` | Log `IngredientEntry` (auth) |
+| `POST` | `/inventory/orders/outbound` | Log `IngredientExit` (auth) |
+| `GET` | `/inventory/orders` | List entries and exits |
+
+CSV Groq-agent routes stay under `/agent/inventory` and do not write Operations stock.
+
+---
+
+## Data pipelines contract
+
+This section is the source of truth for the business-performance pipeline’s **KPI names**, **destination table schema**, and **reporting endpoint contract**. Engineering telemetry (`GET /telemetry/report`, `services/telemetry/analysis.py`) is out of scope here and must stay untouched.
 
 **Audience:** Mariana Restrepo (CEO), Felipe Guerrero (Operations), Lucía Fernández (Procurement).
 **Cadence:** Monday 07:00 America/Bogota, previous chain week `[Monday 00:00, next Monday 00:00)`.

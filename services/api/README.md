@@ -110,33 +110,40 @@ python services/api/main.py
 
 Prefer `uvicorn api.app:app`.
 
-## Inventory endpoints
+## Inventory endpoints (ORM — Operations stock)
 
-Inventory data is stored in [`products.csv`](../../products.csv) at the repository root.
+Live kitchen stock uses SQLModel (`Ingredient`, `IngredientEntry`, `IngredientExit`) with TinyDB JWT `user_uuid` attribution. Spec: [`CONTEXT-company.md`](../../CONTEXT-company.md). Router: `services/routers/inventory.py`. `current_stock` is computed (entries − exits), never stored.
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/inventory/products` | Bearer | List ingredients with `current_stock` |
+| `POST` | `/inventory/products` | Bearer | Create ingredient (`name`, `sku`, `unit`, `category`, `country`) |
+| `GET` | `/inventory/products/{id}` | Bearer | One ingredient with stock |
+| `POST` | `/inventory/orders/inbound` | Bearer | Supplier delivery (`IngredientEntry`) |
+| `POST` | `/inventory/orders/outbound` | Bearer | Consumption/waste (`IngredientExit`) |
+| `GET` | `/inventory/orders` | Bearer | Entry/exit history |
+
+```bash
+TOKEN=$(curl -sS -X POST http://127.0.0.1:8000/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"ops@brasaland.test","password":"secret-password"}' | python3 -c 'import sys,json; print(json.load(sys.stdin)["access_token"])')
+
+curl -sS http://127.0.0.1:8000/inventory/products -H "Authorization: Bearer $TOKEN"
+curl -sS -X POST http://127.0.0.1:8000/inventory/orders/inbound \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"ingredient_id":1,"quantity":10,"supplier_name":"Carnes del Valle S.A.","location_id":1}'
+```
+
+### CSV agent endpoints (`/agent/inventory`)
+
+The Groq CLI agent (`agent.py`) still uses [`products.csv`](../../products.csv) under **`/agent/inventory`**. Those routes do not write Operations ORM stock.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/inventory` | List all products |
-| `POST` | `/inventory` | Add a product (`name`, `quantity`, `unit`) |
-| `PATCH` | `/inventory/{product_id}` | Update stock by `delta` (+ incoming, − outgoing) |
-| `GET` | `/inventory/alerts` | Products below threshold (default `10`) |
-
-### Examples
-
-```bash
-curl http://127.0.0.1:8000/inventory
-
-curl -X POST http://127.0.0.1:8000/inventory \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Olive Oil","quantity":15,"unit":"liters"}'
-
-curl -X PATCH http://127.0.0.1:8000/inventory/1 \
-  -H "Content-Type: application/json" \
-  -d '{"delta":5}'
-
-curl http://127.0.0.1:8000/inventory/alerts
-curl "http://127.0.0.1:8000/inventory/alerts?threshold=20"
-```
+| `GET` | `/agent/inventory` | List CSV products |
+| `POST` | `/agent/inventory` | Add CSV product |
+| `PATCH` | `/agent/inventory/{product_id}` | CSV quantity delta |
+| `GET` | `/agent/inventory/alerts` | CSV low-stock alerts |
 
 Interactive docs: `http://127.0.0.1:8000/docs`
 
@@ -162,7 +169,7 @@ Restaurant Operations (Felipe Guerrero): when an open location has no sale for a
 
 ## Auth endpoints (previous JSON delivery)
 
-SQLite user store: `data/company_api.db`. Set `JWT_SECRET_KEY` so tokens survive reloads.
+TinyDB user store: `data/auth.json` (users + profiles). Inventory orders store the TinyDB document id as `user_uuid`. Set `JWT_SECRET_KEY` so tokens survive reloads.
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
@@ -191,11 +198,11 @@ How to verify each rubric item:
 
 | # | Criterion | How to verify |
 |---|-----------|---------------|
-| 1 | Four FastAPI inventory endpoints | `curl` examples above + `http://127.0.0.1:8000/docs` |
-| 2 | `products.csv` survives restart | `POST` a product, restart `uvicorn`, `GET /inventory` — product still present |
+| 1 | Six ORM inventory endpoints | `GET/POST /inventory/products`, `GET /inventory/products/{id}`, `POST /inventory/orders/inbound|outbound`, `GET /inventory/orders` |
+| 2 | CSV agent data survives restart | `POST` on `/agent/inventory`, restart `uvicorn`, `GET /agent/inventory` |
 | 3 | Agent loop (Observe → Think → Act → Update → Repeat) | See `run_agent_turn()` in [`agent.py`](../../agent.py) |
 | 4 | Tools with name, description, typed params | `TOOLS` constant in [`agent.py`](../../agent.py) |
-| 5 | Agent calls correct API on tool selection | `execute_tool()` maps each tool to `/inventory` routes |
+| 5 | Agent calls correct API on tool selection | `execute_tool()` maps each tool to `/agent/inventory` routes |
 | 6 | Tool result injected before next LLM call | `messages.append({"role": "tool", ...})` in `run_agent_turn()` |
 | 7 | `conversation_log.csv` with 4 fields per event | Run agent; check `actor,message,tool_call,timestamp` columns |
 | 8 | Log append-only across sessions | Run `python agent.py` twice; rows accumulate, never overwritten |
