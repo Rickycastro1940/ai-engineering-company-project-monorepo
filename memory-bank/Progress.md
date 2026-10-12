@@ -525,6 +525,26 @@ POST /sales before evaluate → no alert raised
 POST unknown location → 404; Colombia location with USD → 400; EUR → 422; amount 0 → 400
 ```
 
+## Latest Building Bullet-Proof Applications redo (`cursor/bullet-proof-auth-tests-3d99`)
+
+Department served: **Technology** (Nicolás Park — AUTH-088 unit coverage on staff JWT so Operations/Executive consoles trust register, login, and token sessions).
+
+Prior `auth-unit-tests` submission left `TESTING.md` empty and the three endpoint modules uncollectable (unclosed dict literals / broken imports). This redo adds collectable suites and documents the plan + coverage command.
+
+| Auth endpoint | Module | Happy / edge / failure |
+| --- | --- | --- |
+| `POST /auth/register` | `tests/test_register.py` | session + hash + first admin / email case + second member / duplicate + short password |
+| `POST /auth/login` | `tests/test_login.py` | known password / mixed-case email / unknown≈wrong password + inactive staff |
+| `POST /auth/token` + JWT | `tests/test_token.py` | form token `sub`=user id / mixed-case username / wrong password, expired JWT, wrong secret, inactive |
+
+AI-assisted case (documented in `TESTING.md`): unknown email and wrong password must both refuse a session without revealing whether the mailbox exists (`test_login_denies_unknown_email_and_wrong_password_the_same_way`).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+NO_SALES_MONITOR=0 .venv/bin/python -m pytest tests/test_register.py tests/test_login.py tests/test_token.py -v → 14 passed
+NO_SALES_MONITOR=0 .venv/bin/python -m pytest tests/test_register.py tests/test_login.py tests/test_token.py tests/test_users_api.py --cov → 31 passed; auth.py 98% + users.py 92% (93% total, fail_under=70)
+```
+
 ## How to update this file
 
 After a verified change, append evidence (command + result) and update the coverage table. Do not log plans that were not run.
