@@ -33,6 +33,22 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | Internal backoffice | `uis/backoffice/` — JWT session; `/accessible` locations+inventory; `/reporting/weekly-performance` Monday weekly ops & finance report (COP/USD) |
 | Locations API | `services/api/locations.py` — 14 locations, Colombia 8 / Florida 6, COP+USD; **Bearer JWT required** |
 
+## Latest backoffice inventory UI evidence (`cursor/backoffice-inventory-ui-4c78`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — kitchen stock UI without WhatsApp).
+
+Instructor gaps addressed: stock indicators; inbound/outbound forms; live stock check + API rejection messaging; read-only order history; four required views; Brasaland terminology (ingredients, current stock, supplier delivery, kitchen usage). Dedicated client `uis/backoffice/src/lib/inventory.ts` (no raw `fetch` in pages). Vite SPA bypass so `/inventory/*` document routes are not proxied to FastAPI.
+
+```text
+cd uis/backoffice && npm run build → tsc -b && vite build green
+Playwright E2E (scripts/e2e_inventory_backoffice.mjs) → 14/14 passed
+  stock_indicators, inbound_confirmation, outbound_live_stock,
+  outbound_client_warning, outbound_api_rejection, outbound_success,
+  order_history (user_uuid, no edit/delete), four required views
+Screenshots: /opt/cursor/artifacts/e2e-products.png, e2e-inbound-success.png,
+  e2e-outbound-reject.png, e2e-orders.png
+```
+
 ## Latest inventory ORM dual-database evidence (`cursor/inventory-orm-dual-db-4c78`)
 
 Department served: **Restaurant Operations** (Felipe Guerrero — ingredient stock without WhatsApp) + **Technology** (Nicolás Park — dual DB + six `/inventory` endpoints).

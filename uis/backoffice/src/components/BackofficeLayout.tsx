@@ -5,6 +5,10 @@ import "../pages/AuthPages.css";
 
 const nav = [
   { to: "/accessible", label: "Accessible entry", end: true },
+  { to: "/inventory/products", label: "Current kitchen stock", end: true },
+  { to: "/inventory/orders/inbound", label: "Supplier delivery", end: true },
+  { to: "/inventory/orders/outbound", label: "Kitchen usage", end: true },
+  { to: "/inventory/orders", label: "Ingredient orders", end: true },
   { to: "/reporting/weekly-performance", label: "Monday weekly report", end: true },
   { to: "/account/profile", label: "Profile", end: true },
   { to: "/account/change-password", label: "Change password", end: true },

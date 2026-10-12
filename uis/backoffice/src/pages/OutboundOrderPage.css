@@ -1,0 +1,26 @@
+.outbound-stock {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--bo-border);
+  border-radius: 0.45rem;
+  background: var(--bo-panel-2, color-mix(in srgb, var(--bo-panel) 80%, #000));
+}
+
+.outbound-stock__label {
+  font-size: 0.75rem;
+  color: var(--bo-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.outbound-stock__value {
+  color: var(--bo-text);
+  font-size: 0.95rem;
+}
+
+.outbound-stock__value strong {
+  font-family: var(--font-mono);
+  font-size: 1.15rem;
+}

@@ -3,13 +3,22 @@ import { Link } from "react-router-dom";
 import { AsyncPanel } from "../components/AsyncState";
 import { NoSalesLive } from "../components/NoSalesLive";
 import {
-  fetchInventory,
   fetchLocationsOverview,
   toUserFacingMessage,
-  type InventoryProduct,
   type LocationsOverview,
 } from "../lib/api";
+import {
+  inventoryErrorMessage,
+  listInventory,
+  type InventoryProduct,
+} from "../lib/inventory";
+import {
+  currentStockOf,
+  stockLevelForQuantity,
+  stockLevelLabel,
+} from "../lib/stockLevels";
 import "./AccessiblePage.css";
+import "./ProductsPage.css";
 
 function emptyOverview(): LocationsOverview {
   return {
@@ -92,7 +101,7 @@ export function AccessiblePage() {
 
     void (async () => {
       try {
-        const inventoryData = await fetchInventory();
+        const inventoryData = await listInventory();
         if (cancelled) {
           return;
         }
@@ -102,7 +111,7 @@ export function AccessiblePage() {
         if (!cancelled) {
           setInventory(null);
           setInventoryError(
-            toUserFacingMessage(err, "Kitchen inventory could not be loaded. Try again in a moment."),
+            inventoryErrorMessage(err, "Kitchen inventory could not be loaded. Try again in a moment."),
           );
         }
       } finally {
@@ -218,6 +227,15 @@ export function AccessiblePage() {
 
         <div className="accessible__panel">
           <h3>Kitchen inventory</h3>
+          <p className="accessible__link-row">
+            <Link to="/inventory/products">Current kitchen stock</Link>
+            {" · "}
+            <Link to="/inventory/orders/inbound">Supplier delivery</Link>
+            {" · "}
+            <Link to="/inventory/orders/outbound">Kitchen usage</Link>
+            {" · "}
+            <Link to="/inventory/orders">Ingredient orders</Link>
+          </p>
           <AsyncPanel
             status={inventoryStatus}
             loadingLabel="Loading inventory…"
@@ -233,22 +251,32 @@ export function AccessiblePage() {
                   <thead>
                     <tr>
                       <th scope="col">Ingredient</th>
-                      <th scope="col">SKU</th>
                       <th scope="col">Current stock</th>
                       <th scope="col">Unit</th>
-                      <th scope="col">Market</th>
+                      <th scope="col">Stock level</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {stock.map((product, index) => (
-                      <tr key={product?.id ?? `${product?.sku ?? product?.name ?? "item"}-${index}`}>
-                        <td>{product?.name ?? "Unnamed ingredient"}</td>
-                        <td>{product?.sku ?? "—"}</td>
-                        <td>{product?.current_stock ?? "—"}</td>
-                        <td>{product?.unit ?? "—"}</td>
-                        <td>{product?.country ?? "—"}</td>
-                      </tr>
-                    ))}
+                    {stock.map((product, index) => {
+                      const onHand = currentStockOf(product);
+                      const level = stockLevelForQuantity(Number(onHand ?? 0));
+                      return (
+                        <tr
+                          key={product?.id ?? `${product?.sku ?? product?.name ?? "item"}-${index}`}
+                          className={`products__row products__row--${level}`}
+                        >
+                          <td>{product?.name ?? "Unnamed ingredient"}</td>
+                          <td className="products__on-hand">{onHand ?? "—"}</td>
+                          <td>{product?.unit ?? "—"}</td>
+                          <td>
+                            <span className={`products__level products__level--${level}`}>
+                              <span className={`products__dot products__dot--${level}`} aria-hidden="true" />
+                              {stockLevelLabel(level)}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
