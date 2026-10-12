@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { AsyncPanel } from "../components/AsyncState";
+import { KitchenStockForms } from "../components/KitchenStockForms";
+import { StaffActions } from "../components/StaffActions";
 import { NoSalesLive } from "../components/NoSalesLive";
 import {
   fetchInventory,
@@ -9,6 +11,14 @@ import {
   type InventoryProduct,
   type LocationsOverview,
 } from "../lib/api";
+import {
+  flowAbandon,
+  flowAdvance,
+  flowComplete,
+  flowStart,
+  trackSection,
+  trackUiLatency,
+} from "../telemetry/events";
 import "./AccessiblePage.css";
 
 function emptyOverview(): LocationsOverview {
@@ -33,6 +43,36 @@ export function AccessiblePage() {
   const [inventoryError, setInventoryError] = useState<string | null>(null);
   const [locationNonce, setLocationNonce] = useState(0);
   const [inventoryNonce, setInventoryNonce] = useState(0);
+  const locationsReady = useRef(false);
+  const inventoryReady = useRef(false);
+  const reviewFinished = useRef(false);
+
+  useEffect(() => {
+    trackSection("accessible_entry");
+    trackSection("executive_sales");
+    flowStart("operations_review", "opened");
+    return () => {
+      if (!reviewFinished.current) {
+        flowAbandon("operations_review", "left");
+      }
+    };
+  }, []);
+
+  const notePanel = useCallback((panel: "locations" | "inventory") => {
+    if (panel === "locations") {
+      locationsReady.current = true;
+      flowAdvance("operations_review", "locations_loaded");
+      trackSection("location_roster");
+    } else {
+      inventoryReady.current = true;
+      flowAdvance("operations_review", "inventory_loaded");
+      trackSection("kitchen_inventory");
+    }
+    if (locationsReady.current && inventoryReady.current && !reviewFinished.current) {
+      reviewFinished.current = true;
+      flowComplete("operations_review", "both_ready");
+    }
+  }, []);
 
   const retryLocations = useCallback(() => {
     setLocationNonce((value) => value + 1);
@@ -45,6 +85,8 @@ export function AccessiblePage() {
   useEffect(() => {
     let cancelled = false;
     let outcome: "success" | "error" = "error";
+    const started = performance.now();
+    let settled = false;
     setLocationStatus("loading");
     setLocationError(null);
 
@@ -65,14 +107,18 @@ export function AccessiblePage() {
           locations: locationData?.locations ?? [],
         });
         outcome = "success";
+        notePanel("locations");
+        trackUiLatency("panel", "locations_overview", "success", performance.now() - started);
       } catch (err: unknown) {
         if (!cancelled) {
           setOverview(null);
           setLocationError(
             toUserFacingMessage(err, "Location data could not be loaded. Try again in a moment."),
           );
+          trackUiLatency("panel", "locations_overview", "error", performance.now() - started);
         }
       } finally {
+        settled = true;
         if (!cancelled) {
           setLocationStatus(outcome);
         }
@@ -81,12 +127,17 @@ export function AccessiblePage() {
 
     return () => {
       cancelled = true;
+      if (!settled) {
+        trackUiLatency("panel", "locations_overview", "cancelled", performance.now() - started);
+      }
     };
-  }, [locationNonce]);
+  }, [locationNonce, notePanel]);
 
   useEffect(() => {
     let cancelled = false;
     let outcome: "success" | "error" = "error";
+    const started = performance.now();
+    let settled = false;
     setInventoryStatus("loading");
     setInventoryError(null);
 
@@ -98,14 +149,18 @@ export function AccessiblePage() {
         }
         setInventory(Array.isArray(inventoryData) ? inventoryData : []);
         outcome = "success";
+        notePanel("inventory");
+        trackUiLatency("panel", "inventory", "success", performance.now() - started);
       } catch (err: unknown) {
         if (!cancelled) {
           setInventory(null);
           setInventoryError(
             toUserFacingMessage(err, "Kitchen inventory could not be loaded. Try again in a moment."),
           );
+          trackUiLatency("panel", "inventory", "error", performance.now() - started);
         }
       } finally {
+        settled = true;
         if (!cancelled) {
           setInventoryStatus(outcome);
         }
@@ -114,8 +169,11 @@ export function AccessiblePage() {
 
     return () => {
       cancelled = true;
+      if (!settled) {
+        trackUiLatency("panel", "inventory", "cancelled", performance.now() - started);
+      }
     };
-  }, [inventoryNonce]);
+  }, [inventoryNonce, notePanel]);
 
   const footprint = overview ?? emptyOverview();
   const roster = footprint.locations ?? [];
@@ -249,6 +307,16 @@ export function AccessiblePage() {
               </div>
             )}
           </AsyncPanel>
+          <KitchenStockForms
+            products={stock}
+            disabled={inventoryStatus !== "success"}
+            onChanged={retryInventory}
+          />
+          <StaffActions
+            locations={overview?.locations ?? []}
+            products={stock}
+            disabled={locationStatus !== "success" || inventoryStatus !== "success"}
+          />
         </div>
 
         <div className="accessible__panel accessible__panel--placeholder">

@@ -6,14 +6,51 @@ const apiTarget = process.env.VITE_API_PROXY ?? "http://127.0.0.1:8000";
 // Internal app — separate from uis/website. Proxy API to FastAPI.
 export default defineConfig({
   plugins: [react()],
+  envPrefix: ["VITE_", "NEXT_PUBLIC_"],
   server: {
     port: 5174,
     proxy: {
+      "/telemetry": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
       "/locations": {
         target: apiTarget,
         changeOrigin: true,
       },
       "/inventory": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+      "/menus": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+      "/sales": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+      "/customers": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+      "/suppliers": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+      "/orders": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+      "/people": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+      "/training": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+      "/recommendations": {
         target: apiTarget,
         changeOrigin: true,
       },
