@@ -525,6 +525,32 @@ POST /sales before evaluate → no alert raised
 POST unknown location → 404; Colombia location with USD → 400; EUR → 422; amount 0 → 400
 ```
 
+## Latest StreamLoop churn model tuning (`cursor/streamloop-churn-tuning-fdaa`)
+
+Department served: **Marketing** (Camila — customer retention / CRM signal) via a public telco-proxy churn dataset (assignment stand-in for StreamLoop account, service, and billing attributes). Does **not** change Brasaland `CONTEXT.md` or claim a live Brasa Points churn model.
+
+Added `data/notebooks/churn-model-tuning/`:
+
+- Load IBM Telco Customer Churn CSV from URL (no manual download)
+- Minimal cleaning only (blanks→NaN, target encode, drop id); imputer + StandardScaler + one-hot **inside** one Pipeline (nothing fit before split)
+- Stratified train/test split **before** any model work
+- Baseline = `RandomForestClassifier` defaults (+ `random_state`); test scored once → `baseline_metrics.json`
+- Search scoring = `recall` (catch churners); `RandomizedSearchCV` (`n_jobs=1`) → narrowed `GridSearchCV` (`n_jobs=1`, `refit=True`) on **train only**
+- Inspect `cv_results_` mean vs fold std; final model justified in `tuning_report.md`
+- Test set touched exactly twice (baseline + tuned final)
+- Notebook `streamloop_churn_tuning.ipynb` + headless `run_churn_tuning.py`
+- Local venv deps in folder `requirements.txt` (root `requirements.txt` / `pyproject.toml` untouched)
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+cd data/notebooks/churn-model-tuning && .venv/bin/python run_churn_tuning.py
+shape=(7043, 21); train=5634 test=1409; search_fit_on=X_train_only
+baseline recall≈0.476 → tuned_final recall≈0.799 (Δ +0.324)
+top CV: mean 0.8040 ± 0.0244 (chosen: highest mean; also lowest std among ties)
+wrote tuning_report.md + cv_top_candidates.json
+.venv/bin/jupyter nbconvert --execute streamloop_churn_tuning.ipynb → green
+```
+
 ## How to update this file
 
 After a verified change, append evidence (command + result) and update the coverage table. Do not log plans that were not run.
