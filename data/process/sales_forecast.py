@@ -26,9 +26,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import re
+
 import numpy as np
 import pandas as pd
 from scipy import stats
+from sklearn.preprocessing import StandardScaler
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SALES_PATH = REPO_ROOT / "data" / "raw" / "brasaland_sales.csv"
@@ -69,27 +72,55 @@ FEATURE_COLUMNS = (
 TARGET_COLUMN = "revenue_usd"
 
 
+def sales_columns_in_context(path: Path | str | None = None) -> tuple[str, ...]:
+    """Column names from the monthly-sales table in ``CONTEXT-company.md``."""
+
+    context_path = Path(path) if path is not None else REPO_ROOT / "CONTEXT-company.md"
+    text = context_path.read_text(encoding="utf-8")
+    marker = "## Monthly consolidated sales"
+    start = text.find(marker)
+    if start < 0:
+        raise ValueError("CONTEXT-company.md has no monthly consolidated sales section")
+    section = text[start:].split("\n## ", 1)[0]
+    columns = tuple(re.findall(r"^\| `([a-z0-9_]+)` \|", section, flags=re.MULTILINE))
+    if columns != EXPECTED_COLUMNS:
+        raise ValueError(
+            "CONTEXT-company.md sales columns "
+            f"{columns} do not match the loader contract {EXPECTED_COLUMNS}"
+        )
+    return columns
+
+
 def load_sales(path: Path | str | None = None) -> pd.DataFrame:
     """Load the consolidated monthly series and reject a broken file.
 
-    Null rows are dropped. The official file has none; the drop is the
-    handling step so a blank cell cannot enter training.
+    Columns must match the monthly-sales table in ``CONTEXT-company.md``.
+    Null and blank cells are dropped before any split or scaling.
     """
 
     csv_path = Path(path) if path is not None else DEFAULT_SALES_PATH
+    documented = sales_columns_in_context()
     frame = pd.read_csv(csv_path)
-    missing = [name for name in EXPECTED_COLUMNS if name not in frame.columns]
-    if missing:
-        raise ValueError(f"brasaland_sales.csv is missing columns: {missing}")
+    header = tuple(frame.columns)
+    if header != documented:
+        raise ValueError(
+            f"brasaland_sales.csv columns {header} do not match "
+            f"CONTEXT-company.md {documented}"
+        )
 
     frame = frame.loc[:, list(EXPECTED_COLUMNS)].copy()
-    frame["month"] = pd.to_datetime(frame["month"], format="%Y-%m-%d")
+    for name in ("month", "market"):
+        frame[name] = frame[name].replace(r"^\s*$", np.nan, regex=True)
+    frame["revenue_usd"] = pd.to_numeric(frame["revenue_usd"], errors="coerce")
+    frame["covers_served"] = pd.to_numeric(frame["covers_served"], errors="coerce")
+    frame["avg_ticket_usd"] = pd.to_numeric(frame["avg_ticket_usd"], errors="coerce")
     before = len(frame)
     frame = frame.dropna(subset=list(EXPECTED_COLUMNS))
     dropped = before - len(frame)
     if dropped:
         frame.attrs["null_rows_dropped"] = dropped
 
+    frame["month"] = pd.to_datetime(frame["month"], format="%Y-%m-%d")
     frame = frame.sort_values("month").drop_duplicates("month", keep="last")
     frame = frame.reset_index(drop=True)
 
@@ -137,6 +168,19 @@ def build_features(frame: pd.DataFrame) -> pd.DataFrame:
     out["month_cos"] = np.cos(2 * np.pi * month_number / 12.0)
     out["quarter"] = out["month"].dt.quarter.astype(float)
     return out
+
+
+def scale_features(
+    train: pd.DataFrame,
+    test: pd.DataFrame,
+    columns: tuple[str, ...] = FEATURE_COLUMNS,
+) -> tuple[np.ndarray, np.ndarray, StandardScaler]:
+    """Scale model inputs. The scaler is fit on the training years only."""
+
+    scaler = StandardScaler()
+    x_train = scaler.fit_transform(train.loc[:, list(columns)])
+    x_test = scaler.transform(test.loc[:, list(columns)])
+    return x_train, x_test, scaler
 
 
 def drop_warmup(frame: pd.DataFrame) -> pd.DataFrame:

@@ -36,7 +36,6 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
-from sklearn.preprocessing import StandardScaler
 from statsmodels.tsa.seasonal import seasonal_decompose
 
 from data.process.sales_forecast import (
@@ -54,6 +53,7 @@ from data.process.sales_forecast import (
     mean_absolute_percentage_error,
     normalized_gini,
     population_stability_index,
+    scale_features,
     seasonality_check,
     split_by_year,
 )
@@ -99,9 +99,7 @@ def fit_forest(train: pd.DataFrame, test: pd.DataFrame) -> dict:
     last year, and December's spike is already in last December's revenue.
     """
 
-    scaler = StandardScaler()
-    x_train = scaler.fit_transform(train.loc[:, list(FEATURE_COLUMNS)])
-    x_test = scaler.transform(test.loc[:, list(FEATURE_COLUMNS)])
+    x_train, x_test, scaler = scale_features(train, test)
     y_train_usd = train[TARGET_COLUMN].to_numpy(dtype=float)
     y_test = test[TARGET_COLUMN].to_numpy(dtype=float)
     lag_12_train = train["revenue_lag_12"].to_numpy(dtype=float)

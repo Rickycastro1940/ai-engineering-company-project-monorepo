@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from data.process.sales_forecast import (
     FEATURE_COLUMNS,
@@ -11,6 +12,7 @@ from data.process.sales_forecast import (
     assert_official_calendar,
     build_features,
     load_sales,
+    sales_columns_in_context,
 )
 
 
@@ -19,6 +21,41 @@ def test_official_series_is_unchanged_calendar():
     assert_official_calendar(frame)
     assert (frame["revenue_usd"] > 0).all()
     assert set(frame["market"]) == {"consolidated"}
+    assert list(frame.columns) == [
+        "month",
+        "revenue_usd",
+        "covers_served",
+        "avg_ticket_usd",
+        "market",
+    ]
+
+
+def test_csv_header_matches_context_company_and_blanks_drop(tmp_path):
+    documented = sales_columns_in_context()
+    assert documented == (
+        "month",
+        "revenue_usd",
+        "covers_served",
+        "avg_ticket_usd",
+        "market",
+    )
+    header = ",".join(documented)
+    target = tmp_path / "brasaland_sales.csv"
+    target.write_text(
+        "\n".join(
+            [
+                header,
+                "2016-01-01,420817.2,37946,11.09,consolidated",
+                "2016-02-01,,10,1,consolidated",
+                " ,100,10,1, ",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    loaded = load_sales(target)
+    assert len(loaded) == 1
+    assert loaded.iloc[0]["revenue_usd"] == pytest.approx(420817.2)
 
 
 def test_lag_feature_is_causal():

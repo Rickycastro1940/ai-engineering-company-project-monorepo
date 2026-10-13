@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import numpy as np
+import pandas as pd
+
 from data.process.sales_forecast import (
+    FEATURE_COLUMNS,
     SERIES_START,
     TRAIN_CUTOFF_YEAR,
     build_features,
     drop_warmup,
     load_sales,
+    scale_features,
     split_by_year,
 )
 
@@ -37,3 +42,22 @@ def test_feature_warmup_does_not_pull_test_years_into_training():
     # 2016 cannot form a 12-month lag; it stays out of both sides.
     assert 2016 not in set(train["month"].dt.year)
     assert len(set(train["month"].dt.year)) >= 6
+
+
+def test_scaler_is_fit_on_training_years_only():
+    raw = load_sales()
+    ready = drop_warmup(build_features(raw))
+    train, test = split_by_year(ready, origin_year=SERIES_START.year)
+    x_train, x_test, scaler = scale_features(train, test)
+    columns = list(FEATURE_COLUMNS)
+    train_mean = train.loc[:, columns].mean().to_numpy()
+    both_mean = pd.concat(
+        [train.loc[:, columns], test.loc[:, columns]],
+        ignore_index=True,
+    ).mean().to_numpy()
+
+    assert x_train.shape == (len(train), len(FEATURE_COLUMNS))
+    assert x_test.shape == (len(test), len(FEATURE_COLUMNS))
+    assert abs(float(x_train.mean())) < 1e-6
+    assert np.allclose(scaler.mean_, train_mean)
+    assert not np.allclose(scaler.mean_, both_mean)
