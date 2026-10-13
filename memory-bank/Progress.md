@@ -564,6 +564,7 @@ uv run python -m pytest tests/pipelines/test_temporal_cv.py -q → 4 passed
   action: max_depth 4 → 3 and min_samples_leaf 2 → 4
   TimeSeriesSplit n_splits=5; folds stay chronological; validation actuals do not enter lags
   validation RMSE reported as 37,524 ± 9,590 USD
+.github/workflows/sales-forecast-eval.yml runs that same pytest on pull requests to main
 uv run python scripts/evaluate_sales_model.py
 → diagnosis=overfitting
   validation RMSE 37,524 ± 9,590 USD
