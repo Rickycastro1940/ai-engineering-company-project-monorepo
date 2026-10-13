@@ -15,4 +15,8 @@ python data/eval/eval_knowledge_qa.py
 
 Weekly KPI fixtures in this folder are a separate pipeline check (`validate_weekly_kpis.py`).
 
+## Sales forecast (`sales_forecast/`)
+
+Holdout metrics and charts for the monthly consolidated revenue model. Produced by `scripts/train_sales_forecast.py` (scikit-learn Random Forest, first 8 years train, 2024–2025 test). Model choice, MSE / PSI / Gini / K2 Score, and the variability chart are explained in `sales_forecast/README.md`. Latest numbers are in `sales_forecast/metrics.md`.
+
 > _Spanish version: [README.es.md](./README.es.md)._

@@ -16,6 +16,10 @@ dependencies = [
     "pandas>=2.3.3",
     "python-dotenv>=1.2.1",
     "supabase>=2.31.0",
+    "scikit-learn>=1.6.1",
+    "matplotlib>=3.9.4",
+    "statsmodels>=0.14.6",
+    "scipy>=1.13.1",
 ]
 
 [dependency-groups]
