@@ -4,3 +4,7 @@ Esta carpeta está pensada para almacenar **datos en bruto** (raw) relacionados 
 
 - **Propósito principal**: servir como zona de aterrizaje o referencia de datos originales antes de ser procesados por pipelines.
 - **Recomendación**: documenta el origen de cada dataset, formato, tamaño esperado, consideraciones de privacidad/PII y cómo se versiona (idealmente evitando subir datos sensibles al repositorio).
+
+## `brasaland_sales.csv`
+
+Ventas mensuales consolidadas (120 filas, `2016-01` a `2025-12`) para el pronóstico. Columnas: `month`, `revenue_usd`, `covers_served`, `avg_ticket_usd`, `market`. Es el archivo oficial del curso; no se regenera aquí. El entrenamiento está en `scripts/train_sales_forecast.py`.

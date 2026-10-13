@@ -128,3 +128,25 @@ Do **not** modify `telemetry_events`, `services/telemetry/analysis.py`, or `GET 
 | `data/process/` | Reusable transforms (`location_kpis.py`) |
 | `data/eval/` | Fixtures + validation outputs |
 | `services/reporting/` | Status / trigger / KPI HTTP shell |
+
+---
+
+## Monthly consolidated sales (`data/raw/brasaland_sales.csv`)
+
+Separate from the weekly KPI table above. This is the historical series for the sales forecast (Mariana, Felipe, Lucía). The file in the monorepo is the official series from `content/contexts/sales-forecasting/brasaland/brasaland_sales.csv`. Do not regenerate it.
+
+Grain: **one row per month**, all 14 locations already consolidated. Range: `2016-01-01` through `2025-12-01` (120 months). Target: `revenue_usd`.
+
+| Column | Type | Description |
+| --- | --- | --- |
+| `month` | date (`YYYY-MM-01`) | First day of the reported month |
+| `revenue_usd` | float | Total sales for the month, consolidated in USD (illustrative rate 1 USD = 4,000 COP) |
+| `covers_served` | int | Guests served that month across all 14 locations |
+| `avg_ticket_usd` | float | Average ticket for the month in USD |
+| `market` | string | `colombia`, `florida`, or `consolidated`. This file only has `consolidated` rows. That is the series the model trains on |
+
+Seasonality already in the file: January is about 12–18% under the previous year’s average; December is about 20–30% above that year’s average; other months stay near the trend (±5%). Annual growth is about 5%, alternating near 3% and 7%.
+
+Training uses the first 8 years (`2016`–`2023`). The check set is the 2 most recent years (`2024`–`2025`). The model must not see those test years during training. Blank or null cells are dropped before that split. Dollar and cover features are scaled with a scaler fit on the training rows only.
+
+**Which forecast error costs more.** Underestimating sales is the costlier miss. Felipe buys meat and produce from the expected volume. December is already about 20–30% above that year’s average; a forecast that is low in that month leaves the 14 kitchens short and the location stocks out, so the cover is lost. Overestimating raises waste cost, which the weekly KPI already tracks and which the next order can trim. A large miss on a peak month costs more than the same dollar error spread across quiet months, so RMSE is the primary error and MAE is the companion.
