@@ -550,6 +550,24 @@ uv run python scripts/train_sales_forecast.py
 
 Dollar-level PSI is high because growth puts most test months in the top training decile. The seasonal shape (January dip, December peak) is unchanged, so this is not a call to throw the model out. Smart ordering and a live executive dashboard are still open.
 
+## Latest regression evaluation (`feature/regression-model-eval`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — a low December forecast stocks the kitchens out) + **Executive** (Mariana Restrepo — whether the monthly forest is fit to trust before a dashboard) + **Procurement** (Lucía Fernández — waste from ordering too much is the smaller miss).
+
+Evaluated the existing scikit-learn random forest on 2016–2023 only. `TimeSeriesSplit` with 5 folds of 12 months. Validation features never read that window's actual revenue. Primary metric is RMSE because underestimating a peak month is the costlier error in `CONTEXT-company.md`.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+uv run python -m pytest tests/pipelines/test_temporal_cv.py -q → 1 passed
+uv run python scripts/evaluate_sales_model.py
+→ diagnosis=overfitting
+  validation RMSE 37,524 ± 9,590 USD
+  validation MAE 31,656 ± 9,472 USD
+  longest prefix train RMSE 15,710 vs next-12-month RMSE 54,797 (ratio 3.49)
+```
+
+Corrective action in `data/eval/evaluation_report.md`: lower `max_depth` from 4 to 3 and raise `min_samples_leaf` from 2 to 4. Do not add depth and do not add the 2024–2025 holdout to training.
+
 ## How to update this file
 
 After a verified change, append evidence (command + result) and update the coverage table. Do not log plans that were not run.
