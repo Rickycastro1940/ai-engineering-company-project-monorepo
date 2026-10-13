@@ -1,0 +1,17 @@
+# Brasaland nightly telemetry export.
+# Trigger: OS crontab. Do not schedule this inside the FastAPI process.
+#
+# Cron expression: 0 2 * * *
+# Timezone: America/Bogota (CRON_TZ). Bogotá does not observe daylight saving.
+# 02:00 Bogotá is 03:00 US Eastern during EDT, so both Colombia and Florida
+# have finished the previous calendar day before the export of "yesterday".
+#
+# The script writes public.job_runs via services/job_runner.py and a CSV under
+# data/raw/. SUPABASE_URL and SUPABASE_KEY (service role) must be in the
+# environment cron sees (for example the repo .env, which is not committed).
+#
+# Install (does not replace unrelated crontab lines):
+#   bash infra/cron/install-nightly-export-cron.sh
+#
+CRON_TZ=America/Bogota
+0 2 * * * cd /ABS/PATH/TO/MONOREPO && /ABS/PATH/TO/PYTHON scripts/nightly_export.py >> /ABS/PATH/TO/MONOREPO/data/raw/nightly_export.log 2>&1

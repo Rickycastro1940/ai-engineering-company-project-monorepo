@@ -1,15 +1,40 @@
+"""Nightly landing copy of Brasaland telemetry.
+
+Reads ``public.telemetry_events`` (time column ``timestamp``, same as
+``GET /telemetry/report``) for one America/Bogota calendar day and writes
+``data/raw/telemetry_YYYY-MM-DD.csv``. Status is recorded in ``public.job_runs``
+by ``services.job_runner``. The OS crontab starts this script. The FastAPI
+process does not.
+
+Operational event types match ``data/pipelines/PIPELINE_DESIGN.md``:
+``inbound_order_created``, ``stock_waste_registered``, ``stock_threshold_triggered``.
+"""
+
 from __future__ import annotations
 
 import os
 import sys
 import subprocess
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 load_dotenv()
+
+# public.telemetry_events uses "timestamp". The legacy table also has created_at;
+# the nightly reader follows the current table, not the legacy name.
+TELEMETRY_TIME_COLUMN = "timestamp"
+TELEMETRY_TABLE = "telemetry_events"
+OPERATIONAL_EVENT_TYPES = (
+    "inbound_order_created",
+    "stock_waste_registered",
+    "stock_threshold_triggered",
+)
+BOGOTA = ZoneInfo("America/Bogota")
+JOB_NAME = "nightly_export"
 
 
 def _fail(message: str, code: int = 1) -> None:
@@ -24,11 +49,32 @@ def _parse_target_date(raw: str) -> str:
         _fail(f"Target date must be YYYY-MM-DD, got: {raw}")
 
 
+def default_target_date(now: datetime | None = None) -> str:
+    """Yesterday's calendar date in America/Bogota."""
+    current = now if now is not None else datetime.now(BOGOTA)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=BOGOTA)
+    else:
+        current = current.astimezone(BOGOTA)
+    return (current - timedelta(days=1)).strftime("%Y-%m-%d")
+
+
+def export_bounds(target_date: str) -> tuple[str, str]:
+    """Inclusive start, exclusive end for one Bogota calendar day, as UTC instants."""
+    start = datetime.strptime(target_date, "%Y-%m-%d").replace(tzinfo=BOGOTA)
+    end = start + timedelta(days=1)
+
+    def _z(value: datetime) -> str:
+        return value.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    return _z(start), _z(end)
+
+
 def main() -> None:
     if len(sys.argv) > 1:
         target_date = _parse_target_date(sys.argv[1])
     else:
-        target_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        target_date = default_target_date()
 
     from supabase import create_client
 
@@ -37,7 +83,7 @@ def main() -> None:
 
     print(f"Target date: {target_date}")
 
-    job_name = "nightly_export"
+    job_name = JOB_NAME
     run_id = None
 
     try:
@@ -55,6 +101,9 @@ def main() -> None:
 
         run_id = run
         job_runner.mark_processing(run_id)
+    except job_runner.JobAlreadyRunning:
+        print("A job is currently processing. Exiting.")
+        sys.exit(0)
     except ExternalServiceError:
         _fail("Job store is unavailable.")
     except ImportError:
@@ -81,22 +130,17 @@ def main() -> None:
                 raise ExternalServiceError("reporting store")
             supabase = call_external("reporting store", lambda: create_client(url, key))
 
-            start_dt = f"{target_date}T00:00:00Z"
-            end_date_str = (
-                datetime.strptime(target_date, "%Y-%m-%d") + timedelta(days=1)
-            ).strftime("%Y-%m-%d")
-            end_dt = f"{end_date_str}T00:00:00Z"
+            start_dt, end_dt = export_bounds(target_date)
+            print(f"Window [{start_dt}, {end_dt}) column={TELEMETRY_TIME_COLUMN}")
 
             response = call_external(
                 "reporting store",
-                lambda: supabase.table("telemetry_events").select("*").in_(
-                    "event_type",
-                    [
-                        "inbound_order_created",
-                        "stock_waste_registered",
-                        "stock_threshold_triggered",
-                    ],
-                ).gte("created_at", start_dt).lt("created_at", end_dt).execute(),
+                lambda: supabase.table(TELEMETRY_TABLE)
+                .select("*")
+                .in_("event_type", list(OPERATIONAL_EVENT_TYPES))
+                .gte(TELEMETRY_TIME_COLUMN, start_dt)
+                .lt(TELEMETRY_TIME_COLUMN, end_dt)
+                .execute(),
             )
 
             rows = getattr(response, "data", None)
