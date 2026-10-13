@@ -15,12 +15,12 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Present (seeded)** — `locations`/`menus`/`sales`/`customers`/`suppliers`/`inventory=present` plus `knowledge=present` (`POST /knowledge/query`) and `realtime=present` (`GET /realtime/ops-alerts/stream`) on `uvicorn api.app:app` (`:8000`). Not a live POS or invoice feed |
 | Technology: telemetry + pipeline to dashboards | **Partial** — live no-sales SSE on `GET /realtime/ops-alerts/stream` plus Part 2 weekly location cost/waste ETL, Prefect stage subflows, KPI unit tests, CLI, and backoffice Monday weekly report; engineering `GET /telemetry/report` untouched |
-| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — seeded `GET /sales` tickets and `/sales/overview` (COP and USD, 14 locations) plus `/sales/alerts`; `POST /sales` stores a ticket and calls `record_sale` so the live no-sales alert on backoffice `/accessible` sees that location; Next.js `uis/portal` `/ops/sales` shows per-location sales in COP and USD. Smart ordering still open |
+| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — seeded `GET /sales` tickets and `/sales/overview` (COP and USD, 14 locations) plus `/sales/alerts`; `POST /sales` stores a ticket and calls `record_sale` so the live no-sales alert on backoffice `/accessible` sees that location; Next.js `uis/portal` `/ops/sales` shows per-location sales in COP and USD. Monthly chain forecast for purchasing sits in `data/eval/sales_forecast/` (2024–2025 holdout). Smart ordering still open |
 | Procurement: supplier price history, consolidated spend | **Partial** — seeded `GET /suppliers` (20 suppliers, Colombia and Florida, price history and alerts); Monday weekly purchase cost / price-alert frequency still separate; invoices are not live |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `GET /customers` CRM seed with `brasa_points_balance` on physical stamp cards; Next.js `uis/portal` `/points` looks up a guest and shows Brasa Points balance, history, and tier rewards (fixtures, or `GET /customers` when `BRASALAND_DATA_SOURCE=live`); `uis/website/` corporate home (`/`) live. `CONTEXT.md` still describes stamp cards as today’s in-restaurant programme |
 | People: HR portal / KPIs by country | **Not done** |
 | Training: recipe catalogue, push to 14 locations | **Partial** — `POST /knowledge/query` searches the four English standards (allergens, waste, ordering, Brasa Points) and returns cited chunks. Not a full recipe catalogue and not a push to all 14 kitchens |
-| Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial** — seeded `GET /sales/overview` and portal `/ops/sales` chain totals in COP and USD; Monday weekly ops & finance report in the backoffice; n8n export `workflows/brasaland-monday-leadership-report.n8n.json` schedules Monday 07:00 America/Bogota, logs into the central API, pulls `GET /reporting/weekly-location-performance`, and delivers COP/USD leadership copy (email, Slack, CSV) with a failure branch. Standards questions can go to `POST /knowledge/query`. A sales NL assistant and a chain sales dashboard remain open |
+| Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial** — seeded `GET /sales/overview` and portal `/ops/sales` chain totals in COP and USD; Monday weekly ops & finance report in the backoffice; n8n export `workflows/brasaland-monday-leadership-report.n8n.json` schedules Monday 07:00 America/Bogota, logs into the central API, pulls `GET /reporting/weekly-location-performance`, and delivers COP/USD leadership copy (email, Slack, CSV) with a failure branch. Standards questions can go to `POST /knowledge/query`. A random-forest holdout on consolidated monthly revenue (USD, illustrative COP) is in `data/eval/sales_forecast/`. A sales NL assistant and a chain sales dashboard remain open |
 
 ## What already runs (engineering)
 
@@ -524,6 +524,25 @@ POST /sales co-med-centro 48000 COP during an open alert → 201, active alerts 
 POST /sales before evaluate → no alert raised
 POST unknown location → 404; Colombia location with USD → 400; EUR → 422; amount 0 → 400
 ```
+
+## Latest sales forecast (`feature/sales-forecast-model`)
+
+Department served: **Executive** (Mariana Restrepo — whether chain sales for the coming months are predictable before a dashboard) + **Restaurant Operations** (Felipe Guerrero — purchasing ahead of covers) + **Procurement** (Lucía Fernández — volume ahead of meat buys).
+
+Official series `data/raw/brasaland_sales.csv` (120 consolidated months, 2016-01 through 2025-12; not regenerated). Causal lags, a shifted rolling mean/std, and month sin/cos. Random forest predicts the year-over-year factor; dollars are that factor times the same month last year. Train cutoff stays 2024 after the 12-month warmup. Seed 42. Illustrative COP uses 1 USD = 4,000 COP.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+uv run python -m pytest tests/pipelines/test_sales_forecast_split.py tests/pipelines/test_sales_forecast_features.py -q → 7 passed
+uv run python scripts/train_sales_forecast.py
+→ test 2024-01..2025-12 (24 months); train 2017-01..2023-12 (84 months)
+  MSE=1,274,710,813 USD²  RMSE=35,703 USD  MAPE=3.8%
+  PSI (year-over-year factor)=0.356  PSI (dollar level)=8.612
+  Gini=0.730  K²=0.114 (p=0.945)
+  December seasonal component +128,096 USD; January -90,682 USD
+```
+
+Dollar-level PSI is high because growth puts most test months in the top training decile. The seasonal shape (January dip, December peak) is unchanged, so this is not a call to throw the model out. Smart ordering and a live executive dashboard are still open.
 
 ## How to update this file
 
