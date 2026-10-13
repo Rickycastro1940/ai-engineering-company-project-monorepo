@@ -50,6 +50,13 @@ def test_temporal_cv_preserves_chronological_order():
         assert train_months.is_monotonic_increasing
         assert val_months.is_monotonic_increasing
 
+    for earlier, later in zip(folds, folds[1:]):
+        earlier_idx = {int(i) for i in earlier[0]} | {int(i) for i in earlier[1]}
+        later_val = {int(i) for i in later[1]}
+        # No index from a later fold appears before one from an earlier fold.
+        assert min(later_val) > max(earlier_idx)
+        assert later_val.isdisjoint(earlier_idx)
+
     years = set(history["month"].dt.year)
     assert years == set(range(2016, 2024))
     assert 2024 not in years

@@ -559,6 +559,9 @@ Evaluated the existing scikit-learn random forest on 2016–2023 only. `TimeSeri
 ```text
 head -n 5 CONTEXT.md → # Welcome to Brasaland
 uv run python -m pytest tests/pipelines/test_temporal_cv.py -q → 4 passed
+  a later fold's validation indexes are all after the earlier fold
+  diagnosis in data/eval/evaluation_report.md: overfitting
+  action: max_depth 4 → 3 and min_samples_leaf 2 → 4
   TimeSeriesSplit n_splits=5; folds stay chronological; validation actuals do not enter lags
   validation RMSE reported as 37,524 ± 9,590 USD
 uv run python scripts/evaluate_sales_model.py
