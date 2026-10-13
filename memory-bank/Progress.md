@@ -534,6 +534,8 @@ Official series `data/raw/brasaland_sales.csv` (120 consolidated months, 2016-01
 ```text
 head -n 5 CONTEXT.md → # Welcome to Brasaland
 uv run python -m pytest tests/pipelines/test_sales_forecast_split.py tests/pipelines/test_sales_forecast_features.py -q → 9 passed
+uv run python -m pytest test/pipelines/test_split.py -q → 2 passed
+  train years {2016..2023} disjoint from test years {2024, 2025}; no shared months
 CSV header matches CONTEXT-company.md monthly sales columns (month, revenue_usd, covers_served, avg_ticket_usd, market)
 Blank cells dropped before the split; StandardScaler fit on training years only
 Model is scikit-learn RandomForestRegressor. Choice (explainability, 120-month sample, tuning time) and why a low MSE is not enough: data/eval/sales_forecast/README.md
