@@ -536,6 +536,8 @@ head -n 5 CONTEXT.md → # Welcome to Brasaland
 uv run python -m pytest tests/pipelines/test_sales_forecast_split.py tests/pipelines/test_sales_forecast_features.py -q → 9 passed
 CSV header matches CONTEXT-company.md monthly sales columns (month, revenue_usd, covers_served, avg_ticket_usd, market)
 Blank cells dropped before the split; StandardScaler fit on training years only
+Model is scikit-learn RandomForestRegressor. Choice (explainability, 120-month sample, tuning time) and why a low MSE is not enough: data/eval/sales_forecast/README.md
+Chart with tree variability vs 2024–2025 actuals: data/eval/sales_forecast/forecast_vs_actual.png
 uv run python scripts/train_sales_forecast.py
 → test 2024-01..2025-12 (24 months); train 2017-01..2023-12 (84 months)
   MSE=1,274,710,813 USD²  RMSE=35,703 USD  MAPE=3.8%

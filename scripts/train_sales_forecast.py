@@ -1,15 +1,19 @@
 """Train the Brasaland monthly revenue forecast.
 
-Why Random Forest, not XGBoost
-------------------------------
-The series is 120 months. Finance (Mariana) asked for an error she can
-explain without a black box, and for a range rather than one optimistic
-number. A random forest averages many shallow trees; the spread of those
-trees is the variability band on the chart. XGBoost can be more accurate
-after tuning, but that tuning is hard to justify on fewer than 100 training
-months and the sequential boosting is harder to explain to Operations.
-Seed is fixed (``random_state=42``) so the same file always yields the
-same forest.
+Model choice (scikit-learn ``RandomForestRegressor``)
+------------------------------------------------------
+Criteria, in order:
+
+1. Explainability. Mariana asked for a range she can walk through on a
+   Monday, not a single optimistic number. A forest averages trees. The
+   chart band is the standard deviation across those trees.
+2. Data size. The series is 120 months and about 84 of them are fit.
+   That is a small sample for sequential boosting.
+3. Time to tune. XGBoost usually needs a search over learning rate and
+   tree depth. That search is not justified here.
+
+Seed is fixed (``random_state=42``). Metric definitions and why a low MSE
+is not enough are in ``data/eval/sales_forecast/README.md``.
 
 Run from the repo root::
 
@@ -106,7 +110,8 @@ def fit_forest(train: pd.DataFrame, test: pd.DataFrame) -> dict:
     lag_12_test = test["revenue_lag_12"].to_numpy(dtype=float)
     y_train = y_train_usd / lag_12_train
 
-    # Shallow trees: the factor sits in a narrow band around 1.05.
+    # scikit-learn RandomForestRegressor. See the module docstring for the
+    # choice: explainability, 120-month sample, and little time to tune.
     model = RandomForestRegressor(
         n_estimators=300,
         max_depth=4,
