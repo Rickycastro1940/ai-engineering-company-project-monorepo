@@ -2,6 +2,21 @@
 
 Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project-monorepo`, branch `feature/auth-frontend`. Gaps below are scored against root [`CONTEXT.md`](../CONTEXT.md) department needs.
 
+## Artist showcase page (`uis/artist/`)
+
+Department: **Marketing** only as placement (public HTML under `uis/`). This page is a fictional artist profile for the assigned one-page lesson. It does not change Brasaland’s corporate site, Brasa Points, or the central API.
+
+Section order: header, hero, about, career, shows, footer.
+
+```text
+python3 -m http.server 8765  (from uis/artist)
+GET / → 200
+GET /styles.css → 200
+landmarks: header, nav, main, four sections (hero, about, career, shows), footer
+Desktop ~1280: headline readable beside two paintings; About, Career, Shows jump to those sections; three show cards; footer email
+Mobile ~390: headline readable; paintings sit below the actions, not over the type
+```
+
 ## Agent infrastructure (aligned to `CONTEXT.md`)
 
 - Root `CONTEXT.md` / `CONTEXT.es.md` replaced with official Brasaland briefings (`00-general-contexts/CONTEXT-brasaland-briefing.*.md`). Placeholder four-company list removed.
