@@ -22,3 +22,5 @@ python3 -m http.server 8765
 Open `http://127.0.0.1:8765/`.
 
 Layout uses Flexbox. Class names follow BEM (`block__element--modifier`). Motion is a short rise on load and a lift on show cards, and it turns off when the visitor prefers reduced motion.
+
+`index.html` links `styles.css`. The two paintings are SVG files with `alt` text. A JSON-LD graph in the head describes Vera as a `Person`, plus the two `VisualArtwork` pieces and the three upcoming events. Fonts are local `.woff2` files, so the page does not call Google Fonts.

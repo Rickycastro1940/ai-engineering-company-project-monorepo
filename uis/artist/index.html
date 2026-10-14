@@ -1,22 +1,108 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Vera Quintero — painter and vocalist</title>
     <meta
       name="description"
       content="Vera Quintero paints the hour after a show ends. Oil, scraped gold, and short live sets from a studio in Medellín."
-    />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,620;1,9..144,500&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="styles.css" />
-    <script>
-      document.documentElement.classList.add("js");
+    >
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="preload" href="fonts/fraunces-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="styles.css">
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Person",
+            "@id": "#vera-quintero",
+            "name": "Vera Quintero",
+            "jobTitle": "Painter and vocalist",
+            "description": "Vera Quintero paints the hour after a show ends. Oil, scraped gold, and short live sets from a studio in Medellín.",
+            "email": "vera.quintero@example.com",
+            "url": "./",
+            "homeLocation": {
+              "@type": "Place",
+              "name": "Medellín",
+              "address": {
+                "@type": "PostalAddress",
+                "addressLocality": "Medellín",
+                "addressCountry": "CO"
+              }
+            },
+            "knowsAbout": ["Oil painting", "Gold leaf", "Voice"]
+          },
+          {
+            "@type": "VisualArtwork",
+            "name": "Night ferry",
+            "artform": "Oil and gold leaf",
+            "dateCreated": "2025",
+            "creator": { "@id": "#vera-quintero" },
+            "image": "night-ferry.svg"
+          },
+          {
+            "@type": "VisualArtwork",
+            "name": "After the set",
+            "artform": "Oil",
+            "dateCreated": "2026",
+            "creator": { "@id": "#vera-quintero" },
+            "image": "after-the-set.svg"
+          },
+          {
+            "@type": "ExhibitionEvent",
+            "name": "Lantern Hour",
+            "startDate": "2026-11-21T19:00:00-05:00",
+            "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+            "eventStatus": "https://schema.org/EventScheduled",
+            "performer": { "@id": "#vera-quintero" },
+            "location": {
+              "@type": "Place",
+              "name": "Teatro Bellavista",
+              "address": {
+                "@type": "PostalAddress",
+                "addressLocality": "Medellín",
+                "addressCountry": "CO"
+              }
+            }
+          },
+          {
+            "@type": "MusicEvent",
+            "name": "Salt & Chorus",
+            "startDate": "2027-01-09T20:00:00-05:00",
+            "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+            "eventStatus": "https://schema.org/EventScheduled",
+            "performer": { "@id": "#vera-quintero" },
+            "location": {
+              "@type": "Place",
+              "name": "The Fold",
+              "address": {
+                "@type": "PostalAddress",
+                "addressLocality": "Miami",
+                "addressCountry": "US"
+              }
+            }
+          },
+          {
+            "@type": "ExhibitionEvent",
+            "name": "Open studio",
+            "startDate": "2027-02-28T14:00:00-05:00",
+            "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+            "eventStatus": "https://schema.org/EventScheduled",
+            "performer": { "@id": "#vera-quintero" },
+            "location": {
+              "@type": "Place",
+              "name": "Taller Vera",
+              "address": {
+                "@type": "PostalAddress",
+                "addressLocality": "Envigado",
+                "addressCountry": "CO"
+              }
+            }
+          }
+        ]
+      }
     </script>
   </head>
   <body>
@@ -39,7 +125,7 @@
       </div>
     </header>
 
-    <main id="main">
+    <main id="main" tabindex="-1">
       <section class="hero" id="top" aria-labelledby="hero-title">
         <div class="hero__copy">
           <p class="kicker">Painter · vocalist · Medellín</p>
@@ -55,19 +141,23 @@
           </div>
         </div>
 
-        <div class="hero__stage" aria-hidden="true">
+        <div class="hero__stage">
           <figure class="canvas canvas--harbor">
-            <span class="canvas__sky"></span>
-            <span class="canvas__moon"></span>
-            <span class="canvas__water"></span>
-            <span class="canvas__hull"></span>
-            <span class="canvas__lantern"></span>
+            <img
+              src="night-ferry.svg"
+              width="360"
+              height="520"
+              alt="Night ferry, 2025. A dark boat on lined water under a gold moon, with one lantern lit."
+            >
             <figcaption class="canvas__caption">Night ferry, 2025</figcaption>
           </figure>
           <figure class="canvas canvas--market">
-            <span class="canvas__awning"></span>
-            <span class="canvas__stall"></span>
-            <span class="canvas__fruit"></span>
+            <img
+              src="after-the-set.svg"
+              width="220"
+              height="320"
+              alt="After the set, 2026. Three pieces of fruit on a market stall under a striped awning."
+            >
             <figcaption class="canvas__caption">After the set, 2026</figcaption>
           </figure>
         </div>
@@ -220,14 +310,16 @@
           <p class="site-footer__name">Vera Quintero</p>
           <p>Painting, gold leaf, and voice. Medellín.</p>
         </div>
-        <ul class="site-footer__links">
-          <li>
-            <a href="mailto:vera.quintero@example.com">vera.quintero@example.com</a>
-          </li>
-          <li><a href="#about">About</a></li>
-          <li><a href="#career">Career</a></li>
-          <li><a href="#shows">Shows</a></li>
-        </ul>
+        <nav aria-label="Footer">
+          <ul class="site-footer__links">
+            <li>
+              <a href="mailto:vera.quintero@example.com">vera.quintero@example.com</a>
+            </li>
+            <li><a href="#about">About</a></li>
+            <li><a href="#career">Career</a></li>
+            <li><a href="#shows">Shows</a></li>
+          </ul>
+        </nav>
         <p class="site-footer__note">Fictional artist profile · © 2026</p>
       </div>
     </footer>

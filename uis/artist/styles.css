@@ -1,3 +1,27 @@
+@font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-weight: 560;
+  font-display: swap;
+  src: url("fonts/fraunces-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Figtree";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/figtree-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Figtree";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("fonts/figtree-600-latin.woff2") format("woff2");
+}
+
 :root {
   --ink: #1c1612;
   --ink-soft: #4a4038;
@@ -97,7 +121,7 @@ a {
   align-items: center;
   gap: 0.6rem;
   font-family: var(--font-display);
-  font-weight: 620;
+  font-weight: 560;
   text-decoration: none;
   letter-spacing: -0.02em;
 }
@@ -121,7 +145,7 @@ a {
 .site-header__list a {
   text-decoration: none;
   color: var(--ink-soft);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .site-header__list a:hover {
@@ -192,7 +216,7 @@ h1,
 h2,
 h3 {
   font-family: var(--font-display);
-  font-weight: 620;
+  font-weight: 560;
   letter-spacing: -0.03em;
   line-height: 1.05;
 }
@@ -233,105 +257,20 @@ h1 {
   box-shadow: var(--shadow);
 }
 
+.canvas img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .canvas--harbor {
   width: min(100%, 18rem);
-  height: 26rem;
-  background: #1d2a33;
 }
 
 .canvas--market {
   width: min(42%, 11rem);
-  height: 16rem;
   align-self: flex-start;
   margin-top: 2rem;
-  background: #6d2d22;
-}
-
-.canvas__sky,
-.canvas__water,
-.canvas__moon,
-.canvas__hull,
-.canvas__lantern,
-.canvas__awning,
-.canvas__stall,
-.canvas__fruit {
-  position: absolute;
-  display: block;
-}
-
-.canvas__sky {
-  inset: 0 0 42% 0;
-  background: linear-gradient(#243746, #4d3b46 70%, #8a4a38);
-}
-
-.canvas__moon {
-  width: 3.2rem;
-  height: 3.2rem;
-  top: 12%;
-  right: 16%;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #fff6df, var(--gold) 60%, #a9783a);
-}
-
-.canvas__water {
-  inset: 54% 0 0 0;
-  background:
-    repeating-linear-gradient(
-      180deg,
-      transparent 0 10px,
-      rgba(255, 236, 210, 0.08) 10px 12px
-    ),
-    linear-gradient(#16343a, #0e2428);
-}
-
-.canvas__hull {
-  left: 12%;
-  right: 22%;
-  bottom: 22%;
-  height: 18%;
-  border-radius: 0 0 40% 40%;
-  background: #2a211c;
-  transform: rotate(-6deg);
-}
-
-.canvas__lantern {
-  width: 0.7rem;
-  height: 0.9rem;
-  left: 46%;
-  bottom: 38%;
-  border-radius: 0.2rem;
-  background: #ffd27a;
-  box-shadow: 0 0 18px 8px rgba(255, 196, 92, 0.55);
-}
-
-.canvas__awning {
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 28%;
-  background: repeating-linear-gradient(
-    90deg,
-    #f2d7a2 0 14px,
-    #e07a45 14px 28px
-  );
-}
-
-.canvas__stall {
-  left: 10%;
-  right: 10%;
-  bottom: 0;
-  height: 58%;
-  background: #f6efe4;
-}
-
-.canvas__fruit {
-  width: 2.4rem;
-  height: 2.4rem;
-  left: 22%;
-  bottom: 28%;
-  border-radius: 50%;
-  background: radial-gradient(circle at 30% 30%, #ffe1a8, #e4572e 70%);
-  box-shadow: 2.2rem 0.4rem 0 #c6a15b, 1.1rem -1.6rem 0 #7d2e2a;
 }
 
 .canvas__caption {
@@ -551,39 +490,39 @@ h2 {
 
 .site-footer__note {
   flex-basis: 100%;
-  color: rgba(244, 239, 230, 0.62);
+  color: #d9d0c4;
   font-size: 0.9rem;
 }
 
-.js .hero__copy,
-.js .canvas,
-.js .band__intro,
-.js .milestone,
-.js .show-card {
+.hero__copy,
+.canvas,
+.band__intro,
+.milestone,
+.show-card {
   animation: rise 0.8s var(--ease) both;
 }
 
-.js .canvas--market {
+.canvas--market {
   animation-delay: 0.12s;
 }
 
-.js .milestone:nth-child(2) {
+.milestone:nth-child(2) {
   animation-delay: 0.08s;
 }
 
-.js .milestone:nth-child(3) {
+.milestone:nth-child(3) {
   animation-delay: 0.16s;
 }
 
-.js .milestone:nth-child(4) {
+.milestone:nth-child(4) {
   animation-delay: 0.24s;
 }
 
-.js .show-card:nth-child(2) {
+.show-card:nth-child(2) {
   animation-delay: 0.08s;
 }
 
-.js .show-card:nth-child(3) {
+.show-card:nth-child(3) {
   animation-delay: 0.16s;
 }
 
@@ -630,10 +569,6 @@ h2 {
     justify-content: flex-start;
     min-height: 0;
     margin-top: 0.5rem;
-  }
-
-  .canvas--harbor {
-    height: 22rem;
   }
 
   .facts {
