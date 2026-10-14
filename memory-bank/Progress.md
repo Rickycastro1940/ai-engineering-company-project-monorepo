@@ -19,8 +19,8 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | Procurement: supplier price history, consolidated spend | **Partial** — seeded `GET /suppliers` (20 suppliers, Colombia and Florida, price history and alerts); Monday weekly purchase cost / price-alert frequency still separate; invoices are not live |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `GET /customers` CRM seed with `brasa_points_balance` on physical stamp cards; Next.js `uis/portal` `/points` looks up a guest and shows Brasa Points balance, history, and tier rewards (fixtures, or `GET /customers` when `BRASALAND_DATA_SOURCE=live`); `uis/website/` corporate home (`/`) live. `CONTEXT.md` still describes stamp cards as today’s in-restaurant programme |
 | People: HR portal / KPIs by country | **Not done** |
-| Training: recipe catalogue, push to 14 locations | **Partial** — `POST /knowledge/query` searches the four English standards (allergens, waste, ordering, Brasa Points) and returns cited chunks. Not a full recipe catalogue and not a push to all 14 kitchens |
-| Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial** — seeded `GET /sales/overview` and portal `/ops/sales` chain totals in COP and USD; Monday weekly ops & finance report in the backoffice; n8n export `workflows/brasaland-monday-leadership-report.n8n.json` schedules Monday 07:00 America/Bogota, logs into the central API, pulls `GET /reporting/weekly-location-performance`, and delivers COP/USD leadership copy (email, Slack, CSV) with a failure branch. Standards questions can go to `POST /knowledge/query`. A sales NL assistant and a chain sales dashboard remain open |
+| Training: recipe catalogue, push to 14 locations | **Partial** — `POST /knowledge/query` searches the four English standards (allergens, waste, ordering, Brasa Points) and returns cited chunks. `POST /agent/query` runs that same retrieval and `generate_answer` as separate LangGraph nodes, with a stored trace. Not a full recipe catalogue and not a push to all 14 kitchens |
+| Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial** — seeded `GET /sales/overview` and portal `/ops/sales` chain totals in COP and USD; Monday weekly ops & finance report in the backoffice; n8n export `workflows/brasaland-monday-leadership-report.n8n.json` schedules Monday 07:00 America/Bogota, logs into the central API, pulls `GET /reporting/weekly-location-performance`, and delivers COP/USD leadership copy (email, Slack, CSV) with a failure branch. Standards questions can go to `POST /knowledge/query` or the traced graph `POST /agent/query`. A sales NL assistant and a chain sales dashboard remain open |
 
 ## What already runs (engineering)
 
@@ -562,6 +562,35 @@ crontab -l → CRON_TZ=America/Bogota / 0 2 * * * … scripts/nightly_export.py
 python scripts/nightly_export.py 18-09-2026 → STDERR YYYY-MM-DD, exit 1
 Supabase public.job_runs accepts processing then completed (probe row removed)
 ```
+
+## Latest LangGraph support agent (`feature/langgraph-agent-base`)
+
+Department served: **Training** (Jake Morrison — the standards search stays grounded, and each step is visible) + **Technology** (Nicolás Park — `POST /agent/query` on the central API) + **Executive** (Mariana Restrepo — a standards question with a trace of how it was answered). This is not the chain-sales assistant.
+
+`data/pipelines/rag.py` still owns `setup`, `embed`, `retrieve`, and `query`. `generate_answer(question, context)` is the generation step taken out of `query` so a node can answer from chunks `retrieve` already returned. The graph in `services/agent/` is compiled once with `MemorySaver`. Empty questions stop before retrieval. No chunk above the threshold takes `honest_answer` and does not call generation. `POST /agent/query` only invokes the graph. `GET /agent/traces/{trace_id}` reads the stored steps. `POST /knowledge/query` is unchanged.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+GET http://127.0.0.1:8000/docs → 200
+locations=present
+menus=present
+sales=present
+customers=present
+suppliers=present
+inventory=present
+knowledge=present
+agent=present
+path_count=45
+/agent/query and /agent/traces/{trace_id} present
+POST /agent/query House Sauce → 200, soy and sulfites, trace receive_question → retrieve → query, checkpoint id set
+POST /agent/query blank → 400 Question cannot be empty
+POST /agent/query capital of Japan → honest_answer, not enough information, query node absent
+POST /knowledge/query House Sauce → 200
+NO_SALES_MONITOR=0 .venv/bin/python -m pytest -q → 151 passed
+.venv/bin/python -m pytest tests/pipelines/test_agent_evals.py -q → 8 passed
+```
+
+Skill **passed** (criteria 1–4 and 6). Criterion 5: locations, menus, sales, customers, and suppliers are **present**. The graph does not make POS integration, telemetry, or a digital loyalty wallet complete.
 
 ## How to update this file
 

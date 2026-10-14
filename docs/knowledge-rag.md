@@ -8,7 +8,7 @@ Department: **Training** (Jake Morrison — one searchable standard for recipes,
 | --- | --- | --- |
 | Sources | `docs/company-knowledge-base/*.md` | Allergen guide, waste protocol, supplier ordering, Brasa Points |
 | Index | `data/process/rag.py` | Paragraph chunks, collection name `brasaland_kb` |
-| Retrieve + answer | `data/pipelines/rag.py` | Top chunks, then an answer that stays inside those chunks |
+| Retrieve + answer | `data/pipelines/rag.py` | `retrieve` returns chunks; `generate_answer(question, context)` writes the answer from those chunks and does not retrieve again. `query` still does both, for callers that want one step |
 | HTTP | `services/knowledge/routes.py` | `POST /knowledge/query` |
 | App | `services/api/app.py` | Loaded by `uvicorn api.app:app` |
 
@@ -45,6 +45,8 @@ curl -sS -X POST http://127.0.0.1:8000/knowledge/query \
 Empty or whitespace questions return HTTP 400. A question with no supporting chunk returns the sentence `There is not enough information available to answer this question.` and `"sources": []`. Qdrant or OpenAI failures return HTTP 503 with a generic message (no keys, no host paths).
 
 The route is not behind JWT so a kitchen lead can query standards without the staff console token. Locations and the Monday report stay authenticated.
+
+`POST /agent/query` is the same knowledge base as a compiled graph (receive → retrieve → generate, or an honest miss when nothing clears the threshold). See `services/agent/README.md`.
 
 ## Offline by default
 

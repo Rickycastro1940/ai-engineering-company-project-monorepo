@@ -16,6 +16,7 @@ Live generation and Qdrant are opt-in:
 from __future__ import annotations
 
 import os
+from typing import Optional
 
 from data.process.rag import (
     COLLECTION_NAME,
@@ -192,20 +193,29 @@ def generate_openai(question: str, chunks: list[dict]) -> str:
     return call_external("language model", _run)
 
 
+def generate_answer(question: str, context: Optional[list]) -> str:
+    """Answer from chunks ``retrieve`` already returned.
+
+    Does not call ``retrieve`` or ``query``. An empty context is the honest
+    miss: there is not enough information, and no model call is made.
+    """
+    chunks = list(context or [])
+    cleaned = (question or "").strip()
+    if not cleaned or not chunks:
+        return INSUFFICIENT
+    if llm_backend() == "openai":
+        generated = generate_openai(cleaned, chunks).strip()
+        return generated or extractive_answer(chunks)
+    return extractive_answer(chunks)
+
+
 def answer_question(question: str, k: int = DEFAULT_K) -> dict:
     """Grounded answer plus the source chunks that support it."""
     cleaned = (question or "").strip()
     if not cleaned:
         return {"answer": INSUFFICIENT, "sources": []}
     sources = retrieve(cleaned, k=k)
-    if not sources:
-        return {"answer": INSUFFICIENT, "sources": []}
-    if llm_backend() == "openai":
-        generated = generate_openai(cleaned, sources).strip()
-        answer = generated or extractive_answer(sources)
-    else:
-        answer = extractive_answer(sources)
-    return {"answer": answer, "sources": sources}
+    return {"answer": generate_answer(cleaned, sources), "sources": sources}
 
 
 def query(question: str) -> str:
