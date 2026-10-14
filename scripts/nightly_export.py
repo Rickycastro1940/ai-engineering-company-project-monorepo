@@ -49,20 +49,42 @@ def _fail(message: str, code: int = 1) -> None:
     sys.exit(code)
 
 
+class _JobLogFormatter(logging.Formatter):
+    """Each line carries a timestamp, the job name, and the resulting status."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        if not hasattr(record, "job_name"):
+            record.job_name = JOB_NAME
+        if not hasattr(record, "status"):
+            record.status = "-"
+        return super().format(record)
+
+
 def _ensure_logging() -> None:
-    if not logging.getLogger().handlers:
-        logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
+    logger.setLevel(logging.INFO)
+    if any(getattr(handler, "_brasaland_nightly", False) for handler in logger.handlers):
+        return
+    handler = logging.StreamHandler()
+    handler._brasaland_nightly = True
+    handler.setFormatter(
+        _JobLogFormatter("%(asctime)s %(levelname)s job=%(job_name)s status=%(status)s %(message)s")
+    )
+    logger.addHandler(handler)
+
+
+def _log(level: int, status: str, message: str, *args) -> None:
+    logger.log(level, message, *args, extra={"job_name": JOB_NAME, "status": status})
 
 
 def _mark_failed(job_runner, run_id, message: str) -> None:
     """Move the open row to failed so it cannot stay processing."""
-    logger.error("nightly_export failed: %s", message)
+    _log(logging.ERROR, "failed", "nightly_export failed: %s", message)
     if run_id is None:
         return
     try:
         job_runner.mark_failed(run_id, message)
     except Exception:
-        logger.error("nightly_export could not mark job_runs id=%s failed", run_id)
+        _log(logging.ERROR, "failed", "nightly_export could not mark job_runs id=%s failed", run_id)
 
 
 def _parse_target_date(raw: str) -> str:
@@ -120,13 +142,17 @@ def main() -> None:
 
     try:
         if job_runner.has_processing_lock(job_name):
-            logger.info(
-                "nightly_export cancelled: a job_runs row is already processing"
+            _log(
+                logging.INFO,
+                "cancelled",
+                "nightly_export cancelled: a job_runs row is already processing",
             )
             sys.exit(0)
 
         if job_runner.has_completed_for_date(job_name, target_date):
-            logger.info(
+            _log(
+                logging.INFO,
+                "skipped",
                 "nightly_export skipped as a duplicate for target_date=%s",
                 target_date,
             )
@@ -138,8 +164,13 @@ def main() -> None:
 
         run_id = run
         job_runner.mark_processing(run_id)
+        _log(logging.INFO, "processing", "nightly_export started target_date=%s", target_date)
     except job_runner.JobAlreadyRunning:
-        logger.info("nightly_export cancelled: a job_runs row is already processing")
+        _log(
+            logging.INFO,
+            "cancelled",
+            "nightly_export cancelled: a job_runs row is already processing",
+        )
         sys.exit(0)
     except ExternalServiceError as error:
         _mark_failed(job_runner, run_id, public_error_text(str(error), "job store is unavailable"))
@@ -220,7 +251,7 @@ def main() -> None:
             raise RuntimeError(detail or "Pipeline subprocess failed")
 
         job_runner.mark_completed(run_id)
-        logger.info("nightly_export completed target_date=%s", target_date)
+        _log(logging.INFO, "completed", "nightly_export finished target_date=%s", target_date)
 
     except SystemExit as exit_exc:
         if run_id is not None and exit_exc.code not in (0, None):

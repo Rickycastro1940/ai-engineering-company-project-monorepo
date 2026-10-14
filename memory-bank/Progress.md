@@ -544,7 +544,10 @@ Cron expression: `0 2 * * *` with `CRON_TZ=America/Bogota`.
 
 ```text
 head -n 5 CONTEXT.md → # Welcome to Brasaland
-.venv/bin/python -m pytest tests/test_job_control.py tests/test_scripts_io.py -q → 16 passed
+.venv/bin/python -m pytest tests/test_job_control.py tests/test_scripts_io.py -q → 17 passed
+log line shape: asctime, level, job=nightly_export, status=processing|skipped|completed|failed|cancelled
+INFO for start, finish, and duplicate skip; ERROR for exceptions
+trigger remains OS crontab 0 2 * * * America/Bogota, not FastAPI
 processing lock logs cancellation and exits 0 without create_run
 completed (nightly_export, target_date) logs "skipped as a duplicate" and does not run the pipeline
 pipeline failure calls mark_failed; the row does not stay processing

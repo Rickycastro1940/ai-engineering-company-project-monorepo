@@ -220,6 +220,29 @@ def test_invalid_date_exits_on_stderr(capsys):
     assert "YYYY-MM-DD" not in captured.out
 
 
+def test_log_line_includes_timestamp_job_and_status():
+    import logging
+
+    nightly._ensure_logging()
+    handler = next(item for item in nightly.logger.handlers if getattr(item, "_brasaland_nightly", False))
+    record = nightly.logger.makeRecord(
+        nightly.logger.name,
+        logging.INFO,
+        __file__,
+        1,
+        "nightly_export started target_date=%s",
+        ("2026-10-12",),
+        None,
+        extra={"job_name": "nightly_export", "status": "processing"},
+    )
+    line = handler.format(record)
+    assert line.split()[0][:4].isdigit()
+    assert "INFO" in line
+    assert "job=nightly_export" in line
+    assert "status=processing" in line
+    assert "started" in line
+
+
 def test_processing_lock_exits_without_export(monkeypatch, caplog):
     import logging
 
