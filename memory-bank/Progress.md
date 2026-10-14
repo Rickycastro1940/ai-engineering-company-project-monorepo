@@ -14,7 +14,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Present (seeded)** — `locations`/`menus`/`sales`/`customers`/`suppliers`/`inventory=present` plus `knowledge=present` (`POST /knowledge/query`) and `realtime=present` (`GET /realtime/ops-alerts/stream`) on `uvicorn api.app:app` (`:8000`). Not a live POS or invoice feed |
-| Technology: telemetry + pipeline to dashboards | **Partial** — live no-sales SSE on `GET /realtime/ops-alerts/stream` plus Part 2 weekly location cost/waste ETL, Prefect stage subflows, KPI unit tests, CLI, and backoffice Monday weekly report; engineering `GET /telemetry/report` untouched |
+| Technology: telemetry + pipeline to dashboards | **Partial** — live no-sales SSE on `GET /realtime/ops-alerts/stream` plus Part 2 weekly location cost/waste ETL, Prefect stage subflows, KPI unit tests, CLI, and backoffice Monday weekly report; engineering `GET /telemetry/report` untouched. Nightly landing copy is `scripts/nightly_export.py` (OS cron `0 2 * * *` America/Bogota, status in `public.job_runs`), not a FastAPI scheduler |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — seeded `GET /sales` tickets and `/sales/overview` (COP and USD, 14 locations) plus `/sales/alerts`; `POST /sales` stores a ticket and calls `record_sale` so the live no-sales alert on backoffice `/accessible` sees that location; Next.js `uis/portal` `/ops/sales` shows per-location sales in COP and USD. Smart ordering still open |
 | Procurement: supplier price history, consolidated spend | **Partial** — seeded `GET /suppliers` (20 suppliers, Colombia and Florida, price history and alerts); Monday weekly purchase cost / price-alert frequency still separate; invoices are not live |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `GET /customers` CRM seed with `brasa_points_balance` on physical stamp cards; Next.js `uis/portal` `/points` looks up a guest and shows Brasa Points balance, history, and tier rewards (fixtures, or `GET /customers` when `BRASALAND_DATA_SOURCE=live`); `uis/website/` corporate home (`/`) live. `CONTEXT.md` still describes stamp cards as today’s in-restaurant programme |
@@ -523,6 +523,44 @@ node --experimental-strip-types --test uis/backoffice/tests/noSalesAlerts.test.t
 POST /sales co-med-centro 48000 COP during an open alert → 201, active alerts cleared, ticket on GET /sales
 POST /sales before evaluate → no alert raised
 POST unknown location → 404; Colombia location with USD → 400; EUR → 422; amount 0 → 400
+```
+
+## Latest nightly job control (`cursor/nightly-job-control-8382`)
+
+Department served: **Technology** (Nicolás Park — telemetry stays on `public.telemetry_events`, and a background job has a status table) + **Restaurant Operations** (Felipe Guerrero — nightly copy of purchase, waste, and stockout events for the 14 locations).
+
+Existing tables and names this change follows:
+
+| Table | Time / identity fields already in use |
+| --- | --- |
+| `public.telemetry_events` | `id` uuid, `timestamp` timestamptz, `event_type`, `service`, `level`, `tags` jsonb |
+| `public.telemetry_events_legacy` | `id`, `created_at`, `timestamp`, `event_type`, `tags` |
+| `public.locations` | `id`, `country`, `currency` |
+| `public.job_runs` | `job_name`, `target_date`, `status` (`pending` / `processing` / `completed` / `failed`), `started_at`, `finished_at`, `error_message`, `created_at` |
+
+`scripts/nightly_export.py` resolves `target_date` from the CLI argument, else `TARGET_DATE`, else yesterday in UTC. It writes `data/raw/telemetry_YYYY-MM-DD.csv` from `telemetry_events.timestamp` only when that file is absent (audit snapshot; the pipeline reads the database). It then runs the Milestone 6 CLI `data/pipelines/pipeline.py` as a subprocess. Final status, `target_date`, `started_at` / `finished_at`, and `error_message` go to `public.job_runs` through `services/job_runner.py`. Schema: `data/pipelines/job_runs.sql` (Supabase migration `job_runs_control`). `reporting.pipeline_runs` is a different table. The trigger is the user crontab, not the FastAPI process.
+
+Cron expression: `0 2 * * *` with `CRON_TZ=America/Bogota`.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+.venv/bin/python -m pytest tests/test_job_control.py tests/test_scripts_io.py -q → 18 passed
+state machine: pending → processing → completed|failed, including target_date
+two simultaneous claims: one processing row, the other failed (processing is the lock)
+finally marks a failed execution so the row does not stay processing
+CSV data/raw/telemetry_YYYY-MM-DD.csv contains telemetry_events columns for that UTC day
+log line shape: asctime, level, job=nightly_export, status=processing|skipped|completed|failed|cancelled
+INFO for start, finish, and duplicate skip; ERROR for exceptions
+trigger remains OS crontab 0 2 * * * America/Bogota, not FastAPI
+processing lock logs cancellation and exits 0 without create_run
+completed (nightly_export, target_date) logs "skipped as a duplicate" and does not run the pipeline
+pipeline failure calls mark_failed; the row does not stay processing
+TARGET_DATE=2025-01-15 resolves that date; no env → yesterday UTC
+export bounds 2026-10-12 → [2026-10-12T00:00:00Z, 2026-10-13T00:00:00Z) column=timestamp
+existing data/raw/telemetry_YYYY-MM-DD.csv skips the export and still runs data/pipelines/pipeline.py
+crontab -l → CRON_TZ=America/Bogota / 0 2 * * * … scripts/nightly_export.py
+python scripts/nightly_export.py 18-09-2026 → STDERR YYYY-MM-DD, exit 1
+Supabase public.job_runs accepts processing then completed (probe row removed)
 ```
 
 ## How to update this file
