@@ -563,6 +563,42 @@ python scripts/nightly_export.py 18-09-2026 → STDERR YYYY-MM-DD, exit 1
 Supabase public.job_runs accepts processing then completed (probe row removed)
 ```
 
+## Latest backend architecture proposal (`cursor/backend-architecture-proposal-63ce`)
+
+Department served: **Technology** (Nicolás Park — one written target for the central API, telemetry, and the pipeline into dashboards). The same document maps Restaurant Operations, Procurement, Marketing, People, Training, and Executive needs from `CONTEXT.md` onto the existing monorepo layout.
+
+`docs/ARCHITECTURE_PROPOSAL.md` records the decision to keep growing `uvicorn api.app:app` by router, with Celery, Prefect, OS cron, and n8n off the request path. It states what is seeded today and what is still open (live POS, live invoices, digital Brasa Points, People portal, sales natural-language assistant). No router behavior changed in this change.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+test -f docs/ARCHITECTURE_PROPOSAL.md
+docs/README.md links ARCHITECTURE_PROPOSAL.md
+```
+
+Revised the same file so a reader can check the pattern, the module layout, and the client boundary without inferring them from the diagrams:
+
+- Pattern named: layered modular monolith (one API, domain modules, job layer). Classic MVC, serverless functions, and a service per department are recorded as poor fits for a small Medellín team, 14 locations, and two currencies.
+- Folder criteria and the `services/` / `data/` / `uis/` tree.
+- FastAPI routers grouped by noun (`APIRouter`, prefix, tag, auth dependency), aligned with FastAPI’s bigger-applications layout and adapted to this monorepo.
+- Frontends stay separate processes in the same repo: HTTP/JSON, Bearer JWT, SSE, server env vars versus `NEXT_PUBLIC_` / `VITE_`, and the CORS allow-list for ports 5173 and 5174.
+- Risks and points of attention: a second API per department, business rules copied into `uis/`, and routes piled into `app.py`.
+
+Revised again so the document is scored as technical reasoning. Each required section now states the design force, the option taken, and the option rejected:
+
+- Layered modular monolith is justified from shared nouns, company-owned sites, a small Medellín team, and slow Monday work versus request latency. MVC, layers-without-modules, serverless, and microservices each have a company-specific rejection.
+- Folder cuts are domain owner, consistency, runtime, trust, and change rate. One file per noun stands until Postgres; `data/process/` stays import-free of FastAPI.
+- Router grouping rejects department prefixes because a sale is shared by Operations, Executive, and later Marketing.
+- FastAPI’s bigger-applications layout is adopted for the composition root, routers, dependencies, Pydantic contracts, and env settings, and refused where it would add a second `app/` tree or a crud layer over a list.
+- Frontend separation compares one process, a repo per app, and one repo with separate processes. CORS is limited to browser callers. Staff tokens stay off `NEXT_PUBLIC_` and `VITE_` bundles.
+- Structural risks name the business failure (split roster, divergent tiers, public route inheriting staff auth).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+test -f docs/ARCHITECTURE_PROPOSAL.md
+```
+
+Section 5 now cites the FastAPI “Bigger Applications” tree (`main.py`, `dependencies.py`, `routers/`, `internal/`) and maps each of those conventions onto `services/api/` so the source and the proposed folders name the same ideas.
+
 ## How to update this file
 
 After a verified change, append evidence (command + result) and update the coverage table. Do not log plans that were not run.
