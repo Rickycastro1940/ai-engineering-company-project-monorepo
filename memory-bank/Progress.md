@@ -563,6 +563,18 @@ python scripts/nightly_export.py 18-09-2026 → STDERR YYYY-MM-DD, exit 1
 Supabase public.job_runs accepts processing then completed (probe row removed)
 ```
 
+## Latest backend architecture proposal (`cursor/backend-architecture-proposal-63ce`)
+
+Department served: **Technology** (Nicolás Park — one written target for the central API, telemetry, and the pipeline into dashboards). The same document maps Restaurant Operations, Procurement, Marketing, People, Training, and Executive needs from `CONTEXT.md` onto the existing monorepo layout.
+
+`docs/ARCHITECTURE_PROPOSAL.md` records the decision to keep growing `uvicorn api.app:app` by router, with Celery, Prefect, OS cron, and n8n off the request path. It states what is seeded today and what is still open (live POS, live invoices, digital Brasa Points, People portal, sales natural-language assistant). No router behavior changed in this change.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+test -f docs/ARCHITECTURE_PROPOSAL.md
+docs/README.md links ARCHITECTURE_PROPOSAL.md
+```
+
 ## How to update this file
 
 After a verified change, append evidence (command + result) and update the coverage table. Do not log plans that were not run.

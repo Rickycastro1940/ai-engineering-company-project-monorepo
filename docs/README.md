@@ -5,6 +5,7 @@ This folder holds **cross-cutting documentation** for the monorepo: architecture
 - **Main purpose**: provide a single place for “global” project documentation (not tied to one app or agent only).
 - **Recommendation**: organize docs by topic (architecture, deployment, data, security, observability, etc.) and keep links from each component’s README to these guides.
 
+- [ARCHITECTURE_PROPOSAL.md](./ARCHITECTURE_PROPOSAL.md) — backend architecture for Nicolás Park: one central FastAPI app (locations, menus, sales, customers, suppliers), telemetry, and the Monday reporting path.
 - [central-api.md](./central-api.md) — menus, sales, customers, and suppliers on `uvicorn api.app:app` (how to run and what a grader should see in `/docs`).
 - [knowledge-rag.md](./knowledge-rag.md) — `POST /knowledge/query` on the same app (cited answers from the company knowledge base).
 - [`realtime-no-sales.md`](./realtime-no-sales.md) — live no-sales alert (SSE) for open locations, grader simulator, and how it hooks to a future `/sales` router.
