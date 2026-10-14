@@ -544,7 +544,11 @@ Cron expression: `0 2 * * *` with `CRON_TZ=America/Bogota`.
 
 ```text
 head -n 5 CONTEXT.md → # Welcome to Brasaland
-.venv/bin/python -m pytest tests/test_job_control.py tests/test_scripts_io.py -q → 17 passed
+.venv/bin/python -m pytest tests/test_job_control.py tests/test_scripts_io.py -q → 18 passed
+state machine: pending → processing → completed|failed, including target_date
+two simultaneous claims: one processing row, the other failed (processing is the lock)
+finally marks a failed execution so the row does not stay processing
+CSV data/raw/telemetry_YYYY-MM-DD.csv contains telemetry_events columns for that UTC day
 log line shape: asctime, level, job=nightly_export, status=processing|skipped|completed|failed|cancelled
 INFO for start, finish, and duplicate skip; ERROR for exceptions
 trigger remains OS crontab 0 2 * * * America/Bogota, not FastAPI
