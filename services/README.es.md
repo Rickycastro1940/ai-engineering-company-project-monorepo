@@ -6,3 +6,7 @@ Cada subcarpeta dentro de `services/` debe corresponder a **un servicio concreto
 
 - **Propósito principal**: centralizar toda la lógica backend, APIs y consumidores de colas que dan soporte a los casos de uso de la compañía.
 - **Recomendación**: documenta en este archivo (o en sub-READMEs) los servicios que vayas añadiendo, su objetivo, tecnología usada y cómo ejecutarlos.
+
+## Agente de soporte (LangGraph)
+
+`services/agent/` compila el asistente de estándares como un grafo: recibe la pregunta, llama a `retrieve` en `data/pipelines/rag.py` y solo entonces a `generate_answer` si un fragmento superó el umbral. Una pregunta vacía se detiene antes de recuperar. Si no hay contexto, responde con honestidad y no genera. `POST /agent/query` solo invoca el grafo. Detalle: [`services/agent/README.es.md`](./agent/README.es.md).

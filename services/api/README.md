@@ -100,6 +100,16 @@ curl -sS -X POST http://127.0.0.1:8000/knowledge/query \
 
 No API key is required. The default path uses local embeddings. `BRASALAND_RAG_BACKEND=qdrant` and `BRASALAND_RAG_LLM=openai` turn on the vector store and chat model.
 
+## Support agent
+
+`POST /agent/query` runs the same knowledge base through the compiled LangGraph in `services/agent/`. The handler does not retrieve or generate; it invokes the graph. `GET /agent/traces/{trace_id}` returns the node trace for that run.
+
+```bash
+curl -sS -X POST http://127.0.0.1:8000/agent/query \
+  -H 'Content-Type: application/json' \
+  -d '{"question":"What allergens are in the House Sauce?"}'
+```
+
 ## Alternative run command
 
 `services/api/main.py` is deprecated (it used to import a missing knowledge router). It now starts the same central app:
