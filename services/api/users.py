@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import sqlite3
 from datetime import datetime, timezone
+from enum import Enum
 from pathlib import Path
 from typing import Any, Optional
 
@@ -9,12 +9,21 @@ from auth import create_access_token, decode_access_token, hash_password, oauth2
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from services.database import AUTH_DB_PATH
+from tinydb import Query, TinyDB
+from tinydb.table import Document
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DATABASE_PATH = REPO_ROOT / "data" / "company_api.db"
+DATABASE_PATH = AUTH_DB_PATH
 
 UNSET = object()
 router = APIRouter(tags=["users"])
+
+
+class UserRole(str, Enum):
+    admin = "admin"
+    manager = "manager"
+    user = "user"
 
 
 class UserCreate(BaseModel):
@@ -47,6 +56,7 @@ class UserUpdate(BaseModel):
     address: Optional[str] = Field(default=None, max_length=240)
     is_active: Optional[bool] = None
     is_admin: Optional[bool] = None
+    role: Optional[UserRole] = None
 
     @field_validator("name", "phone", "address", mode="before")
     @classmethod
@@ -80,7 +90,16 @@ class UserPublic(BaseModel):
     address: Optional[str] = None
     is_active: bool
     is_admin: bool
+    role: str
     created_at: str
+
+
+class ProfilePublic(BaseModel):
+    id: int
+    user_id: int
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
 
 
 class TokenResponse(BaseModel):
@@ -92,50 +111,97 @@ class AuthResponse(TokenResponse):
     user: UserPublic
 
 
-def _connect() -> sqlite3.Connection:
+def _auth_db() -> TinyDB:
+    from services import database as dual_db
+
+    dual_db.AUTH_DB_PATH = Path(DATABASE_PATH)
     try:
-        DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        connection = sqlite3.connect(DATABASE_PATH)
-    except (OSError, sqlite3.Error) as error:
+        return dual_db.get_auth_db()
+    except OSError as error:
         raise HTTPException(status_code=503, detail="User store is unavailable.") from error
-    connection.row_factory = sqlite3.Row
-    return connection
 
 
-def _ensure_user_table() -> None:
-    with _connect() as connection:
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT NOT NULL UNIQUE,
-                hashed_password TEXT NOT NULL,
-                name TEXT,
-                phone TEXT,
-                address TEXT,
-                is_active INTEGER NOT NULL DEFAULT 1,
-                is_admin INTEGER NOT NULL DEFAULT 0,
-                created_at TEXT NOT NULL
-            )
-            """
-        )
-        columns = {row[1] for row in connection.execute("PRAGMA table_info(users)").fetchall()}
-        for column in ("name", "phone", "address"):
-            if column not in columns:
-                connection.execute(f"ALTER TABLE users ADD COLUMN {column} TEXT")
+def _users_table():
+    return _auth_db().table("users")
+
+
+def _profiles_table():
+    return _auth_db().table("profiles")
 
 
 def _normalize_email(email: str) -> str:
     return email.strip().lower()
 
 
-def _row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
+def _normalize_role(role: str | UserRole | None, *, is_admin: bool | None = None) -> str:
+    if is_admin is True:
+        return UserRole.admin.value
+    if isinstance(role, UserRole):
+        return role.value
+    if role in {item.value for item in UserRole}:
+        return str(role)
+    if is_admin is False:
+        return UserRole.user.value
+    return UserRole.user.value
+
+
+def _document_to_user(document: Document | dict[str, Any] | None, profile: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    if document is None:
+        return None
+    user_id = int(document.doc_id) if isinstance(document, Document) else int(document["id"])
+    payload = dict(document)
+    role = _normalize_role(payload.get("role"), is_admin=bool(payload.get("is_admin", False)))
+    if profile is None:
+        profile = _get_profile_row(user_id) or {}
+    return {
+        "id": user_id,
+        "email": payload["email"],
+        "hashed_password": payload["hashed_password"],
+        "is_active": bool(payload.get("is_active", True)),
+        "role": role,
+        "is_admin": role == UserRole.admin.value,
+        "created_at": payload["created_at"],
+        "name": profile.get("name"),
+        "phone": profile.get("phone"),
+        "address": profile.get("address"),
+        "profile_id": profile.get("id"),
+    }
+
+
+def _get_profile_row(user_id: int) -> dict[str, Any] | None:
+    UserQuery = Query()
+    row = _profiles_table().get(UserQuery.user_id == user_id)
     if row is None:
         return None
-    user = dict(row)
-    user["is_active"] = bool(user["is_active"])
-    user["is_admin"] = bool(user["is_admin"])
-    return user
+    return {
+        "id": int(row.doc_id) if isinstance(row, Document) else int(row.get("id", user_id)),
+        "user_id": user_id,
+        "name": row.get("name"),
+        "phone": row.get("phone"),
+        "address": row.get("address"),
+    }
+
+
+def _upsert_profile(user_id: int, *, name: Any = UNSET, phone: Any = UNSET, address: Any = UNSET) -> dict[str, Any]:
+    existing = _get_profile_row(user_id)
+    payload = {
+        "user_id": user_id,
+        "name": None if name is UNSET else name,
+        "phone": None if phone is UNSET else phone,
+        "address": None if address is UNSET else address,
+    }
+    if existing is not None:
+        if name is UNSET:
+            payload["name"] = existing.get("name")
+        if phone is UNSET:
+            payload["phone"] = existing.get("phone")
+        if address is UNSET:
+            payload["address"] = existing.get("address")
+        _profiles_table().update(payload, doc_ids=[existing["id"]])
+        return _get_profile_row(user_id) or payload
+    profile_id = _profiles_table().insert(payload)
+    payload["id"] = profile_id
+    return payload
 
 
 def _public_user(user: dict[str, Any]) -> dict[str, Any]:
@@ -147,15 +213,38 @@ def _public_user(user: dict[str, Any]) -> dict[str, Any]:
         "address": user.get("address"),
         "is_active": user["is_active"],
         "is_admin": user["is_admin"],
+        "role": user.get("role", UserRole.user.value),
         "created_at": user["created_at"],
     }
 
 
+def _public_profile(user: dict[str, Any]) -> dict[str, Any]:
+    profile = _get_profile_row(user["id"]) or _upsert_profile(user["id"])
+    return {
+        "id": profile.get("id", user["id"]),
+        "user_id": user["id"],
+        "name": profile.get("name"),
+        "phone": profile.get("phone"),
+        "address": profile.get("address"),
+    }
+
+
 def count_users() -> int:
-    _ensure_user_table()
-    with _connect() as connection:
-        row = connection.execute("SELECT COUNT(*) AS count FROM users").fetchone()
-    return int(row["count"])
+    return len(_users_table())
+
+
+def ensure_seed_supervisor() -> dict[str, Any]:
+    existing = get_user_by_email("felipe.guerrero@brasaland.test")
+    if existing is not None:
+        return existing
+    return create_user(
+        "felipe.guerrero@brasaland.test",
+        "brasaland-ops",
+        is_admin=count_users() == 0,
+        name="Felipe Guerrero",
+        phone="+57 300 000 0000",
+        address="Medellín HQ",
+    )
 
 
 def create_user(
@@ -167,31 +256,23 @@ def create_user(
     name: Optional[str] = None,
     phone: Optional[str] = None,
     address: Optional[str] = None,
+    role: str | UserRole | None = None,
 ) -> dict[str, Any]:
-    _ensure_user_table()
-    created_at = datetime.now(timezone.utc).isoformat()
-    try:
-        with _connect() as connection:
-            cursor = connection.execute(
-                """
-                INSERT INTO users (email, hashed_password, name, phone, address, is_active, is_admin, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    _normalize_email(email),
-                    hash_password(password),
-                    name,
-                    phone,
-                    address,
-                    int(is_active),
-                    int(is_admin),
-                    created_at,
-                ),
-            )
-            user_id = int(cursor.lastrowid)
-    except sqlite3.IntegrityError as error:
-        raise HTTPException(status_code=409, detail="User with this email already exists") from error
+    normalized_email = _normalize_email(email)
+    if get_user_by_email(normalized_email) is not None:
+        raise HTTPException(status_code=409, detail="User with this email already exists")
 
+    assigned_role = UserRole.admin.value if is_admin else _normalize_role(role)
+    user_id = _users_table().insert(
+        {
+            "email": normalized_email,
+            "hashed_password": hash_password(password),
+            "is_active": is_active,
+            "role": assigned_role,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+    _upsert_profile(user_id, name=name, phone=phone, address=address)
     user = get_user_by_id(user_id)
     if user is None:
         raise HTTPException(status_code=500, detail="User was not created")
@@ -199,24 +280,19 @@ def create_user(
 
 
 def get_user_by_id(user_id: int) -> dict[str, Any] | None:
-    _ensure_user_table()
-    with _connect() as connection:
-        row = connection.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-    return _row_to_dict(row)
+    document = _users_table().get(doc_id=user_id)
+    return _document_to_user(document)
 
 
 def get_user_by_email(email: str) -> dict[str, Any] | None:
-    _ensure_user_table()
-    with _connect() as connection:
-        row = connection.execute("SELECT * FROM users WHERE email = ?", (_normalize_email(email),)).fetchone()
-    return _row_to_dict(row)
+    UserQuery = Query()
+    document = _users_table().get(UserQuery.email == _normalize_email(email))
+    return _document_to_user(document)
 
 
 def list_users() -> list[dict[str, Any]]:
-    _ensure_user_table()
-    with _connect() as connection:
-        rows = connection.execute("SELECT * FROM users ORDER BY id").fetchall()
-    return [_row_to_dict(row) for row in rows if row is not None]
+    users = [_document_to_user(document) for document in _users_table().all()]
+    return sorted((user for user in users if user is not None), key=lambda item: item["id"])
 
 
 def update_user(
@@ -229,62 +305,45 @@ def update_user(
     address: Any = UNSET,
     is_active: bool | None = None,
     is_admin: bool | None = None,
+    role: str | UserRole | None = None,
 ) -> dict[str, Any]:
-    _ensure_user_table()
-    updates: list[str] = []
-    values: list[Any] = []
-    if email is not None:
-        updates.append("email = ?")
-        values.append(_normalize_email(email))
-    if password is not None:
-        updates.append("hashed_password = ?")
-        values.append(hash_password(password))
-    if name is not UNSET:
-        updates.append("name = ?")
-        values.append(name)
-    if phone is not UNSET:
-        updates.append("phone = ?")
-        values.append(phone)
-    if address is not UNSET:
-        updates.append("address = ?")
-        values.append(address)
-    if is_active is not None:
-        updates.append("is_active = ?")
-        values.append(int(is_active))
-    if is_admin is not None:
-        updates.append("is_admin = ?")
-        values.append(int(is_admin))
-
-    if not updates:
-        user = get_user_by_id(user_id)
-        if user is None:
-            raise HTTPException(status_code=404, detail=f"User {user_id} not found")
-        return user
-
-    values.append(user_id)
-    try:
-        with _connect() as connection:
-            cursor = connection.execute(f"UPDATE users SET {', '.join(updates)} WHERE id = ?", values)
-    except sqlite3.IntegrityError as error:
-        raise HTTPException(status_code=409, detail="User with this email already exists") from error
-
-    if cursor.rowcount == 0:
-        raise HTTPException(status_code=404, detail=f"User {user_id} not found")
-
     user = get_user_by_id(user_id)
     if user is None:
         raise HTTPException(status_code=404, detail=f"User {user_id} not found")
-    return user
+
+    updates: dict[str, Any] = {}
+    if email is not None:
+        normalized = _normalize_email(email)
+        existing = get_user_by_email(normalized)
+        if existing is not None and existing["id"] != user_id:
+            raise HTTPException(status_code=409, detail="User with this email already exists")
+        updates["email"] = normalized
+    if password is not None:
+        updates["hashed_password"] = hash_password(password)
+    if is_active is not None:
+        updates["is_active"] = is_active
+    if role is not None or is_admin is not None:
+        updates["role"] = _normalize_role(role if role is not None else user.get("role"), is_admin=is_admin)
+
+    if updates:
+        _users_table().update(updates, doc_ids=[user_id])
+    if name is not UNSET or phone is not UNSET or address is not UNSET:
+        _upsert_profile(user_id, name=name, phone=phone, address=address)
+
+    updated = get_user_by_id(user_id)
+    if updated is None:
+        raise HTTPException(status_code=404, detail=f"User {user_id} not found")
+    return updated
 
 
 def delete_user(user_id: int) -> dict[str, Any]:
-    _ensure_user_table()
     user = get_user_by_id(user_id)
     if user is None:
         raise HTTPException(status_code=404, detail=f"User {user_id} not found")
-
-    with _connect() as connection:
-        connection.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    profile = _get_profile_row(user_id)
+    _users_table().remove(doc_ids=[user_id])
+    if profile is not None:
+        _profiles_table().remove(doc_ids=[profile["id"]])
     return user
 
 
@@ -367,6 +426,11 @@ def read_current_user(current_user: dict[str, Any] = Depends(get_current_user)) 
     return _public_user(current_user)
 
 
+@router.get("/profiles/me", response_model=ProfilePublic)
+def read_my_profile(current_user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
+    return _public_profile(current_user)
+
+
 @router.put("/profiles/me", response_model=UserPublic)
 def update_my_profile(
     body: ProfileUpdate,
@@ -412,7 +476,9 @@ def read_user(user_id: int, current_user: dict[str, Any] = Depends(get_current_u
 @router.put("/users/{user_id}", response_model=UserPublic)
 def replace_user(user_id: int, body: UserUpdate, current_user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
     _require_self_or_admin(user_id, current_user)
-    if not current_user["is_admin"] and (body.is_active is not None or body.is_admin is not None):
+    if not current_user["is_admin"] and (
+        body.is_active is not None or body.is_admin is not None or body.role is not None
+    ):
         raise HTTPException(status_code=403, detail="Only an admin can update user status or role")
     user = update_user(
         user_id,
@@ -423,6 +489,7 @@ def replace_user(user_id: int, body: UserUpdate, current_user: dict[str, Any] = 
         address=body.address if "address" in body.model_fields_set else UNSET,
         is_active=body.is_active if current_user["is_admin"] else None,
         is_admin=body.is_admin if current_user["is_admin"] else None,
+        role=body.role if current_user["is_admin"] else None,
     )
     return _public_user(user)
 

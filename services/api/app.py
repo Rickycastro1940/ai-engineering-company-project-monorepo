@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 import tempfile
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
 
@@ -12,14 +14,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from customers import router as customers_router
-from inventory import router as inventory_router
+from inventory import router as inventory_csv_router
 from locations import router as locations_router
 from menus import router as menus_router
 from sales import router as sales_router
 from suppliers import router as suppliers_router
 from errors import register_error_handlers
 from pydantic import BaseModel, Field
-from users import router as users_router
+from sqlmodel import Session
+from users import ensure_seed_supervisor, router as users_router
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
@@ -30,6 +33,10 @@ if str(REPO_ROOT) not in sys.path:
 from services.reporting.routes import router as reporting_router  # noqa: E402
 from no_sales_router import register as register_ops_alerts  # noqa: E402
 from services.knowledge.routes import router as knowledge_router  # noqa: E402
+from services.database import get_engine  # noqa: E402
+from services.models import Ingredient, IngredientEntry, IngredientExit  # noqa: E402,F401
+from services.routers import inventory_router  # noqa: E402
+from services.seed_inventory import seed_inventory  # noqa: E402
 
 UI_ROOT = REPO_ROOT / "uis" / "web"
 UPLOAD_DIR = REPO_ROOT / "data" / "uploads"
@@ -122,7 +129,28 @@ def _register_analyze_routes(app: FastAPI, route_prefix: str) -> None:
             await file.close()
         return _run_analysis(input_path, output_path, engine)
 
-app = FastAPI(title="Brasaland Central API", version="1.0.0", debug=False)
+
+def _bootstrap_inventory() -> None:
+    """Seed Ingredient / Entry / Exit rows for Operations demos (idempotent)."""
+    user_uuid = "1"
+    if os.getenv("PYTEST_CURRENT_TEST") is None:
+        user_uuid = str(ensure_seed_supervisor()["id"])
+    with Session(get_engine()) as session:
+        seed_inventory(session, user_uuid)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    from sqlmodel import SQLModel
+
+    from services.database import engine
+
+    SQLModel.metadata.create_all(engine)
+    _bootstrap_inventory()
+    yield
+
+
+app = FastAPI(title="Brasaland Central API", version="1.0.0", debug=False, lifespan=lifespan)
 register_error_handlers(app)
 app.add_middleware(
     CORSMiddleware,
@@ -141,7 +169,8 @@ app.include_router(menus_router)
 app.include_router(sales_router)
 app.include_router(customers_router)
 app.include_router(suppliers_router)
-app.include_router(inventory_router)
+app.include_router(inventory_router)  # ORM Ingredient/Entry/Exit under /inventory
+app.include_router(inventory_csv_router)  # CSV Groq agent under /agent/inventory
 app.include_router(users_router)
 app.include_router(reporting_router)
 app.include_router(knowledge_router)
