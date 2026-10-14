@@ -538,14 +538,16 @@ Existing tables and names this change follows:
 | `public.locations` | `id`, `country`, `currency` |
 | `public.job_runs` | `job_name`, `target_date`, `status` (`pending` / `processing` / `completed` / `failed`), `started_at`, `finished_at`, `error_message`, `created_at` |
 
-`scripts/nightly_export.py` filters `telemetry_events.timestamp` for one America/Bogota calendar day (`gte` / `lt`, UTC instants). It does not read the legacy `created_at` column. Status writes go through `services/job_runner.py` into `public.job_runs`. Schema in the repo: `data/pipelines/job_runs.sql` (applied on the Supabase project as migration `job_runs_control`). The trigger is the user crontab, not the FastAPI process.
+`scripts/nightly_export.py` resolves `target_date` from the CLI argument, else `TARGET_DATE`, else yesterday in UTC. It writes `data/raw/telemetry_YYYY-MM-DD.csv` from `telemetry_events.timestamp` only when that file is absent (audit snapshot; the pipeline reads the database). It then runs the Milestone 6 CLI `data/pipelines/pipeline.py` as a subprocess. Final status, `target_date`, `started_at` / `finished_at`, and `error_message` go to `public.job_runs` through `services/job_runner.py`. Schema: `data/pipelines/job_runs.sql` (Supabase migration `job_runs_control`). `reporting.pipeline_runs` is a different table. The trigger is the user crontab, not the FastAPI process.
 
 Cron expression: `0 2 * * *` with `CRON_TZ=America/Bogota`.
 
 ```text
 head -n 5 CONTEXT.md → # Welcome to Brasaland
-.venv/bin/python -m pytest tests/test_job_control.py tests/test_scripts_io.py -q → 13 passed
-export bounds 2026-10-12 → [2026-10-12T05:00:00Z, 2026-10-13T05:00:00Z) column=timestamp
+.venv/bin/python -m pytest tests/test_job_control.py tests/test_scripts_io.py -q → 14 passed
+TARGET_DATE=2025-01-15 resolves that date; no env → yesterday UTC
+export bounds 2026-10-12 → [2026-10-12T00:00:00Z, 2026-10-13T00:00:00Z) column=timestamp
+existing data/raw/telemetry_YYYY-MM-DD.csv skips the export and still runs data/pipelines/pipeline.py
 crontab -l → CRON_TZ=America/Bogota / 0 2 * * * … scripts/nightly_export.py
 python scripts/nightly_export.py 18-09-2026 → STDERR YYYY-MM-DD, exit 1
 Supabase public.job_runs accepts processing then completed (probe row removed)

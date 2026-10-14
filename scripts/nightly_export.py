@@ -1,13 +1,16 @@
 """Nightly landing copy of Brasaland telemetry.
 
-Reads ``public.telemetry_events`` (time column ``timestamp``, same as
-``GET /telemetry/report``) for one America/Bogota calendar day and writes
-``data/raw/telemetry_YYYY-MM-DD.csv``. Status is recorded in ``public.job_runs``
-by ``services.job_runner``. The OS crontab starts this script. The FastAPI
-process does not.
+Reads ``public.telemetry_events`` (time column ``timestamp``) for one UTC
+calendar day and writes ``data/raw/telemetry_YYYY-MM-DD.csv`` only when that
+file is not already there. The CSV is a backup snapshot. The Milestone 6
+pipeline (``data/pipelines/pipeline.py``) reads the database, not this file.
 
-Operational event types match ``data/pipelines/PIPELINE_DESIGN.md``:
-``inbound_order_created``, ``stock_waste_registered``, ``stock_threshold_triggered``.
+``target_date`` comes from the first CLI argument, else ``TARGET_DATE``, else
+yesterday in UTC. Status (final status, ``target_date``, timestamps, and
+``error_message``) is written to ``public.job_runs`` by ``services.job_runner``.
+OS crontab starts this script. The FastAPI process does not.
+
+Run: ``python scripts/nightly_export.py``
 """
 
 from __future__ import annotations
@@ -16,7 +19,6 @@ import os
 import sys
 import subprocess
 from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 
@@ -33,8 +35,11 @@ OPERATIONAL_EVENT_TYPES = (
     "stock_waste_registered",
     "stock_threshold_triggered",
 )
-BOGOTA = ZoneInfo("America/Bogota")
 JOB_NAME = "nightly_export"
+# Milestone 6 CLI. There is no data.pipelines.telemetry_kpi_daily package here.
+PIPELINE_SCRIPT = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "data", "pipelines", "pipeline.py")
+)
 
 
 def _fail(message: str, code: int = 1) -> None:
@@ -50,31 +55,39 @@ def _parse_target_date(raw: str) -> str:
 
 
 def default_target_date(now: datetime | None = None) -> str:
-    """Yesterday's calendar date in America/Bogota."""
-    current = now if now is not None else datetime.now(BOGOTA)
+    """Yesterday's calendar date in UTC."""
+    current = now if now is not None else datetime.now(timezone.utc)
     if current.tzinfo is None:
-        current = current.replace(tzinfo=BOGOTA)
+        current = current.replace(tzinfo=timezone.utc)
     else:
-        current = current.astimezone(BOGOTA)
+        current = current.astimezone(timezone.utc)
     return (current - timedelta(days=1)).strftime("%Y-%m-%d")
 
 
+def resolve_target_date(argv: list[str] | None = None, env: dict | None = None) -> str:
+    """CLI argument, then TARGET_DATE, then yesterday in UTC."""
+    args = sys.argv if argv is None else argv
+    source = os.environ if env is None else env
+    if len(args) > 1 and args[1].strip():
+        return _parse_target_date(args[1].strip())
+    raw = source.get("TARGET_DATE")
+    if raw is not None and str(raw).strip():
+        return _parse_target_date(str(raw).strip())
+    return default_target_date()
+
+
 def export_bounds(target_date: str) -> tuple[str, str]:
-    """Inclusive start, exclusive end for one Bogota calendar day, as UTC instants."""
-    start = datetime.strptime(target_date, "%Y-%m-%d").replace(tzinfo=BOGOTA)
+    """Inclusive start, exclusive end for one UTC calendar day."""
+    start = datetime.strptime(target_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     end = start + timedelta(days=1)
-
-    def _z(value: datetime) -> str:
-        return value.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    return _z(start), _z(end)
+    return (
+        start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    )
 
 
 def main() -> None:
-    if len(sys.argv) > 1:
-        target_date = _parse_target_date(sys.argv[1])
-    else:
-        target_date = default_target_date()
+    target_date = resolve_target_date()
 
     from supabase import create_client
 
@@ -118,6 +131,7 @@ def main() -> None:
 
         csv_path = os.path.join(csv_dir, f"telemetry_{target_date}.csv")
 
+        # Audit snapshot only. The pipeline below reads telemetry_events, not this CSV.
         if os.path.exists(csv_path):
             if not os.path.isfile(csv_path) or os.path.getsize(csv_path) == 0:
                 _fail(f"Existing telemetry export is missing or empty: telemetry_{target_date}.csv")
@@ -161,14 +175,16 @@ def main() -> None:
                 _fail(f"Could not write telemetry CSV: telemetry_{target_date}.csv")
             print(f"Exported {len(df)} rows")
 
-        pipeline_path = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..", "data", "pipelines", "pipeline.py")
-        )
-        if not os.path.isfile(pipeline_path):
+        if not os.path.isfile(PIPELINE_SCRIPT):
             _fail("Pipeline script was not found.")
 
         print("Running pipeline subprocess")
-        result = subprocess.run([sys.executable, pipeline_path], capture_output=True, text=True)
+        # Milestone 6 entry point (not data.pipelines.telemetry_kpi_daily, which is absent).
+        result = subprocess.run(
+            [sys.executable, PIPELINE_SCRIPT],
+            capture_output=True,
+            text=True,
+        )
 
         if result.returncode != 0:
             raise RuntimeError("Pipeline subprocess failed")

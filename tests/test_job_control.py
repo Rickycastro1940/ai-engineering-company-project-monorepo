@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import importlib.util
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -154,16 +153,61 @@ def test_complete_and_fail_set_finished_at(store):
     assert latest["status"] == "failed"
 
 
-def test_export_uses_telemetry_timestamp_and_bogota_day():
+def test_target_date_is_env_or_yesterday_utc():
     start, end = nightly.export_bounds("2026-10-12")
     assert nightly.TELEMETRY_TIME_COLUMN == "timestamp"
     assert nightly.TELEMETRY_TABLE == "telemetry_events"
-    assert start == "2026-10-12T05:00:00Z"
-    assert end == "2026-10-13T05:00:00Z"
-    bogota = ZoneInfo("America/Bogota")
-    # 02:05 Bogotá on the 13th exports the 12th. 22:00 on the 12th is still the 11th's "yesterday".
-    assert nightly.default_target_date(datetime(2026, 10, 13, 2, 5, tzinfo=bogota)) == "2026-10-12"
-    assert nightly.default_target_date(datetime(2026, 10, 12, 22, 0, tzinfo=bogota)) == "2026-10-11"
+    assert start == "2026-10-12T00:00:00Z"
+    assert end == "2026-10-13T00:00:00Z"
+    # 03:00 UTC on the 13th is still the evening of the 12th in Bogotá.
+    # The contract date is yesterday in UTC, which is the 12th.
+    assert nightly.default_target_date(datetime(2026, 10, 13, 3, 0, tzinfo=timezone.utc)) == "2026-10-12"
+    assert nightly.resolve_target_date(["nightly_export.py"], {"TARGET_DATE": "2025-01-15"}) == "2025-01-15"
+    assert nightly.resolve_target_date(["nightly_export.py", "2026-04-01"], {"TARGET_DATE": "2025-01-15"}) == "2026-04-01"
+
+
+def test_existing_csv_skips_export_and_still_runs_pipeline(monkeypatch):
+    import services.job_runner as job_runner
+
+    csv_path = REPO_ROOT / "data" / "raw" / "telemetry_2099-02-02.csv"
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    csv_path.write_text("id,timestamp\n", encoding="utf-8")
+    queried = {"hit": False}
+
+    class _Supabase:
+        def table(self, _name):
+            queried["hit"] = True
+            raise AssertionError("existing CSV must not be re-exported")
+
+    monkeypatch.setattr(job_runner, "has_processing_lock", lambda _name: False)
+    monkeypatch.setattr(job_runner, "has_completed_for_date", lambda _name, _date: False)
+    monkeypatch.setattr(job_runner, "create_run", lambda _name, _date: 9)
+    monkeypatch.setattr(job_runner, "mark_processing", lambda run_id: [{"id": run_id}])
+    completed = {}
+    monkeypatch.setattr(job_runner, "mark_completed", lambda run_id: completed.setdefault("id", run_id))
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_KEY", "service-role-test")
+
+    import supabase
+
+    monkeypatch.setattr(supabase, "create_client", lambda _url, _key: _Supabase())
+    ran = {}
+
+    def _fake_run(cmd, capture_output, text):
+        ran["cmd"] = cmd
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(nightly.subprocess, "run", _fake_run)
+    monkeypatch.setattr(sys, "argv", ["nightly_export.py"])
+    monkeypatch.setenv("TARGET_DATE", "2099-02-02")
+    try:
+        nightly.main()
+    finally:
+        csv_path.unlink(missing_ok=True)
+
+    assert queried["hit"] is False
+    assert ran["cmd"][-1].endswith("pipeline.py")
+    assert completed["id"] == 9
 
 
 def test_invalid_date_exits_on_stderr(capsys):
@@ -255,7 +299,7 @@ def test_export_filters_timestamp_then_marks_completed(monkeypatch, tmp_path):
             csv_path.unlink()
 
     assert ("table", "telemetry_events") in calls
-    assert ("gte", "timestamp", "2099-01-15T05:00:00Z") in calls
-    assert ("lt", "timestamp", "2099-01-16T05:00:00Z") in calls
+    assert ("gte", "timestamp", "2099-01-15T00:00:00Z") in calls
+    assert ("lt", "timestamp", "2099-01-16T00:00:00Z") in calls
     assert completed["id"] == 7
     assert "created_at" not in {item[1] for item in calls if isinstance(item, tuple) and item[0] in {"gte", "lt"}}

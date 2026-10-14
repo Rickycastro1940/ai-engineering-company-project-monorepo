@@ -7,11 +7,16 @@ This folder contains **helper scripts** for the monorepo: development automation
 
 ## `nightly_export.py`
 
-Copies one America/Bogota calendar day of operational rows from `public.telemetry_events` (`timestamp`, not `created_at`) into `data/raw/telemetry_YYYY-MM-DD.csv`, then runs `data/pipelines/pipeline.py`. Status is `public.job_runs` via `services/job_runner.py`.
+Copies one UTC calendar day of operational rows from `public.telemetry_events` (`timestamp`) into `data/raw/telemetry_YYYY-MM-DD.csv` only when that file is not already there. The CSV is a backup snapshot. The Milestone 6 pipeline (`data/pipelines/pipeline.py`) reads the database, not the file. The script then records final status, `target_date`, timestamps, and any error on `public.job_runs`.
+
+`target_date` is the first CLI argument, otherwise `TARGET_DATE`, otherwise yesterday in UTC.
 
 ```bash
-# Yesterday in America/Bogota (what cron runs)
+# Yesterday in UTC (what cron runs)
 python scripts/nightly_export.py
+
+# One calendar day from the environment
+TARGET_DATE=2026-10-12 python scripts/nightly_export.py
 
 # One calendar day, backfill
 python scripts/nightly_export.py 2026-10-12
