@@ -30,11 +30,41 @@ uvicorn api.app:app
 
 Heavy work stays off the request path: Celery + Redis for the weekly ETL enqueue, Prefect for the location-week transform, OS cron for the nightly telemetry copy, and n8n for Monday delivery. Analytical tables live in a `reporting` schema. Engineering events stay in `public.telemetry_events`. Staff and guest interfaces in `uis/` call this API. They do not own business rules.
 
-That shape matches a two-person technology team, two countries, and a chain that still runs on spreadsheets and two POS systems. A microservice per noun would split COP/USD rules, JWT, and the 14-location roster across deploys Nicolás cannot staff.
+That shape matches a small technology team in Medellín, two countries, and a chain that still runs on spreadsheets and two POS systems. One roster, one currency rule, and one JWT stay in a single process Nicolás can run.
 
 ---
 
-## 2. Problem the backend has to close
+## 2. Architectural pattern
+
+**Pattern:** layered modular monolith.
+
+One deployable HTTP service. Inside it, **layers** separate responsibility and **modules** separate business domains. Background workers are extra processes that call the same domain rules. They are not extra products.
+
+| Layer | What it owns | Brasaland examples |
+| --- | --- | --- |
+| Interface | HTTP, status codes, auth dependencies, OpenAPI | `APIRouter` modules included from `services/api/app.py` |
+| Domain | Nouns, validation, currency and location rules | Pydantic models for locations, menus, sales, customers, suppliers |
+| Jobs | Work that must not block a request | Celery weekly enqueue, Prefect transform, nightly cron, n8n Monday delivery |
+| Data | Stores | Postgres/Supabase for telemetry and reporting, SQLite for staff users, `products.csv` for stock, Redis for the queue |
+
+A module is a vertical slice for one department noun: locations, menus, sales, customers, suppliers, inventory, reporting, knowledge, realtime alerts, users. Each slice may touch several layers. The slice still has one owner in `CONTEXT.md`.
+
+### Why this pattern fits Brasaland
+
+Technology (`CONTEXT.md`) asks for **one central API** covering locations, menus, sales, customers, and suppliers, plus telemetry and a pipeline into dashboards. The company has 14 sites, two currencies, and two POS systems. Headquarters is one office in Medellín with a small technology team. The pattern keeps the roster and the COP/USD rule in one place those systems can call.
+
+### Patterns set aside
+
+| Pattern | Why it is a poor fit here |
+| --- | --- |
+| Classic MVC | The product screens are separate apps in `uis/`. The API returns JSON and one Server-Sent Events stream. A `views/` folder of HTML templates would hide department ownership and would not serve the Vite and Next.js clients. |
+| Serverless (one function per route) | The no-sales alert is a long-lived stream. The Monday pipeline is a multi-step load with a lock in `public.job_runs`. Splitting that across functions would copy the 14-location roster and the currency check into every function’s configuration. |
+| Microservices (one service per department) | Felipe, Lucía, Camila, and Mariana all need the same location id and the same ticket. A service per department would fork that contract across deploys the current team cannot staff. Workers stay separate processes **inside** the monolith’s ops story. They are not a new public API. |
+| A second repository | The briefing work already lives in this monorepo (`services/`, `data/`, `uis/`, `workflows/`). A new backend repo would split the company context from the clients that read it. |
+
+---
+
+## 3. Problem the backend has to close
 
 `CONTEXT.md` describes a profitable chain run with single-restaurant tools:
 
@@ -48,7 +78,7 @@ The backend’s job is to become the system of record those questions read, whil
 
 ---
 
-## 3. What this monorepo already runs
+## 4. What this monorepo already runs
 
 The proposal extends this checkout. It does not replace it.
 
@@ -79,7 +109,7 @@ Detail for graders and operators already lives beside this proposal:
 
 ---
 
-## 4. Target architecture
+## 5. Target architecture
 
 ```mermaid
 flowchart TB
@@ -141,9 +171,48 @@ flowchart TB
 
 ---
 
-## 5. Component map inside the monorepo
+## 6. Folder and module structure
 
 New backend code stays in the folders that already exist. A new top-level application is out of scope.
+
+### Separation criteria
+
+Modules are cut by **who in `CONTEXT.md` owns the rule**, then by **what kind of code it is**.
+
+| Criterion | Rule | Example |
+| --- | --- | --- |
+| Domain | One package or module per noun or department capability | Sales tickets stay in `services/api/sales.py`. Supplier price history stays in `services/api/suppliers.py`. |
+| Layer | HTTP does not compute weekly KPIs. Pipelines do not import FastAPI | `data/process/location_kpis.py` is a pure transform. `services/reporting/` only triggers and reads. |
+| Process | A long job is a worker, a cron entry, or an n8n workflow | `POST /reporting/pipeline-runs` returns 202. The Celery worker runs the load. |
+| Client | Frontends do not import Python. They call HTTP | `uis/website`, `uis/backoffice`, and `uis/portal` are separate apps in the same git repo. |
+| Shared identity | Location ids, currencies, and chain-week bounds are defined once | Reporting, sales, and the no-sales alert all use the roster in `services/api/locations.py`. |
+
+```text
+api/app.py                         # uvicorn entry; loads services/api/app.py
+services/
+  api/
+    app.py                         # FastAPI(); include_router; CORS; error handlers
+    locations.py                   # domain module: router + Pydantic models
+    menus.py
+    sales.py
+    customers.py
+    suppliers.py
+    inventory.py
+    users.py
+    auth.py                        # JWT helpers shared by Depends(get_current_user)
+    no_sales.py / no_sales_router.py
+  reporting/                       # weekly KPI HTTP shell
+  knowledge/                       # POST /knowledge/query
+  celery_app.py, tasks.py          # queue
+  job_runner.py                    # public.job_runs
+data/
+  process/                         # pure transforms and RAG index
+  pipelines/                       # Prefect flows and SQL
+  raw/  eval/
+uis/                               # separate frontend apps (see section 10)
+workflows/                         # n8n, calls the API
+infra/cron/                        # OS schedule, not a FastAPI route
+```
 
 | Path | Responsibility |
 | --- | --- |
@@ -168,7 +237,7 @@ New backend code stays in the folders that already exist. A new top-level applic
 
 ---
 
-## 6. Domain model
+## 7. Domain model
 
 The five nouns are the core. Inventory, telemetry, and the weekly report hang off `location_id`.
 
@@ -270,9 +339,26 @@ Ashley’s portal (holiday requests, absence, onboarding, turnover and vacancy t
 
 ---
 
-## 7. API surface
+## 8. FastAPI endpoints and routers
 
 Interactive docs: `http://127.0.0.1:8000/docs` after `uvicorn api.app:app`.
+
+### Grouping criteria
+
+Routers are grouped by **domain noun**, not by HTTP verb and not by the screen that calls them.
+
+| Criterion | How it is applied |
+| --- | --- |
+| One router per noun | `locations`, `menus`, `sales`, `customers`, `suppliers`, `inventory`, `users` each have their own `APIRouter` and OpenAPI tag. |
+| Prefix equals the noun | Paths hang off `/locations`, `/menus`, `/sales`, `/customers`, `/suppliers`. A caller can tell Lucía’s data from Felipe’s data from the path. |
+| Auth is a router dependency | Staff nouns use `Depends(get_current_user)` on the router. Menus stay public because every kitchen and the public site show the same card. |
+| A path that is not the noun gets its own prefix | Reporting is `/reporting/...` (analytical read model). Knowledge is `/knowledge/query`. Live alerts are `/realtime/ops-alerts` so they do not take over `/sales`. |
+| The app file only composes | `services/api/app.py` constructs `FastAPI`, registers error handlers and CORS, and calls `include_router`. Route bodies stay in the domain module. |
+| Writes and reads of one noun stay together | `GET /sales` and `POST /sales` live on the sales router. `POST /sales` then notifies the no-sales monitor. The monitor does not own the ticket schema. |
+
+### Routes by domain
+
+No new code is required for this proposal. These are the routes the structure already groups, plus later routes that must join the same routers.
 
 | Area | Auth | Representative routes | Caller |
 | --- | --- | --- | --- |
@@ -304,9 +390,63 @@ Errors use a JSON envelope (`status`, `code`, `message`, `detail`) for 400, 404,
 
 ---
 
-## 8. Data flows
+## 9. How a standard FastAPI layout influences this proposal
 
-### 8.1 Ticket to dashboard
+FastAPI’s own guidance for larger apps ([Bigger Applications](https://fastapi.tiangolo.com/tutorial/bigger-applications/)) is the reference used here. The usual shape is a package with `main.py` that only builds the app, plus one module per area that exposes an `APIRouter`, Pydantic models for bodies and responses, and `Depends` for shared auth or a database session. Configuration comes from the environment. Automatic OpenAPI at `/docs` is the contract clients and graders read.
+
+That standard changes three decisions in this repo:
+
+1. **Routers, not one file of routes.** Each Technology noun is already an `APIRouter` (`services/api/locations.py`, `menus.py`, `sales.py`, `customers.py`, `suppliers.py`). New People or Procurement routes follow that file-per-domain rule. They are included from `services/api/app.py` and show up as their own tag in `/docs`.
+2. **Models next to the router, persistence behind them.** While the five nouns are seeded lists, the Pydantic models are the contract. When those lists move to Postgres, the router file keeps the schema and a small data-access function replaces the list. The HTTP shape Felipe and Camila already call stays stable.
+3. **The textbook `app/routers/` tree is adapted, not copied.** A greenfield FastAPI tutorial would put everything under `app/`. This monorepo already separates `services/` (HTTP and workers), `data/` (transforms the tests can run without Uvicorn), and `uis/` (clients). Copying the tutorial tree would create a second backend layout beside `services/api/`. The FastAPI idea — one app object, many routers, shared dependencies — is applied inside the layout the company repo already has.
+
+Configuration follows the same practice: `JWT_SECRET_KEY`, `DATABASE_URL`, `REDIS_URL`, `GROQ_API_KEY`, and Supabase settings are environment variables. They are not constants in the routers.
+
+---
+
+## 10. Frontend and backend as separate systems
+
+The clients and the API are **separate programs that share one git repository**. They are not one process, and they are not separate company repositories.
+
+| App | Stack | Dev URL | How it reaches the API |
+| --- | --- | --- | --- |
+| Central API | FastAPI | `http://127.0.0.1:8000` | Serves JSON and SSE |
+| `uis/website` | Vite / React | `http://localhost:5173` | Public corporate pages. Menu reads can call `GET /menus` from the browser |
+| `uis/backoffice` | Vite / React | `http://localhost:5174` | Browser calls same-origin paths; Vite proxies `/auth`, `/locations`, `/inventory`, `/reporting`, `/realtime`, and related prefixes to port 8000 |
+| `uis/portal` | Next.js | `http://localhost:3000` | Server-side fetch of `GET /customers` and `GET /sales` when `BRASALAND_DATA_SOURCE=live` |
+| `agent.py`, n8n | Python CLI, n8n | — | HTTP clients of the same API |
+
+`uis/web` is incident HTML mounted by the API for an older analysis page. Marketing’s site stays in `uis/website`.
+
+### API communication
+
+- Resource reads and writes are JSON over HTTP.
+- Staff calls send `Authorization: Bearer <access_token>` from `POST /auth/login`.
+- The no-sales banner uses `fetch` and a `ReadableStream` on `GET /realtime/ops-alerts/stream`, because browser `EventSource` cannot set that header.
+- The portal treats the API as an upstream. If the live call fails, it falls back to typed fixtures and says so. It does not reimplement loyalty tiers in a second rules engine. The point rule (1 point per 10,000 COP or 10 USD; Bronze / Silver / Gold) is defined with the customer noun.
+
+A separate git repo per frontend was set aside. Mariana’s Monday report, Camila’s points page, and Felipe’s sales page all depend on field names that change together (`location_id`, `currency`, `brasa_points_balance`). One monorepo keeps those clients next to the routers. Separate **processes** still let the website deploy without restarting the worker.
+
+### Environment variables
+
+| Variable | Process | Rule |
+| --- | --- | --- |
+| `JWT_SECRET_KEY`, `DATABASE_URL`, `REDIS_URL`, `GROQ_API_KEY`, Supabase keys | API, worker, cron | Server only. Never prefixed for a browser bundle |
+| `VITE_API_PROXY` | Backoffice dev server | Proxy target (default `http://127.0.0.1:8000`). Not a secret |
+| `BRASALAND_API_BASE_URL`, `BRASALAND_API_TOKEN`, `BRASALAND_DATA_SOURCE` | Portal **server** | The token is sent as Bearer. It stays off `NEXT_PUBLIC_*` so the guest bundle does not contain a staff JWT |
+| `BRASALAND_STAFF_EMAIL`, `BRASALAND_STAFF_PASSWORD` | n8n | Runtime credentials for Monday login. Absent from the exported workflow JSON |
+
+Root `.env` is gitignored. Each app reads the names it needs. The API does not import Vite or Next config.
+
+### CORS
+
+Browser apps on another origin need an explicit allow-list. `CORSMiddleware` on the central app allows the website (`http://localhost:5173` and `127.0.0.1:5173`) and the backoffice (`5174`), with credentials and the methods and headers those apps send. The portal’s live calls are server-to-server, so browser CORS does not apply to them. A wildcard origin together with credentials would expose staff responses to any site a manager has open. New local ports are added to the allow-list by name when a new `uis/` app calls the API from the browser.
+
+---
+
+## 11. Data flows
+
+### 11.1 Ticket to dashboard
 
 1. A location records a sale (`POST /sales` today; a POS adapter later).
 2. The ticket is stored in the location currency.
@@ -316,7 +456,7 @@ Errors use a JSON envelope (`status`, `code`, `message`, `detail`) for 400, 404,
 
 A location with no sale history stays silent so the alert does not fire for all 14 sites before a POS exists. The simulator exists for graders.
 
-### 8.2 Monday operations and finance
+### 11.2 Monday operations and finance
 
 1. During the week, location events land in `public.telemetry_events` (purchase, waste, stockout, price alert).
 2. Nightly, cron `0 2 * * *` America/Bogota runs `scripts/nightly_export.py`. It writes `public.job_runs` (`pending` → `processing` → `completed` or `failed`). A `processing` row is the lock. A completed row for that date skips a duplicate.
@@ -325,17 +465,17 @@ A location with no sale history stays silent so the alert does not fire for all 
 5. Monday 07:00 America/Bogota, n8n logs into the API, calls `GET /reporting/weekly-location-performance`, and delivers COP and USD leadership copy (email, Slack, CSV). The workflow does not enqueue the pipeline. The week must already be loaded.
 6. The backoffice page “Monday weekly ops & finance report” reads the same endpoint for Mariana, Felipe, and Lucía.
 
-### 8.3 Standards question
+### 11.3 Standards question
 
 `POST /knowledge/query` retrieves chunks from the company knowledge base (allergens, waste, ordering, Brasa Points) and answers only from those chunks, with citations. Default embeddings are local. `BRASALAND_RAG_BACKEND=qdrant` and `BRASALAND_RAG_LLM=openai` are optional. This route is the Training search. It is not Mariana’s sales assistant.
 
-### 8.4 Inventory assistant
+### 11.4 Inventory assistant
 
 `python agent.py` starts only after the API is up. The loop is plain Python (observe, think, act, update) using the Groq client. Tools map to `/inventory`. Turns append to `conversation_log.csv`.
 
 ---
 
-## 9. Persistence plan
+## 12. Persistence plan
 
 Today’s seeds prove the contracts. The next backend step is durability, not a new framework.
 
@@ -360,7 +500,7 @@ Idempotency rules that must survive the move:
 
 ---
 
-## 10. Authentication and authorization
+## 13. Authentication and authorization
 
 | Principal | How they enter | What they may do |
 | --- | --- | --- |
@@ -380,7 +520,7 @@ Authorization to add when nouns become durable:
 
 ---
 
-## 11. Processes and schedules
+## 14. Processes and schedules
 
 Four clocks, on purpose. Folding them into the API process would tie a long ETL or a crashed cron to request latency.
 
@@ -395,7 +535,7 @@ Flower (`localhost:5555`) is the local view of queued, running, and finished Cel
 
 ---
 
-## 12. Multi-market rules
+## 15. Multi-market rules
 
 These rules are part of the architecture. A single-currency or single-timezone shortcut fails the briefing.
 
@@ -407,7 +547,7 @@ These rules are part of the architecture. A single-currency or single-timezone s
 
 ---
 
-## 13. Security and failure behavior
+## 16. Security and failure behavior
 
 - Secrets stay in the environment. Client JSON never echoes DSNs, keys, or filesystem paths.
 - Upload and incident paths resolve inside the repository root.
@@ -419,7 +559,7 @@ These rules are part of the architecture. A single-currency or single-timezone s
 
 ---
 
-## 14. Delivery sequence
+## 17. Delivery sequence
 
 Work continues in this repository, in this order. Each step names a `CONTEXT.md` department.
 
@@ -435,7 +575,15 @@ Monday delivery, the weekly KPI table, the public menu, the seeded CRM, and the 
 
 ---
 
-## 15. Risks
+## 18. Risks and points of attention
+
+If the team leaves this structure, two failures show up in the business before they show up in a code review.
+
+**Point of attention 1 — a second API per department.** If People, Procurement, or Marketing each start their own FastAPI app (or their own repository), the 14-location roster and the COP/USD check get copied. A Florida ticket can land in COP, or a kitchen can be saved as `miami-downtown` in one service and `us-mia-downtown` in another. Mariana’s chain total and Felipe’s no-sales alert then disagree. The proposed structure keeps those rules on the one app and adds a router.
+
+**Point of attention 2 — business rules inside a frontend.** If loyalty tiers, currency checks, or “this location has gone quiet” move into `uis/portal` or `uis/backoffice`, the website, the inventory agent, and the Monday n8n flow each grow their own copy. A guest can see a different Brasa Points tier than the staff CRM, and a sale recorded by the agent will not clear the banner. Domain rules stay in the routers. Clients display the JSON they receive.
+
+**Point of attention 3 — routes piled into `app.py`.** If every new path is written in the application factory, a menu change sits next to staff passwords and the incident uploader. OpenAPI tags stop matching departments, and a public menu route can accidentally inherit staff auth. New endpoints go in the domain module and are mounted with `include_router`.
 
 | Risk | Why it matters | Mitigation in this design |
 | --- | --- | --- |
@@ -449,7 +597,7 @@ Monday delivery, the weekly KPI table, the public menu, the seeded CRM, and the 
 
 ---
 
-## 16. How to read this against the running app
+## 19. How to read this against the running app
 
 From the repository root, with dependencies installed and `JWT_SECRET_KEY` set:
 

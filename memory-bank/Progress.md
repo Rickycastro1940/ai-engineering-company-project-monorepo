@@ -575,6 +575,14 @@ test -f docs/ARCHITECTURE_PROPOSAL.md
 docs/README.md links ARCHITECTURE_PROPOSAL.md
 ```
 
+Revised the same file so a reader can check the pattern, the module layout, and the client boundary without inferring them from the diagrams:
+
+- Pattern named: layered modular monolith (one API, domain modules, job layer). Classic MVC, serverless functions, and a service per department are recorded as poor fits for a small Medellín team, 14 locations, and two currencies.
+- Folder criteria and the `services/` / `data/` / `uis/` tree.
+- FastAPI routers grouped by noun (`APIRouter`, prefix, tag, auth dependency), aligned with FastAPI’s bigger-applications layout and adapted to this monorepo.
+- Frontends stay separate processes in the same repo: HTTP/JSON, Bearer JWT, SSE, server env vars versus `NEXT_PUBLIC_` / `VITE_`, and the CORS allow-list for ports 5173 and 5174.
+- Risks and points of attention: a second API per department, business rules copied into `uis/`, and routes piled into `app.py`.
+
 ## How to update this file
 
 After a verified change, append evidence (command + result) and update the coverage table. Do not log plans that were not run.
