@@ -202,36 +202,40 @@ Unknown ids return 404. A missing token returns 401. Validation errors return 42
 
 ## 5. How a standard FastAPI project shapes this decision
 
-FastAPI’s guide for larger applications ([Bigger Applications — Multiple Files](https://fastapi.tiangolo.com/tutorial/bigger-applications/)) describes the structure this proposal starts from. The usual project that follows it, and that shows up in community layouts such as those summarized around `fastapi/full-stack-fastapi-template` and the “bigger apps” discussions, looks like this:
+Source: FastAPI’s own guide, [Bigger Applications — Multiple Files](https://fastapi.tiangolo.com/tutorial/bigger-applications/). That page is the structure this proposal is checked against. It shows a single package, not one file of routes:
 
 ```text
 app/
-  main.py            # FastAPI() and include_router only
-  api/
-    deps.py          # shared Depends: current user, database session
-    routes/
-      items.py       # APIRouter(prefix="/items", tags=["items"])
-  core/
-    config.py        # settings read once from the environment
-  models/            # persistence models
-  schemas/           # Pydantic request and response models
-  crud/              # queries
+  main.py                 # creates FastAPI() and include_router(...) only
+  dependencies.py         # shared Depends callables (common auth, common query params)
+  routers/
+    items.py              # APIRouter(); paths for one area
+    users.py              # another APIRouter(); its own paths
+  internal/
+    admin.py              # a router included with a prefix and extra dependencies
 ```
 
-The practices that matter, and the effect each one has on Brasaland:
+The same page states the conventions this proposal treats as required:
 
-| Standard practice | What it is for | Decision taken here |
-| --- | --- | --- |
-| `APIRouter` plus `include_router` | Keep path operations out of the application factory. Prefixes, tags, and dependencies attach at include time or on the router. | Adopted. `services/api/app.py` is the factory. Each noun module exposes a router. People and procurement suggestions will be new routers, not new functions in the factory. |
-| Router-level `dependencies` | One policy for every route in a group. | Adopted for staff nouns via `Depends(get_current_user)`. Menus omit it on purpose. |
-| Pydantic models as the HTTP boundary | The OpenAPI document is generated from the models, so clients and the implementation share one declaration. | Adopted. The response models are the contract the portal and the backoffice bind to. When Postgres arrives, persistence models may diverge from these schemas. The schemas stay the contract. |
-| `Depends` for a database session | A request opens a session and closes it, including on failure. | Adopted at the moment nouns leave memory. Injecting a session while the store is a Python list would fake a boundary. |
-| Settings object loaded from the environment at startup | One place lists `JWT_SECRET_KEY`, `DATABASE_URL`, `REDIS_URL`. A missing value fails boot. | Adopted as the target of `services/api/core/`. Today `JWT_SECRET_KEY` can fall back to a process-random secret, which logs every staff user out on restart and hides a misconfiguration. A settings module that refuses to start without the secret is the standard practice applied to a real failure this API already has. |
-| A single `models/` package for every table | Convenient in a tutorial with a handful of unrelated tables. | Rejected as the long-term home. A global models package would put a sale, a supplier price, and a user password in one import graph. That is the spreadsheet problem. Persistence models live in the noun package once the noun has a table. |
-| `crud/` parallel to `routes/` | Keeps SQL out of the path function. | Deferred until SQL exists. A crud function that returns a hard-coded list adds a hop and no invariant. |
-| Tutorial root named `app/` | The framework’s examples are a single project. | Not copied as a new top-level tree. This repository is a monorepo whose backend root is already `services/`. Building `app/routers` beside `services/api` would give Nicolás two composition roots. The FastAPI ideas are applied inside `services/api`. |
+- Path operations for one area live in a module that builds an `APIRouter`.
+- `main.py` imports those routers and mounts them with `include_router`.
+- A router may carry a `prefix`, `tags`, and `dependencies` so every route in that area shares them.
+- The same router can be included more than once under different prefixes.
+- Shared request dependencies live in `dependencies.py`, not copied into each route.
 
-The influence is selective. The proposal takes the composition root, the router-per-domain rule, shared dependencies, Pydantic as the contract, and environment-based settings. It refuses the tutorial’s directory names where those names would create a second backend or a premature persistence layer.
+Those conventions are present in the layout in section 3, under the names this monorepo already uses:
+
+| Convention from the FastAPI guide | Where it sits in this proposal |
+| --- | --- |
+| `app/main.py` only builds the app and includes routers | `services/api/app.py`. `api/app.py` only loads that module so `uvicorn api.app:app` stays the process entry. |
+| `app/routers/<area>.py` as an `APIRouter` | `services/api/locations.py`, `menus.py`, `sales.py`, `customers.py`, `suppliers.py`, `inventory.py`, `users.py`, plus `services/reporting/` and `services/knowledge/`. One module per domain. Routes are not declared in the factory. |
+| `prefix`, `tags`, and router-level `dependencies` | Each noun router sets its prefix and OpenAPI tag. Staff nouns set `Depends(get_current_user)` on the router. Menus omit that dependency because the card is public. |
+| `dependencies.py` for shared dependencies | `services/api/auth.py` is that module: token decode and the current-user dependency. `services/api/core/` is the place settings join it, so a missing `JWT_SECRET_KEY` fails at startup instead of minting a new secret on every boot. |
+| `internal/` included with an extra prefix and extra dependencies | `services/reporting/` is the internal read model. It is mounted under `/reporting` with the same staff dependency, separate from the public menu router. |
+
+The guide’s directory is named `app/` because the tutorial is a single project. This repository is a monorepo whose backend root is already `services/`. Copying an `app/routers` tree beside `services/api` would create a second composition root. The conventions move. The tutorial folder name does not.
+
+Pydantic models sit in the same module as their router. The guide generates OpenAPI from those models, and that is the contract the website and the staff console call. A later split into `schemas.py` and a persistence file happens when a noun gains a table, as drawn under `services/api/sales/` in section 3. Doing that split while the store is still a list would add files the guide does not require.
 
 ---
 

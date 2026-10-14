@@ -597,6 +597,8 @@ head -n 5 CONTEXT.md → # Welcome to Brasaland
 test -f docs/ARCHITECTURE_PROPOSAL.md
 ```
 
+Section 5 now cites the FastAPI “Bigger Applications” tree (`main.py`, `dependencies.py`, `routers/`, `internal/`) and maps each of those conventions onto `services/api/` so the source and the proposed folders name the same ideas.
+
 ## How to update this file
 
 After a verified change, append evidence (command + result) and update the coverage table. Do not log plans that were not run.
