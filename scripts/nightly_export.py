@@ -15,6 +15,7 @@ Run: ``python scripts/nightly_export.py``
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 import subprocess
@@ -36,6 +37,7 @@ OPERATIONAL_EVENT_TYPES = (
     "stock_threshold_triggered",
 )
 JOB_NAME = "nightly_export"
+logger = logging.getLogger("brasaland.nightly_export")
 # Milestone 6 CLI. There is no data.pipelines.telemetry_kpi_daily package here.
 PIPELINE_SCRIPT = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "data", "pipelines", "pipeline.py")
@@ -45,6 +47,22 @@ PIPELINE_SCRIPT = os.path.abspath(
 def _fail(message: str, code: int = 1) -> None:
     print(message, file=sys.stderr)
     sys.exit(code)
+
+
+def _ensure_logging() -> None:
+    if not logging.getLogger().handlers:
+        logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
+
+
+def _mark_failed(job_runner, run_id, message: str) -> None:
+    """Move the open row to failed so it cannot stay processing."""
+    logger.error("nightly_export failed: %s", message)
+    if run_id is None:
+        return
+    try:
+        job_runner.mark_failed(run_id, message)
+    except Exception:
+        logger.error("nightly_export could not mark job_runs id=%s failed", run_id)
 
 
 def _parse_target_date(raw: str) -> str:
@@ -87,6 +105,7 @@ def export_bounds(target_date: str) -> tuple[str, str]:
 
 
 def main() -> None:
+    _ensure_logging()
     target_date = resolve_target_date()
 
     from supabase import create_client
@@ -101,11 +120,16 @@ def main() -> None:
 
     try:
         if job_runner.has_processing_lock(job_name):
-            print("A job is currently processing. Exiting.")
+            logger.info(
+                "nightly_export cancelled: a job_runs row is already processing"
+            )
             sys.exit(0)
 
         if job_runner.has_completed_for_date(job_name, target_date):
-            print(f"Job has already completed successfully for {target_date}. Exiting.")
+            logger.info(
+                "nightly_export skipped as a duplicate for target_date=%s",
+                target_date,
+            )
             sys.exit(0)
 
         run = job_runner.create_run(job_name, target_date)
@@ -115,9 +139,10 @@ def main() -> None:
         run_id = run
         job_runner.mark_processing(run_id)
     except job_runner.JobAlreadyRunning:
-        print("A job is currently processing. Exiting.")
+        logger.info("nightly_export cancelled: a job_runs row is already processing")
         sys.exit(0)
-    except ExternalServiceError:
+    except ExternalServiceError as error:
+        _mark_failed(job_runner, run_id, public_error_text(str(error), "job store is unavailable"))
         _fail("Job store is unavailable.")
     except ImportError:
         _fail("Job store dependencies are missing.")
@@ -127,14 +152,16 @@ def main() -> None:
         try:
             os.makedirs(csv_dir, exist_ok=True)
         except OSError:
-            _fail("Could not create the telemetry export directory.")
+            raise RuntimeError("Could not create the telemetry export directory.") from None
 
         csv_path = os.path.join(csv_dir, f"telemetry_{target_date}.csv")
 
         # Audit snapshot only. The pipeline below reads telemetry_events, not this CSV.
         if os.path.exists(csv_path):
             if not os.path.isfile(csv_path) or os.path.getsize(csv_path) == 0:
-                _fail(f"Existing telemetry export is missing or empty: telemetry_{target_date}.csv")
+                raise RuntimeError(
+                    f"Existing telemetry export is missing or empty: telemetry_{target_date}.csv"
+                )
             print("Telemetry file already exists, skipping export.")
         else:
             print(f"Exporting telemetry events for {target_date}...")
@@ -159,24 +186,26 @@ def main() -> None:
 
             rows = getattr(response, "data", None)
             if rows is None:
-                _fail("Telemetry export returned no dataset.")
+                raise RuntimeError("Telemetry export returned no dataset.")
             if not isinstance(rows, list):
-                _fail("Telemetry export returned malformed data.")
+                raise RuntimeError("Telemetry export returned malformed data.")
 
             try:
                 import pandas as pd
             except ImportError:
-                _fail("pandas is required to write the telemetry CSV.")
+                raise RuntimeError("pandas is required to write the telemetry CSV.") from None
 
             df = pd.DataFrame(rows)
             try:
                 df.to_csv(csv_path, index=False)
             except OSError:
-                _fail(f"Could not write telemetry CSV: telemetry_{target_date}.csv")
+                raise RuntimeError(
+                    f"Could not write telemetry CSV: telemetry_{target_date}.csv"
+                ) from None
             print(f"Exported {len(df)} rows")
 
         if not os.path.isfile(PIPELINE_SCRIPT):
-            _fail("Pipeline script was not found.")
+            raise RuntimeError("Pipeline script was not found.")
 
         print("Running pipeline subprocess")
         # Milestone 6 entry point (not data.pipelines.telemetry_kpi_daily, which is absent).
@@ -187,26 +216,19 @@ def main() -> None:
         )
 
         if result.returncode != 0:
-            raise RuntimeError("Pipeline subprocess failed")
+            detail = (result.stderr or result.stdout or "Pipeline subprocess failed").strip()
+            raise RuntimeError(detail or "Pipeline subprocess failed")
 
         job_runner.mark_completed(run_id)
-        print("Job run completed successfully.")
+        logger.info("nightly_export completed target_date=%s", target_date)
 
     except SystemExit as exit_exc:
         if run_id is not None and exit_exc.code not in (0, None):
-            try:
-                job_runner.mark_failed(run_id, "nightly export failed")
-            except ExternalServiceError:
-                pass
+            _mark_failed(job_runner, run_id, "nightly export failed")
         raise
     except Exception as error:
         safe = public_error_text(str(error), "nightly export failed")
-        print(f"Job run failed: {safe}", file=sys.stderr)
-        if run_id is not None:
-            try:
-                job_runner.mark_failed(run_id, safe)
-            except ExternalServiceError:
-                pass
+        _mark_failed(job_runner, run_id, safe)
         sys.exit(1)
 
 

@@ -544,7 +544,10 @@ Cron expression: `0 2 * * *` with `CRON_TZ=America/Bogota`.
 
 ```text
 head -n 5 CONTEXT.md → # Welcome to Brasaland
-.venv/bin/python -m pytest tests/test_job_control.py tests/test_scripts_io.py -q → 14 passed
+.venv/bin/python -m pytest tests/test_job_control.py tests/test_scripts_io.py -q → 16 passed
+processing lock logs cancellation and exits 0 without create_run
+completed (nightly_export, target_date) logs "skipped as a duplicate" and does not run the pipeline
+pipeline failure calls mark_failed; the row does not stay processing
 TARGET_DATE=2025-01-15 resolves that date; no env → yesterday UTC
 export bounds 2026-10-12 → [2026-10-12T00:00:00Z, 2026-10-13T00:00:00Z) column=timestamp
 existing data/raw/telemetry_YYYY-MM-DD.csv skips the export and still runs data/pipelines/pipeline.py

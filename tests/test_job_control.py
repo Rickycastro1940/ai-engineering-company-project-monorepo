@@ -220,14 +220,90 @@ def test_invalid_date_exits_on_stderr(capsys):
     assert "YYYY-MM-DD" not in captured.out
 
 
-def test_processing_lock_exits_without_export(monkeypatch):
+def test_processing_lock_exits_without_export(monkeypatch, caplog):
+    import logging
+
     import services.job_runner as job_runner
 
+    caplog.set_level(logging.INFO, logger="brasaland.nightly_export")
     monkeypatch.setattr(job_runner, "has_processing_lock", lambda _name: True)
+    monkeypatch.setattr(job_runner, "create_run", lambda *_args: (_ for _ in ()).throw(AssertionError("locked")))
     monkeypatch.setattr(sys, "argv", ["nightly_export.py", "2026-10-12"])
     with pytest.raises(SystemExit) as exc:
         nightly.main()
     assert exc.value.code == 0
+    assert "cancelled" in caplog.text
+    assert "processing" in caplog.text
+
+
+def test_completed_target_date_skips_as_duplicate(monkeypatch, caplog):
+    import logging
+
+    import services.job_runner as job_runner
+
+    caplog.set_level(logging.INFO, logger="brasaland.nightly_export")
+    seen = {}
+
+    def _completed(name, target_date):
+        seen["name"] = name
+        seen["date"] = target_date
+        return True
+
+    monkeypatch.setattr(job_runner, "has_processing_lock", lambda _name: False)
+    monkeypatch.setattr(job_runner, "has_completed_for_date", _completed)
+    monkeypatch.setattr(job_runner, "create_run", lambda *_args: (_ for _ in ()).throw(AssertionError("duplicate")))
+    monkeypatch.setattr(
+        nightly.subprocess,
+        "run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("pipeline")),
+    )
+    monkeypatch.setattr(sys, "argv", ["nightly_export.py", "2026-10-12"])
+    with pytest.raises(SystemExit) as exc:
+        nightly.main()
+    assert exc.value.code == 0
+    assert seen == {"name": "nightly_export", "date": "2026-10-12"}
+    assert "skipped as a duplicate" in caplog.text
+    assert "2026-10-12" in caplog.text
+
+
+def test_pipeline_failure_clears_processing(monkeypatch, caplog):
+    import logging
+
+    import services.job_runner as job_runner
+
+    caplog.set_level(logging.ERROR, logger="brasaland.nightly_export")
+    failed = {}
+    monkeypatch.setattr(job_runner, "has_processing_lock", lambda _name: False)
+    monkeypatch.setattr(job_runner, "has_completed_for_date", lambda _name, _date: False)
+    monkeypatch.setattr(job_runner, "create_run", lambda _name, _date: 4)
+    monkeypatch.setattr(job_runner, "mark_processing", lambda run_id: [{"id": run_id, "status": "processing"}])
+    monkeypatch.setattr(job_runner, "mark_completed", lambda _run_id: (_ for _ in ()).throw(AssertionError("completed")))
+
+    def _mark_failed(run_id, message):
+        failed["id"] = run_id
+        failed["status"] = "failed"
+        failed["message"] = message
+
+    monkeypatch.setattr(job_runner, "mark_failed", _mark_failed)
+    monkeypatch.setattr(
+        nightly.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=1, stdout="", stderr="pipeline blew up"),
+    )
+    csv_path = REPO_ROOT / "data" / "raw" / "telemetry_2099-03-03.csv"
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    csv_path.write_text("id\n1\n", encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", ["nightly_export.py", "2099-03-03"])
+    try:
+        with pytest.raises(SystemExit) as exc:
+            nightly.main()
+    finally:
+        csv_path.unlink(missing_ok=True)
+    assert exc.value.code == 1
+    assert failed["id"] == 4
+    assert failed["status"] == "failed"
+    assert "pipeline blew up" in failed["message"]
+    assert "nightly_export failed" in caplog.text
 
 
 def test_export_filters_timestamp_then_marks_completed(monkeypatch, tmp_path):
