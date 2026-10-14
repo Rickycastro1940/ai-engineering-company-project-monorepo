@@ -40,7 +40,7 @@ Task logs (every attempt): `task_id`, `attempt`, `status`, `duration_ms`; failur
 
 ## Job status control (nightly export)
 
-`services/job_runner.py` is the status store for background jobs. It creates, updates, and queries `public.job_runs` (`create_run`, `mark_processing`, `mark_completed`, `mark_failed`, `has_processing_lock`, `has_completed_for_date`). A `processing` row for `nightly_export` cancels a second start. A `completed` row for that `job_name` and `target_date` skips the export. A failed execution is stored as `failed` with `error_message` so the row does not stay `processing`. Schema: `data/pipelines/job_runs.sql`.
+`services/job_runner.py` is the status store for background jobs. It creates, updates, and queries `public.job_runs` (`create_run`, `mark_processing`, `mark_completed`, `mark_failed`, `has_processing_lock`, `has_completed_for_date`). A new row starts `pending`, then `mark_processing` moves it to `processing` (that status is the lock). A `processing` row for `nightly_export` cancels a second start. A `completed` row for that `job_name` and `target_date` skips the export. A failed execution is stored as `failed` with `error_message` so the row does not stay `processing`. Schema: `data/pipelines/job_runs.sql`.
 
 The caller is `scripts/nightly_export.py`. OS crontab runs it (`0 2 * * *`, `America/Bogota`). It is not a FastAPI route and it is not started by `uvicorn`. See `infra/cron/brasaland-nightly-export.cron`.
 

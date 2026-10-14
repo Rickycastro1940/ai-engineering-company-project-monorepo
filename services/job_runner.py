@@ -57,12 +57,11 @@ def _unique_violation(error: BaseException) -> bool:
 
 
 def create_run(job_name: str, target_date: str):
-    """Insert a processing row and return its id. Raises JobAlreadyRunning on the lock."""
+    """Insert a pending row and return its id. ``mark_processing`` claims the lock."""
     payload = {
         "job_name": job_name,
         "target_date": target_date,
-        "status": "processing",
-        "started_at": _utcnow(),
+        "status": "pending",
     }
 
     def _insert():
@@ -81,14 +80,24 @@ def create_run(job_name: str, target_date: str):
 
 
 def mark_processing(run_id):
-    response = call_external(
-        "job store",
-        lambda: _client()
-        .table("job_runs")
-        .update({"status": "processing", "started_at": _utcnow()})
-        .eq("id", run_id)
-        .execute(),
-    )
+    """Move pending → processing. A second claim for the same date raises JobAlreadyRunning."""
+
+    def _update():
+        return (
+            _client()
+            .table("job_runs")
+            .update({"status": "processing", "started_at": _utcnow()})
+            .eq("id", run_id)
+            .execute()
+        )
+
+    try:
+        response = call_external("job store", _update)
+    except ExternalServiceError as error:
+        cause = error.__cause__
+        if cause is not None and _unique_violation(cause):
+            raise JobAlreadyRunning(str(run_id)) from cause
+        raise
     return response.data
 
 

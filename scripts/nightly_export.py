@@ -166,6 +166,16 @@ def main() -> None:
         job_runner.mark_processing(run_id)
         _log(logging.INFO, "processing", "nightly_export started target_date=%s", target_date)
     except job_runner.JobAlreadyRunning:
+        if run_id is not None:
+            try:
+                job_runner.mark_failed(run_id, "cancelled: processing lock held")
+            except Exception:
+                _log(
+                    logging.ERROR,
+                    "failed",
+                    "nightly_export could not mark job_runs id=%s failed",
+                    run_id,
+                )
         _log(
             logging.INFO,
             "cancelled",
@@ -178,6 +188,9 @@ def main() -> None:
     except ImportError:
         _fail("Job store dependencies are missing.")
 
+    finished = False
+    exit_code = 0
+    failure_message = "nightly export failed"
     try:
         csv_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "raw"))
         try:
@@ -251,16 +264,26 @@ def main() -> None:
             raise RuntimeError(detail or "Pipeline subprocess failed")
 
         job_runner.mark_completed(run_id)
+        finished = True
         _log(logging.INFO, "completed", "nightly_export finished target_date=%s", target_date)
 
-    except SystemExit as exit_exc:
-        if run_id is not None and exit_exc.code not in (0, None):
-            _mark_failed(job_runner, run_id, "nightly export failed")
-        raise
     except Exception as error:
-        safe = public_error_text(str(error), "nightly export failed")
-        _mark_failed(job_runner, run_id, safe)
-        sys.exit(1)
+        failure_message = public_error_text(str(error), "nightly export failed")
+        _log(logging.ERROR, "failed", "nightly_export failed: %s", failure_message)
+        exit_code = 1
+    finally:
+        if run_id is not None and not finished:
+            try:
+                job_runner.mark_failed(run_id, failure_message)
+            except Exception:
+                _log(
+                    logging.ERROR,
+                    "failed",
+                    "nightly_export could not mark job_runs id=%s failed",
+                    run_id,
+                )
+    if exit_code:
+        sys.exit(exit_code)
 
 
 if __name__ == "__main__":

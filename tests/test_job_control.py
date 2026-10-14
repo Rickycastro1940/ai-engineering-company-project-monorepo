@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -23,6 +24,7 @@ def _load_nightly():
 
 
 nightly = _load_nightly()
+_STORE_LOCK = threading.Lock()
 
 
 class _Response:
@@ -63,28 +65,27 @@ class _Query:
         return self
 
     def execute(self):
-        if self.op == "insert":
-            clash = any(
-                row.get("job_name") == self.payload.get("job_name")
-                and str(row.get("target_date")) == str(self.payload.get("target_date"))
-                and row.get("status") == "processing"
-                and self.payload.get("status") == "processing"
-                for row in self.store
-            )
-            if clash:
-                error = Exception("duplicate key value violates unique constraint")
-                error.code = "23505"
-                raise error
-            row = {"id": len(self.store) + 1, "error_message": None, **self.payload}
-            self.store.append(row)
-            return _Response([row])
-        if self.op == "update":
-            updated = []
-            for row in self.store:
-                if row.get("id") == self.filters.get("id"):
-                    row.update(self.payload)
-                    updated.append(dict(row))
-            return _Response(updated)
+        with _STORE_LOCK:
+            if self.op == "insert":
+                row = {"id": len(self.store) + 1, "error_message": None, "started_at": None, **self.payload}
+                self.store.append(row)
+                return _Response([dict(row)])
+            if self.op == "update":
+                current = next(row for row in self.store if row.get("id") == self.filters.get("id"))
+                if self.payload.get("status") == "processing":
+                    clash = any(
+                        row.get("id") != current.get("id")
+                        and row.get("job_name") == current.get("job_name")
+                        and str(row.get("target_date")) == str(current.get("target_date"))
+                        and row.get("status") == "processing"
+                        for row in self.store
+                    )
+                    if clash:
+                        error = Exception("duplicate key value violates unique constraint")
+                        error.code = "23505"
+                        raise error
+                current.update(self.payload)
+                return _Response([dict(current)])
         rows = [
             row
             for row in self.store
@@ -113,29 +114,62 @@ def store(monkeypatch):
     return rows
 
 
-def test_create_run_claims_processing_with_started_at(store):
+def test_create_run_moves_pending_to_processing(store):
     import services.job_runner as job_runner
 
     run_id = job_runner.create_run("nightly_export", "2026-10-12")
     assert run_id == 1
-    assert store[0]["status"] == "processing"
-    assert store[0]["job_name"] == "nightly_export"
+    assert store[0]["status"] == "pending"
     assert store[0]["target_date"] == "2026-10-12"
+    assert store[0]["started_at"] is None
+    job_runner.mark_processing(run_id)
+    assert store[0]["status"] == "processing"
     assert store[0]["started_at"]
 
 
 def test_second_processing_claim_is_the_lock(store):
     import services.job_runner as job_runner
 
-    job_runner.create_run("nightly_export", "2026-10-12")
+    first = job_runner.create_run("nightly_export", "2026-10-12")
+    job_runner.mark_processing(first)
+    second = job_runner.create_run("nightly_export", "2026-10-12")
+    assert store[1]["status"] == "pending"
     with pytest.raises(job_runner.JobAlreadyRunning):
-        job_runner.create_run("nightly_export", "2026-10-12")
+        job_runner.mark_processing(second)
+
+
+def test_two_instances_only_one_stays_processing(store):
+    import services.job_runner as job_runner
+
+    barrier = threading.Barrier(2)
+    outcomes = []
+
+    def _instance():
+        barrier.wait()
+        run_id = job_runner.create_run("nightly_export", "2026-10-12")
+        try:
+            job_runner.mark_processing(run_id)
+            outcomes.append(run_id)
+        except job_runner.JobAlreadyRunning:
+            job_runner.mark_failed(run_id, "cancelled: processing lock held")
+
+    threads = [threading.Thread(target=_instance) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    statuses = sorted(row["status"] for row in store)
+    assert statuses == ["failed", "processing"]
+    assert len(outcomes) == 1
+    assert all(row["target_date"] == "2026-10-12" for row in store)
 
 
 def test_complete_and_fail_set_finished_at(store):
     import services.job_runner as job_runner
 
     run_id = job_runner.create_run("nightly_export", "2026-10-12")
+    job_runner.mark_processing(run_id)
     job_runner.mark_completed(run_id)
     assert store[0]["status"] == "completed"
     assert store[0]["finished_at"]
@@ -393,6 +427,7 @@ def test_export_filters_timestamp_then_marks_completed(monkeypatch, tmp_path):
     monkeypatch.setattr(sys, "argv", ["nightly_export.py", "2099-01-15"])
     try:
         nightly.main()
+        text = csv_path.read_text(encoding="utf-8")
     finally:
         if csv_path.exists():
             csv_path.unlink()
@@ -401,4 +436,7 @@ def test_export_filters_timestamp_then_marks_completed(monkeypatch, tmp_path):
     assert ("gte", "timestamp", "2099-01-15T00:00:00Z") in calls
     assert ("lt", "timestamp", "2099-01-16T00:00:00Z") in calls
     assert completed["id"] == 7
+    assert "timestamp" in text
+    assert "stock_waste_registered" in text
+    assert "co-med-centro" in text
     assert "created_at" not in {item[1] for item in calls if isinstance(item, tuple) and item[0] in {"gte", "lt"}}
