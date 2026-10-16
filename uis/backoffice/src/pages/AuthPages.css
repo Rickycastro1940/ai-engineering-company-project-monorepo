@@ -122,6 +122,13 @@
   font-size: 0.9rem;
 }
 
+.auth-form__warning {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--bo-warn, #fbbf24);
+  font-size: 0.85rem;
+}
+
 .auth-card__muted {
   margin-top: 1rem;
   color: var(--bo-muted);

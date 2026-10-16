@@ -1,63 +1,23 @@
-from pydantic import BaseModel, Field
-from typing import List, Optional
-from datetime import datetime
-from enum import Enum
+"""Compatibility shim — Pydantic inventory schemas live in ``services/schemas.py``."""
 
-class OrderType(str, Enum):
-    INBOUND = "INBOUND"
-    OUTBOUND = "OUTBOUND"
+from services.schemas import (
+    IngredientCreate,
+    IngredientEntryCreate,
+    IngredientEntryResponse,
+    IngredientExitCreate,
+    IngredientExitResponse,
+    IngredientResponse,
+    InventoryOrderResponse,
+    OrderType,
+)
 
-class ProductBase(BaseModel):
-    sku: str
-    name: str
-    description: Optional[str] = None
-    price: float = Field(..., gt=0)
-
-class ProductCreate(ProductBase):
-    pass
-
-class ProductResponse(ProductBase):
-    product_id: str
-    current_stock: int = 0
-
-    class Config:
-        from_attributes = True
-
-class OrderItemBase(BaseModel):
-    product_id: str
-    quantity: int = Field(..., gt=0)
-
-class OrderItemCreate(OrderItemBase):
-    pass
-
-class OrderItemResponse(OrderItemBase):
-    pass
-
-class OrderBase(BaseModel):
-    type: OrderType
-    items: List[OrderItemCreate]
-
-class OrderCreate(OrderBase):
-    pass
-
-class InboundOrderCreate(OrderBase):
-    type: OrderType = OrderType.INBOUND
-
-class OutboundOrderCreate(OrderBase):
-    type: OrderType = OrderType.OUTBOUND
-
-class OrderResponse(BaseModel):
-    id: str
-    type: OrderType
-    created_by: str
-    created_at: datetime
-    items: List[OrderItemResponse]
-
-    class Config:
-        from_attributes = True
-
-class ProductStockResponse(BaseModel):
-    product_id: str
-    sku: str
-    name: str
-    current_stock: int
+__all__ = [
+    "IngredientCreate",
+    "IngredientEntryCreate",
+    "IngredientEntryResponse",
+    "IngredientExitCreate",
+    "IngredientExitResponse",
+    "IngredientResponse",
+    "InventoryOrderResponse",
+    "OrderType",
+]

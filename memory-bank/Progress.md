@@ -26,12 +26,50 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 
 | Area | Evidence |
 | --- | --- |
-| Inventory API + Groq agent | `services/api/inventory.py` (CSV-backed flat imports; no package-relative `.auth`), `agent.py` |
+| Inventory API + Groq agent | ORM Operations stock: `services/routers/inventory.py` (`Ingredient` / `IngredientEntry` / `IngredientExit`, computed `current_stock`); dual DB TinyDB auth + SQLModel inventory; CSV Groq agent under `/agent/inventory` via `services/api/inventory.py` + `agent.py` |
 | Incident analysis UI | `uis/web` |
 | Weekly cost/waste pipeline + Celery | `data/process/location_kpis.py`, `data/pipelines/pipeline.py`, `services/reporting/main.py`, `services/tasks.py`; Compose Redis/Flower/worker |
 | Public corporate website | `uis/website/` — Vite/React, route `/`, brand tokens + components from `CONTEXT.md`; screenshot `docs/screenshots/website-corporate-home.png` |
 | Internal backoffice | `uis/backoffice/` — JWT session; `/accessible` locations+inventory; `/reporting/weekly-performance` Monday weekly ops & finance report (COP/USD) |
 | Locations API | `services/api/locations.py` — 14 locations, Colombia 8 / Florida 6, COP+USD; **Bearer JWT required** |
+
+## Latest backoffice inventory UI evidence (`cursor/backoffice-inventory-ui-4c78`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — kitchen stock UI without WhatsApp).
+
+Instructor gaps addressed: stock indicators; inbound/outbound forms; live stock check + API rejection messaging; read-only order history; four required views; Brasaland terminology (ingredients, current stock, supplier delivery, kitchen usage). Dedicated client `uis/backoffice/src/lib/inventory.ts` (no raw `fetch` in pages). Vite SPA bypass so `/inventory/*` document routes are not proxied to FastAPI.
+
+```text
+cd uis/backoffice && npm run build → tsc -b && vite build green
+Playwright E2E (scripts/e2e_inventory_backoffice.mjs) → 14/14 passed
+  stock_indicators, inbound_confirmation, outbound_live_stock,
+  outbound_client_warning, outbound_api_rejection, outbound_success,
+  order_history (user_uuid, no edit/delete), four required views
+Screenshots: /opt/cursor/artifacts/e2e-products.png, e2e-inbound-success.png,
+  e2e-outbound-reject.png, e2e-orders.png
+```
+
+## Latest inventory ORM dual-database evidence (`cursor/inventory-orm-dual-db-4c78`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — ingredient stock without WhatsApp) + **Technology** (Nicolás Park — dual DB + six `/inventory` endpoints).
+
+Instructor gaps addressed: live API no longer uses CSV for Operations stock; entry/exit records; JWT `user_uuid` attribution; required ingredient fields (`sku`, `unit`, `category`, `country`); six endpoints present.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+GET /docs → 200
+locations=present menus=present sales=present customers=present suppliers=present inventory=present
+path_count=48
+OpenAPI: GET/POST /inventory/products, GET /inventory/products/{id},
+  POST /inventory/orders/inbound, POST /inventory/orders/outbound, GET /inventory/orders
+GET /inventory/products anonymous → 401
+GET /inventory/products Bearer → 200, 6 seeded ingredients, current_stock computed
+POST inbound + outbound → user_uuid from TinyDB JWT; beef 60 → 61 after +3/−2
+PATCH /inventory/1 → 405 (no direct quantity edit on ORM inventory)
+GET /agent/inventory → 200 (CSV agent remains separate)
+uv run pytest tests/test_inventory_orm.py tests/test_users_api.py tests/test_error_handling.py -q → 45 passed
+uv run pytest tests/test_central_api_domains.py -q → 7 passed
+```
 
 ## Latest auth-frontend evidence (`feature/auth-frontend`)
 

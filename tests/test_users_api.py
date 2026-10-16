@@ -25,11 +25,21 @@ class UsersApiTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         self.original_database_path = users.DATABASE_PATH
-        users.DATABASE_PATH = Path(self.temp_dir.name) / "company_api.db"
+        users.DATABASE_PATH = Path(self.temp_dir.name) / "auth.json"
+        from services import database as dual_db
+
+        self._dual_db = dual_db
+        self._original_url = dual_db.DATABASE_URL
+        self._original_auth_path = dual_db.AUTH_DB_PATH
+        dual_db.AUTH_DB_PATH = users.DATABASE_PATH
+        dual_db.configure_engine(f"sqlite:///{Path(self.temp_dir.name) / 'inventory.sqlite'}")
+        dual_db.create_db_and_tables()
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
         users.DATABASE_PATH = self.original_database_path
+        self._dual_db.AUTH_DB_PATH = self._original_auth_path
+        self._dual_db.configure_engine(self._original_url)
         self.temp_dir.cleanup()
 
     def _register(self, email: str, password: str = "secret-password") -> dict:
@@ -303,7 +313,7 @@ class UsersApiTestCase(unittest.TestCase):
 
     def test_authenticated_inventory_list_works_with_bearer_token(self) -> None:
         self._register("ops@example.com")
-        response = self.client.get("/inventory", headers=self._auth_headers("ops@example.com"))
+        response = self.client.get("/inventory/products", headers=self._auth_headers("ops@example.com"))
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response.json(), list)
 
