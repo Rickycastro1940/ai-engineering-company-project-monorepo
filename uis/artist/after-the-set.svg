@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 320" width="220" height="320" role="img">
+  <title>After the set, 2026</title>
+  <rect width="220" height="320" fill="#6d2d22"/>
+  <g>
+    <rect width="28" height="90" fill="#f2d7a2"/>
+    <rect x="28" width="28" height="90" fill="#e07a45"/>
+    <rect x="56" width="28" height="90" fill="#f2d7a2"/>
+    <rect x="84" width="28" height="90" fill="#e07a45"/>
+    <rect x="112" width="28" height="90" fill="#f2d7a2"/>
+    <rect x="140" width="28" height="90" fill="#e07a45"/>
+    <rect x="168" width="28" height="90" fill="#f2d7a2"/>
+    <rect x="196" width="24" height="90" fill="#e07a45"/>
+  </g>
+  <rect x="22" y="130" width="176" height="190" fill="#f6efe4"/>
+  <circle cx="78" cy="210" r="22" fill="#e4572e"/>
+  <circle cx="118" cy="198" r="18" fill="#7d2e2a"/>
+  <circle cx="126" cy="230" r="20" fill="#c6a15b"/>
+</svg>

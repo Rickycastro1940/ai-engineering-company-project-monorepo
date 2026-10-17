@@ -11,6 +11,7 @@ Also present:
 
 - **`portal/`** — Next.js App Router portal. Guest Brasa Points (`/points`) and staff sales by location in COP and USD (`/ops/sales`). See [`portal/README.md`](./portal/README.md).
 - **`web/`** — incident-analysis HTML tool (not the public marketing site).
+- **`artist/`** — static HTML/CSS one-pager for a fictional artist (header, hero, about, career, shows, footer). Not the Brasaland corporate site. See [`artist/README.md`](./artist/README.md).
 
 Organize `uis/` by **different concerns** — each subfolder covers a distinct area of the company (for example, public web vs internal operations) and includes its own technical and functional documentation.
 
