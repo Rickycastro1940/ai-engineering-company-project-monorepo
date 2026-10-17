@@ -173,6 +173,26 @@ SQLite user store: `data/company_api.db`. Set `JWT_SECRET_KEY` so tokens survive
 | `PUT` | `/profiles/me` | Update own name and contact fields (Bearer) |
 | `GET`/`PUT`/`DELETE` | `/users/{id}` | Profile and password updates (self or admin) |
 
+## Incident manager
+
+Staff log operational incidents for Felipe Guerrero (operations) and Mariana Restrepo (open counts by location). The model, CSV transforms, and status transitions live in `packages/shared/incident_rules.py` and are reused by `scripts/seed_incidents.py`.
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `POST` | `/api/incidents` | Create an incident. `400` names the field when a value is missing or not allowed. |
+| `GET` | `/api/incidents` | List incidents. Optional `status`, `origin`, `branch`, `category`. Empty store returns `[]`. |
+| `GET` | `/api/incidents/{id}` | One incident, or `404`. |
+| `PATCH` | `/api/incidents/{id}/status` | `open → in_progress\|discarded`, `in_progress → resolved\|discarded`. Final states return `400`. |
+| `GET` | `/api/incidents/summary` | Totals by status, category, origin, and branch. Zeros when the table is empty. |
+
+Seed (idempotent, skips invalid analyzer rows):
+
+```bash
+python scripts/seed_incidents.py
+```
+
+The backoffice pages are `/incidents/new`, `/incidents`, and `/incidents/summary`.
+
 ## Incident analysis endpoints
 
 The FastAPI app also includes:

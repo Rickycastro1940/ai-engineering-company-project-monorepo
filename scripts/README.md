@@ -5,6 +5,15 @@ This folder contains **helper scripts** for the monorepo: development automation
 - **Main purpose**: group support tools that do not belong to a specific app, agent, or pipeline but make the team’s work easier.
 - **Recommendation**: document each script (what it does, parameters, requirements, usage examples) and keep them reproducible (and safe) across environments.
 
+## `seed_incidents.py`
+
+Loads `scripts/incidents-brasaland.csv` into the incident manager (`data/company_api.db` unless `--database` is set). Invalid analyzer rows are printed and skipped. A second run does not insert duplicates.
+
+```bash
+python scripts/seed_incidents.py
+python scripts/seed_incidents.py scripts/incidents-brasaland.csv --database /tmp/incidents.db
+```
+
 ## `nightly_export.py`
 
 Copies one UTC calendar day of operational rows from `public.telemetry_events` (`timestamp`) into `data/raw/telemetry_YYYY-MM-DD.csv` only when that file is not already there. The CSV is a backup snapshot. The Milestone 6 pipeline (`data/pipelines/pipeline.py`) reads the database, not the file. The script then records final status, `target_date`, timestamps, and any error on `public.job_runs`.

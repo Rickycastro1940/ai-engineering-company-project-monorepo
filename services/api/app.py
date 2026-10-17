@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from customers import router as customers_router
+from incidents import router as incidents_router
 from inventory import router as inventory_router
 from locations import router as locations_router
 from menus import router as menus_router
@@ -145,6 +146,7 @@ app.include_router(inventory_router)
 app.include_router(users_router)
 app.include_router(reporting_router)
 app.include_router(knowledge_router)
+app.include_router(incidents_router)
 register_ops_alerts(app)
 _register_analyze_routes(app, "anylayze")
 _register_analyze_routes(app, "analyze")
