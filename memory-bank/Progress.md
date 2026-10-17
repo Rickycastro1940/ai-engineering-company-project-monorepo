@@ -15,7 +15,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Present (seeded)** — `locations`/`menus`/`sales`/`customers`/`suppliers`/`inventory=present` plus `knowledge=present` (`POST /knowledge/query`) and `realtime=present` (`GET /realtime/ops-alerts/stream`) on `uvicorn api.app:app` (`:8000`). Not a live POS or invoice feed |
 | Technology: telemetry + pipeline to dashboards | **Partial** — live no-sales SSE on `GET /realtime/ops-alerts/stream` plus Part 2 weekly location cost/waste ETL, Prefect stage subflows, KPI unit tests, CLI, and backoffice Monday weekly report; engineering `GET /telemetry/report` untouched. Nightly landing copy is `scripts/nightly_export.py` (OS cron `0 2 * * *` America/Bogota, status in `public.job_runs`), not a FastAPI scheduler |
-| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — seeded `GET /sales` tickets and `/sales/overview` (COP and USD, 14 locations) plus `/sales/alerts`; `POST /sales` stores a ticket and calls `record_sale` so the live no-sales alert on backoffice `/accessible` sees that location; Next.js `uis/portal` `/ops/sales` shows per-location sales in COP and USD. Smart ordering still open |
+| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — seeded `GET /sales` tickets and `/sales/overview` (COP and USD, 14 locations) plus `/sales/alerts`; `POST /sales` stores a ticket and calls `record_sale` so the live no-sales alert on backoffice `/accessible` sees that location; Next.js `uis/portal` `/ops/sales` shows per-location sales in COP and USD. Centralized incident manager is on `/api/incidents` and backoffice `/incidents` (Felipe: branch, category, status). Smart ordering still open |
 | Procurement: supplier price history, consolidated spend | **Partial** — seeded `GET /suppliers` (20 suppliers, Colombia and Florida, price history and alerts); Monday weekly purchase cost / price-alert frequency still separate; invoices are not live |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `GET /customers` CRM seed with `brasa_points_balance` on physical stamp cards; Next.js `uis/portal` `/points` looks up a guest and shows Brasa Points balance, history, and tier rewards (fixtures, or `GET /customers` when `BRASALAND_DATA_SOURCE=live`); `uis/website/` corporate home (`/`) live. `CONTEXT.md` still describes stamp cards as today’s in-restaurant programme |
 | People: HR portal / KPIs by country | **Not done** |
@@ -561,6 +561,23 @@ existing data/raw/telemetry_YYYY-MM-DD.csv skips the export and still runs data/
 crontab -l → CRON_TZ=America/Bogota / 0 2 * * * … scripts/nightly_export.py
 python scripts/nightly_export.py 18-09-2026 → STDERR YYYY-MM-DD, exit 1
 Supabase public.job_runs accepts processing then completed (probe row removed)
+```
+
+## Latest centralized incident manager (`cursor/centralized-incident-manager-8ccc`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — one panel for incidents at every branch) + **Executive** (Mariana Restrepo — open / category / branch totals) + **Technology** (Nicolás Park — routes on the central API, shared validation in `packages/shared/incident_rules.py`).
+
+Historical rows come from `scripts/incidents-brasaland.csv` through `scripts/seed_incidents.py`. Analyzer rules reject 4 invalid rows. The other 96 map to model status and category counts from the incident-manager context (`open` 32, `resolved` 50, `discarded` 14, `customer_complaint` 48). Branch labels are the kitchen names (Medellín Centro, Central (Medellín / Miami), and the rest of the 15-value list). `source_incident_id` is only the seed idempotency key and is not returned by the API.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+python3 -m pytest tests/test_incident_manager.py tests/test_scripts_io.py tests/test_error_handling.py -q → 24 passed
+python3 scripts/seed_incidents.py → Inserted: 96, Invalid CSV rows: 4, second run Already present: 96
+GET /api/incidents/summary → total 96, open 32, resolved 50, discarded 14, customer_complaint 48 before the UI created extra rows
+cd uis/backoffice && npm run build → tsc -b && vite build green
+Browser :5174 login felipe.ops@brasaland.test → /incidents/new empty submit shows “Enter a short title.” and “Describe what happened.”; Branch origin highlights Medellín Centro
+Save grill incident → confirmation, form clears; list shows In progress after the status select; Open filter hides that row
+Totals on /incidents reload after a status change (Open 32→31, In progress 1→2)
 ```
 
 ## How to update this file
