@@ -69,8 +69,11 @@ def test_evaluator_agent_unit_module_includes_failure_case() -> None:
     names = _test_function_names(EVALUATOR_UNIT)
     assert any("evaluator_agent" in n for n in names), names
     assert any("fail" in n for n in names), names
+    assert any("generic" in n for n in names), names
     src = EVALUATOR_UNIT.read_text(encoding="utf-8")
     assert "ComplianceEvaluatorAgent" in src or "EvaluatorAgent" in src
+    assert "ReadabilityEvaluatorAgent" in src
+    assert "passed is True" in src
     assert "passed is False" in src
     assert "TestClient" not in src
     assert "run_section_loop" not in src
@@ -83,6 +86,7 @@ def test_compliance_failure_unit_is_one_context_rule_fixture() -> None:
     assert "@pytest.fixture" in src
     assert "evaluate_compliance" in src
     assert "passed is False" in src
+    assert "min_setup_business_days" in src
     assert "CONTEXT" in src or "10 business days" in src or "setup" in src.casefold()
     assert "run_section_loop" not in src
     assert "TestClient" not in src

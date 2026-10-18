@@ -9,6 +9,7 @@ from data.pipelines.rfp_intake.constants import DEPARTMENT_OPERACIONES
 from data.pipelines.rfp_response.evaluators import (
     ComplianceEvaluatorAgent,
     EvaluatorContext,
+    ReadabilityEvaluatorAgent,
 )
 from data.pipelines.rfp_response.generator import generate_department_draft
 
@@ -37,6 +38,25 @@ def test_compliance_evaluator_agent_unit_passes_context_compliant_draft() -> Non
     assert result.evaluator_agent == "compliance_evaluator_agent"
     assert result.name == "compliance"
     assert result.passed is True
+
+
+def test_readability_evaluator_agent_unit_generic_evaluation_fails() -> None:
+    """Unit: generic evaluation failure (readability), not a CONTEXT §5 rule_id."""
+    agent = ReadabilityEvaluatorAgent()
+    ctx = EvaluatorContext(
+        department_id=DEPARTMENT_OPERACIONES,
+        draft_content="TOO SHORT. ALL CAPS JUNK.",
+        key_aspects=["Operational feasibility for Andes Tech"],
+        metadata={"client_name": "Andes Tech"},
+    )
+
+    result = agent.evaluate(ctx)
+
+    assert result.evaluator_agent == "readability_evaluator_agent"
+    assert result.name == "readability"
+    assert result.passed is False
+    assert result.failures
+    assert not result.rule_ids
 
 
 def test_compliance_evaluator_agent_unit_evaluation_fails() -> None:
