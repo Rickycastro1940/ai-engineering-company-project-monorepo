@@ -39,6 +39,58 @@ class DimensionResult:
     evaluator_agent: str = ""
 
 
+class UnstructuredEvaluationError(TypeError):
+    """Raised when evaluation_results is prose instead of an EvaluationResult object."""
+
+
+def assert_evaluation_result_shape(payload: object) -> dict[str, Any]:
+    """CONTEXT §2.3: evaluation_results is (readability, relevance, compliance) objects.
+
+    Rejects unstructured text such as a single narrative string, or dimension
+    values that are paragraphs instead of ``{passed, score, ...}`` dicts.
+    """
+    if isinstance(payload, str):
+        raise UnstructuredEvaluationError(
+            "evaluation_results must be a structured EvaluationResult object, "
+            "not unstructured text"
+        )
+    if not isinstance(payload, dict):
+        raise UnstructuredEvaluationError(
+            f"evaluation_results must be a dict, not {type(payload).__name__}"
+        )
+    for dim in EVAL_DIMENSIONS:
+        value = payload.get(dim)
+        if isinstance(value, str):
+            raise UnstructuredEvaluationError(
+                f"evaluation_results.{dim} must be a structured object "
+                "(passed/score/notes/failures), not unstructured text"
+            )
+        if not isinstance(value, dict):
+            raise UnstructuredEvaluationError(
+                f"evaluation_results.{dim} must be a dict, not {type(value).__name__}"
+            )
+        if not isinstance(value.get("passed"), bool):
+            raise UnstructuredEvaluationError(
+                f"evaluation_results.{dim}.passed must be a bool"
+            )
+        score = value.get("score")
+        if isinstance(score, bool) or not isinstance(score, (int, float)):
+            raise UnstructuredEvaluationError(
+                f"evaluation_results.{dim}.score must be a number"
+            )
+        for list_key in ("notes", "failures", "rule_ids"):
+            if list_key in value and not isinstance(value[list_key], list):
+                raise UnstructuredEvaluationError(
+                    f"evaluation_results.{dim}.{list_key} must be a list, not prose"
+                )
+    feedback = payload.get("feedback")
+    if feedback is not None and not isinstance(feedback, list):
+        raise UnstructuredEvaluationError(
+            "evaluation_results.feedback must be a list of items, not unstructured text"
+        )
+    return payload
+
+
 @dataclass
 class EvaluationResult:
     """Structured per-section evaluation (CONTEXT §2.3 ``evaluation_results``).
@@ -74,7 +126,7 @@ class EvaluationResult:
             "relevance": self.relevance.score,
             "compliance": self.compliance.score,
         }
-        return {
+        payload = {
             "department_id": self.department_id,
             "passed": self.passed,
             "scores": scores,
@@ -87,6 +139,7 @@ class EvaluationResult:
             "parallel": self.parallel,
             "evaluator_agents": list(self.evaluator_agents),
         }
+        return assert_evaluation_result_shape(payload)
 
 
 @dataclass(frozen=True)

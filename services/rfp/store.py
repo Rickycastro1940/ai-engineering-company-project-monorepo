@@ -199,10 +199,12 @@ def _upsert_section_drafts(
         if section.get("draft_content"):
             row.draft_content = section.get("draft_content") or ""
         if section.get("evaluation_results") is not None:
-            row.evaluation_results_json = json.dumps(
-                section.get("evaluation_results") or {},
-                ensure_ascii=False,
+            from data.pipelines.rfp_response.evaluators import (
+                assert_evaluation_result_shape,
             )
+
+            shaped = assert_evaluation_result_shape(section.get("evaluation_results"))
+            row.evaluation_results_json = json.dumps(shaped, ensure_ascii=False)
         if section.get("passed"):
             row.approval_status = row.approval_status or "pending"
         elif section.get("exhausted") or section.get("section_status") == STATUS_NEEDS_HUMAN_REVIEW:
