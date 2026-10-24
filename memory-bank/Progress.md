@@ -586,6 +586,17 @@ Department served: **Marketing** (Camila Ospina — Tailwind public site).
 Merged draft Tailwind work onto current `main` for continued website milestones.
 ```
 
+## Latest public website + Brasa Points form (`cursor/website-brasa-points-form-8ccc`)
+
+Department served: **Marketing** (Camila Ospina — relaunch corporate site and capture Brasa Points signups).
+
+Merged Tailwind draft onto `main`, then aligned landing copy to the web-fundamentals BRIEFING and added `/join` registration with dependent country → city → location fields and the required error/success messages. Schema.org Restaurant JSON-LD on home. Ordering disclaimer visible on form and contact.
+
+```text
+cd uis/website && npm run build → tsc -b && vite build green
+npm run preview → / /locations /brasa-points /join → 200
+```
+
 ## How to update this file
 
 After a verified change, append evidence (command + result) and update the coverage table. Do not log plans that were not run.

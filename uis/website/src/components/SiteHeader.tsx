@@ -2,15 +2,17 @@ import { Link, NavLink } from "react-router-dom";
 import { brand } from "../content/brand";
 
 const links = [
-  { to: "/#commitments", label: "Our promise" },
+  { to: "/", label: "Home", end: true },
   { to: "/locations", label: "Locations" },
+  { to: "/#story", label: "Menu" },
   { to: "/brasa-points", label: "Brasa Points" },
+  { to: "/#contact", label: "Contact" },
 ];
 
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-20 h-[4.25rem] border-b border-brasa-charcoal/10 bg-brasa-paper/90 backdrop-blur-[10px]">
-      <div className="mx-auto flex h-full w-[min(100%-2rem,68rem)] items-center gap-6">
+      <div className="mx-auto flex h-full w-[min(100%-2rem,68rem)] items-center gap-4 md:gap-6">
         <Link
           to="/"
           className="mr-auto inline-flex items-center gap-2.5 no-underline"
@@ -22,14 +24,17 @@ export function SiteHeader() {
           />
           <span className="font-display text-xl font-bold tracking-tight">{brand.name}</span>
         </Link>
-        <nav className="hidden gap-5 text-[0.95rem] font-semibold md:flex" aria-label="Primary">
+        <nav className="hidden gap-4 text-[0.92rem] font-semibold lg:flex" aria-label="Primary">
           {links.map((link) => (
             <NavLink
               key={link.to}
               to={link.to}
+              end={link.end}
               className={({ isActive }) =>
                 `no-underline transition-colors ${
-                  isActive ? "text-brasa-charcoal" : "text-brasa-muted hover:text-brasa-charcoal"
+                  isActive && link.to !== "/#story" && link.to !== "/#contact"
+                    ? "text-brasa-charcoal"
+                    : "text-brasa-muted hover:text-brasa-charcoal"
                 }`
               }
             >
@@ -38,10 +43,10 @@ export function SiteHeader() {
           ))}
         </nav>
         <Link
-          to="/locations"
+          to="/join"
           className="inline-flex items-center justify-center rounded-[0.35rem] bg-brasa-ember px-4 py-2 font-display text-sm font-semibold text-white no-underline transition-colors hover:bg-brasa-ember-deep focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brasa-ember"
         >
-          Find a location
+          Join Brasa Points
         </Link>
       </div>
     </header>

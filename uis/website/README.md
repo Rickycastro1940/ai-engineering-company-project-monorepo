@@ -1,67 +1,56 @@
 # Brasaland public website
 
-Public-facing corporate site for **Brasaland** (see root [`CONTEXT.md`](../../CONTEXT.md)).
+Public-facing corporate site for **Brasaland** (Camila Ospina / Marketing). Facts follow the web-fundamentals **BRIEFING** and root [`CONTEXT.md`](../../CONTEXT.md).
 
-**Location:** `uis/website/` — matches the monorepo template’s `uis/website` slot (Marketing / Camila Ospina).  
-`uis/web/` remains the separate incident-analysis HTML tool; do not conflate the two.
+**Location:** `uis/website/` — not `uis/web/` (incident HTML tool).
 
 ## Stack
 
 - React 19 + TypeScript + Vite
-- **Tailwind CSS v4** (`@tailwindcss/vite`) with Brasaland theme tokens in `src/styles/index.css`
-- React Router: `/` (home), `/locations`, `/brasa-points`
-- Copy/facts in `src/content/brand.ts` and location roster in `src/content/locations.ts` (aligned with `CONTEXT.md`)
+- **Tailwind CSS v4** (`@tailwindcss/vite`) with Brasaland `@theme` tokens
+- React Router: `/`, `/locations`, `/brasa-points`, `/join`
 
-## Run
+## Run (local or Codespaces)
 
 ```bash
 cd uis/website
 npm install
-npm run dev
+npm run dev -- --host 0.0.0.0 --port 5173
 ```
 
-Open the printed local URL (default `http://localhost:5173/`).
+Forward port **5173** as **Public** in Codespaces so graders can open the preview URL.
 
 ```bash
-npm run build   # production build → dist/
-npm run preview # serve dist/
+npm run build
+npm run preview -- --host 0.0.0.0 --port 4173
+```
+
+Codespaces-friendly static preview of a production build:
+
+```bash
+cd uis/website && npm run build && npx --yes serve dist -l 3000
 ```
 
 ## Routes
 
 | Path | Purpose |
 | --- | --- |
-| `/` | Corporate home — brand hero, commitments, markets, Brasa Points teaser |
-| `/locations` | 14 company-owned sites (Colombia COP / Florida USD) |
-| `/brasa-points` | Loyalty programme status (physical stamp cards today) |
+| `/` | Landing — hero, story, pillars, markets, Brasa Points, contact + Schema.org |
+| `/locations` | 14 sites (Colombia 10 / Florida 4) |
+| `/brasa-points` | Loyalty programme overview |
+| `/join` | Brasa Points registration form (BRIEFING fields + validation) |
 
-## Structure
+## Form validation (`/join`)
 
-```text
-src/
-  components/   # SiteHeader, Hero, BrandPillars, Markets, LoyaltyTeaser, SiteFooter
-  content/      # brand.ts, locations.ts — CONTEXT-aligned facts
-  pages/        # HomePage, LocationsPage, BrasaPointsPage
-  styles/       # index.css — Tailwind + @theme brand tokens
-```
+Matches BRIEFING: full name (2+ words), email, phone `+57`/`+1`, country → city → favorite location, dietary optional, how found, DOB 18+, terms required, offers optional. Clear + success states included. Online ordering disclaimer is visible on the form and contact section.
 
-## Tailwind notes (Web UI Fundamentals)
-
-- Theme colors and fonts live under `@theme` in `src/styles/index.css` (`brasa-*` utilities).
-- Layout and typography use utility classes; grill-atmosphere gradients stay in `@layer components` (`.hero-glow`, `.hero-grill`).
-- Motion: `animate-ember-pulse`, `animate-fade-up`, `animate-fade-in` (respects `prefers-reduced-motion`).
-
-## Academy checklist — Web UI Fundamentals with Tailwind
+## Academy checklist
 
 | Checkpoint | Evidence |
 | --- | --- |
-| Tailwind installed | `package.json` → `tailwindcss`, `@tailwindcss/vite` |
-| Vite plugin wired | `vite.config.ts` |
-| Theme / design tokens | `@theme` in `src/styles/index.css` |
-| Utility-first components | Header, Hero, pillars, markets, loyalty, footer |
-| Multi-page routing | `/`, `/locations`, `/brasa-points` |
-| Responsive layout | `sm:` / `md:` / `lg:` grids; mobile nav hides links |
-| Build green | `npm run build` |
-| Screenshots | `docs/screenshots/website-tailwind-*.png` |
-
-After this branch is merged (or the PR is submitted to graders), refresh the 4Geeks academy progress row for **Web UI Fundamentals with Tailwind** until it shows 100% delivered.
+| Tailwind | `package.json`, `vite.config.ts`, `src/styles/index.css` |
+| Landing sections | `HomePage.tsx` |
+| Signup form | `pages/JoinPage.tsx` + `lib/validateLoyaltyForm.ts` |
+| Schema.org Restaurant | `components/SchemaOrg.tsx` |
+| Responsive + a11y | Tailwind `md:`/`lg:`, labels, `aria-*`, alt on story image |
+| Public Codespaces URL | Forward Vite/serve port as Public; paste URL in the PR |

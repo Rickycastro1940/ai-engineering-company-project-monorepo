@@ -4,15 +4,15 @@ import { brand } from "../content/brand";
 const markets = [
   {
     name: "Colombia",
-    hub: brand.hq,
+    hub: `${brand.colombiaLocations} restaurants in Medellín, Bogotá and Cali`,
     accent: "border-brasa-leaf",
-    copy: "Headquarters and the roots of the brand. Company-owned kitchens across the country keep the original Medellín standard.",
+    copy: "Hours: Mon–Sun 11:00 AM – 10:00 PM. Headquarters in Medellín keeps the original grill standard.",
   },
   {
-    name: "Florida, United States",
-    hub: brand.miamiOffice,
+    name: "United States (Florida)",
+    hub: `${brand.floridaLocations} restaurants in Miami and Orlando`,
     accent: "border-brasa-teal",
-    copy: "Commercial and operations office in Miami coordinates Florida locations — same grill standards, second market.",
+    copy: "Hours: Mon–Sun 11:00 AM – 10:00 PM. Miami office coordinates Florida locations — same recipes, second market.",
   },
 ];
 

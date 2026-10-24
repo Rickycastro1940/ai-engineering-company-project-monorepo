@@ -12,10 +12,7 @@ export function SiteFooter() {
           >
             {brand.name}
           </Link>
-          <p>
-            Led by {brand.ceo}. Built for guests in Colombia and Florida —
-            same grill, two markets.
-          </p>
+          <p>© 2025 Brasaland. All rights reserved.</p>
           <nav className="mt-4 flex flex-wrap gap-4 font-display text-sm font-semibold" aria-label="Footer">
             <Link to="/locations" className="text-white/80 no-underline hover:text-white">
               Locations
@@ -23,10 +20,34 @@ export function SiteFooter() {
             <Link to="/brasa-points" className="text-white/80 no-underline hover:text-white">
               Brasa Points
             </Link>
+            <Link to="/join" className="text-white/80 no-underline hover:text-white">
+              Join
+            </Link>
+            <Link to="/#contact" className="text-white/80 no-underline hover:text-white">
+              Contact
+            </Link>
+            <a
+              href={brand.social.instagram}
+              className="text-white/80 no-underline hover:text-white"
+              rel="noreferrer"
+              target="_blank"
+            >
+              Instagram
+            </a>
+            <a
+              href={brand.social.facebook}
+              className="text-white/80 no-underline hover:text-white"
+              rel="noreferrer"
+              target="_blank"
+            >
+              Facebook
+            </a>
           </nav>
         </div>
         <p className="font-display text-sm tracking-wide md:text-right">
-          HQ {brand.hq} · Office {brand.miamiOffice}
+          {brand.contact.email}
+          <br />
+          Colombia {brand.contact.colombiaPhone} · Florida {brand.contact.floridaPhone}
         </p>
       </div>
     </footer>

@@ -1,4 +1,4 @@
-/** Illustrative roster aligned with CONTEXT.md (14 sites, Colombia + Florida). */
+/** Marketing roster from the web-fundamentals BRIEFING (14 sites: Colombia 10 / Florida 4). */
 export type MarketLocation = {
   id: string;
   name: string;
@@ -9,18 +9,18 @@ export type MarketLocation = {
 };
 
 export const locations: MarketLocation[] = [
-  { id: "co-med-centro", name: "Medellín Centro", city: "Medellín", country: "Colombia", region: "Colombia", currency: "COP" },
-  { id: "co-med-elpoblado", name: "Medellín El Poblado", city: "Medellín", country: "Colombia", region: "Colombia", currency: "COP" },
-  { id: "co-bog-chapinero", name: "Bogotá Chapinero", city: "Bogotá", country: "Colombia", region: "Colombia", currency: "COP" },
-  { id: "co-bog-norte", name: "Bogotá Norte", city: "Bogotá", country: "Colombia", region: "Colombia", currency: "COP" },
-  { id: "co-cali-norte", name: "Cali Norte", city: "Cali", country: "Colombia", region: "Colombia", currency: "COP" },
-  { id: "co-barranquilla", name: "Barranquilla", city: "Barranquilla", country: "Colombia", region: "Colombia", currency: "COP" },
-  { id: "co-cartagena", name: "Cartagena", city: "Cartagena", country: "Colombia", region: "Colombia", currency: "COP" },
-  { id: "co-pereira", name: "Pereira", city: "Pereira", country: "Colombia", region: "Colombia", currency: "COP" },
-  { id: "us-mia-brickell", name: "Miami Brickell", city: "Miami", country: "United States", region: "Florida", currency: "USD" },
-  { id: "us-mia-downtown", name: "Miami Downtown", city: "Miami", country: "United States", region: "Florida", currency: "USD" },
-  { id: "us-orlando", name: "Orlando", city: "Orlando", country: "United States", region: "Florida", currency: "USD" },
-  { id: "us-tampa", name: "Tampa", city: "Tampa", country: "United States", region: "Florida", currency: "USD" },
-  { id: "us-ftlauderdale", name: "Fort Lauderdale", city: "Fort Lauderdale", country: "United States", region: "Florida", currency: "USD" },
-  { id: "us-jacksonville", name: "Jacksonville", city: "Jacksonville", country: "United States", region: "Florida", currency: "USD" },
+  { id: "co-med-elpoblado", name: "Brasaland El Poblado", city: "Medellín", country: "Colombia", region: "Colombia", currency: "COP" },
+  { id: "co-med-laureles", name: "Brasaland Laureles", city: "Medellín", country: "Colombia", region: "Colombia", currency: "COP" },
+  { id: "co-med-envigado", name: "Brasaland Envigado", city: "Medellín", country: "Colombia", region: "Colombia", currency: "COP" },
+  { id: "co-med-sabaneta", name: "Brasaland Sabaneta", city: "Medellín", country: "Colombia", region: "Colombia", currency: "COP" },
+  { id: "co-bog-usaquen", name: "Brasaland Usaquén", city: "Bogotá", country: "Colombia", region: "Colombia", currency: "COP" },
+  { id: "co-bog-chapinero", name: "Brasaland Chapinero", city: "Bogotá", country: "Colombia", region: "Colombia", currency: "COP" },
+  { id: "co-bog-zonarosa", name: "Brasaland Zona Rosa", city: "Bogotá", country: "Colombia", region: "Colombia", currency: "COP" },
+  { id: "co-cali-granada", name: "Brasaland Granada", city: "Cali", country: "Colombia", region: "Colombia", currency: "COP" },
+  { id: "co-cali-ciudadjardin", name: "Brasaland Ciudad Jardín", city: "Cali", country: "Colombia", region: "Colombia", currency: "COP" },
+  { id: "co-cali-unicentro", name: "Brasaland Unicentro", city: "Cali", country: "Colombia", region: "Colombia", currency: "COP" },
+  { id: "us-mia-brickell", name: "Brasaland Brickell", city: "Miami", country: "United States", region: "Florida", currency: "USD" },
+  { id: "us-mia-coralgables", name: "Brasaland Coral Gables", city: "Miami", country: "United States", region: "Florida", currency: "USD" },
+  { id: "us-orl-downtown", name: "Brasaland Downtown", city: "Orlando", country: "United States", region: "Florida", currency: "USD" },
+  { id: "us-orl-idrive", name: "Brasaland International Drive", city: "Orlando", country: "United States", region: "Florida", currency: "USD" },
 ];
