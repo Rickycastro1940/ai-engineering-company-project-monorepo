@@ -602,7 +602,7 @@ npm run preview → / /locations /brasa-points /join → 200
 
 Department served: **Marketing** (Camila Ospina — bilingual public site and a faster first load for the Brasa Points signup).
 
-English stays the default. Header EN/ES writes `brasaland-lang` and `document.documentElement.lang`. English form errors stay the BRIEFING strings. Google Fonts and the Unsplash story photo are gone (system fonts, inline grill SVG). Root `vercel.json` builds `uis/website` when a Vercel project has no root directory, and rewrites SPA routes. PR #113 was still open when this was verified; production `brasaland-website.vercel.app` was an older Next.js deploy without `/join`.
+English stays the default. Header EN/ES writes `brasaland-lang` and `document.documentElement.lang`. English form errors stay the BRIEFING strings. Google Fonts and the Unsplash story photo are gone (system fonts, inline grill SVG). `uis/website/vercel.json` rewrites SPA routes when the Vercel project root is that folder. A repository-root `vercel.json` was tried and removed: commits `4a196a8`, `953d24f`, and `2ab31d1` failed every linked Vercel project (website, brasaland-website, backoffice, portal, web-incident-ui, agents) with no preview URL. PR #113 stays open. Production `brasaland-website.vercel.app` is still the older Next.js site (`/` 200, `/join` 404).
 
 ```text
 cd uis/website && npm run build → tsc -b && vite build green
@@ -612,6 +612,9 @@ empty /join submit EN → “Enter your full name (first and last name)”; ES �
 resource entries → only /assets/*.js and /assets/*.css (no fonts.googleapis, no images.unsplash)
 mobile 390px home → documentElement.scrollWidth within the viewport; header height 69px
 npx lighthouse http://127.0.0.1:4173 → performance 1.00, accessibility 0.96, LCP 1.5s, CLS 0 (local preview, not field PageSpeed)
+gh commit statuses 2ab31d1 → six Vercel contexts failure, no preview URL (about 4:39 PM ET)
+GET https://brasaland-website.vercel.app/ → 200 “Brasaland — The Taste of the Grill, in Every Bite”; /join → 404
+GET https://brasaland.vercel.app/ → 200 older Vite title; /join /locations /brasa-points → 404
 ```
 
 ## How to update this file
