@@ -9,6 +9,8 @@ Public-facing corporate site for **Brasaland** (Camila Ospina / Marketing). Fact
 - React 19 + TypeScript + Vite
 - **Tailwind CSS v4** (`@tailwindcss/vite`) with Brasaland `@theme` tokens
 - React Router: `/`, `/locations`, `/brasa-points`, `/join`
+- Header **EN / ES** toggle (`localStorage` key `brasaland-lang`). English is the default and keeps the BRIEFING error strings.
+- System fonts and an inline story graphic (no Google Fonts, no remote photo) so the first load stays on this origin.
 
 ## Run (local or Codespaces)
 
@@ -52,5 +54,6 @@ Matches BRIEFING: full name (2+ words), email, phone `+57`/`+1`, country → cit
 | Landing sections | `HomePage.tsx` |
 | Signup form | `pages/JoinPage.tsx` + `lib/validateLoyaltyForm.ts` |
 | Schema.org Restaurant | `components/SchemaOrg.tsx` |
-| Responsive + a11y | Tailwind `md:`/`lg:`, labels, `aria-*`, alt on story image |
+| Responsive + a11y | Tailwind `md:`/`lg:`, labels, `aria-*`, story SVG `aria-label` |
+| ES/EN | Header toggle in `SiteHeader.tsx`, copy in `src/i18n/LanguageContext.tsx` |
 | Public Codespaces URL | Forward Vite/serve port as Public; paste URL in the PR |

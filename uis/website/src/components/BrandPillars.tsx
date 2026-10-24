@@ -1,6 +1,8 @@
-import { brand } from "../content/brand";
+import { useI18n } from "../i18n/LanguageContext";
 
 export function BrandPillars() {
+  const { t } = useI18n();
+
   return (
     <section
       id="commitments"
@@ -9,17 +11,14 @@ export function BrandPillars() {
     >
       <div className="mx-auto w-[min(100%-2rem,68rem)]">
         <p className="mb-4 font-display text-sm font-semibold uppercase tracking-[0.08em] text-brasa-teal">
-          What we stand for
+          {t.pillars.eyebrow}
         </p>
         <h2 id="pillars-title" className="mb-4 text-[clamp(1.75rem,3vw,2.35rem)]">
-          Three commitments in every kitchen
+          {t.pillars.title}
         </h2>
-        <p className="max-w-xl text-lg text-brasa-muted">
-          From a single family grill in Medellín to {brand.locations} company-owned
-          restaurants, Brasaland still runs on the same three promises.
-        </p>
+        <p className="max-w-xl text-lg text-brasa-muted">{t.pillars.lead}</p>
         <ul className="mt-10 grid list-none gap-6 p-0 md:grid-cols-3">
-          {brand.commitments.map((item, index) => (
+          {t.pillars.items.map((item, index) => (
             <li
               key={item.title}
               className="border-t-[3px] border-brasa-ember pt-6 animate-fade-up"

@@ -1,4 +1,4 @@
-import { CITIES_BY_COUNTRY, ERRORS, LOCATIONS_BY_CITY, type Country } from "../content/loyaltySignup";
+import { CITIES_BY_COUNTRY, LOCATIONS_BY_CITY, type Country } from "../content/loyaltySignup";
 
 export type LoyaltyFormValues = {
   fullName: string;
@@ -33,30 +33,30 @@ export function validateLoyaltyForm(values: LoyaltyFormValues): FieldErrors {
   const errors: FieldErrors = {};
   const nameParts = values.fullName.trim().split(/\s+/).filter(Boolean);
   if (nameParts.length < 2) {
-    errors.fullName = ERRORS.fullName;
+    errors.fullName = "fullName";
   }
   const email = values.email.trim();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    errors.email = ERRORS.email;
+    errors.email = "email";
   }
   const phone = values.phone.trim();
   if (!/^\+(57|1)\s?\d[\d\s-]{6,}$/.test(phone)) {
-    errors.phone = ERRORS.phone;
+    errors.phone = "phone";
   }
   if (values.country !== "Colombia" && values.country !== "United States") {
-    errors.country = ERRORS.country;
+    errors.country = "country";
   }
   if (!values.city.trim()) {
-    errors.city = ERRORS.city;
+    errors.city = "city";
   }
   if (!values.howFound.trim()) {
-    errors.howFound = ERRORS.howFound;
+    errors.howFound = "howFound";
   }
   if (!ageAtLeast18(values.dateOfBirth)) {
-    errors.dateOfBirth = ERRORS.dateOfBirth;
+    errors.dateOfBirth = "dateOfBirth";
   }
   if (!values.acceptTerms) {
-    errors.acceptTerms = ERRORS.terms;
+    errors.acceptTerms = "terms";
   }
   return errors;
 }

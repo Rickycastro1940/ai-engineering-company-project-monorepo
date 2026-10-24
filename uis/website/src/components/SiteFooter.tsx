@@ -1,30 +1,30 @@
 import { Link } from "react-router-dom";
 import { brand } from "../content/brand";
+import { useI18n } from "../i18n/LanguageContext";
 
 export function SiteFooter() {
+  const { t } = useI18n();
+
   return (
     <footer className="bg-[#11100e] py-10 text-[0.95rem] text-white/70">
       <div className="mx-auto grid w-[min(100%-2rem,68rem)] gap-6 md:grid-cols-[1.4fr_1fr] md:items-end">
         <div>
-          <Link
-            to="/"
-            className="mb-2 inline-block font-display text-xl font-bold text-white no-underline"
-          >
+          <Link to="/" className="mb-2 inline-block font-display text-xl font-bold text-white no-underline">
             {brand.name}
           </Link>
-          <p>© 2025 Brasaland. All rights reserved.</p>
+          <p>{t.footer.rights}</p>
           <nav className="mt-4 flex flex-wrap gap-4 font-display text-sm font-semibold" aria-label="Footer">
             <Link to="/locations" className="text-white/80 no-underline hover:text-white">
-              Locations
+              {t.nav.locations}
             </Link>
             <Link to="/brasa-points" className="text-white/80 no-underline hover:text-white">
-              Brasa Points
+              {t.nav.points}
             </Link>
             <Link to="/join" className="text-white/80 no-underline hover:text-white">
-              Join
+              {t.footer.join}
             </Link>
             <Link to="/#contact" className="text-white/80 no-underline hover:text-white">
-              Contact
+              {t.nav.contact}
             </Link>
             <a
               href={brand.social.instagram}

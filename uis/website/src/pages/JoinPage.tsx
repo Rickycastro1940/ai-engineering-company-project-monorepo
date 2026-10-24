@@ -2,14 +2,8 @@ import { useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { SiteFooter } from "../components/SiteFooter";
 import { SiteHeader } from "../components/SiteHeader";
-import {
-  COUNTRIES,
-  DIETARY_OPTIONS,
-  HOW_FOUND_OPTIONS,
-  ORDERING_NOTE,
-  SUCCESS_BODY,
-  SUCCESS_TITLE,
-} from "../content/loyaltySignup";
+import { COUNTRIES, DIETARY_OPTIONS, HOW_FOUND_OPTIONS } from "../content/loyaltySignup";
+import { useI18n } from "../i18n/LanguageContext";
 import {
   citiesFor,
   emptyLoyaltyForm,
@@ -25,6 +19,7 @@ const errorClass = "mt-1 text-sm font-semibold text-brasa-ember-deep";
 const labelClass = "font-display text-sm font-semibold text-brasa-charcoal";
 
 export function JoinPage() {
+  const { t } = useI18n();
   const [values, setValues] = useState<LoyaltyFormValues>(emptyLoyaltyForm);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [touched, setTouched] = useState<Partial<Record<keyof LoyaltyFormValues, boolean>>>({});
@@ -94,6 +89,15 @@ export function JoinPage() {
     setSubmittedOk(false);
   }
 
+  function errorText(key: keyof LoyaltyFormValues): string | undefined {
+    const code = errors[key];
+    if (!code) return undefined;
+    if (code in t.errors) {
+      return t.errors[code as keyof typeof t.errors];
+    }
+    return code;
+  }
+
   function toggleDietary(option: string) {
     setField(
       "dietary",
@@ -109,18 +113,15 @@ export function JoinPage() {
       <main id="main-content" className="bg-brasa-paper">
         <div className="mx-auto w-[min(100%-2rem,40rem)] py-12 md:py-16">
           <p className="mb-3 font-display text-sm font-semibold uppercase tracking-[0.08em] text-brasa-ember">
-            Brasa Points
+            {t.join.eyebrow}
           </p>
-          <h1 className="mb-3 text-[clamp(1.85rem,4vw,2.5rem)]">Join the loyalty programme</h1>
-          <p className="mb-4 text-lg text-brasa-muted">
-            Register for digital Brasa Points. Earn 1 point for every $10,000 COP or $5 USD and redeem
-            at any of our 14 locations. Guests must be 18 or older.
-          </p>
+          <h1 className="mb-3 text-[clamp(1.85rem,4vw,2.5rem)]">{t.join.title}</h1>
+          <p className="mb-4 text-lg text-brasa-muted">{t.join.lead}</p>
           <p
             className="mb-8 rounded-[0.35rem] border border-brasa-teal/30 bg-brasa-teal/10 px-4 py-3 text-sm text-brasa-charcoal"
             role="note"
           >
-            {ORDERING_NOTE}
+            {t.ordering}
           </p>
 
           {submittedOk ? (
@@ -129,21 +130,21 @@ export function JoinPage() {
               role="status"
               aria-live="polite"
             >
-              <h2 className="mb-3 text-2xl text-brasa-leaf">{SUCCESS_TITLE}</h2>
-              <p className="text-brasa-ink">{SUCCESS_BODY}</p>
+              <h2 className="mb-3 text-2xl text-brasa-leaf">{t.join.successTitle}</h2>
+              <p className="text-brasa-ink">{t.join.successBody}</p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <Link
                   to="/locations"
                   className="inline-flex rounded-[0.35rem] bg-brasa-ember px-4 py-3 font-display text-sm font-semibold text-white no-underline hover:bg-brasa-ember-deep"
                 >
-                  Find a location
+                  {t.join.find}
                 </Link>
                 <button
                   type="button"
                   onClick={handleClear}
                   className="inline-flex rounded-[0.35rem] border border-brasa-charcoal/20 bg-white px-4 py-3 font-display text-sm font-semibold"
                 >
-                  Register another guest
+                  {t.join.another}
                 </button>
               </div>
             </div>
@@ -151,11 +152,11 @@ export function JoinPage() {
             <form className="grid gap-5" onSubmit={handleSubmit} noValidate>
               <fieldset className="grid gap-5 rounded-[0.5rem] border border-brasa-charcoal/10 bg-white p-5 md:p-6">
                 <legend className="px-1 font-display text-base font-bold text-brasa-charcoal">
-                  Your details
+                  {t.join.details}
                 </legend>
                 <div>
                   <label className={labelClass} htmlFor="fullName">
-                    Full name
+                    {t.join.fullName}
                   </label>
                   <input
                     id="fullName"
@@ -170,15 +171,15 @@ export function JoinPage() {
                     aria-invalid={Boolean(touched.fullName && errors.fullName)}
                     aria-describedby={errors.fullName ? "fullName-error" : undefined}
                   />
-                  {touched.fullName && errors.fullName ? (
+                  {touched.fullName && errorText("fullName") ? (
                     <p id="fullName-error" className={errorClass} role="alert">
-                      {errors.fullName}
+                      {errorText("fullName")}
                     </p>
                   ) : null}
                 </div>
                 <div>
                   <label className={labelClass} htmlFor="email">
-                    Email
+                    {t.join.email}
                   </label>
                   <input
                     id="email"
@@ -193,15 +194,15 @@ export function JoinPage() {
                     aria-invalid={Boolean(touched.email && errors.email)}
                     aria-describedby={errors.email ? "email-error" : undefined}
                   />
-                  {touched.email && errors.email ? (
+                  {touched.email && errorText("email") ? (
                     <p id="email-error" className={errorClass} role="alert">
-                      {errors.email}
+                      {errorText("email")}
                     </p>
                   ) : null}
                 </div>
                 <div>
                   <label className={labelClass} htmlFor="phone">
-                    Phone
+                    {t.join.phone}
                   </label>
                   <input
                     id="phone"
@@ -217,15 +218,15 @@ export function JoinPage() {
                     aria-invalid={Boolean(touched.phone && errors.phone)}
                     aria-describedby={errors.phone ? "phone-error" : undefined}
                   />
-                  {touched.phone && errors.phone ? (
+                  {touched.phone && errorText("phone") ? (
                     <p id="phone-error" className={errorClass} role="alert">
-                      {errors.phone}
+                      {errorText("phone")}
                     </p>
                   ) : null}
                 </div>
                 <div>
                   <label className={labelClass} htmlFor="dateOfBirth">
-                    Date of birth
+                    {t.join.dob}
                   </label>
                   <input
                     id="dateOfBirth"
@@ -239,9 +240,9 @@ export function JoinPage() {
                     aria-invalid={Boolean(touched.dateOfBirth && errors.dateOfBirth)}
                     aria-describedby={errors.dateOfBirth ? "dob-error" : undefined}
                   />
-                  {touched.dateOfBirth && errors.dateOfBirth ? (
+                  {touched.dateOfBirth && errorText("dateOfBirth") ? (
                     <p id="dob-error" className={errorClass} role="alert">
-                      {errors.dateOfBirth}
+                      {errorText("dateOfBirth")}
                     </p>
                   ) : null}
                 </div>
@@ -249,11 +250,11 @@ export function JoinPage() {
 
               <fieldset className="grid gap-5 rounded-[0.5rem] border border-brasa-charcoal/10 bg-white p-5 md:p-6">
                 <legend className="px-1 font-display text-base font-bold text-brasa-charcoal">
-                  Where you visit
+                  {t.join.visit}
                 </legend>
                 <div>
                   <label className={labelClass} htmlFor="country">
-                    Country
+                    {t.join.country}
                   </label>
                   <select
                     id="country"
@@ -265,22 +266,22 @@ export function JoinPage() {
                     onBlur={() => handleBlur("country")}
                     aria-invalid={Boolean(touched.country && errors.country)}
                   >
-                    <option value="">Select your country</option>
+                    <option value="">{t.join.selectCountry}</option>
                     {COUNTRIES.map((country) => (
                       <option key={country} value={country}>
-                        {country}
+                        {t.options.countries[country]}
                       </option>
                     ))}
                   </select>
-                  {touched.country && errors.country ? (
+                  {touched.country && errorText("country") ? (
                     <p className={errorClass} role="alert">
-                      {errors.country}
+                      {errorText("country")}
                     </p>
                   ) : null}
                 </div>
                 <div>
                   <label className={labelClass} htmlFor="city">
-                    City
+                    {t.join.city}
                   </label>
                   <select
                     id="city"
@@ -293,22 +294,22 @@ export function JoinPage() {
                     onBlur={() => handleBlur("city")}
                     aria-invalid={Boolean(touched.city && errors.city)}
                   >
-                    <option value="">Select your city</option>
+                    <option value="">{t.join.selectCity}</option>
                     {cityOptions.map((city) => (
                       <option key={city} value={city}>
                         {city}
                       </option>
                     ))}
                   </select>
-                  {touched.city && errors.city ? (
+                  {touched.city && errorText("city") ? (
                     <p className={errorClass} role="alert">
-                      {errors.city}
+                      {errorText("city")}
                     </p>
                   ) : null}
                 </div>
                 <div>
                   <label className={labelClass} htmlFor="favoriteLocation">
-                    Favorite Brasaland location <span className="font-normal text-brasa-muted">(optional)</span>
+                    {t.join.favorite} <span className="font-normal text-brasa-muted">{t.join.optional}</span>
                   </label>
                   <select
                     id="favoriteLocation"
@@ -318,7 +319,7 @@ export function JoinPage() {
                     disabled={!values.city}
                     onChange={(event) => setField("favoriteLocation", event.target.value)}
                   >
-                    <option value="">Select a location</option>
+                    <option value="">{t.join.selectLocation}</option>
                     {locationOptions.map((location) => (
                       <option key={location} value={location}>
                         {location}
@@ -330,11 +331,11 @@ export function JoinPage() {
 
               <fieldset className="grid gap-5 rounded-[0.5rem] border border-brasa-charcoal/10 bg-white p-5 md:p-6">
                 <legend className="px-1 font-display text-base font-bold text-brasa-charcoal">
-                  Preferences
+                  {t.join.prefs}
                 </legend>
                 <div>
                   <p className={labelClass} id="dietary-label">
-                    Dietary preferences <span className="font-normal text-brasa-muted">(optional)</span>
+                    {t.join.dietary} <span className="font-normal text-brasa-muted">{t.join.optional}</span>
                   </p>
                   <div className="mt-3 grid gap-2" role="group" aria-labelledby="dietary-label">
                     {DIETARY_OPTIONS.map((option) => (
@@ -345,14 +346,14 @@ export function JoinPage() {
                           onChange={() => toggleDietary(option)}
                           className="size-4 accent-brasa-ember"
                         />
-                        {option}
+                        {t.options.dietary[option]}
                       </label>
                     ))}
                   </div>
                 </div>
                 <div>
                   <label className={labelClass} htmlFor="howFound">
-                    How did you find us?
+                    {t.join.howFound}
                   </label>
                   <select
                     id="howFound"
@@ -364,16 +365,16 @@ export function JoinPage() {
                     onBlur={() => handleBlur("howFound")}
                     aria-invalid={Boolean(touched.howFound && errors.howFound)}
                   >
-                    <option value="">Select an option</option>
+                    <option value="">{t.join.selectHow}</option>
                     {HOW_FOUND_OPTIONS.map((option) => (
                       <option key={option} value={option}>
-                        {option}
+                        {t.options.howFound[option]}
                       </option>
                     ))}
                   </select>
-                  {touched.howFound && errors.howFound ? (
+                  {touched.howFound && errorText("howFound") ? (
                     <p className={errorClass} role="alert">
-                      {errors.howFound}
+                      {errorText("howFound")}
                     </p>
                   ) : null}
                 </div>
@@ -387,11 +388,11 @@ export function JoinPage() {
                     required
                     aria-invalid={Boolean(touched.acceptTerms && errors.acceptTerms)}
                   />
-                  <span>I accept the Brasa Points program terms</span>
+                  <span>{t.join.terms}</span>
                 </label>
-                {touched.acceptTerms && errors.acceptTerms ? (
+                {touched.acceptTerms && errorText("acceptTerms") ? (
                   <p className={errorClass} role="alert">
-                    {errors.acceptTerms}
+                    {errorText("acceptTerms")}
                   </p>
                 ) : null}
                 <label className="flex items-start gap-3 text-base">
@@ -401,7 +402,7 @@ export function JoinPage() {
                     onChange={(event) => setField("receiveOffers", event.target.checked)}
                     className="mt-1 size-4 accent-brasa-ember"
                   />
-                  <span>I want to receive offers via email</span>
+                  <span>{t.join.offers}</span>
                 </label>
               </fieldset>
 
@@ -410,14 +411,14 @@ export function JoinPage() {
                   type="submit"
                   className="inline-flex min-h-12 items-center justify-center rounded-[0.35rem] bg-brasa-ember px-5 py-3 font-display text-[0.95rem] font-semibold text-white hover:bg-brasa-ember-deep focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brasa-ember"
                 >
-                  Join Brasa Points
+                  {t.join.submit}
                 </button>
                 <button
                   type="button"
                   onClick={handleClear}
                   className="inline-flex min-h-12 items-center justify-center rounded-[0.35rem] border border-brasa-charcoal/25 bg-white px-5 py-3 font-display text-[0.95rem] font-semibold text-brasa-charcoal hover:bg-brasa-stone"
                 >
-                  Clear form
+                  {t.join.clear}
                 </button>
               </div>
             </form>

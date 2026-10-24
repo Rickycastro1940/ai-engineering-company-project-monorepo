@@ -15,8 +15,8 @@
   --color-brasa-ink: #292524;
   --color-brasa-muted: #57534e;
 
-  --font-display: "Outfit", system-ui, sans-serif;
-  --font-body: "Source Sans 3", "Segoe UI", sans-serif;
+  --font-display: "Segoe UI", system-ui, sans-serif;
+  --font-body: system-ui, "Segoe UI", sans-serif;
 
   --animate-ember-pulse: ember-pulse 8s ease-in-out infinite alternate;
   --animate-fade-up: fade-up 0.7s ease-out both;

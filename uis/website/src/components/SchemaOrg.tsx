@@ -27,7 +27,7 @@ const schema = {
     "@type": "ContactPoint",
     telephone: "+57-4-123-4567",
     contactType: "customer service",
-    availableLanguage: ["English"],
+    availableLanguage: ["English", "Spanish"],
   },
   sameAs: [brand.social.instagram, brand.social.facebook],
 };

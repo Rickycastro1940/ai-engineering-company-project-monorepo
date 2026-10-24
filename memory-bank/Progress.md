@@ -17,7 +17,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | Technology: telemetry + pipeline to dashboards | **Partial** — live no-sales SSE on `GET /realtime/ops-alerts/stream` plus Part 2 weekly location cost/waste ETL, Prefect stage subflows, KPI unit tests, CLI, and backoffice Monday weekly report; engineering `GET /telemetry/report` untouched. Nightly landing copy is `scripts/nightly_export.py` (OS cron `0 2 * * *` America/Bogota, status in `public.job_runs`), not a FastAPI scheduler |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — seeded `GET /sales` tickets and `/sales/overview` (COP and USD, 14 locations) plus `/sales/alerts`; `POST /sales` stores a ticket and calls `record_sale` so the live no-sales alert on backoffice `/accessible` sees that location; Next.js `uis/portal` `/ops/sales` shows per-location sales in COP and USD. Centralized incident manager is on `/api/incidents` and backoffice `/incidents` (Felipe: branch, category, status). Smart ordering still open |
 | Procurement: supplier price history, consolidated spend | **Partial** — seeded `GET /suppliers` (20 suppliers, Colombia and Florida, price history and alerts); Monday weekly purchase cost / price-alert frequency still separate; invoices are not live |
-| Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `GET /customers` CRM seed with `brasa_points_balance` on physical stamp cards; Next.js `uis/portal` `/points`; public `uis/website/` now Tailwind (routes `/`, `/locations`, `/brasa-points`). `CONTEXT.md` still describes stamp cards as today’s in-restaurant programme |
+| Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `GET /customers` CRM seed with `brasa_points_balance` on physical stamp cards; Next.js `uis/portal` `/points`; public `uis/website/` Tailwind routes `/`, `/locations`, `/brasa-points`, `/join` with an ES/EN toggle. `CONTEXT.md` still describes stamp cards as today’s in-restaurant programme |
 | People: HR portal / KPIs by country | **Not done** |
 | Training: recipe catalogue, push to 14 locations | **Partial** — `POST /knowledge/query` searches the four English standards (allergens, waste, ordering, Brasa Points) and returns cited chunks. Not a full recipe catalogue and not a push to all 14 kitchens |
 | Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial** — seeded `GET /sales/overview` and portal `/ops/sales` chain totals in COP and USD; Monday weekly ops & finance report in the backoffice; n8n export `workflows/brasaland-monday-leadership-report.n8n.json` schedules Monday 07:00 America/Bogota, logs into the central API, pulls `GET /reporting/weekly-location-performance`, and delivers COP/USD leadership copy (email, Slack, CSV) with a failure branch. Standards questions can go to `POST /knowledge/query`. A sales NL assistant and a chain sales dashboard remain open |
@@ -578,6 +578,7 @@ cd uis/backoffice && npm run build → tsc -b && vite build green
 Browser :5174 login felipe.ops@brasaland.test → /incidents/new empty submit shows “Enter a short title.” and “Describe what happened.”; Branch origin highlights Medellín Centro
 Save grill incident → confirmation, form clears; list shows In progress after the status select; Open filter hides that row
 Totals on /incidents reload after a status change (Open 32→31, In progress 1→2)
+```
 
 ## Latest public website Tailwind (`cursor/website-tailwind-fdaa`)
 
@@ -595,6 +596,22 @@ Merged Tailwind draft onto `main`, then aligned landing copy to the web-fundamen
 ```text
 cd uis/website && npm run build → tsc -b && vite build green
 npm run preview → / /locations /brasa-points /join → 200
+```
+
+## Latest website ES/EN + PageSpeed (`cursor/website-brasa-points-form-8ccc`)
+
+Department served: **Marketing** (Camila Ospina — bilingual public site and a faster first load for the Brasa Points signup).
+
+English stays the default. Header EN/ES writes `brasaland-lang` and `document.documentElement.lang`. English form errors stay the BRIEFING strings. Google Fonts and the Unsplash story photo are gone (system fonts, inline grill SVG). Root `vercel.json` builds `uis/website` when a Vercel project has no root directory, and rewrites SPA routes. PR #113 was still open when this was verified; production `brasaland-website.vercel.app` was an older Next.js deploy without `/join`.
+
+```text
+cd uis/website && npm run build → tsc -b && vite build green
+preview :4173 → / /locations /brasa-points /join → 200
+headless Chrome → EN headline “The taste of the grill, in every bite”; ES “El sabor de la parrilla, en cada bocado”
+empty /join submit EN → “Enter your full name (first and last name)”; ES → “Escribe tu nombre completo (nombre y apellido)”
+resource entries → only /assets/*.js and /assets/*.css (no fonts.googleapis, no images.unsplash)
+mobile 390px home → documentElement.scrollWidth within the viewport; header height 69px
+npx lighthouse http://127.0.0.1:4173 → performance 1.00, accessibility 0.96, LCP 1.5s, CLS 0 (local preview, not field PageSpeed)
 ```
 
 ## How to update this file
