@@ -1,9 +1,10 @@
 {
-  "framework": "vite",
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
   "installCommand": "npm ci --prefix uis/website",
   "buildCommand": "npm run build --prefix uis/website",
   "outputDirectory": "uis/website/dist",
-  "rewrites": [{ "source": "/((?!assets/|favicon.svg).*)", "destination": "/index.html" }],
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
   "headers": [
     {
       "source": "/assets/(.*)",
