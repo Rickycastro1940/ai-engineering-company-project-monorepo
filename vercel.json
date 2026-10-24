@@ -1,9 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "npm ci --prefix uis/website",
-  "buildCommand": "npm run build --prefix uis/website",
-  "outputDirectory": "uis/website/dist",
+  "installCommand": "npm ci --include=dev --prefix uis/website",
+  "buildCommand": "npm run build --prefix uis/website && rm -rf dist && cp -a uis/website/dist dist",
+  "outputDirectory": "dist",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
   "headers": [
     {
