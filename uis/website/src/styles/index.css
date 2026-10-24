@@ -1,0 +1,120 @@
+@import "tailwindcss";
+
+/*
+  Brasaland Marketing site — Tailwind v4 theme tokens.
+  Colors: charcoal grill, ember, Colombia leaf, Florida teal.
+*/
+@theme {
+  --color-brasa-charcoal: #1c1917;
+  --color-brasa-ember: #e85d04;
+  --color-brasa-ember-deep: #bc4500;
+  --color-brasa-leaf: #2d6a4f;
+  --color-brasa-teal: #0e7c7b;
+  --color-brasa-stone: #e8e6e1;
+  --color-brasa-paper: #faf9f7;
+  --color-brasa-ink: #292524;
+  --color-brasa-muted: #57534e;
+
+  --font-display: "Outfit", system-ui, sans-serif;
+  --font-body: "Source Sans 3", "Segoe UI", sans-serif;
+
+  --animate-ember-pulse: ember-pulse 8s ease-in-out infinite alternate;
+  --animate-fade-up: fade-up 0.7s ease-out both;
+  --animate-fade-in: fade-in 0.9s ease-out both;
+}
+
+@keyframes ember-pulse {
+  from {
+    transform: translateY(0) scale(1);
+    opacity: 0.9;
+  }
+  to {
+    transform: translateY(-1.5%) scale(1.04);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  body {
+    @apply m-0 min-w-80 bg-brasa-paper font-body font-normal leading-normal text-brasa-ink antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply m-0 font-display font-bold leading-tight;
+  }
+
+  p {
+    @apply m-0;
+  }
+
+  a {
+    @apply text-inherit;
+  }
+
+  img {
+    @apply block max-w-full;
+  }
+}
+
+/* Grill atmosphere — complex layered backgrounds kept as utilities via CSS */
+@layer components {
+  .hero-glow {
+    background:
+      radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--color-brasa-ember) 55%, transparent), transparent 60%),
+      radial-gradient(ellipse at 20% 40%, color-mix(in srgb, #ffb703 25%, transparent), transparent 50%),
+      radial-gradient(ellipse at 80% 30%, color-mix(in srgb, var(--color-brasa-teal) 20%, transparent), transparent 45%);
+  }
+
+  .hero-grill {
+    opacity: 0.35;
+    background-image:
+      repeating-linear-gradient(
+        90deg,
+        transparent 0,
+        transparent 18px,
+        color-mix(in srgb, #000 55%, transparent) 18px,
+        color-mix(in srgb, #000 55%, transparent) 20px
+      ),
+      linear-gradient(180deg, transparent 35%, color-mix(in srgb, #000 70%, transparent) 100%);
+  }
+}

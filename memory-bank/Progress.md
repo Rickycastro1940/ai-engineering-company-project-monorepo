@@ -17,7 +17,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | Technology: telemetry + pipeline to dashboards | **Partial** — live no-sales SSE on `GET /realtime/ops-alerts/stream` plus Part 2 weekly location cost/waste ETL, Prefect stage subflows, KPI unit tests, CLI, and backoffice Monday weekly report; engineering `GET /telemetry/report` untouched. Nightly landing copy is `scripts/nightly_export.py` (OS cron `0 2 * * *` America/Bogota, status in `public.job_runs`), not a FastAPI scheduler |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — seeded `GET /sales` tickets and `/sales/overview` (COP and USD, 14 locations) plus `/sales/alerts`; `POST /sales` stores a ticket and calls `record_sale` so the live no-sales alert on backoffice `/accessible` sees that location; Next.js `uis/portal` `/ops/sales` shows per-location sales in COP and USD. Centralized incident manager is on `/api/incidents` and backoffice `/incidents` (Felipe: branch, category, status). Smart ordering still open |
 | Procurement: supplier price history, consolidated spend | **Partial** — seeded `GET /suppliers` (20 suppliers, Colombia and Florida, price history and alerts); Monday weekly purchase cost / price-alert frequency still separate; invoices are not live |
-| Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `GET /customers` CRM seed with `brasa_points_balance` on physical stamp cards; Next.js `uis/portal` `/points` looks up a guest and shows Brasa Points balance, history, and tier rewards (fixtures, or `GET /customers` when `BRASALAND_DATA_SOURCE=live`); `uis/website/` corporate home (`/`) live. `CONTEXT.md` still describes stamp cards as today’s in-restaurant programme |
+| Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `GET /customers` CRM seed with `brasa_points_balance` on physical stamp cards; Next.js `uis/portal` `/points`; public `uis/website/` now Tailwind (routes `/`, `/locations`, `/brasa-points`). `CONTEXT.md` still describes stamp cards as today’s in-restaurant programme |
 | People: HR portal / KPIs by country | **Not done** |
 | Training: recipe catalogue, push to 14 locations | **Partial** — `POST /knowledge/query` searches the four English standards (allergens, waste, ordering, Brasa Points) and returns cited chunks. Not a full recipe catalogue and not a push to all 14 kitchens |
 | Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial** — seeded `GET /sales/overview` and portal `/ops/sales` chain totals in COP and USD; Monday weekly ops & finance report in the backoffice; n8n export `workflows/brasaland-monday-leadership-report.n8n.json` schedules Monday 07:00 America/Bogota, logs into the central API, pulls `GET /reporting/weekly-location-performance`, and delivers COP/USD leadership copy (email, Slack, CSV) with a failure branch. Standards questions can go to `POST /knowledge/query`. A sales NL assistant and a chain sales dashboard remain open |
@@ -578,6 +578,12 @@ cd uis/backoffice && npm run build → tsc -b && vite build green
 Browser :5174 login felipe.ops@brasaland.test → /incidents/new empty submit shows “Enter a short title.” and “Describe what happened.”; Branch origin highlights Medellín Centro
 Save grill incident → confirmation, form clears; list shows In progress after the status select; Open filter hides that row
 Totals on /incidents reload after a status change (Open 32→31, In progress 1→2)
+
+## Latest public website Tailwind (`cursor/website-tailwind-fdaa`)
+
+Department served: **Marketing** (Camila Ospina — Tailwind public site).
+
+Merged draft Tailwind work onto current `main` for continued website milestones.
 ```
 
 ## How to update this file
