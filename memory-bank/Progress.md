@@ -612,9 +612,11 @@ empty /join submit EN → “Enter your full name (first and last name)”; ES �
 resource entries → only /assets/*.js and /assets/*.css (no fonts.googleapis, no images.unsplash)
 mobile 390px home → documentElement.scrollWidth within the viewport; header height 69px
 npx lighthouse http://127.0.0.1:4173 → performance 1.00, accessibility 0.96, LCP 1.5s, CLS 0 (local preview, not field PageSpeed)
-gh commit statuses 2ab31d1 → six Vercel contexts failure, no preview URL (about 4:39 PM ET)
-GET https://brasaland-website.vercel.app/ → 200 “Brasaland — The Taste of the Grill, in Every Bite”; /join → 404
-GET https://brasaland.vercel.app/ → 200 older Vite title; /join /locations /brasa-points → 404
+gh commit statuses 16ce614 → all six Vercel projects Deployment has completed (about 4:57 PM ET)
+Preview (Vercel login wall): https://brasaland-website-git-cursor-w-63004b-rickycastro1940s-projects.vercel.app
+Preview (Vercel login wall): https://website-git-cursor-website-bra-5955ff-rickycastro1940s-projects.vercel.app
+GET https://brasaland-website.vercel.app/ → 200 older Next.js title; /join → 404 (production branch was not updated)
+dig brasaland.com → Cloudflare NS only, no A or CNAME
 ```
 
 ## How to update this file
