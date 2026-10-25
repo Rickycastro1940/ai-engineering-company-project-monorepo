@@ -4,7 +4,8 @@ This folder contains **all projects with a user interface** for the cross-functi
 
 The two main projects stored here are:
 
-- **`website`** — Brasaland’s public-facing corporate site (Vite + React + Tailwind CSS). Routes `/`, `/locations`, `/brasa-points`, `/join`, with an EN/ES toggle. See [`website/README.md`](./website/README.md).
+- **`website-classic`** — the public site production publishes (dish photos, menu, locations, Brasa Points, allergens, supplier application, EN/ES). See [`website-classic/README.md`](./website-classic/README.md).
+- **`website`** — later Vite + React experiment (routes `/`, `/locations`, `/brasa-points`, `/join`). It is not the build Vercel serves. See [`website/README.md`](./website/README.md).
 - **`backoffice`** — internal Brasaland Digital console (Vite + React). Public `/login` and `/register`; staff views (`/`, `/accessible`, `/incidents`, `/incidents/new`, `/incidents/summary`, `/account/profile`, `/account/change-password`) use a client layout guard (`ProtectedRoute` + `useRequireAuth`) that checks `localStorage` and `GET /auth/me`. `/accessible` shows live no-sales alerts for Felipe Guerrero. `/incidents` is the centralized incident manager. See [`backoffice/README.md`](./backoffice/README.md). Legacy static KPI HTML lives in `backoffice/legacy/`.
 
 Also present:

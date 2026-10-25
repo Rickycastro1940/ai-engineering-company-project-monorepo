@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
-echo "Node $(node -v)"
-npm ci --include=dev --prefix uis/website
-npm run build --prefix uis/website
 rm -rf dist
-cp -a uis/website/dist dist
+mkdir dist
+cp -a uis/website-classic/. dist
+rm -f dist/README.md
+echo "Published classic Brasaland site ($(find dist -type f | wc -l) files)"
