@@ -17,7 +17,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | Technology: telemetry + pipeline to dashboards | **Partial** — live no-sales SSE on `GET /realtime/ops-alerts/stream` plus Part 2 weekly location cost/waste ETL, Prefect stage subflows, KPI unit tests, CLI, and backoffice Monday weekly report; engineering `GET /telemetry/report` untouched. Nightly landing copy is `scripts/nightly_export.py` (OS cron `0 2 * * *` America/Bogota, status in `public.job_runs`), not a FastAPI scheduler |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — seeded `GET /sales` tickets and `/sales/overview` (COP and USD, 14 locations) plus `/sales/alerts`; `POST /sales` stores a ticket and calls `record_sale` so the live no-sales alert on backoffice `/accessible` sees that location; Next.js `uis/portal` `/ops/sales` shows per-location sales in COP and USD. Centralized incident manager is on `/api/incidents` and backoffice `/incidents` (Felipe: branch, category, status). Smart ordering still open |
 | Procurement: supplier price history, consolidated spend | **Partial** — seeded `GET /suppliers` (20 suppliers, Colombia and Florida, price history and alerts); Monday weekly purchase cost / price-alert frequency still separate; invoices are not live |
-| Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `GET /customers` CRM seed with `brasa_points_balance` on physical stamp cards; Next.js `uis/portal` `/points`; public `uis/website/` Tailwind routes `/`, `/locations`, `/brasa-points`, `/join` with an ES/EN toggle. `CONTEXT.md` still describes stamp cards as today’s in-restaurant programme |
+| Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `GET /customers` CRM seed with `brasa_points_balance` on physical stamp cards; Next.js `uis/portal` `/points`; public production site is `uis/website-classic/` (dish photos, menu, locations, Brasa Points, allergens, supplier application, EN/ES), restored from commit `2465196`. The Vite app in `uis/website/` is not what Vercel publishes. `CONTEXT.md` still describes stamp cards as today’s in-restaurant programme |
 | People: HR portal / KPIs by country | **Not done** |
 | Training: recipe catalogue, push to 14 locations | **Partial** — `POST /knowledge/query` searches the four English standards (allergens, waste, ordering, Brasa Points) and returns cited chunks. Not a full recipe catalogue and not a push to all 14 kitchens |
 | Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial** — seeded `GET /sales/overview` and portal `/ops/sales` chain totals in COP and USD; Monday weekly ops & finance report in the backoffice; n8n export `workflows/brasaland-monday-leadership-report.n8n.json` schedules Monday 07:00 America/Bogota, logs into the central API, pulls `GET /reporting/weekly-location-performance`, and delivers COP/USD leadership copy (email, Slack, CSV) with a failure branch. Standards questions can go to `POST /knowledge/query`. A sales NL assistant and a chain sales dashboard remain open |
@@ -617,6 +617,22 @@ Preview (Vercel login wall): https://brasaland-website-git-cursor-w-63004b-ricky
 Preview (Vercel login wall): https://website-git-cursor-website-bra-5955ff-rickycastro1940s-projects.vercel.app
 GET https://brasaland-website.vercel.app/ → 200 older Next.js title; /join → 404 (production branch was not updated)
 dig brasaland.com → Cloudflare NS only, no A or CNAME
+```
+
+## Latest public site restored to the photo build (`cursor/restore-photo-site-8ccc`)
+
+Department served: **Marketing** (Camila Ospina — the public site guests actually see).
+
+The dark Vite page on `www.brasalandrestaurant.com` replaced the earlier multi-page site. That earlier build is commit `2465196` and is still the GitHub Pages site. Production now copies `uis/website-classic/` (photos, menu, locations, loyalty, allergens, supplier application, EN/ES, table-request chat). `/join`, `/locations`, `/brasa-points`, and `/menu` map to those pages. Schema.org URLs use `https://www.brasalandrestaurant.com`.
+
+```text
+sh scripts/build-website.sh → Published classic Brasaland site (23 files)
+python3 -m http.server 4188 --directory dist
+GET / → 200, title “Brasaland — Grilled food in Colombia and Florida”, sirloin photo in the hero
+GET /menu.html /locations.html /loyalty.html /allergens.html /application.html /404.html → 200
+headless Chrome home → flame logo, sirloin photo, Menu / Locations / Brasa Points / Allergens / Supplier apply, ES, Reserve
+headless Chrome /menu.html → six dish photos (sirloin, ribs, chicken, salad, arepa, house sauce)
+vercel.json maps /join and /brasa-points to loyalty.html, /locations to locations.html, /menu to menu.html
 ```
 
 ## How to update this file

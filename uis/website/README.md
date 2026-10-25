@@ -1,6 +1,6 @@
 # Brasaland public website
 
-Public-facing corporate site for **Brasaland** (Camila Ospina / Marketing). Facts follow the web-fundamentals **BRIEFING** and root [`CONTEXT.md`](../../CONTEXT.md).
+Later Vite experiment for **Brasaland** (Camila Ospina / Marketing). Production publishes [`../website-classic/`](../website-classic/README.md), the photo menu site restored from commit `2465196`. This folder is not the build Vercel serves.
 
 **Location:** `uis/website/` — not `uis/web/` (incident HTML tool).
 

@@ -1,0 +1,316 @@
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.brasalandrestaurant.com/#organization",
+      "name": "Brasaland",
+      "description": "Grilled-food restaurant chain operating in Colombia and Florida (US). Sirloin, ribs, and chicken over the brasa, with house sauce and corn arepas. Brasa Points are valid at every location. Florida stays in USD $; Colombia stays in COP $.",
+      "url": "https://www.brasalandrestaurant.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.brasalandrestaurant.com/images/brasaland-logo.svg"
+      },
+      "sameAs": [
+        "https://github.com/Rickycastro1940/ai-engineering-company-project-monorepo"
+      ],
+      "areaServed": [
+        {
+          "@type": "Country",
+          "name": "Colombia"
+        },
+        {
+          "@type": "AdministrativeArea",
+          "name": "Florida",
+          "containedInPlace": {
+            "@type": "Country",
+            "name": "United States"
+          }
+        }
+      ],
+      "hasMenu": {
+        "@id": "https://www.brasalandrestaurant.com/#menu"
+      },
+      "subOrganization": [
+        { "@id": "https://www.brasalandrestaurant.com/#miami-downtown" },
+        { "@id": "https://www.brasalandrestaurant.com/#bogota-norte" },
+        { "@id": "https://www.brasalandrestaurant.com/#COL-01" },
+        { "@id": "https://www.brasalandrestaurant.com/#COL-02" },
+        { "@id": "https://www.brasalandrestaurant.com/#COL-03" },
+        { "@id": "https://www.brasalandrestaurant.com/#COL-04" },
+        { "@id": "https://www.brasalandrestaurant.com/#COL-05" },
+        { "@id": "https://www.brasalandrestaurant.com/#COL-06" },
+        { "@id": "https://www.brasalandrestaurant.com/#COL-07" },
+        { "@id": "https://www.brasalandrestaurant.com/#COL-08" },
+        { "@id": "https://www.brasalandrestaurant.com/#COL-09" },
+        { "@id": "https://www.brasalandrestaurant.com/#COL-10" }
+      ]
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.brasalandrestaurant.com/#website",
+      "name": "Brasaland",
+      "url": "https://www.brasalandrestaurant.com/",
+      "inLanguage": ["en", "es"],
+      "publisher": {
+        "@id": "https://www.brasalandrestaurant.com/#organization"
+      }
+    },
+    {
+      "@type": "Menu",
+      "@id": "https://www.brasalandrestaurant.com/#menu",
+      "name": "Brasaland guest menu",
+      "url": "https://www.brasalandrestaurant.com/menu.html",
+      "hasMenuSection": [
+        {
+          "@type": "MenuSection",
+          "name": "From the grill",
+          "hasMenuItem": [
+            {
+              "@type": "MenuItem",
+              "name": "Grilled Sirloin",
+              "alternateName": "Lomo a la Brasa",
+              "description": "Beef sirloin over the brasa, with a marinade."
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Brasaland BBQ Ribs",
+              "description": "Grilled ribs with imported sauce."
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Classic Grilled Chicken",
+              "description": "Chicken cooked over the brasa."
+            }
+          ]
+        },
+        {
+          "@type": "MenuSection",
+          "name": "Salad, side, and sauce",
+          "hasMenuItem": [
+            {
+              "@type": "MenuItem",
+              "name": "Tropical Salad",
+              "description": "With cashew and feta."
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Corn Arepa",
+              "description": "Served with the grill."
+            },
+            {
+              "@type": "MenuItem",
+              "name": "House Sauce",
+              "description": "Brasaland house sauce."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "@type": ["Restaurant", "LocalBusiness", "FoodEstablishment"],
+      "@id": "https://www.brasalandrestaurant.com/#miami-downtown",
+      "name": "Brasaland",
+      "branchCode": "miami-downtown",
+      "parentOrganization": {
+        "@id": "https://www.brasalandrestaurant.com/#organization"
+      },
+      "currenciesAccepted": "USD",
+      "hasMenu": {
+        "@id": "https://www.brasalandrestaurant.com/#menu"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressRegion": "Florida",
+        "addressCountry": "US"
+      }
+    },
+    {
+      "@type": ["Restaurant", "LocalBusiness", "FoodEstablishment"],
+      "@id": "https://www.brasalandrestaurant.com/#bogota-norte",
+      "name": "Brasaland",
+      "branchCode": "bogota-norte",
+      "parentOrganization": {
+        "@id": "https://www.brasalandrestaurant.com/#organization"
+      },
+      "currenciesAccepted": "COP",
+      "hasMenu": {
+        "@id": "https://www.brasalandrestaurant.com/#menu"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CO"
+      }
+    },
+    {
+      "@type": ["Restaurant", "LocalBusiness", "FoodEstablishment"],
+      "@id": "https://www.brasalandrestaurant.com/#COL-01",
+      "name": "Brasaland",
+      "branchCode": "COL-01",
+      "parentOrganization": {
+        "@id": "https://www.brasalandrestaurant.com/#organization"
+      },
+      "currenciesAccepted": "COP",
+      "hasMenu": {
+        "@id": "https://www.brasalandrestaurant.com/#menu"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CO"
+      }
+    },
+    {
+      "@type": ["Restaurant", "LocalBusiness", "FoodEstablishment"],
+      "@id": "https://www.brasalandrestaurant.com/#COL-02",
+      "name": "Brasaland",
+      "branchCode": "COL-02",
+      "parentOrganization": {
+        "@id": "https://www.brasalandrestaurant.com/#organization"
+      },
+      "currenciesAccepted": "COP",
+      "hasMenu": {
+        "@id": "https://www.brasalandrestaurant.com/#menu"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CO"
+      }
+    },
+    {
+      "@type": ["Restaurant", "LocalBusiness", "FoodEstablishment"],
+      "@id": "https://www.brasalandrestaurant.com/#COL-03",
+      "name": "Brasaland",
+      "branchCode": "COL-03",
+      "parentOrganization": {
+        "@id": "https://www.brasalandrestaurant.com/#organization"
+      },
+      "currenciesAccepted": "COP",
+      "hasMenu": {
+        "@id": "https://www.brasalandrestaurant.com/#menu"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CO"
+      }
+    },
+    {
+      "@type": ["Restaurant", "LocalBusiness", "FoodEstablishment"],
+      "@id": "https://www.brasalandrestaurant.com/#COL-04",
+      "name": "Brasaland",
+      "branchCode": "COL-04",
+      "parentOrganization": {
+        "@id": "https://www.brasalandrestaurant.com/#organization"
+      },
+      "currenciesAccepted": "COP",
+      "hasMenu": {
+        "@id": "https://www.brasalandrestaurant.com/#menu"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CO"
+      }
+    },
+    {
+      "@type": ["Restaurant", "LocalBusiness", "FoodEstablishment"],
+      "@id": "https://www.brasalandrestaurant.com/#COL-05",
+      "name": "Brasaland",
+      "branchCode": "COL-05",
+      "parentOrganization": {
+        "@id": "https://www.brasalandrestaurant.com/#organization"
+      },
+      "currenciesAccepted": "COP",
+      "hasMenu": {
+        "@id": "https://www.brasalandrestaurant.com/#menu"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CO"
+      }
+    },
+    {
+      "@type": ["Restaurant", "LocalBusiness", "FoodEstablishment"],
+      "@id": "https://www.brasalandrestaurant.com/#COL-06",
+      "name": "Brasaland",
+      "branchCode": "COL-06",
+      "parentOrganization": {
+        "@id": "https://www.brasalandrestaurant.com/#organization"
+      },
+      "currenciesAccepted": "COP",
+      "hasMenu": {
+        "@id": "https://www.brasalandrestaurant.com/#menu"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CO"
+      }
+    },
+    {
+      "@type": ["Restaurant", "LocalBusiness", "FoodEstablishment"],
+      "@id": "https://www.brasalandrestaurant.com/#COL-07",
+      "name": "Brasaland",
+      "branchCode": "COL-07",
+      "parentOrganization": {
+        "@id": "https://www.brasalandrestaurant.com/#organization"
+      },
+      "currenciesAccepted": "COP",
+      "hasMenu": {
+        "@id": "https://www.brasalandrestaurant.com/#menu"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CO"
+      }
+    },
+    {
+      "@type": ["Restaurant", "LocalBusiness", "FoodEstablishment"],
+      "@id": "https://www.brasalandrestaurant.com/#COL-08",
+      "name": "Brasaland",
+      "branchCode": "COL-08",
+      "parentOrganization": {
+        "@id": "https://www.brasalandrestaurant.com/#organization"
+      },
+      "currenciesAccepted": "COP",
+      "hasMenu": {
+        "@id": "https://www.brasalandrestaurant.com/#menu"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CO"
+      }
+    },
+    {
+      "@type": ["Restaurant", "LocalBusiness", "FoodEstablishment"],
+      "@id": "https://www.brasalandrestaurant.com/#COL-09",
+      "name": "Brasaland",
+      "branchCode": "COL-09",
+      "parentOrganization": {
+        "@id": "https://www.brasalandrestaurant.com/#organization"
+      },
+      "currenciesAccepted": "COP",
+      "hasMenu": {
+        "@id": "https://www.brasalandrestaurant.com/#menu"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CO"
+      }
+    },
+    {
+      "@type": ["Restaurant", "LocalBusiness", "FoodEstablishment"],
+      "@id": "https://www.brasalandrestaurant.com/#COL-10",
+      "name": "Brasaland",
+      "branchCode": "COL-10",
+      "parentOrganization": {
+        "@id": "https://www.brasalandrestaurant.com/#organization"
+      },
+      "currenciesAccepted": "COP",
+      "hasMenu": {
+        "@id": "https://www.brasalandrestaurant.com/#menu"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "CO"
+      }
+    }
+  ]
+}
