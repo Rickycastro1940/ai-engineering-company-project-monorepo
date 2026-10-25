@@ -1,31 +1,47 @@
 export const brand = {
   name: "Brasaland",
-  tagline: "Grilled food that tastes the same in Medellín and Miami.",
+  headline: "The taste of the grill, in every bite",
+  tagline:
+    "Since 2008 serving the best grilled meats in Colombia and the United States. 14 locations, one passion for quality and flavor.",
   founded: 2008,
   hq: "Medellín, Colombia",
   miamiOffice: "Miami, Florida",
   locations: 14,
+  colombiaLocations: 10,
+  floridaLocations: 4,
   employees: 115,
   markets: ["Colombia", "Florida (US)"],
   currencies: ["COP", "USD"],
+  story:
+    "Founded in Medellín in 2008, Brasaland began as a family dream: sharing the authentic taste of grilled meat with consistent quality and warm service. Today we are 14 restaurants in two countries, but we maintain the same recipe for success: fresh products, traditional techniques, and passion for every dish we serve.",
   commitments: [
     {
-      title: "Same taste everywhere",
-      body: "A Brasaland plate in Medellín matches the one in Miami — recipes and presentation stay consistent across all 14 kitchens.",
+      title: "Consistent Quality",
+      body: "Same recipes and standards in all locations. Fresh ingredients selected daily.",
     },
     {
-      title: "Warm, consistent service",
-      body: "Guests feel the same welcome whether they walk into a Colombia location or a Florida dining room.",
+      title: "Warm Experience",
+      body: "Friendly and attentive service. Family atmosphere on every visit.",
     },
     {
-      title: "A kitchen that moves fast",
-      body: "Speed without shortcuts: the grill line is built for rush hour without losing quality.",
+      title: "Speed",
+      body: "Your food ready in minutes — without sacrificing flavor or quality.",
     },
   ],
   loyalty: {
     name: "Brasa Points",
     status:
-      "Today Brasa Points still runs on physical stamp cards. Brasaland Digital is building the digital loyalty experience Camila Ospina’s team needs.",
+      "Accumulate 1 point for every $10,000 COP or $5 USD. Redeem for discounts and free dishes. Exclusive member offers. 100% digital registration — no more paper cards.",
+  },
+  contact: {
+    email: "hello@brasaland.com",
+    colombiaPhone: "+57 4 123 4567",
+    floridaPhone: "+1 305 123 4567",
+  },
+  social: {
+    instagram: "https://instagram.com/brasaland",
+    facebook: "https://facebook.com/brasaland",
   },
   ceo: "Mariana Restrepo",
+  marketingLead: "Camila Ospina",
 } as const;

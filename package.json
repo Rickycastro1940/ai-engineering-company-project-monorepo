@@ -1,4 +1,10 @@
 {
+  "scripts": {
+    "build": "sh scripts/build-website.sh"
+  },
+  "engines": {
+    "node": "22.x"
+  },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.0"

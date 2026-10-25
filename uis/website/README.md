@@ -1,37 +1,59 @@
 # Brasaland public website
 
-Public-facing corporate site for **Brasaland** (see root [`CONTEXT.md`](../../CONTEXT.md)).
+Public-facing corporate site for **Brasaland** (Camila Ospina / Marketing). Facts follow the web-fundamentals **BRIEFING** and root [`CONTEXT.md`](../../CONTEXT.md).
 
-**Location:** `uis/website/` — matches the monorepo template’s `uis/website` slot (Marketing / Camila Ospina).  
-`uis/web/` remains the separate incident-analysis HTML tool; do not conflate the two.
+**Location:** `uis/website/` — not `uis/web/` (incident HTML tool).
 
 ## Stack
 
 - React 19 + TypeScript + Vite
-- React Router (`/` → home)
-- Shared visual tokens in `src/styles/tokens.css`
-- Copy/facts in `src/content/brand.ts` (aligned with `CONTEXT.md`)
+- **Tailwind CSS v4** (`@tailwindcss/vite`) with Brasaland `@theme` tokens
+- React Router: `/`, `/locations`, `/brasa-points`, `/join`
+- Header **EN / ES** toggle (`localStorage` key `brasaland-lang`). English is the default and keeps the BRIEFING error strings.
+- System fonts and an inline story graphic (no Google Fonts, no remote photo) so the first load stays on this origin.
 
-## Run
+## Run (local or Codespaces)
 
 ```bash
 cd uis/website
 npm install
-npm run dev
+npm run dev -- --host 0.0.0.0 --port 5173
 ```
 
-Open the printed local URL (default `http://localhost:5173/`). Route `/` renders the corporate home page.
+Forward port **5173** as **Public** in Codespaces so graders can open the preview URL.
 
 ```bash
-npm run build   # production build → dist/
+npm run build
+npm run preview -- --host 0.0.0.0 --port 4173
 ```
 
-## Structure
+Codespaces-friendly static preview of a production build:
 
-```text
-src/
-  components/   # SiteHeader, Hero, BrandPillars, Markets, LoyaltyTeaser, SiteFooter
-  content/      # brand.ts — CONTEXT-aligned facts
-  pages/        # HomePage
-  styles/       # tokens.css — company visual identity
+```bash
+cd uis/website && npm run build && npx --yes serve dist -l 3000
 ```
+
+## Routes
+
+| Path | Purpose |
+| --- | --- |
+| `/` | Landing — hero, story, pillars, markets, Brasa Points, contact + Schema.org |
+| `/locations` | 14 sites (Colombia 10 / Florida 4) |
+| `/brasa-points` | Loyalty programme overview |
+| `/join` | Brasa Points registration form (BRIEFING fields + validation) |
+
+## Form validation (`/join`)
+
+Matches BRIEFING: full name (2+ words), email, phone `+57`/`+1`, country → city → favorite location, dietary optional, how found, DOB 18+, terms required, offers optional. Clear + success states included. Online ordering disclaimer is visible on the form and contact section.
+
+## Academy checklist
+
+| Checkpoint | Evidence |
+| --- | --- |
+| Tailwind | `package.json`, `vite.config.ts`, `src/styles/index.css` |
+| Landing sections | `HomePage.tsx` |
+| Signup form | `pages/JoinPage.tsx` + `lib/validateLoyaltyForm.ts` |
+| Schema.org Restaurant | `components/SchemaOrg.tsx` |
+| Responsive + a11y | Tailwind `md:`/`lg:`, labels, `aria-*`, story SVG `aria-label` |
+| ES/EN | Header toggle in `SiteHeader.tsx`, copy in `src/i18n/LanguageContext.tsx` |
+| Public Codespaces URL | Forward Vite/serve port as Public; paste URL in the PR |
