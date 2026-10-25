@@ -5,7 +5,7 @@ const schema = {
   "@type": "Restaurant",
   name: brand.name,
   description: "Grilled food restaurant chain in Colombia and the United States",
-  url: "https://brasaland.com",
+  url: "https://brasalandrestaurant.com",
   foundingDate: String(brand.founded),
   servesCuisine: "Grilled food, Colombian cuisine",
   priceRange: "$$",
