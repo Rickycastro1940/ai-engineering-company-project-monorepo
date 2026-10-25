@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "alias": ["brasalandrestaurant.com", "www.brasalandrestaurant.com"],
   "builds": [
     {
       "src": "package.json",
