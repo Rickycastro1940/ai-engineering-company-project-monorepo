@@ -141,6 +141,35 @@ describe("RFP registration notifications", () => {
     assert.equal(reconnectDelayMs(3), 4000);
   });
 
+  it("recovers a ticket missed during the backoff without a second card", () => {
+    const connected = reduceRfpTickets([], {
+      id: "4",
+      event: "rfp_ticket_created",
+      data: andes as unknown as Record<string, unknown>,
+    });
+    const firstWait = reconnectDelayMs(1);
+    const secondWait = reconnectDelayMs(2);
+    assert.equal(firstWait, 1000);
+    assert.equal(secondWait, 2000);
+    assert.ok(secondWait > firstWait);
+    const replayed = reduceRfpTickets(connected, {
+      id: "5",
+      event: "rfp_ticket_created",
+      data: sunset as unknown as Record<string, unknown>,
+    });
+    const replayedAgain = reduceRfpTickets(replayed, {
+      id: "5",
+      event: "rfp_ticket_created",
+      data: sunset as unknown as Record<string, unknown>,
+    });
+    const recovered = mergeRfpTickets(replayedAgain, [andes, sunset]);
+    assert.deepEqual(
+      recovered.map((row) => row.ticket_id),
+      ["def", "abc"],
+    );
+    assert.equal(new Set(recovered.map((row) => row.ticket_id)).size, recovered.length);
+  });
+
   it("labels a new analyzing ticket apart from the roster and resumes after its event id", () => {
     const label = rfpArrivalLabel(andes);
     assert.match(label, /New RFP/);

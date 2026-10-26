@@ -70,3 +70,7 @@ Open `http://127.0.0.1:5174/login`, sign in, and open **RFP registration**.
 NO_SALES_MONITOR=0 python -m pytest tests/test_rfp_sse.py -q
 node --experimental-strip-types --test uis/backoffice/tests/rfpNotifications.test.ts
 ```
+
+`test_http_stream_frames_named_rfp_ticket_created_event` reads `GET /notifications/stream` and checks `Content-Type: text/event-stream`, the `event: rfp_ticket_created` line, and a `data:` JSON object with the Brasaland RFP fields (`ticket_id`, `status: analyzing`, client site, restaurants, COP or USD).
+
+`test_reconnect_recovers_ticket_registered_while_disconnected` closes that stream, registers a ticket during the gap, and opens it again with `Last-Event-ID`. The missed ticket is the only `rfp_ticket_created` frame. The UI test `recovers a ticket missed during the backoff without a second card` checks the 1s then 2s wait and that a replay plus a snapshot still has one row per `ticket_id`.

@@ -30,9 +30,9 @@ Department served: **Marketing** (Camila Ospina — she opens the corporate RFP 
 
 ```text
 NO_SALES_MONITOR=0 python3 -m pytest tests/test_rfp_sse.py -q
-# 7 passed
+# 9 passed
 node --experimental-strip-types --test uis/backoffice/tests/rfpNotifications.test.ts
-# 4 passed
+# 5 passed
 cd uis/backoffice && npx tsc -b --pretty false
 # exit 0
 ```

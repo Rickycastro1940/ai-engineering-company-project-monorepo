@@ -268,6 +268,116 @@ async def _sse_round_trip() -> None:
         await replay.aclose()
 
 
+def _read_sse_until(response, needle: str, *, max_chunks: int = 40) -> str:
+    """Read the live HTTP stream until one frame contains needle."""
+    text = ""
+    for chunk in response.iter_text():
+        text += chunk
+        if needle in text:
+            return text
+        max_chunks -= 1
+        if max_chunks <= 0:
+            break
+    raise AssertionError(f"SSE stream did not include {needle!r}. Saw: {text!r}")
+
+
+def _named_event_payloads(text: str) -> list[dict]:
+    payloads: list[dict] = []
+    for block in text.replace("\r\n", "\n").split("\n\n"):
+        if "event: rfp_ticket_created" not in block:
+            continue
+        data_lines = [
+            line.split(":", 1)[1].lstrip()
+            for line in block.split("\n")
+            if line.startswith("data:")
+        ]
+        if data_lines:
+            payloads.append(json.loads("\n".join(data_lines)))
+    return payloads
+
+
+def test_http_stream_frames_named_rfp_ticket_created_event() -> None:
+    """The SSE route itself, not a detached dict: headers, event name, and JSON data."""
+    from fastapi.testclient import TestClient
+
+    with TestClient(app) as client:
+        headers = _auth_headers(client)
+        created = _post_rfp(client, headers, ANDES)
+        assert created.status_code == 201, created.text
+        ticket_id = created.json()["ticket_id"]
+        with client.stream("GET", "/notifications/stream", headers=headers, timeout=5) as response:
+            assert response.status_code == 200
+            content_type = response.headers["content-type"]
+            assert content_type.startswith("text/event-stream")
+            assert response.headers["cache-control"] == "no-cache"
+            assert response.headers["x-accel-buffering"] == "no"
+            wire = _read_sse_until(response, ticket_id)
+
+    assert wire.startswith(": keep-alive")
+    assert "event: message" not in wire
+    assert "event: rfp_ticket_created" in wire
+    payloads = _named_event_payloads(wire)
+    assert payloads
+    payload = next(row for row in payloads if row["ticket_id"] == ticket_id)
+    assert payload["status"] == "analyzing"
+    assert payload["terminal"] is False
+    assert payload["company"] == "brasaland"
+    assert payload["owner"] == "Camila Ospina"
+    assert payload["client_name"] == "Andes Tech Solutions"
+    assert payload["location"] == "Medellín"
+    assert payload["country"] == "Colombia"
+    assert payload["currency"] == "COP"
+    assert payload["service_type"] == "weekly catering"
+    assert payload["scope"].startswith("220 employees")
+    assert payload["deadline"] == "2026-11-30"
+    assert payload["budget_range"] == "48000000 COP/year"
+    assert payload["departments_needed"] == ["marketing", "operaciones", "procurement"]
+    assert [site["id"] for site in payload["locations"]] == [
+        "co-med-centro",
+        "co-med-elpoblado",
+    ]
+    assert payload["rfp_id"].startswith("rfp_")
+    assert "emergency_order" not in wire
+    assert "waste_escalation" not in wire
+
+
+def test_reconnect_recovers_ticket_registered_while_disconnected() -> None:
+    """Drop the stream, register during the gap, reconnect with Last-Event-ID once."""
+    from fastapi.testclient import TestClient
+
+    with TestClient(app) as client:
+        headers = _auth_headers(client)
+        first = _post_rfp(client, headers, ANDES)
+        assert first.status_code == 201, first.text
+        first_body = first.json()
+        with client.stream("GET", "/notifications/stream", headers=headers, timeout=5) as response:
+            assert response.headers["content-type"].startswith("text/event-stream")
+            seen = _read_sse_until(response, first_body["ticket_id"])
+        assert _named_event_payloads(seen)[0]["ticket_id"] == first_body["ticket_id"]
+
+        missed = _post_rfp(client, headers, SUNSET)
+        assert missed.status_code == 201, missed.text
+        missed_body = missed.json()
+        resumed = {**headers, "Last-Event-ID": str(first_body["event_id"])}
+        with client.stream(
+            "GET",
+            "/notifications/stream",
+            headers=resumed,
+            timeout=5,
+        ) as response:
+            assert response.status_code == 200
+            assert response.headers["content-type"].startswith("text/event-stream")
+            recovered = _read_sse_until(response, missed_body["ticket_id"])
+
+    payloads = _named_event_payloads(recovered)
+    ids = [row["ticket_id"] for row in payloads]
+    assert ids == [missed_body["ticket_id"]]
+    assert first_body["ticket_id"] not in ids
+    assert payloads[0]["status"] == "analyzing"
+    assert payloads[0]["budget_range"] == "60000-75000 USD/year"
+    assert payloads[0]["currency"] == "USD"
+
+
 def test_last_event_id_skips_older_registrations() -> None:
     older = rfp.register_rfp(
         client_name="Andes Tech Solutions",
