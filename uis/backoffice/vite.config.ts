@@ -47,6 +47,16 @@ export default defineConfig({
         timeout: 0,
         proxyTimeout: 0,
       },
+      "/rfp/tickets": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
+      "/notifications": {
+        target: apiTarget,
+        changeOrigin: true,
+        timeout: 0,
+        proxyTimeout: 0,
+      },
       "/api": {
         target: apiTarget,
         changeOrigin: true,

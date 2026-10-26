@@ -9,6 +9,7 @@ import { IncidentListPage, IncidentSummaryPage } from "./pages/IncidentListPage"
 import { LoginPage } from "./pages/LoginPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { RfpIntakePage } from "./pages/RfpIntakePage";
 import { WeeklyPerformancePage } from "./pages/WeeklyPerformancePage";
 
 export default function App() {
@@ -27,6 +28,7 @@ export default function App() {
           >
             {/* Staff views: session required (token in localStorage, validated with GET /auth/me). */}
             <Route path="/accessible" element={<AccessiblePage />} />
+            <Route path="/rfp-intake" element={<RfpIntakePage />} />
             <Route path="/incidents/new" element={<IncidentFormPage />} />
             <Route path="/incidents/summary" element={<IncidentSummaryPage />} />
             <Route path="/incidents" element={<IncidentListPage />} />
