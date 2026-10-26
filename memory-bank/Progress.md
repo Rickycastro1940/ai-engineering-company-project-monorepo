@@ -26,13 +26,13 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 
 Department served: **Marketing** (Camila Ospina — she opens the corporate RFP ticket) and **Technology** (Nicolás Park — SSE on the central API). Felipe, Lucía, and Jake see the same `analyzing` ticket.
 
-`POST /rfp/tickets` stores the Brasaland RFP fields and sets `status` to `analyzing`. `GET /notifications/stream` emits `rfp_ticket_created` (`text/event-stream`, keep-alive, `Last-Event-ID`). The backoffice page is `/rfp-intake`. `location` is the client site. `locations` lists Brasaland restaurants from one market only (`country` and `currency` follow that roster). Colombia stays COP and Florida stays USD.
+`POST /rfp/tickets` stores the Brasaland RFP fields and sets `status` to `analyzing`. `GET /notifications/stream` emits `rfp_ticket_created` (`text/event-stream`, keep-alive, `Last-Event-ID`). The operations dashboard `/accessible` shows a Corporate RFP notice from that stream (`fetch` + `ReadableStream`, staff JWT) without reloading locations or inventory. Recovery is `Last-Event-ID` plus a refetch of `GET /rfp/tickets` on reconnect, deduped by `ticket_id`. `/rfp-intake` is the registration form. `location` is the client site. `locations` lists Brasaland restaurants from one market only (`country` and `currency` follow that roster). Colombia stays COP and Florida stays USD.
 
 ```text
 NO_SALES_MONITOR=0 python3 -m pytest tests/test_rfp_sse.py -q
 # 7 passed
 node --experimental-strip-types --test uis/backoffice/tests/rfpNotifications.test.ts
-# 3 passed
+# 4 passed
 cd uis/backoffice && npx tsc -b --pretty false
 # exit 0
 ```

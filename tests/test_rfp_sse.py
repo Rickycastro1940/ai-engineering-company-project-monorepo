@@ -118,6 +118,7 @@ def test_registration_starts_analyzing_with_brasaland_rfp_fields() -> None:
         assert body["departments_needed"] == ["marketing", "operaciones", "procurement"]
         assert body["rfp_id"].startswith("rfp_")
         assert body["ticket_id"]
+        assert isinstance(body["event_id"], int)
         assert body["raw_pdf_path"].endswith("andes-request.pdf")
         assert "emergency_order" not in created.text
         assert "waste_escalation" not in created.text

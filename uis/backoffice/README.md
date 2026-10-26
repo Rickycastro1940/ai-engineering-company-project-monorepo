@@ -10,7 +10,7 @@ Internal staff console for **Brasaland Digital** (see root [`CONTEXT.md`](../../
 | --- | --- | --- |
 | `/login` | Email + password form. Success stores JWT and opens `/accessible`. Failure stays on the form. | Public |
 | `/register` | Registration form. Success: `POST /users` (optional `name`) then `POST /auth/login`, store JWT, open `/accessible`. Failure shows field-level errors. | Public |
-| `/accessible` | Welcome dashboard — locations, inventory, and live no-sales alerts | Protected |
+| `/accessible` | Welcome dashboard — locations, inventory, live no-sales alerts, and a live Corporate RFP notice | Protected |
 | `/rfp-intake` | Register a corporate RFP. Live `analyzing` tickets from `GET /notifications/stream` | Protected |
 | `/incidents/new` | Log an incident (branch dropdown uses kitchen labels; branch origin highlights the field) | Protected |
 | `/incidents` | Incident list with status, origin, and branch filters, plus totals | Protected |
@@ -55,6 +55,8 @@ npm run dev
 Open `http://localhost:5174/login`. Vite proxies `/auth`, `/users`, `/profiles`, `/locations`, `/inventory`, `/reporting/weekly-location-performance`, `/reporting/pipeline-runs`, `/tasks`, `/realtime`, `/rfp/tickets`, `/notifications`, and `/api` to `http://127.0.0.1:8000` (not the SPA route `/reporting/weekly-performance`).
 
 `/accessible` subscribes to `GET /realtime/ops-alerts/stream` (SSE, Bearer JWT) and shows a banner, toast, and list when an open location has no sales. Use **Simulate no sales** / **Record a sale** on that page, or `python scripts/simulate_no_sales.py`. See [`docs/realtime-no-sales.md`](../../docs/realtime-no-sales.md).
+
+`/accessible` shows a Corporate RFP notice from `GET /notifications/stream` (`fetch` + `ReadableStream`, `Authorization: Bearer`). A ticket that arrives after the page opens is labeled **New RFP** and `analyzing`. Reconnect uses `Last-Event-ID` and refetches `GET /rfp/tickets` only. Locations and inventory stay as they were.
 
 `/rfp-intake` registers a corporate RFP (`POST /rfp/tickets`). The client site is `location`. Brasaland restaurants come from `GET /locations/overview` and are sent as `locations` (one market: Colombia COP or Florida USD). The ticket is stored with status `analyzing` and pushed on `GET /notifications/stream` as `rfp_ticket_created`. See [`docs/realtime-rfp.md`](../../docs/realtime-rfp.md).
 

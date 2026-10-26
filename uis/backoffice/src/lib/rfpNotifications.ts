@@ -69,6 +69,17 @@ export function isRfpTicket(value: unknown): value is RfpTicket {
   return typeof row.ticket_id === "string" && row.ticket_id.length > 0 && typeof row.status === "string";
 }
 
+/** Banner copy for a ticket that arrived on the stream. Distinct from location and inventory rows. */
+export function rfpArrivalLabel(ticket: RfpTicket): string {
+  const money = ticket.currency ? ` · ${ticket.currency}` : "";
+  return `New RFP · ${ticket.status} · ${ticket.client_name} · ${ticket.location}${money}`;
+}
+
+export function latestEventId(tickets: RfpTicket[]): string | null {
+  const max = tickets.reduce((cursor, ticket) => Math.max(cursor, ticket.event_id ?? 0), 0);
+  return max > 0 ? String(max) : null;
+}
+
 /** One row per ticket_id. A replay and a live frame for the same id stay a single card. */
 export function reduceRfpTickets(tickets: RfpTicket[], frame: NamedFrame): RfpTicket[] {
   if (frame.event !== RFP_TICKET_CREATED || !isRfpTicket(frame.data)) {

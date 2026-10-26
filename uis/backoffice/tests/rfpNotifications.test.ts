@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { consumeSseBuffer, reconnectDelayMs } from "../src/lib/noSalesAlerts.ts";
 import {
+  latestEventId,
   mergeRfpTickets,
   reduceRfpTickets,
   restaurantsShareOneMarket,
+  rfpArrivalLabel,
   type RfpTicket,
 } from "../src/lib/rfpNotifications.ts";
 
@@ -40,6 +42,7 @@ const andes: RfpTicket = {
   departments_needed: ["marketing", "operaciones", "procurement"],
   raw_pdf_path: "data/uploads/rfp/abc/andes.pdf",
   owner: "Camila Ospina",
+  event_id: 4,
   created_at: "2026-10-26T16:00:00Z",
   updated_at: "2026-10-26T16:00:00Z",
   terminal: false,
@@ -72,6 +75,7 @@ const sunset: RfpTicket = {
   service_type: "co-branded concession",
   budget_range: "60000-75000 USD/year",
   departments_needed: ["marketing", "operaciones", "procurement", "training"],
+  event_id: 5,
   created_at: "2026-10-26T16:05:00Z",
 };
 
@@ -135,5 +139,21 @@ describe("RFP registration notifications", () => {
     assert.equal(reconnectDelayMs(1), 1000);
     assert.equal(reconnectDelayMs(2), 2000);
     assert.equal(reconnectDelayMs(3), 4000);
+  });
+
+  it("labels a new analyzing ticket apart from the roster and resumes after its event id", () => {
+    const label = rfpArrivalLabel(andes);
+    assert.match(label, /New RFP/);
+    assert.match(label, /analyzing/);
+    assert.match(label, /Andes Tech Solutions/);
+    assert.match(label, /COP/);
+    assert.equal(label.includes("inventory"), false);
+    assert.equal(latestEventId([andes, sunset]), "5");
+    const replayed = reduceRfpTickets([andes], {
+      id: "4",
+      event: "rfp_ticket_created",
+      data: andes as unknown as Record<string, unknown>,
+    });
+    assert.equal(replayed.length, 1);
   });
 });

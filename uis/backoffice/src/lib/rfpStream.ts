@@ -29,9 +29,13 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 /** Staff JWT via fetch. EventSource cannot set Authorization. */
-export async function connectRfpStream(handlers: Handlers, signal: AbortSignal): Promise<void> {
+export async function connectRfpStream(
+  handlers: Handlers,
+  signal: AbortSignal,
+  options?: { initialEventId?: string | null },
+): Promise<void> {
   let attempt = 0;
-  let lastEventId: string | null = null;
+  let lastEventId: string | null = options?.initialEventId ?? null;
 
   while (!signal.aborted) {
     handlers.onStatus(attempt === 0 ? "connecting" : "reconnecting", null);

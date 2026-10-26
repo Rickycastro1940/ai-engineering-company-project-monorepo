@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { AsyncPanel } from "../components/AsyncState";
 import { NoSalesLive } from "../components/NoSalesLive";
+import { RfpLiveNotice } from "../components/RfpLiveNotice";
 import {
   fetchInventory,
   fetchLocationsOverview,
@@ -136,6 +137,8 @@ export function AccessiblePage() {
       </div>
 
       <NoSalesLive />
+
+      <RfpLiveNotice />
 
       <div className="accessible__dashboard" aria-label="Authenticated operations dashboard">
         <div className="accessible__panel accessible__panel--span">

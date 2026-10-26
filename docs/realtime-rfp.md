@@ -2,7 +2,7 @@
 
 Department: **Marketing and Digital Experience** (Camila Ospina) — she opens the ticket when a corporate catering, concession, or co-branding request arrives. **Technology** (Nicolás Park) — the stream sits on the central API. Felipe Guerrero, Lucía Fernández, and Jake Morrison see the same ticket while it is `analyzing`.
 
-The staff console (`uis/backoffice`, route `/rfp-intake`) subscribes with the staff JWT. A new registration shows up without a reload.
+The staff console (`uis/backoffice`) subscribes with the staff JWT. `/accessible` is the operations dashboard (locations, inventory, no-sales). A new registration appears there as a Corporate RFP notice without reloading the page and without reloading locations or inventory. `/rfp-intake` is the registration form and the full ticket list.
 
 ## Event
 
@@ -44,7 +44,11 @@ Unauthenticated calls return **401**.
 
 `location` is the client site. `locations` is the list of Brasaland restaurants (`id`, `name`, `city`, `country`, `currency`). Mixing a Colombia id with a Florida id returns **400**. A Florida ticket whose budget is written in COP also returns **400**.
 
-`GET /notifications/stream` sends `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `X-Accel-Buffering: no`, a `: keep-alive` comment, then `id` / `event: rfp_ticket_created` / `data`. `Last-Event-ID` replays newer registrations. The console uses `fetch` and `ReadableStream` because `EventSource` cannot set `Authorization`. Reconnect waits 1s, 2s, 4s, 8s, 16s, then 30s, and refetches `GET /rfp/tickets`. The list keeps one row per `ticket_id`. The intake form loads `GET /locations/overview` and disables the other market once one restaurant is checked.
+`GET /notifications/stream` sends `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `X-Accel-Buffering: no`, a `: keep-alive` comment, then `id` / `event: rfp_ticket_created` / `data`. Each payload includes `event_id`.
+
+Recovery, documented here: the browser sends `Last-Event-ID` and the server replays newer tickets. On reconnect the dashboard also refetches `GET /rfp/tickets` and merges by `ticket_id`, so a ticket registered during the gap is not dropped and is not shown twice. The operations dashboard opens the stream after that snapshot, using the highest `event_id` as the first cursor, so older tickets stay in the list and only a later registration is marked **New RFP**.
+
+The console uses `fetch` and `ReadableStream` (`response.body.getReader()`) with `Authorization: Bearer`. It does not use `EventSource`. Reconnect waits 1s, 2s, 4s, 8s, 16s, then 30s. The intake form loads `GET /locations/overview` and disables the other market once one restaurant is checked.
 
 ## Run
 

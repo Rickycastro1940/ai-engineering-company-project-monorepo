@@ -132,6 +132,7 @@ def sse_payload(ticket: dict[str, Any]) -> dict[str, Any]:
         "created_at": ticket["created_at"],
         "updated_at": ticket["updated_at"],
         "terminal": bool(ticket["terminal"]),
+        "event_id": int(ticket["event_id"]),
     }
     if ticket.get("title"):
         payload["title"] = ticket["title"]
