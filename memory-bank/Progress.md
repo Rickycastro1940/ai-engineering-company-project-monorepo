@@ -13,14 +13,27 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
-| Technology: central API (locations, menus, sales, customers, suppliers) | **Present (seeded)** — `locations`/`menus`/`sales`/`customers`/`suppliers`/`inventory=present` plus `knowledge=present` (`POST /knowledge/query`) and `realtime=present` (`GET /realtime/ops-alerts/stream`) on `uvicorn api.app:app` (`:8000`). Not a live POS or invoice feed |
+| Technology: central API (locations, menus, sales, customers, suppliers) | **Present (seeded)** — `locations`/`menus`/`sales`/`customers`/`suppliers`/`inventory=present` plus `knowledge=present` (`POST /knowledge/query`) and `realtime=present` (`GET /realtime/ops-alerts/stream`, `GET /notifications/stream`) on `uvicorn api.app:app` (`:8000`). Not a live POS or invoice feed |
 | Technology: telemetry + pipeline to dashboards | **Partial** — live no-sales SSE on `GET /realtime/ops-alerts/stream` plus Part 2 weekly location cost/waste ETL, Prefect stage subflows, KPI unit tests, CLI, and backoffice Monday weekly report; engineering `GET /telemetry/report` untouched. Nightly landing copy is `scripts/nightly_export.py` (OS cron `0 2 * * *` America/Bogota, status in `public.job_runs`), not a FastAPI scheduler. `data/pipelines/public_site_snapshot.py` reads the public site into JSON Lines and SQLite (guest menu and the locations printed on the page) |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — seeded `GET /sales` tickets and `/sales/overview` (COP and USD, 14 locations) plus `/sales/alerts`; `POST /sales` stores a ticket and calls `record_sale` so the live no-sales alert on backoffice `/accessible` sees that location; Next.js `uis/portal` `/ops/sales` shows per-location sales in COP and USD. Centralized incident manager is on `/api/incidents` and backoffice `/incidents` (Felipe: branch, category, status). Smart ordering still open |
 | Procurement: supplier price history, consolidated spend | **Partial** — seeded `GET /suppliers` (20 suppliers, Colombia and Florida, price history and alerts); Monday weekly purchase cost / price-alert frequency still separate; invoices are not live |
-| Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `GET /customers` CRM seed with `brasa_points_balance` on physical stamp cards; Next.js `uis/portal` `/points`; public production site is `uis/website-classic/` (dish photos, menu, locations, Brasa Points, allergens, supplier application, EN/ES), restored from commit `2465196`. The Vite app in `uis/website/` is not what Vercel publishes. `CONTEXT.md` still describes stamp cards as today’s in-restaurant programme |
+| Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `GET /customers` CRM seed with `brasa_points_balance` on physical stamp cards; Next.js `uis/portal` `/points`; public production site is `uis/website-classic/` (dish photos, menu, locations, Brasa Points, allergens, supplier application, EN/ES), restored from commit `2465196`. The Vite app in `uis/website/` is not what Vercel publishes. `CONTEXT.md` still describes stamp cards as today’s in-restaurant programme. Corporate RFP registration is live on `POST /rfp/tickets` (status `analyzing`, Camila Ospina) and `GET /notifications/stream` |
 | People: HR portal / KPIs by country | **Not done** |
 | Training: recipe catalogue, push to 14 locations | **Partial** — `POST /knowledge/query` searches the four English standards (allergens, waste, ordering, Brasa Points) and returns cited chunks. Not a full recipe catalogue and not a push to all 14 kitchens |
 | Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial** — seeded `GET /sales/overview` and portal `/ops/sales` chain totals in COP and USD; Monday weekly ops & finance report in the backoffice; n8n export `workflows/brasaland-monday-leadership-report.n8n.json` schedules Monday 07:00 America/Bogota, logs into the central API, pulls `GET /reporting/weekly-location-performance`, and delivers COP/USD leadership copy (email, Slack, CSV) with a failure branch. Standards questions can go to `POST /knowledge/query`. A sales NL assistant and a chain sales dashboard remain open |
+
+## Latest RFP registration stream (2026-10-26)
+
+Department served: **Marketing** (Camila Ospina — she opens the corporate RFP ticket) and **Technology** (Nicolás Park — SSE on the central API). Felipe, Lucía, and Jake see the same `analyzing` ticket.
+
+`POST /rfp/tickets` stores the Brasaland RFP fields and sets `status` to `analyzing`. `GET /notifications/stream` emits `rfp_ticket_created` (`text/event-stream`, keep-alive, `Last-Event-ID`). The backoffice page is `/rfp-intake`. COP and USD budgets stay as written.
+
+```text
+NO_SALES_MONITOR=0 python -m pytest tests/test_rfp_sse.py -q
+# 7 passed
+node --experimental-strip-types --test uis/backoffice/tests/rfpNotifications.test.ts
+# 3 passed
+```
 
 ## What already runs (engineering)
 
@@ -28,6 +41,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | --- | --- |
 | Inventory API + Groq agent | `services/api/inventory.py` (CSV-backed flat imports; no package-relative `.auth`), `agent.py` |
 | Incident analysis UI | `uis/web` |
+| RFP registration SSE | `POST /rfp/tickets`, `GET /notifications/stream`, backoffice `/rfp-intake` (`docs/realtime-rfp.md`) |
 | Weekly cost/waste pipeline + Celery | `data/process/location_kpis.py`, `data/pipelines/pipeline.py`, `services/reporting/main.py`, `services/tasks.py`; Compose Redis/Flower/worker |
 | Public corporate website | `uis/website/` — Vite/React, route `/`, brand tokens + components from `CONTEXT.md`; screenshot `docs/screenshots/website-corporate-home.png` |
 | Internal backoffice | `uis/backoffice/` — JWT session; `/accessible` locations+inventory; `/reporting/weekly-performance` Monday weekly ops & finance report (COP/USD) |
