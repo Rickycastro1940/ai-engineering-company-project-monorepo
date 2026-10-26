@@ -18,11 +18,14 @@ Fields on every notification:
 | `company` | `brasaland` |
 | `owner` | Camila Ospina |
 | `client_name` | Client on the request |
-| `location` | Client location (Medellín, Florida, …) |
+| `location` | Client site as written on the request (Medellín, Florida, …) |
+| `locations` | Brasaland restaurants from the 14-location roster. One ticket uses one market |
+| `country` | `Colombia` or `United States`, taken from those restaurants |
+| `currency` | `COP` or `USD`, taken from those restaurants. The API does not convert |
 | `service_type` | Catering, concession, co-branding, or the wording on the request |
 | `scope` | Volume: diners, sites, contract length |
 | `deadline` | Response deadline, as written |
-| `budget_range` | Optional. COP or USD as written. The API does not convert |
+| `budget_range` | Optional. Must name the ticket currency (`COP` or `USD`) as written |
 | `departments_needed` | Any of `marketing`, `operaciones`, `procurement`, `training` |
 | `raw_pdf_path` | Stored upload |
 | `created_at`, `updated_at` | UTC timestamps |
@@ -39,7 +42,9 @@ Fields on every notification:
 
 Unauthenticated calls return **401**.
 
-`GET /notifications/stream` sends `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `X-Accel-Buffering: no`, a `: keep-alive` comment, then `id` / `event: rfp_ticket_created` / `data`. `Last-Event-ID` replays newer registrations. The console uses `fetch` and `ReadableStream` because `EventSource` cannot set `Authorization`. Reconnect waits 1s, 2s, 4s, 8s, 16s, then 30s, and refetches `GET /rfp/tickets`. The list keeps one row per `ticket_id`.
+`location` is the client site. `locations` is the list of Brasaland restaurants (`id`, `name`, `city`, `country`, `currency`). Mixing a Colombia id with a Florida id returns **400**. A Florida ticket whose budget is written in COP also returns **400**.
+
+`GET /notifications/stream` sends `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `X-Accel-Buffering: no`, a `: keep-alive` comment, then `id` / `event: rfp_ticket_created` / `data`. `Last-Event-ID` replays newer registrations. The console uses `fetch` and `ReadableStream` because `EventSource` cannot set `Authorization`. Reconnect waits 1s, 2s, 4s, 8s, 16s, then 30s, and refetches `GET /rfp/tickets`. The list keeps one row per `ticket_id`. The intake form loads `GET /locations/overview` and disables the other market once one restaurant is checked.
 
 ## Run
 

@@ -56,6 +56,6 @@ Open `http://localhost:5174/login`. Vite proxies `/auth`, `/users`, `/profiles`,
 
 `/accessible` subscribes to `GET /realtime/ops-alerts/stream` (SSE, Bearer JWT) and shows a banner, toast, and list when an open location has no sales. Use **Simulate no sales** / **Record a sale** on that page, or `python scripts/simulate_no_sales.py`. See [`docs/realtime-no-sales.md`](../../docs/realtime-no-sales.md).
 
-`/rfp-intake` registers a corporate RFP (`POST /rfp/tickets`). The ticket is stored with status `analyzing` and pushed on `GET /notifications/stream` as `rfp_ticket_created`. See [`docs/realtime-rfp.md`](../../docs/realtime-rfp.md).
+`/rfp-intake` registers a corporate RFP (`POST /rfp/tickets`). The client site is `location`. Brasaland restaurants come from `GET /locations/overview` and are sent as `locations` (one market: Colombia COP or Florida USD). The ticket is stored with status `analyzing` and pushed on `GET /notifications/stream` as `rfp_ticket_created`. See [`docs/realtime-rfp.md`](../../docs/realtime-rfp.md).
 
 Legacy static KPI/telemetry HTML (pre-Vite) is under `legacy/`.

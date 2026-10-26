@@ -4,6 +4,7 @@ import { consumeSseBuffer, reconnectDelayMs } from "../src/lib/noSalesAlerts.ts"
 import {
   mergeRfpTickets,
   reduceRfpTickets,
+  restaurantsShareOneMarket,
   type RfpTicket,
 } from "../src/lib/rfpNotifications.ts";
 
@@ -14,6 +15,24 @@ const andes: RfpTicket = {
   company: "brasaland",
   client_name: "Andes Tech Solutions",
   location: "Medellín",
+  country: "Colombia",
+  currency: "COP",
+  locations: [
+    {
+      id: "co-med-centro",
+      name: "Medellín Centro",
+      city: "Medellín",
+      country: "Colombia",
+      currency: "COP",
+    },
+    {
+      id: "co-med-elpoblado",
+      name: "Medellín El Poblado",
+      city: "Medellín",
+      country: "Colombia",
+      currency: "COP",
+    },
+  ],
   service_type: "weekly catering",
   scope: "220 employees",
   deadline: "2026-11-30",
@@ -32,6 +51,24 @@ const sunset: RfpTicket = {
   rfp_id: "rfp_def",
   client_name: "Sunset Bay Resorts",
   location: "Florida",
+  country: "United States",
+  currency: "USD",
+  locations: [
+    {
+      id: "us-mia-brickell",
+      name: "Miami Brickell",
+      city: "Miami",
+      country: "United States",
+      currency: "USD",
+    },
+    {
+      id: "us-mia-downtown",
+      name: "Miami Downtown",
+      city: "Miami",
+      country: "United States",
+      currency: "USD",
+    },
+  ],
   service_type: "co-branded concession",
   budget_range: "60000-75000 USD/year",
   departments_needed: ["marketing", "operaciones", "procurement", "training"],
@@ -69,6 +106,18 @@ describe("RFP registration notifications", () => {
       ["def", "abc"],
     );
     assert.equal(merged.length, 2);
+    assert.equal(merged[0].currency, "USD");
+    assert.equal(merged[1].currency, "COP");
+    assert.deepEqual(
+      merged[0].locations?.map((site) => site.id),
+      ["us-mia-brickell", "us-mia-downtown"],
+    );
+    assert.ok(restaurantsShareOneMarket(andes.locations ?? []));
+    assert.ok(restaurantsShareOneMarket(sunset.locations ?? []));
+    assert.equal(
+      restaurantsShareOneMarket([...(andes.locations ?? []), ...(sunset.locations ?? [])]),
+      false,
+    );
   });
 
   it("parses a named analyzing frame and backs off 1s, 2s, then 4s", () => {

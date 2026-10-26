@@ -53,6 +53,9 @@ def _connect() -> sqlite3.Connection:
             status TEXT NOT NULL,
             client_name TEXT NOT NULL,
             location TEXT NOT NULL,
+            country TEXT NOT NULL,
+            currency TEXT NOT NULL,
+            locations_json TEXT NOT NULL,
             service_type TEXT NOT NULL,
             scope TEXT NOT NULL,
             deadline TEXT NOT NULL,
@@ -68,6 +71,15 @@ def _connect() -> sqlite3.Connection:
         )
         """
     )
+    columns = {row[1] for row in connection.execute("PRAGMA table_info(rfp_tickets)")}
+    if "country" not in columns:
+        connection.execute("ALTER TABLE rfp_tickets ADD COLUMN country TEXT NOT NULL DEFAULT ''")
+    if "currency" not in columns:
+        connection.execute("ALTER TABLE rfp_tickets ADD COLUMN currency TEXT NOT NULL DEFAULT ''")
+    if "locations_json" not in columns:
+        connection.execute(
+            "ALTER TABLE rfp_tickets ADD COLUMN locations_json TEXT NOT NULL DEFAULT '[]'"
+        )
     return connection
 
 
@@ -80,6 +92,9 @@ def _row_to_ticket(row: sqlite3.Row) -> dict[str, Any]:
         "status": row["status"],
         "client_name": row["client_name"],
         "location": row["location"],
+        "country": row["country"],
+        "currency": row["currency"],
+        "locations": json.loads(row["locations_json"] or "[]"),
         "service_type": row["service_type"],
         "scope": row["scope"],
         "deadline": row["deadline"],
@@ -104,6 +119,9 @@ def sse_payload(ticket: dict[str, Any]) -> dict[str, Any]:
         "company": ticket["company"],
         "client_name": ticket["client_name"],
         "location": ticket["location"],
+        "country": ticket["country"],
+        "currency": ticket["currency"],
+        "locations": list(ticket["locations"]),
         "service_type": ticket["service_type"],
         "scope": ticket["scope"],
         "deadline": ticket["deadline"],
@@ -134,7 +152,7 @@ def _clean_text(value: str, field: str, *, limit: int) -> str:
     return text
 
 
-def _clean_budget(value: str | None) -> str | None:
+def _clean_budget(value: str | None, *, currency: str) -> str | None:
     if value is None:
         return None
     text = value.strip()
@@ -143,13 +161,50 @@ def _clean_budget(value: str | None) -> str | None:
     if len(text) > 160:
         raise ValueError("budget_range must be 160 characters or fewer.")
     upper = text.upper()
-    if "COP" not in upper and "USD" not in upper:
-        raise ValueError(
-            "budget_range must keep the amount in COP or USD as written."
-        )
     if re.search(r"\b(EUR|GBP|BRL)\b", upper):
         raise ValueError("budget_range uses COP or USD only.")
+    other = "USD" if currency == "COP" else "COP"
+    if currency not in upper or other in upper:
+        raise ValueError(
+            f"budget_range for this ticket must keep the amount in {currency} as written."
+        )
     return text
+
+
+def _clean_locations(values: list[str] | None) -> tuple[str, str, list[dict[str, str]]]:
+    """One ticket serves one market. Colombia stays COP; Florida stays USD."""
+    from locations import get_location
+
+    chosen: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for raw in values or []:
+        for piece in str(raw).split(","):
+            location_id = piece.strip()
+            if not location_id or location_id in seen:
+                continue
+            site = get_location(location_id)
+            if site is None:
+                raise ValueError(
+                    "locations must be Brasaland restaurant ids from the 14-location roster."
+                )
+            seen.add(location_id)
+            chosen.append(
+                {
+                    "id": site.id,
+                    "name": site.name,
+                    "city": site.city,
+                    "country": site.country,
+                    "currency": site.currency,
+                }
+            )
+    if not chosen:
+        raise ValueError("Select at least one Brasaland location.")
+    countries = {site["country"] for site in chosen}
+    if len(countries) != 1:
+        raise ValueError(
+            "Keep Colombia and Florida locations on separate RFP tickets. COP and USD are not converted."
+        )
+    return chosen[0]["country"], chosen[0]["currency"], chosen
 
 
 def _clean_departments(values: list[str] | None) -> list[str]:
@@ -227,6 +282,7 @@ def register_rfp(
     *,
     client_name: str,
     location: str,
+    locations: list[str] | None,
     service_type: str,
     scope: str,
     deadline: str,
@@ -244,10 +300,11 @@ def register_rfp(
 
     client = _clean_text(client_name, "client_name", limit=160)
     place = _clean_text(location, "location", limit=160)
+    country, currency, sites = _clean_locations(locations)
     service = _clean_text(service_type, "service_type", limit=160)
     work_scope = _clean_text(scope, "scope", limit=800)
     due = _clean_text(deadline, "deadline", limit=80)
-    budget = _clean_budget(budget_range)
+    budget = _clean_budget(budget_range, currency=currency)
     departments = _clean_departments(departments_needed)
     cleaned_title = (title or "").strip() or None
     if cleaned_title and len(cleaned_title) > 180:
@@ -270,10 +327,11 @@ def register_rfp(
         cursor = connection.execute(
             """
             INSERT INTO rfp_tickets (
-                ticket_id, rfp_id, status, client_name, location, service_type,
+                ticket_id, rfp_id, status, client_name, location, country, currency,
+                locations_json, service_type,
                 scope, deadline, budget_range, departments_needed_json,
                 raw_pdf_path, title, company, owner, created_at, updated_at, terminal
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 ticket_id,
@@ -281,6 +339,9 @@ def register_rfp(
                 STATUS_ANALYZING,
                 client,
                 place,
+                country,
+                currency,
+                json.dumps(sites),
                 service,
                 work_scope,
                 due,

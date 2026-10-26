@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { apiRequest, toUserFacingMessage } from "../lib/api";
+import { apiRequest, fetchLocationsOverview, toUserFacingMessage, type Location } from "../lib/api";
 import {
   RFP_DEPARTMENTS,
   RFP_TICKET_CREATED,
   isRfpTicket,
   mergeRfpTickets,
   reduceRfpTickets,
+  restaurantsShareOneMarket,
   type RfpTicket,
 } from "../lib/rfpNotifications";
 import { connectRfpStream, type StreamStatus } from "../lib/rfpStream";
@@ -30,6 +31,8 @@ export function RfpIntakePage() {
   const [reconnectSeconds, setReconnectSeconds] = useState<number | null>(null);
   const [clientName, setClientName] = useState("");
   const [location, setLocation] = useState("");
+  const [roster, setRoster] = useState<Location[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [serviceType, setServiceType] = useState("");
   const [scope, setScope] = useState("");
   const [deadline, setDeadline] = useState("");
@@ -67,6 +70,11 @@ export function RfpIntakePage() {
 
   useEffect(() => {
     void refetchTickets();
+    void fetchLocationsOverview()
+      .then((overview) => setRoster(overview.locations))
+      .catch(() => {
+        setFormError("The 14-location roster did not load. Sign in and try again.");
+      });
   }, []);
 
   function applyFrame(frame: ParsedSse) {
@@ -110,6 +118,28 @@ export function RfpIntakePage() {
     );
   }
 
+  const colombia = roster.filter((site) => site.country === "Colombia");
+  const florida = roster.filter((site) => site.currency === "USD");
+  const selected = roster.filter((site) => selectedIds.includes(site.id));
+  const market = selected[0]?.country ?? null;
+  const ticketCurrency = selected[0]?.currency ?? null;
+
+  function toggleRestaurant(site: Location) {
+    if (selectedIds.includes(site.id)) {
+      setSelectedIds((current) => current.filter((id) => id !== site.id));
+      return;
+    }
+    const chosen = roster.filter((row) => selectedIds.includes(row.id) || row.id === site.id);
+    if (!restaurantsShareOneMarket(chosen)) {
+      setFormError(
+        "Keep Colombia and Florida locations on separate RFP tickets. COP and USD are not converted.",
+      );
+      return;
+    }
+    setFormError(null);
+    setSelectedIds((current) => [...current, site.id]);
+  }
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError(null);
@@ -117,14 +147,23 @@ export function RfpIntakePage() {
       setFormError("Choose the RFP file to register.");
       return;
     }
-    const budget = budgetRange.trim();
-    if (budget && !/COP|USD/i.test(budget)) {
-      setFormError("Write the budget in COP or USD. Leave the amount as written.");
+    if (!restaurantsShareOneMarket(selected)) {
+      setFormError("Select Brasaland restaurants from one market. Colombia is COP. Florida is USD.");
       return;
+    }
+    const budget = budgetRange.trim();
+    if (budget && ticketCurrency) {
+      const upper = budget.toUpperCase();
+      const other = ticketCurrency === "COP" ? "USD" : "COP";
+      if (!upper.includes(ticketCurrency) || upper.includes(other)) {
+        setFormError(`Write the budget in ${ticketCurrency}. Leave the amount as written.`);
+        return;
+      }
     }
     const body = new FormData();
     body.set("client_name", clientName.trim());
     body.set("location", location.trim());
+    body.set("locations", selected.map((site) => site.id).join(","));
     body.set("service_type", serviceType.trim());
     body.set("scope", scope.trim());
     body.set("deadline", deadline.trim());
@@ -148,6 +187,7 @@ export function RfpIntakePage() {
       known.current.add(created.ticket_id);
       setClientName("");
       setLocation("");
+      setSelectedIds([]);
       setServiceType("");
       setScope("");
       setDeadline("");
@@ -176,7 +216,8 @@ export function RfpIntakePage() {
         <p className="rfp__lead">
           Catering, concession, and co-branding requests open a ticket owned by Camila Ospina.
           The server sets the status to <strong>analyzing</strong>. Staff who are signed in see
-          the ticket on this page without a reload. Amounts stay in COP or USD as written.
+          the ticket on this page without a reload. The client site stays as written. Brasaland
+          restaurants are chosen separately, and one ticket stays in Colombia (COP) or Florida (USD).
         </p>
         <p className="rfp__stream" role="status">
           Stream <span className={`rfp__badge rfp__badge--${status}`}>{badge}</span>
@@ -190,9 +231,59 @@ export function RfpIntakePage() {
           <input value={clientName} onChange={(event) => setClientName(event.target.value)} required minLength={2} name="client_name" />
         </label>
         <label>
-          Location
-          <input value={location} onChange={(event) => setLocation(event.target.value)} required name="location" placeholder="Medellín or Florida" />
+          Client location
+          <input
+            value={location}
+            onChange={(event) => setLocation(event.target.value)}
+            required
+            name="location"
+            placeholder="Where the client is based, for example Medellín"
+          />
         </label>
+        <fieldset>
+          <legend>Brasaland restaurants</legend>
+          <p className="rfp__hint">
+            One ticket, one market. A Colombia kitchen stays COP. A Florida kitchen stays USD.
+          </p>
+          <div className="rfp__markets">
+            <div className={market === "United States" ? "rfp__market rfp__market--off" : "rfp__market"}>
+              <p className="rfp__market-title">Colombia · COP</p>
+              {colombia.map((site) => (
+                <label key={site.id} className="rfp__check">
+                  <input
+                    type="checkbox"
+                    name="locations"
+                    value={site.id}
+                    checked={selectedIds.includes(site.id)}
+                    disabled={market === "United States"}
+                    onChange={() => toggleRestaurant(site)}
+                  />
+                  <span>
+                    {site.name} <span className="rfp__meta">{site.city}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div className={market === "Colombia" ? "rfp__market rfp__market--off" : "rfp__market"}>
+              <p className="rfp__market-title">Florida · USD</p>
+              {florida.map((site) => (
+                <label key={site.id} className="rfp__check">
+                  <input
+                    type="checkbox"
+                    name="locations"
+                    value={site.id}
+                    checked={selectedIds.includes(site.id)}
+                    disabled={market === "Colombia"}
+                    onChange={() => toggleRestaurant(site)}
+                  />
+                  <span>
+                    {site.name} <span className="rfp__meta">{site.city}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </fieldset>
         <label>
           Service type
           <input value={serviceType} onChange={(event) => setServiceType(event.target.value)} required name="service_type" placeholder="weekly catering, concession, co-branding" />
@@ -207,7 +298,18 @@ export function RfpIntakePage() {
         </label>
         <label>
           Budget range (optional)
-          <input value={budgetRange} onChange={(event) => setBudgetRange(event.target.value)} name="budget_range" placeholder="48000000 COP/year or 60000-75000 USD/year" />
+          <input
+            value={budgetRange}
+            onChange={(event) => setBudgetRange(event.target.value)}
+            name="budget_range"
+            placeholder={
+              ticketCurrency === "USD"
+                ? "60000-75000 USD/year"
+                : ticketCurrency === "COP"
+                  ? "48000000 COP/year"
+                  : "48000000 COP/year or 60000-75000 USD/year"
+            }
+          />
         </label>
         <label>
           Title (optional)
@@ -264,8 +366,15 @@ export function RfpIntakePage() {
                   <span className="rfp__status">{ticket.status}</span>
                 </div>
                 <p>
-                  {ticket.service_type} · {ticket.location}
+                  {ticket.service_type} · client site {ticket.location}
+                  {ticket.currency ? ` · ${ticket.currency}` : ""}
                 </p>
+                {ticket.locations && ticket.locations.length > 0 ? (
+                  <p>
+                    Brasaland{" "}
+                    {ticket.locations.map((site) => site.name).join(", ")}
+                  </p>
+                ) : null}
                 <p>{ticket.scope}</p>
                 <p>
                   Deadline {ticket.deadline}

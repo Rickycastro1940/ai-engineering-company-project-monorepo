@@ -26,6 +26,7 @@ import users  # noqa: E402
 ANDES = {
     "client_name": "Andes Tech Solutions",
     "location": "Medellín",
+    "locations": "co-med-centro,co-med-elpoblado",
     "service_type": "weekly catering",
     "scope": "220 employees, 12-month contract, standard menu",
     "deadline": "2026-11-30",
@@ -37,6 +38,7 @@ ANDES = {
 SUNSET = {
     "client_name": "Sunset Bay Resorts",
     "location": "Florida",
+    "locations": "us-mia-brickell,us-mia-downtown",
     "service_type": "co-branded concession",
     "scope": "3 Florida resorts, exclusivity and a new signature menu",
     "deadline": "2026-12-01",
@@ -102,6 +104,13 @@ def test_registration_starts_analyzing_with_brasaland_rfp_fields() -> None:
         assert body["owner"] == "Camila Ospina"
         assert body["client_name"] == "Andes Tech Solutions"
         assert body["location"] == "Medellín"
+        assert body["country"] == "Colombia"
+        assert body["currency"] == "COP"
+        assert [site["id"] for site in body["locations"]] == [
+            "co-med-centro",
+            "co-med-elpoblado",
+        ]
+        assert {site["currency"] for site in body["locations"]} == {"COP"}
         assert body["service_type"] == "weekly catering"
         assert body["scope"].startswith("220 employees")
         assert body["deadline"] == "2026-11-30"
@@ -142,6 +151,18 @@ def test_budget_must_keep_cop_or_usd_and_departments_are_brasaland_ids() -> None
             {**ANDES, "departments_needed": "marketing,sales"},
         )
         assert unknown.status_code == 400
+        mixed = _post_rfp(
+            client,
+            headers,
+            {**ANDES, "locations": "co-med-centro,us-mia-brickell"},
+        )
+        assert mixed.status_code == 400
+        wrong_market = _post_rfp(
+            client,
+            headers,
+            {**SUNSET, "budget_range": "48000000 COP/year"},
+        )
+        assert wrong_market.status_code == 400
         empty = client.post(
             "/rfp/tickets",
             headers=headers,
@@ -162,6 +183,12 @@ def test_sunset_budget_stays_in_usd() -> None:
         assert body["status"] == "analyzing"
         assert body["budget_range"] == "60000-75000 USD/year"
         assert body["location"] == "Florida"
+        assert body["country"] == "United States"
+        assert body["currency"] == "USD"
+        assert [site["id"] for site in body["locations"]] == [
+            "us-mia-brickell",
+            "us-mia-downtown",
+        ]
         assert "training" in body["departments_needed"]
 
 
@@ -187,6 +214,7 @@ async def _sse_round_trip() -> None:
         first = rfp.register_rfp(
             client_name=ANDES["client_name"],
             location=ANDES["location"],
+            locations=["co-med-centro", "co-med-elpoblado"],
             service_type=ANDES["service_type"],
             scope=ANDES["scope"],
             deadline=ANDES["deadline"],
@@ -205,6 +233,9 @@ async def _sse_round_trip() -> None:
         assert payload["ticket_id"] == first["ticket_id"]
         assert payload["client_name"] == "Andes Tech Solutions"
         assert payload["budget_range"] == "48000000 COP/year"
+        assert payload["currency"] == "COP"
+        assert payload["locations"][0]["id"] == "co-med-centro"
+        assert "us-mia" not in live
         assert payload["company"] == "brasaland"
         assert "emergency_order" not in live
         assert "waste" not in live
@@ -217,6 +248,7 @@ async def _sse_round_trip() -> None:
         second = rfp.register_rfp(
             client_name=SUNSET["client_name"],
             location=SUNSET["location"],
+            locations=["us-mia-brickell", "us-mia-downtown"],
             service_type=SUNSET["service_type"],
             scope=SUNSET["scope"],
             deadline=SUNSET["deadline"],
@@ -239,6 +271,7 @@ def test_last_event_id_skips_older_registrations() -> None:
     older = rfp.register_rfp(
         client_name="Andes Tech Solutions",
         location="Medellín",
+        locations=["co-med-centro"],
         service_type="weekly catering",
         scope="220 employees",
         deadline="2026-11-30",
@@ -250,6 +283,7 @@ def test_last_event_id_skips_older_registrations() -> None:
     newer = rfp.register_rfp(
         client_name="Sunset Bay Resorts",
         location="Florida",
+        locations=["us-mia-brickell"],
         service_type="concession",
         scope="3 resorts",
         deadline="2026-12-01",

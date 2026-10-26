@@ -93,6 +93,28 @@
   align-items: center;
 }
 
+.rfp__markets {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.rfp__market {
+  border: 1px solid var(--bo-panel-2);
+  border-radius: 8px;
+  padding: 0.55rem 0.7rem 0.7rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.rfp__market--off {
+  opacity: 0.55;
+}
+
+.rfp__market-title {
+  margin: 0;
+  font-weight: 650;
+}
+
 .rfp__form button {
   justify-self: start;
   background: var(--bo-accent);

@@ -5,13 +5,29 @@ type NamedFrame = {
   data: Record<string, unknown>;
 };
 
+/** A Brasaland restaurant on the 14-location roster. */
+export type RfpRestaurant = {
+  id: string;
+  name: string;
+  city: string;
+  country: string;
+  currency: string;
+};
+
 export type RfpTicket = {
   ticket_id: string;
   status: string;
   rfp_id: string;
   company: string;
   client_name: string;
+  /** Client site as written on the request (Medellín, Florida, …). */
   location: string;
+  /** Market of the Brasaland restaurants on this ticket. */
+  country?: string;
+  /** COP for Colombia, USD for Florida. Never converted. */
+  currency?: string;
+  /** Brasaland restaurants that would serve this request. One market only. */
+  locations?: RfpRestaurant[];
   service_type: string;
   scope: string;
   deadline: string;
@@ -25,6 +41,18 @@ export type RfpTicket = {
   title?: string | null;
   event_id?: number;
 };
+
+/** Colombia (COP) and Florida (USD) cannot share one ticket. */
+export function restaurantsShareOneMarket(
+  sites: Array<{ country: string; currency: string }>,
+): boolean {
+  if (sites.length === 0) {
+    return false;
+  }
+  const country = sites[0].country;
+  const currency = sites[0].currency;
+  return sites.every((site) => site.country === country && site.currency === currency);
+}
 
 export const RFP_DEPARTMENTS = [
   { id: "marketing", label: "Marketing — Camila Ospina" },

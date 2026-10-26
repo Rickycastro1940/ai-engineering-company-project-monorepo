@@ -60,6 +60,7 @@ async def create_rfp_ticket(
     file: UploadFile = File(...),
     client_name: str = Form(...),
     location: str = Form(...),
+    locations: str = Form(...),
     service_type: str = Form(...),
     scope: str = Form(...),
     deadline: str = Form(...),
@@ -73,6 +74,7 @@ async def create_rfp_ticket(
         ticket = register_rfp(
             client_name=client_name,
             location=location,
+            locations=[locations],
             service_type=service_type,
             scope=scope,
             deadline=deadline,
