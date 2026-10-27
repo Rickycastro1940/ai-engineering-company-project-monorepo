@@ -8,6 +8,7 @@ Los proyectos principales que se almacenan aquí son:
 - **`backoffice`** — consola interna de Brasaland Digital (Vite + React, JWT).
 - **`portal`** — portal Next.js (App Router): Brasa Points para invitados (`/points`) y ventas por sede en COP y USD (`/ops/sales`). Ver [`portal/README.md`](./portal/README.md).
 - **`web/`** — herramienta HTML de análisis de incidentes (no es el sitio de marketing).
+- **`artist/`** — página estática HTML/CSS de una artista ficticia (header, hero, about, career, shows, footer). No es el sitio corporativo de Brasaland. Ver [`artist/README.md`](./artist/README.md).
 
 Organiza `uis/` por **distintas áreas de la compañía** — cada subcarpeta agrupa un ámbito diferente (por ejemplo, web pública frente a operaciones internas) e incluye su propia documentación técnica y funcional.
 
