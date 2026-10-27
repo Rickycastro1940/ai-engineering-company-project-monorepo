@@ -8,7 +8,7 @@ The staff console (`uis/backoffice`, route `/accessible`) subscribes to a Server
 
 Alerts are server → client only. SSE keeps one HTTP response, named events, keep-alive comments, and `Last-Event-ID` replay. The console sends the same staff JWT with `fetch` + `ReadableStream`, because `EventSource` cannot set `Authorization`. Reconnect waits 1s, 2s, 4s, 8s, 16s, then 30s.
 
-Draft PR **#53** (`feature/sse-notifications`) used this shape for emergency-order and waste tickets on an older backoffice. Draft PR **#54** (`feature/websocket-chat`) used a WebSocket for a bidirectional knowledge chat. Those branches also rewrite briefing files and are far from current `main`. This channel keeps the SSE ideas that still fit (JWT `fetch` stream, named events, replay, backoff) and does not merge either PR. **#53 and #54 can be closed.** They do not implement this alert, and rebasing them onto `main` would fight the current API and the Vite staff console.
+Corporate RFP registration is a different channel. `POST /rfp/tickets` stores a ticket at `analyzing`, and `GET /notifications/stream` emits `rfp_ticket_created` with the Brasaland RFP fields (`docs/realtime-rfp.md`). This no-sales channel does not emit that event. Its names stay `ops_alert_snapshot`, `no_sales_alert`, `no_sales_cleared`, and `sale_recorded`.
 
 ## Routes
 
