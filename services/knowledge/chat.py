@@ -19,11 +19,12 @@ COMPANY_SLUG = "brasaland"
 AGENT_ID = "manager_support"
 SESSION_ID_PREFIX = "BRS-CHAT-"
 EVENT_USER_MESSAGE = "support_user_message"
-EVENT_INTERRUPT = "support_interrupt"
+EVENT_INTERRUPT = "interrupt"
 EVENT_AUTH = "support_auth"
 EVENT_SESSION = "support_session"
 EVENT_TOKEN = "token_chunk"
-EVENT_ASSISTANT_MESSAGE = "support_assistant_message"
+EVENT_INTERRUPTED = "generation_interrupted"
+EVENT_COMPLETED = "generation_completed"
 EVENT_ERROR = "support_error"
 # Token UI matches LangGraph stream_mode="messages". This agent is not a graph.
 STREAM_MODE = "messages"
@@ -147,14 +148,17 @@ def token_event(session_id: str, delta: str) -> dict[str, str]:
     }
 
 
-def assistant_event(session_id: str, content: str, status: str) -> dict[str, str]:
-    return {
-        "event": EVENT_ASSISTANT_MESSAGE,
+def assistant_event(session_id: str, content: str, status: str, new_input: str = "") -> dict[str, str]:
+    payload = {
+        "event": EVENT_COMPLETED if status == "complete" else EVENT_INTERRUPTED,
         "session_id": session_id,
         "thread_id": session_id,
         "content": content,
         "status": status,
     }
+    if status == "interrupted" and new_input:
+        payload["new_input"] = new_input
+    return payload
 
 
 class KnowledgeProducer:
@@ -166,6 +170,7 @@ class KnowledgeProducer:
         self._events = events
         self._task: asyncio.Task | None = None
         self._cancel = asyncio.Event()
+        self._new_input = ""
 
     def busy(self) -> bool:
         return self._task is not None and not self._task.done()
@@ -184,7 +189,9 @@ class KnowledgeProducer:
         self._cancel = asyncio.Event()
         self._task = asyncio.create_task(self._turn(text))
 
-    async def interrupt(self, content: str = "") -> None:
+    async def interrupt(self, new_input: str = "") -> None:
+        follow = (new_input or "").strip()
+        self._new_input = follow
         self._cancel.set()
         task = self._task
         if task and not task.done():
@@ -192,7 +199,7 @@ class KnowledgeProducer:
                 await task
             except asyncio.CancelledError:
                 pass
-        follow = (content or "").strip()
+        self._new_input = ""
         if follow:
             await self.start_turn(follow)
 
@@ -234,7 +241,10 @@ class KnowledgeProducer:
             self._sessions.append_message(session_id, "assistant", answer, status=status)
         self._sessions.set_draft(session_id, "")
         self._sessions.set_status(session_id, "idle" if status == "complete" else "interrupted")
-        await self._events.publish(session_id, assistant_event(session_id, answer, status))
+        await self._events.publish(
+            session_id,
+            assistant_event(session_id, answer, status, new_input=self._new_input),
+        )
         await self._events.publish(session_id, self._sessions.public_session(session_id))
 
 

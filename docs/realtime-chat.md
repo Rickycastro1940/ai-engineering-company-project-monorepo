@@ -22,11 +22,11 @@ The page waits 1s, then 2s, 4s, and so on up to 30s before it opens the socket a
 
 ## Events
 
-Client: `support_auth` (`token`), `support_user_message` (`content`), `support_interrupt` (optional `content` starts a new turn after the stop).
+Client: `support_auth` (`token`), `support_user_message` (`content`), `interrupt` (optional `new_input` starts a new turn after the stop).
 
-Server: `support_session`, `token_chunk` (`delta`), `support_assistant_message` (`content`, `status` `complete` or `interrupted`), `support_error` (`detail`).
+Server: `support_session`, `token_chunk` (`delta`), `generation_interrupted` (`content`, `status: interrupted`, optional `new_input`), `generation_completed` (`content`, `status: complete`), `support_error` (`detail`).
 
-`support_interrupt` cancels the turn task and closes the model stream. The partial assistant text stays on the thread with `status: interrupted`. The next user message appends a new turn. There is no generic `message` event and no Part 1 RFP event on this socket.
+`interrupt` cancels the turn task and closes the model stream. No further `token_chunk` frames belong to that generation. The partial assistant text stays on the thread. When `new_input` is set, the next `generation_completed` answers that text as a new turn. There is no generic `message` event and no Part 1 RFP event on this socket.
 
 Generation publishes to an in-memory hub. The socket only forwards. Redis is not required.
 
@@ -37,7 +37,7 @@ JWT_SECRET_KEY=brasaland-dev-secret NO_SALES_MONITOR=0 \
   python3 -m uvicorn api.app:app --host 127.0.0.1 --port 8000
 ```
 
-Open `http://127.0.0.1:8000/knowledge/`, sign in with a staff email and password, and ask a standards question. Tokens append to the live bubble. The finished frame does not replace that text. **Stop reply** sends `support_interrupt`. Sending another question while tokens are still arriving sends `support_interrupt` with that question: the partial bubble stays, marked Interrupted, and the new answer is a separate bubble. A dropped connection waits 1s, 2s, 4s, up to 30s, then opens the same `session_id` and `thread_id`. The page restores `support_session.messages` before it appends any new `token_chunk`. A reload keeps that id in `sessionStorage` under `brasaland-manager-support-session`.
+Open `http://127.0.0.1:8000/knowledge/`, sign in with a staff email and password, and ask a standards question. Tokens append to the live bubble. The finished frame does not replace that text. **Stop reply** sends `interrupt`. Sending another question while tokens are still arriving sends `interrupt` with `new_input`: the partial bubble stays, marked Interrupted, and the new answer is a separate bubble. A dropped connection waits 1s, 2s, 4s, up to 30s, then opens the same `session_id` and `thread_id`. The page restores `support_session.messages` before it appends any new `token_chunk`. A reload keeps that id in `sessionStorage` under `brasaland-manager-support-session`.
 
 ```bash
 NO_SALES_MONITOR=0 python3 -m pytest tests/test_websocket_chat.py tests/test_knowledge_query.py -q

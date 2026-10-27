@@ -20,8 +20,8 @@ test("a message during a live reply aborts, and tokens wait for the checkpoint",
     content: "What is Brasa Points?",
   });
   assert.deepEqual(outboundEvent(true, "Stop and answer allergens"), {
-    event: "support_interrupt",
-    content: "Stop and answer allergens",
+    event: "interrupt",
+    new_input: "Stop and answer allergens",
   });
   assert.equal(acceptToken(false), false);
   assert.equal(acceptToken(true), true);

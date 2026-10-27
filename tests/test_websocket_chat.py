@@ -19,6 +19,10 @@ for path in (str(API_ROOT), str(REPO_ROOT)):
 from api.app import app  # noqa: E402
 from data.pipelines.rag import answer_question, query_stream  # noqa: E402
 from services.knowledge.chat import (  # noqa: E402
+    EVENT_COMPLETED,
+    EVENT_INTERRUPT,
+    EVENT_INTERRUPTED,
+    EVENT_TOKEN,
     PART1_EVENT_NAMES,
     hub,
     producers,
@@ -66,6 +70,14 @@ def _session(client: TestClient, token: str) -> str:
     return body["session_id"]
 
 
+def test_event_contract_names_token_chunk_interrupt_and_generation_results() -> None:
+    assert EVENT_TOKEN == "token_chunk"
+    assert EVENT_INTERRUPT == "interrupt"
+    assert EVENT_INTERRUPTED == "generation_interrupted"
+    assert EVENT_COMPLETED == "generation_completed"
+    assert {EVENT_TOKEN, EVENT_INTERRUPT, EVENT_INTERRUPTED, EVENT_COMPLETED}.isdisjoint(PART1_EVENT_NAMES)
+
+
 def test_query_stream_matches_the_full_answer_in_message_sized_deltas() -> None:
     question = "What does the House Sauce contain?"
     pieces = list(query_stream(question))
@@ -110,12 +122,14 @@ def test_stream_emits_token_chunks_and_restores_the_thread() -> None:
         while True:
             frame = socket.receive_json()
             frames.append(frame)
-            if frame["event"] == "support_assistant_message":
+            if frame["event"] == "generation_completed":
                 break
     events = [frame["event"] for frame in frames]
     assert "token_chunk" in events
+    assert "generation_completed" in events
     assert "knowledge_token" not in events
-    assert events[-1] == "support_assistant_message"
+    assert "support_assistant_message" not in events
+    assert events[-1] == "generation_completed"
     assert "message" not in events
     assert PART1_EVENT_NAMES.isdisjoint(events)
     done = frames[-1]
@@ -158,16 +172,17 @@ def test_interrupt_stops_the_token_stream(monkeypatch: pytest.MonkeyPatch) -> No
             frame = socket.receive_json()
             if frame["event"] == "token_chunk" and not saw_token:
                 saw_token = True
-                socket.send_json({"event": "support_interrupt"})
-            if frame["event"] == "support_assistant_message":
+                socket.send_json({"event": "interrupt"})
+            if frame["event"] == "generation_interrupted":
                 final = frame
+                break
     assert saw_token
     assert final is not None
+    assert final["event"] == "generation_interrupted"
     assert final["status"] == "interrupted"
     assert final["content"]
     full = answer_question("What does the House Sauce contain?")["answer"]
     assert len(final["content"]) < len(full)
-    assert final["event"] == "support_assistant_message"
 
 
 def test_a_new_question_during_the_reply_keeps_the_partial_and_starts_another_turn(
@@ -187,21 +202,35 @@ def test_a_new_question_during_the_reply_keeps_the_partial_and_starts_another_tu
             {"event": "support_user_message", "content": "What does the House Sauce contain?"}
         )
         steered = False
-        finals = []
-        while len(finals) < 2:
+        frames = []
+        while True:
             frame = socket.receive_json()
+            frames.append(frame)
             if frame["event"] == "token_chunk" and not steered:
                 steered = True
-                socket.send_json({"event": "support_interrupt", "content": follow})
-            if frame["event"] == "support_assistant_message":
-                finals.append(frame)
+                socket.send_json({"event": "interrupt", "new_input": follow})
+            if frame["event"] == "generation_completed":
+                break
     assert steered
-    assert finals[0]["status"] == "interrupted"
-    assert finals[0]["content"]
-    assert len(finals[0]["content"]) < len(full)
-    assert finals[1]["status"] == "complete"
-    assert "not enough information" in finals[1]["content"].lower()
-    assert finals[1]["content"] != finals[0]["content"]
+    interrupted = next(frame for frame in frames if frame["event"] == "generation_interrupted")
+    completed = frames[-1]
+    assert interrupted["status"] == "interrupted"
+    assert interrupted["new_input"] == follow
+    assert interrupted["content"]
+    assert len(interrupted["content"]) < len(full)
+    later = []
+    seen = False
+    for frame in frames:
+        if frame["event"] == "generation_interrupted":
+            seen = True
+            continue
+        if seen and frame["event"] == "token_chunk":
+            later.append(frame["delta"])
+    assert "".join(later) == completed["content"]
+    assert completed["event"] == "generation_completed"
+    assert completed["status"] == "complete"
+    assert "not enough information" in completed["content"].lower()
+    assert not completed["content"].startswith(interrupted["content"])
 
     with client.websocket_connect(
         f"/knowledge/ws?token={token}&session_id={session_id}&thread_id={session_id}"
@@ -214,9 +243,10 @@ def test_a_new_question_during_the_reply_keeps_the_partial_and_starts_another_tu
         "assistant",
     ]
     assert restored["messages"][1]["status"] == "interrupted"
-    assert restored["messages"][1]["content"] == finals[0]["content"]
+    assert restored["messages"] != []
+    assert restored["messages"][1]["content"] == interrupted["content"]
     assert restored["messages"][2]["content"] == follow
-    assert restored["messages"][3]["content"] == finals[1]["content"]
+    assert restored["messages"][3]["content"] == completed["content"]
 
 
 def test_two_subscribers_receive_the_same_token_chunk() -> None:

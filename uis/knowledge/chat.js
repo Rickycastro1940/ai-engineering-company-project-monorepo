@@ -157,8 +157,8 @@ function connect() {
       }
       liveBubble.textContent += frame.delta || "";
       setStatus("Streaming");
-    } else if (frame.event === "support_assistant_message") {
-      if (frame.status === "interrupted") {
+    } else if (frame.event === "generation_interrupted" || frame.event === "generation_completed") {
+      if (frame.event === "generation_interrupted" || frame.status === "interrupted") {
         markInterrupted(liveBubble);
       }
       liveBubble = null;
@@ -220,7 +220,7 @@ stopButton.addEventListener("click", () => {
   holdTokens = true;
   markInterrupted(liveBubble);
   liveBubble = null;
-  socket.send(JSON.stringify({ event: "support_interrupt" }));
+  socket.send(JSON.stringify({ event: "interrupt" }));
 });
 
 reconnectButton.addEventListener("click", () => {

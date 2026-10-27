@@ -19,18 +19,18 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | Procurement: supplier price history, consolidated spend | **Partial** — seeded `GET /suppliers` (20 suppliers, Colombia and Florida, price history and alerts); Monday weekly purchase cost / price-alert frequency still separate; invoices are not live |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `GET /customers` CRM seed with `brasa_points_balance` on physical stamp cards; Next.js `uis/portal` `/points`; public production site is `uis/website-classic/` (dish photos, menu, locations, Brasa Points, allergens, supplier application, EN/ES), restored from commit `2465196`. The Vite app in `uis/website/` is not what Vercel publishes. `CONTEXT.md` still describes stamp cards as today’s in-restaurant programme |
 | People: HR portal / KPIs by country | **Not done** |
-| Training: recipe catalogue, push to 14 locations | **Partial** — `POST /knowledge/query` searches the four English standards (allergens, waste, ordering, Brasa Points) and returns cited chunks. Location managers reach that answer on `WS /knowledge/ws` as `manager_support` (`token_chunk`, stop with `support_interrupt`). Not a full recipe catalogue and not a push to all 14 kitchens |
+| Training: recipe catalogue, push to 14 locations | **Partial** — `POST /knowledge/query` searches the four English standards (allergens, waste, ordering, Brasa Points) and returns cited chunks. Location managers reach that answer on `WS /knowledge/ws` as `manager_support` (`token_chunk`, stop with `interrupt`, end with `generation_interrupted` or `generation_completed`). Not a full recipe catalogue and not a push to all 14 kitchens |
 | Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial** — seeded `GET /sales/overview` and portal `/ops/sales` chain totals in COP and USD; Monday weekly ops & finance report in the backoffice; n8n export `workflows/brasaland-monday-leadership-report.n8n.json` schedules Monday 07:00 America/Bogota, logs into the central API, pulls `GET /reporting/weekly-location-performance`, and delivers COP/USD leadership copy (email, Slack, CSV) with a failure branch. Standards questions can go to `POST /knowledge/query` or the streamed chat at `GET /knowledge/ui`. A chain sales dashboard remains open |
 
 ## Latest manager support chat (2026-10-27)
 
 Department served: **Operations** (Felipe Guerrero — location managers) and **Training** (Jake Morrison — cited standards). Technology hosts `WS /knowledge/ws`.
 
-`POST /knowledge/query` still returns one answer. The socket streams `token_chunk` for agent `manager_support`. A question sent during a reply sends `support_interrupt` with that text: the partial bubble stays marked interrupted and the next answer is a new bubble. Any number of sockets can subscribe to one `BRS-CHAT-` thread. The page reconnects after 1s, 2s, 4s, up to 30s, and restores `support_session.messages` before it appends tokens. Reload keeps the same id in `sessionStorage`.
+`POST /knowledge/query` still returns one answer. The socket streams `token_chunk` for agent `manager_support`. A question sent during a reply sends `interrupt` with `new_input`: the partial bubble stays marked interrupted and the next answer is a new bubble. Any number of sockets can subscribe to one `BRS-CHAT-` thread. The page reconnects after 1s, 2s, 4s, up to 30s, and restores `support_session.messages` before it appends tokens. Reload keeps the same id in `sessionStorage`.
 
 ```text
 NO_SALES_MONITOR=0 python3 -m pytest tests/test_websocket_chat.py tests/test_knowledge_query.py -q
-# 21 passed
+# 22 passed
 node --test tests/test_chat_reconnect_delay.mjs
 # reconnect delay 1s, 2s, 4s, cap 30s
 ```

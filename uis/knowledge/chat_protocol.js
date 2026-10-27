@@ -1,7 +1,7 @@
 /** Frame to send when the manager submits text. A live reply is aborted first. */
 export function outboundEvent(streaming, content) {
   if (streaming) {
-    return { event: "support_interrupt", content };
+    return { event: "interrupt", new_input: content };
   }
   return { event: "support_user_message", content };
 }

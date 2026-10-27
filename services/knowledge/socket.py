@@ -128,16 +128,15 @@ async def run_knowledge_websocket(websocket: WebSocket) -> None:
                 )
                 continue
             event = data.get("event")
+            follow = str(data.get("new_input") or data.get("content") or "")
             if event == EVENT_USER_MESSAGE:
-                await producer.start_turn(str(data.get("content") or ""))
-            elif event == EVENT_INTERRUPT:
-                await producer.interrupt(str(data.get("content") or ""))
+                await producer.start_turn(follow)
+            elif event in {EVENT_INTERRUPT, "support_interrupt"}:
+                await producer.interrupt(follow)
             else:
                 await hub.publish(
                     session_id,
-                    support_error_event(
-                        "event must be support_user_message or support_interrupt"
-                    ),
+                    support_error_event("event must be support_user_message or interrupt"),
                 )
     except WebSocketDisconnect:
         pass
