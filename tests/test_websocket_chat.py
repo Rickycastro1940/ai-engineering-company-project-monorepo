@@ -170,6 +170,55 @@ def test_interrupt_stops_the_token_stream(monkeypatch: pytest.MonkeyPatch) -> No
     assert final["event"] == "support_assistant_message"
 
 
+def test_a_new_question_during_the_reply_keeps_the_partial_and_starts_another_turn(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("BRASALAND_CHAT_TOKEN_DELAY", "0.05")
+    client = TestClient(app)
+    token = _token(client)
+    session_id = _session(client, token)
+    follow = "What is the capital of Japan?"
+    full = answer_question("What does the House Sauce contain?")["answer"]
+    with client.websocket_connect(
+        f"/knowledge/ws?token={token}&session_id={session_id}&thread_id={session_id}"
+    ) as socket:
+        assert socket.receive_json()["event"] == "support_session"
+        socket.send_json(
+            {"event": "support_user_message", "content": "What does the House Sauce contain?"}
+        )
+        steered = False
+        finals = []
+        while len(finals) < 2:
+            frame = socket.receive_json()
+            if frame["event"] == "token_chunk" and not steered:
+                steered = True
+                socket.send_json({"event": "support_interrupt", "content": follow})
+            if frame["event"] == "support_assistant_message":
+                finals.append(frame)
+    assert steered
+    assert finals[0]["status"] == "interrupted"
+    assert finals[0]["content"]
+    assert len(finals[0]["content"]) < len(full)
+    assert finals[1]["status"] == "complete"
+    assert "not enough information" in finals[1]["content"].lower()
+    assert finals[1]["content"] != finals[0]["content"]
+
+    with client.websocket_connect(
+        f"/knowledge/ws?token={token}&session_id={session_id}&thread_id={session_id}"
+    ) as socket:
+        restored = socket.receive_json()
+    assert [row["role"] for row in restored["messages"]] == [
+        "user",
+        "assistant",
+        "user",
+        "assistant",
+    ]
+    assert restored["messages"][1]["status"] == "interrupted"
+    assert restored["messages"][1]["content"] == finals[0]["content"]
+    assert restored["messages"][2]["content"] == follow
+    assert restored["messages"][3]["content"] == finals[1]["content"]
+
+
 def test_two_subscribers_receive_the_same_token_chunk() -> None:
     async def scenario() -> None:
         session_id = store.create()["session_id"]

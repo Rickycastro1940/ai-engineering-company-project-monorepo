@@ -26,11 +26,11 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 
 Department served: **Operations** (Felipe Guerrero — location managers) and **Training** (Jake Morrison — cited standards). Technology hosts `WS /knowledge/ws`.
 
-`POST /knowledge/query` still returns one answer. The socket streams `token_chunk` for agent `manager_support`. `support_interrupt` stops the turn and keeps the partial reply. Any number of sockets can subscribe to one `BRS-CHAT-` thread. The page reconnects after 1s, 2s, 4s, up to 30s.
+`POST /knowledge/query` still returns one answer. The socket streams `token_chunk` for agent `manager_support`. A question sent during a reply sends `support_interrupt` with that text: the partial bubble stays marked interrupted and the next answer is a new bubble. Any number of sockets can subscribe to one `BRS-CHAT-` thread. The page reconnects after 1s, 2s, 4s, up to 30s, and restores `support_session.messages` before it appends tokens. Reload keeps the same id in `sessionStorage`.
 
 ```text
 NO_SALES_MONITOR=0 python3 -m pytest tests/test_websocket_chat.py tests/test_knowledge_query.py -q
-# 20 passed
+# 21 passed
 node --test tests/test_chat_reconnect_delay.mjs
 # reconnect delay 1s, 2s, 4s, cap 30s
 ```

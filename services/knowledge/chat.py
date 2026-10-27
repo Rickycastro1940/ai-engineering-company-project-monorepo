@@ -179,10 +179,7 @@ class KnowledgeProducer:
             )
             return
         if self.busy():
-            await self._events.publish(
-                self.session_id,
-                support_error_event("a reply is already streaming"),
-            )
+            await self.interrupt(text)
             return
         self._cancel = asyncio.Event()
         self._task = asyncio.create_task(self._turn(text))

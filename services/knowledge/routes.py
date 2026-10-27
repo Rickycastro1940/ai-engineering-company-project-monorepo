@@ -76,17 +76,23 @@ async def knowledge_chat_socket(websocket: WebSocket) -> None:
 
 @router.get("/chat.js", include_in_schema=False)
 def knowledge_chat_script() -> FileResponse:
-    script = UI_PAGE.with_name("chat.js")
-    if not script.is_file():
-        raise HTTPException(status_code=404, detail="Knowledge chat script is not installed")
-    return FileResponse(script, media_type="text/javascript")
+    return _script("chat.js", "Knowledge chat script is not installed")
 
 
 @router.get("/reconnect.js", include_in_schema=False)
 def knowledge_reconnect_script() -> FileResponse:
-    script = UI_PAGE.with_name("reconnect.js")
+    return _script("reconnect.js", "Reconnect script is not installed")
+
+
+@router.get("/chat_protocol.js", include_in_schema=False)
+def knowledge_chat_protocol_script() -> FileResponse:
+    return _script("chat_protocol.js", "Chat protocol script is not installed")
+
+
+def _script(name: str, missing: str) -> FileResponse:
+    script = UI_PAGE.with_name(name)
     if not script.is_file():
-        raise HTTPException(status_code=404, detail="Reconnect script is not installed")
+        raise HTTPException(status_code=404, detail=missing)
     return FileResponse(script, media_type="text/javascript")
 
 

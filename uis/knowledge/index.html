@@ -21,6 +21,8 @@
     .bubble { padding: 0.7rem 0.8rem; border-radius: 10px; background: #fff; border: 1px solid #e4d8c6; }
     .bubble.user { background: #efe4d4; }
     .bubble.assistant { white-space: pre-wrap; }
+    .bubble.interrupted { box-shadow: inset 3px 0 0 #8c3a1e; }
+    .bubble.interrupted::after { content: "Interrupted"; display: block; margin-top: 0.35rem; font-size: 0.8rem; color: #8c3a1e; }
     .meta, .status { color: #6b5e4e; font-size: 0.85rem; }
     .error { color: #8c1e1e; }
   </style>
@@ -40,7 +42,7 @@
       <p class="meta">Session <code id="session"></code> · <span id="agent">manager_support</span></p>
       <div id="log" aria-live="polite"></div>
       <form id="ask">
-        <label>Question <textarea id="content" rows="3" required placeholder="What does the House Sauce contain?"></textarea></label>
+        <label>Question <textarea id="content" rows="3" required placeholder="What does the House Sauce contain?" autocomplete="off"></textarea></label>
         <div class="row">
           <button type="submit" id="send">Send</button>
           <button type="button" class="secondary" id="stop">Stop reply</button>

@@ -1,4 +1,7 @@
+import { acceptToken, outboundEvent } from "./chat_protocol.js";
 import { reconnectDelayMs } from "./reconnect.js";
+
+const SESSION_KEY = "brasaland-manager-support-session";
 
 const loginForm = document.querySelector("#login");
 const chat = document.querySelector("#chat");
@@ -16,6 +19,7 @@ let sessionId = "";
 let socket = null;
 let liveBubble = null;
 let sawCheckpoint = false;
+let holdTokens = false;
 let attempt = 0;
 let reconnectTimer = null;
 let generation = 0;
@@ -32,13 +36,25 @@ function addBubble(role, text) {
   return node;
 }
 
+function markInterrupted(bubble) {
+  if (!bubble) {
+    return;
+  }
+  bubble.dataset.state = "interrupted";
+  bubble.classList.add("interrupted");
+}
+
+function streamingNow() {
+  return statusLine.textContent === "Streaming" || Boolean(liveBubble);
+}
+
 function renderHistory(messages, draft) {
   log.replaceChildren();
   liveBubble = null;
   for (const message of messages || []) {
     const bubble = addBubble(message.role === "user" ? "user" : "assistant", message.content || "");
     if (message.role === "assistant" && message.status === "interrupted") {
-      bubble.dataset.state = "interrupted";
+      markInterrupted(bubble);
     }
   }
   if (draft) {
@@ -55,8 +71,28 @@ async function createSession() {
     throw new Error("The chat session could not be opened.");
   }
   const body = await response.json();
-  sessionId = body.session_id;
-  sessionLine.textContent = sessionId;
+  rememberSession(body.session_id);
+}
+
+function rememberSession(id) {
+  sessionId = id;
+  sessionLine.textContent = id;
+  window.sessionStorage.setItem(SESSION_KEY, id);
+}
+
+async function openSession() {
+  const saved = window.sessionStorage.getItem(SESSION_KEY) || "";
+  if (saved) {
+    const response = await fetch(`/knowledge/sessions/${encodeURIComponent(saved)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (response.ok) {
+      const body = await response.json();
+      rememberSession(body.session_id);
+      return;
+    }
+  }
+  await createSession();
 }
 
 function connect() {
@@ -66,11 +102,13 @@ function connect() {
     reconnectTimer = null;
   }
   sawCheckpoint = false;
+  holdTokens = false;
   if (socket) {
     socket.close();
   }
   const protocol = location.protocol === "https:" ? "wss" : "ws";
-  const url = `${protocol}://${location.host}/knowledge/ws?token=${encodeURIComponent(token)}&session_id=${encodeURIComponent(sessionId)}`;
+  const thread = encodeURIComponent(sessionId);
+  const url = `${protocol}://${location.host}/knowledge/ws?token=${encodeURIComponent(token)}&session_id=${thread}&thread_id=${thread}`;
   socket = new WebSocket(url);
   setStatus("Connecting");
   socket.addEventListener("open", () => {
@@ -95,32 +133,36 @@ function connect() {
     }
     const frame = JSON.parse(event.data);
     if (frame.event === "support_session") {
-      sessionLine.textContent = frame.session_id;
+      rememberSession(frame.session_id);
       if (!sawCheckpoint) {
         renderHistory(frame.messages, frame.draft);
+        contentBox.value = "";
         sawCheckpoint = true;
       }
       if (frame.status === "streaming") {
         setStatus("Streaming");
       } else if (frame.status === "interrupted") {
         setStatus("Interrupted");
-      } else {
+      } else if (!liveBubble) {
         setStatus("Live");
       }
+    } else if (!acceptToken(sawCheckpoint)) {
+      return;
     } else if (frame.event === "token_chunk") {
+      if (holdTokens) {
+        return;
+      }
       if (!liveBubble) {
         liveBubble = addBubble("assistant", "");
       }
       liveBubble.textContent += frame.delta || "";
       setStatus("Streaming");
     } else if (frame.event === "support_assistant_message") {
-      if (!liveBubble) {
-        liveBubble = addBubble("assistant", frame.content || "");
-      }
       if (frame.status === "interrupted") {
-        liveBubble.dataset.state = "interrupted";
+        markInterrupted(liveBubble);
       }
       liveBubble = null;
+      holdTokens = false;
       setStatus(frame.status === "interrupted" ? "Interrupted" : "Live");
     } else if (frame.event === "support_error") {
       const note = document.createElement("p");
@@ -148,7 +190,7 @@ loginForm.addEventListener("submit", async (event) => {
   }
   const body = await response.json();
   token = body.access_token;
-  await createSession();
+  await openSession();
   loginForm.hidden = true;
   chat.hidden = false;
   connect();
@@ -160,9 +202,14 @@ askForm.addEventListener("submit", (event) => {
   if (!content || !socket || socket.readyState !== WebSocket.OPEN) {
     return;
   }
+  const streaming = streamingNow();
+  if (streaming) {
+    holdTokens = true;
+    markInterrupted(liveBubble);
+    liveBubble = null;
+  }
   addBubble("user", content);
-  liveBubble = null;
-  socket.send(JSON.stringify({ event: "support_user_message", content }));
+  socket.send(JSON.stringify(outboundEvent(streaming, content)));
   contentBox.value = "";
 });
 
@@ -170,6 +217,9 @@ stopButton.addEventListener("click", () => {
   if (!socket || socket.readyState !== WebSocket.OPEN) {
     return;
   }
+  holdTokens = true;
+  markInterrupted(liveBubble);
+  liveBubble = null;
   socket.send(JSON.stringify({ event: "support_interrupt" }));
 });
 

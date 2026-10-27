@@ -37,7 +37,7 @@ JWT_SECRET_KEY=brasaland-dev-secret NO_SALES_MONITOR=0 \
   python3 -m uvicorn api.app:app --host 127.0.0.1 --port 8000
 ```
 
-Open `http://127.0.0.1:8000/knowledge/`, sign in with a staff email and password, and ask a standards question. **Stop reply** sends `support_interrupt`. A dropped connection reconnects on its own with the growing delay above.
+Open `http://127.0.0.1:8000/knowledge/`, sign in with a staff email and password, and ask a standards question. Tokens append to the live bubble. The finished frame does not replace that text. **Stop reply** sends `support_interrupt`. Sending another question while tokens are still arriving sends `support_interrupt` with that question: the partial bubble stays, marked Interrupted, and the new answer is a separate bubble. A dropped connection waits 1s, 2s, 4s, up to 30s, then opens the same `session_id` and `thread_id`. The page restores `support_session.messages` before it appends any new `token_chunk`. A reload keeps that id in `sessionStorage` under `brasaland-manager-support-session`.
 
 ```bash
 NO_SALES_MONITOR=0 python3 -m pytest tests/test_websocket_chat.py tests/test_knowledge_query.py -q
