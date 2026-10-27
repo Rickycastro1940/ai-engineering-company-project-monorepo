@@ -1,3 +1,5 @@
+import { reconnectDelayMs } from "./reconnect.js";
+
 const loginForm = document.querySelector("#login");
 const chat = document.querySelector("#chat");
 const statusLine = document.querySelector("#status");
@@ -14,6 +16,9 @@ let sessionId = "";
 let socket = null;
 let liveBubble = null;
 let sawCheckpoint = false;
+let attempt = 0;
+let reconnectTimer = null;
+let generation = 0;
 
 function setStatus(text) {
   statusLine.textContent = text;
@@ -27,11 +32,17 @@ function addBubble(role, text) {
   return node;
 }
 
-function renderHistory(messages) {
+function renderHistory(messages, draft) {
   log.replaceChildren();
   liveBubble = null;
   for (const message of messages || []) {
-    addBubble(message.role === "user" ? "user" : "assistant", message.content || "");
+    const bubble = addBubble(message.role === "user" ? "user" : "assistant", message.content || "");
+    if (message.role === "assistant" && message.status === "interrupted") {
+      bubble.dataset.state = "interrupted";
+    }
+  }
+  if (draft) {
+    liveBubble = addBubble("assistant", draft);
   }
 }
 
@@ -49,6 +60,11 @@ async function createSession() {
 }
 
 function connect() {
+  const mine = ++generation;
+  if (reconnectTimer) {
+    window.clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
   sawCheckpoint = false;
   if (socket) {
     socket.close();
@@ -57,14 +73,31 @@ function connect() {
   const url = `${protocol}://${location.host}/knowledge/ws?token=${encodeURIComponent(token)}&session_id=${encodeURIComponent(sessionId)}`;
   socket = new WebSocket(url);
   setStatus("Connecting");
-  socket.addEventListener("open", () => setStatus("Live"));
-  socket.addEventListener("close", () => setStatus("Disconnected"));
+  socket.addEventListener("open", () => {
+    if (mine !== generation) {
+      return;
+    }
+    attempt = 0;
+    setStatus("Live");
+  });
+  socket.addEventListener("close", () => {
+    if (mine !== generation || !sessionId) {
+      return;
+    }
+    const delay = reconnectDelayMs(attempt);
+    attempt += 1;
+    setStatus(`Reconnecting in ${delay / 1000}s`);
+    reconnectTimer = window.setTimeout(connect, delay);
+  });
   socket.addEventListener("message", (event) => {
+    if (mine !== generation) {
+      return;
+    }
     const frame = JSON.parse(event.data);
-    if (frame.event === "knowledge_session") {
+    if (frame.event === "support_session") {
       sessionLine.textContent = frame.session_id;
       if (!sawCheckpoint) {
-        renderHistory(frame.messages);
+        renderHistory(frame.messages, frame.draft);
         sawCheckpoint = true;
       }
       if (frame.status === "streaming") {
@@ -74,19 +107,22 @@ function connect() {
       } else {
         setStatus("Live");
       }
-    } else if (frame.event === "knowledge_token") {
+    } else if (frame.event === "token_chunk") {
       if (!liveBubble) {
         liveBubble = addBubble("assistant", "");
       }
       liveBubble.textContent += frame.delta || "";
       setStatus("Streaming");
-    } else if (frame.event === "knowledge_assistant_message") {
-      if (liveBubble && frame.status === "interrupted") {
+    } else if (frame.event === "support_assistant_message") {
+      if (!liveBubble) {
+        liveBubble = addBubble("assistant", frame.content || "");
+      }
+      if (frame.status === "interrupted") {
         liveBubble.dataset.state = "interrupted";
       }
       liveBubble = null;
       setStatus(frame.status === "interrupted" ? "Interrupted" : "Live");
-    } else if (frame.event === "knowledge_error") {
+    } else if (frame.event === "support_error") {
       const note = document.createElement("p");
       note.className = "error";
       note.textContent = frame.detail || "The assistant could not answer.";
@@ -126,21 +162,18 @@ askForm.addEventListener("submit", (event) => {
   }
   addBubble("user", content);
   liveBubble = null;
-  socket.send(JSON.stringify({ event: "knowledge_user_message", content }));
+  socket.send(JSON.stringify({ event: "support_user_message", content }));
   contentBox.value = "";
-  sendButton.disabled = true;
-  window.setTimeout(() => {
-    sendButton.disabled = false;
-  }, 300);
 });
 
 stopButton.addEventListener("click", () => {
   if (!socket || socket.readyState !== WebSocket.OPEN) {
     return;
   }
-  socket.send(JSON.stringify({ event: "knowledge_interrupt" }));
+  socket.send(JSON.stringify({ event: "support_interrupt" }));
 });
 
 reconnectButton.addEventListener("click", () => {
+  attempt = 0;
   connect();
 });

@@ -1,8 +1,9 @@
-"""WebSocket consumer for brasaland_knowledge_assistant.
+"""WebSocket consumer for manager_support.
 
 The handshake URL names an existing thread (``session_id`` or ``thread_id``).
-Auth is the same staff JWT as ``POST /auth/login``. The socket only forwards
-events published on ``ChatEventHub``.
+Auth is the same staff JWT as ``POST /auth/login``. Each socket only forwards
+events published on ``ChatEventHub``. Several sockets may share one session.
+Closing one socket does not abort the turn.
 """
 
 from __future__ import annotations
@@ -17,14 +18,12 @@ from services.knowledge.chat import (
     EVENT_AUTH,
     EVENT_INTERRUPT,
     EVENT_USER_MESSAGE,
-    WS_CLOSE_BUSY,
     WS_CLOSE_NO_THREAD,
     WS_CLOSE_UNAUTHORIZED,
-    SessionBusyError,
     hub,
-    knowledge_error_event,
     producers,
     store,
+    support_error_event,
 )
 
 
@@ -96,10 +95,7 @@ async def run_knowledge_websocket(websocket: WebSocket) -> None:
 
     session_id = _thread_from_socket(websocket)
     try:
-        store.attach(session_id)
-    except SessionBusyError:
-        await _close(websocket, WS_CLOSE_BUSY, "Session already connected")
-        return
+        store.require(session_id)
     except KeyError:
         await _close(
             websocket,
@@ -122,13 +118,13 @@ async def run_knowledge_websocket(websocket: WebSocket) -> None:
             except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
                 await hub.publish(
                     session_id,
-                    knowledge_error_event("frame must be JSON with an event field"),
+                    support_error_event("frame must be JSON with an event field"),
                 )
                 continue
             if not isinstance(data, dict):
                 await hub.publish(
                     session_id,
-                    knowledge_error_event("frame must be JSON with an event field"),
+                    support_error_event("frame must be JSON with an event field"),
                 )
                 continue
             event = data.get("event")
@@ -139,8 +135,8 @@ async def run_knowledge_websocket(websocket: WebSocket) -> None:
             else:
                 await hub.publish(
                     session_id,
-                    knowledge_error_event(
-                        "event must be knowledge_user_message or knowledge_interrupt"
+                    support_error_event(
+                        "event must be support_user_message or support_interrupt"
                     ),
                 )
     except WebSocketDisconnect:
@@ -152,9 +148,3 @@ async def run_knowledge_websocket(websocket: WebSocket) -> None:
         except asyncio.CancelledError:
             pass
         hub.unsubscribe(session_id, queue)
-        await producer.abort_generation()
-        live = store.get(session_id)
-        if live and live["status"] == "streaming":
-            store.set_status(session_id, "interrupted")
-        store.detach(session_id)
-        producers.drop(session_id)

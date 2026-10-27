@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Brasaland knowledge chat</title>
+  <title>Brasaland manager support</title>
   <style>
     :root { color-scheme: light; font-family: Georgia, "Iowan Old Style", serif; }
     body { margin: 0; background: #f6f1e8; color: #1f1a14; }
@@ -28,8 +28,8 @@
 <body>
   <main>
     <p class="meta">Training · Jake Morrison · Executive · Mariana Restrepo</p>
-    <h1>Brasaland knowledge chat</h1>
-    <p>Ask about allergens, Brasa Points, ordering, or waste. The answer arrives token by token. Stop it if it heads the wrong way. Amounts stay in COP or USD as written.</p>
+    <h1>Brasaland manager support</h1>
+    <p>Location managers can ask about allergens, Brasa Points, ordering, or waste. The answer arrives token by token. Stop it if it heads the wrong way. Amounts stay in COP or USD as written.</p>
     <form id="login">
       <label>Email <input id="email" type="email" required autocomplete="username" /></label>
       <label>Password <input id="password" type="password" required minlength="8" autocomplete="current-password" /></label>
@@ -37,7 +37,7 @@
     </form>
     <p id="status" class="status" role="status"></p>
     <div id="chat" hidden>
-      <p class="meta">Session <code id="session"></code> · <span id="agent">brasaland_knowledge_assistant</span></p>
+      <p class="meta">Session <code id="session"></code> · <span id="agent">manager_support</span></p>
       <div id="log" aria-live="polite"></div>
       <form id="ask">
         <label>Question <textarea id="content" rows="3" required placeholder="What does the House Sauce contain?"></textarea></label>
@@ -49,6 +49,6 @@
       </form>
     </div>
   </main>
-  <script src="/knowledge/chat.js"></script>
+  <script type="module" src="/knowledge/chat.js"></script>
 </body>
 </html>

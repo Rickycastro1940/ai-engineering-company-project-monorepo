@@ -1,8 +1,8 @@
-"""In-memory chat sessions for the Brasaland knowledge assistant.
+"""In-memory chat sessions for Brasaland manager support.
 
-The assistant produces named events onto ``ChatEventHub``. WebSocket
-connections subscribe and forward those events. Generation does not call
-``websocket.send_json``.
+``manager_support`` produces named events onto ``ChatEventHub``. Every
+WebSocket on that session subscribes and forwards. Generation does not call
+``websocket.send_json``, and a socket closing does not stop the turn.
 """
 
 from __future__ import annotations
@@ -16,20 +16,19 @@ from typing import Any
 from data.pipelines.rag import query_stream
 
 COMPANY_SLUG = "brasaland"
-AGENT_ID = "brasaland_knowledge_assistant"
+AGENT_ID = "manager_support"
 SESSION_ID_PREFIX = "BRS-CHAT-"
-EVENT_USER_MESSAGE = "knowledge_user_message"
-EVENT_INTERRUPT = "knowledge_interrupt"
-EVENT_AUTH = "knowledge_auth"
-EVENT_SESSION = "knowledge_session"
-EVENT_TOKEN = "knowledge_token"
-EVENT_ASSISTANT_MESSAGE = "knowledge_assistant_message"
-EVENT_ERROR = "knowledge_error"
+EVENT_USER_MESSAGE = "support_user_message"
+EVENT_INTERRUPT = "support_interrupt"
+EVENT_AUTH = "support_auth"
+EVENT_SESSION = "support_session"
+EVENT_TOKEN = "token_chunk"
+EVENT_ASSISTANT_MESSAGE = "support_assistant_message"
+EVENT_ERROR = "support_error"
 # Token UI matches LangGraph stream_mode="messages". This agent is not a graph.
 STREAM_MODE = "messages"
 WS_CLOSE_UNAUTHORIZED = 4401
 WS_CLOSE_NO_THREAD = 4404
-WS_CLOSE_BUSY = 4409
 AUTH_TIMEOUT_SECONDS = 5.0
 PART1_EVENT_NAMES = frozenset(
     {
@@ -37,12 +36,11 @@ PART1_EVENT_NAMES = frozenset(
         "waste_escalation_created",
         "rfp_ticket_created",
         "message",
+        "knowledge_token",
+        "knowledge_session",
+        "knowledge_assistant_message",
     }
 )
-
-
-class SessionBusyError(Exception):
-    """Another socket is already attached to this conversation."""
 
 
 def _utcnow() -> str:
@@ -52,12 +50,10 @@ def _utcnow() -> str:
 class ChatSessionStore:
     def __init__(self) -> None:
         self._sessions: dict[str, dict[str, Any]] = {}
-        self._attached: set[str] = set()
         self._seq = 0
 
     def reset(self) -> None:
         self._sessions.clear()
-        self._attached.clear()
         self._seq = 0
 
     def create(self) -> dict[str, Any]:
@@ -70,6 +66,7 @@ class ChatSessionStore:
             "agent_id": AGENT_ID,
             "status": "idle",
             "messages": [],
+            "draft": "",
             "created_at": _utcnow(),
         }
         self._sessions[session_id] = session
@@ -79,24 +76,22 @@ class ChatSessionStore:
         session = self._sessions.get(session_id)
         return deepcopy(session) if session else None
 
-    def attach(self, session_id: str) -> dict[str, Any]:
+    def require(self, session_id: str) -> dict[str, Any]:
         if session_id not in self._sessions:
             raise KeyError(session_id)
-        if session_id in self._attached:
-            raise SessionBusyError(session_id)
-        self._attached.add(session_id)
         return self.public_session(session_id)
-
-    def detach(self, session_id: str) -> None:
-        self._attached.discard(session_id)
 
     def set_status(self, session_id: str, status: str) -> None:
         self._sessions[session_id]["status"] = status
 
-    def append_message(self, session_id: str, role: str, content: str) -> None:
-        self._sessions[session_id]["messages"].append(
-            {"role": role, "content": content, "created_at": _utcnow()}
-        )
+    def append_message(self, session_id: str, role: str, content: str, status: str | None = None) -> None:
+        row: dict[str, Any] = {"role": role, "content": content, "created_at": _utcnow()}
+        if status:
+            row["status"] = status
+        self._sessions[session_id]["messages"].append(row)
+
+    def set_draft(self, session_id: str, content: str) -> None:
+        self._sessions[session_id]["draft"] = content
 
     def public_session(self, session_id: str) -> dict[str, Any]:
         session = self._sessions[session_id]
@@ -108,6 +103,7 @@ class ChatSessionStore:
             "agent_id": session["agent_id"],
             "status": session["status"],
             "messages": deepcopy(session["messages"]),
+            "draft": session.get("draft") or "",
             "created_at": session["created_at"],
         }
 
@@ -138,7 +134,7 @@ class ChatEventHub:
             await queue.put(payload)
 
 
-def knowledge_error_event(detail: str) -> dict[str, str]:
+def support_error_event(detail: str) -> dict[str, str]:
     return {"event": EVENT_ERROR, "detail": detail}
 
 
@@ -179,13 +175,13 @@ class KnowledgeProducer:
         if not text:
             await self._events.publish(
                 self.session_id,
-                knowledge_error_event("content is required"),
+                support_error_event("content is required"),
             )
             return
         if self.busy():
             await self._events.publish(
                 self.session_id,
-                knowledge_error_event("a reply is already streaming"),
+                support_error_event("a reply is already streaming"),
             )
             return
         self._cancel = asyncio.Event()
@@ -216,6 +212,7 @@ class KnowledgeProducer:
     async def _turn(self, content: str) -> None:
         session_id = self.session_id
         self._sessions.append_message(session_id, "user", content)
+        self._sessions.set_draft(session_id, "")
         self._sessions.set_status(session_id, "streaming")
         await self._events.publish(session_id, self._sessions.public_session(session_id))
         pieces: list[str] = []
@@ -228,6 +225,7 @@ class KnowledgeProducer:
                     finished = True
                     break
                 pieces.append(delta)
+                self._sessions.set_draft(session_id, "".join(pieces))
                 await self._events.publish(session_id, token_event(session_id, delta))
                 delay = float(os.getenv("BRASALAND_CHAT_TOKEN_DELAY", "0") or "0")
                 await asyncio.sleep(delay)
@@ -236,7 +234,8 @@ class KnowledgeProducer:
         answer = "".join(pieces)
         status = "complete" if finished and not self._cancel.is_set() else "interrupted"
         if answer or status == "interrupted":
-            self._sessions.append_message(session_id, "assistant", answer)
+            self._sessions.append_message(session_id, "assistant", answer, status=status)
+        self._sessions.set_draft(session_id, "")
         self._sessions.set_status(session_id, "idle" if status == "complete" else "interrupted")
         await self._events.publish(session_id, assistant_event(session_id, answer, status))
         await self._events.publish(session_id, self._sessions.public_session(session_id))

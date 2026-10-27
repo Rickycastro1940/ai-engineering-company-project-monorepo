@@ -4,7 +4,7 @@ Department: **Training** (Jake Morrison — searchable standards) and **Executiv
 
 `POST /knowledge/query` is mounted on `uvicorn api.app:app`. The handler is `services/knowledge/routes.py`. Indexing and retrieval are `data/process/rag.py` and `data/pipelines/rag.py` (one collection, `brasaland_kb`). That route still returns the full answer in one response.
 
-`POST /knowledge/sessions` opens a thread (`BRS-CHAT-000001`). `WS /knowledge/ws?token=...&session_id=...` streams the same assistant as `knowledge_token` events. The staff page is `GET /knowledge/ui`. See `docs/realtime-chat.md`.
+`POST /knowledge/sessions` opens a thread (`BRS-CHAT-000001`, agent `manager_support`). `WS /knowledge/ws?token=...&session_id=...` streams that answer as `token_chunk` events. More than one socket can subscribe. The staff page is `GET /knowledge/`. See `docs/realtime-chat.md`.
 
 Request:
 

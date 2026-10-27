@@ -1,7 +1,8 @@
-"""WebSocket chat for the Brasaland knowledge assistant."""
+"""WebSocket chat for Brasaland manager_support."""
 
 from __future__ import annotations
 
+import asyncio
 import sys
 from pathlib import Path
 
@@ -17,7 +18,14 @@ for path in (str(API_ROOT), str(REPO_ROOT)):
 
 from api.app import app  # noqa: E402
 from data.pipelines.rag import answer_question, query_stream  # noqa: E402
-from services.knowledge.chat import PART1_EVENT_NAMES, reset_chat_state  # noqa: E402
+from services.knowledge.chat import (  # noqa: E402
+    PART1_EVENT_NAMES,
+    hub,
+    producers,
+    reset_chat_state,
+    store,
+    token_event,
+)
 import users  # noqa: E402
 
 
@@ -52,7 +60,7 @@ def _session(client: TestClient, token: str) -> str:
     assert body["session_id"].startswith("BRS-CHAT-")
     assert body["thread_id"] == body["session_id"]
     assert body["company"] == "brasaland"
-    assert body["agent_id"] == "brasaland_knowledge_assistant"
+    assert body["agent_id"] == "manager_support"
     assert body["status"] == "idle"
     assert body["messages"] == []
     return body["session_id"]
@@ -85,7 +93,7 @@ def test_unknown_thread_closes_before_a_session_event() -> None:
     assert caught.value.code == 4404
 
 
-def test_stream_emits_named_knowledge_tokens_and_restores_the_thread() -> None:
+def test_stream_emits_token_chunks_and_restores_the_thread() -> None:
     client = TestClient(app)
     token = _token(client)
     session_id = _session(client, token)
@@ -94,18 +102,20 @@ def test_stream_emits_named_knowledge_tokens_and_restores_the_thread() -> None:
         f"/knowledge/ws?token={token}&thread_id={session_id}"
     ) as socket:
         hello = socket.receive_json()
-        assert hello["event"] == "knowledge_session"
+        assert hello["event"] == "support_session"
+        assert hello["agent_id"] == "manager_support"
         assert hello["messages"] == []
-        socket.send_json({"event": "knowledge_user_message", "content": question})
+        socket.send_json({"event": "support_user_message", "content": question})
         frames = []
         while True:
             frame = socket.receive_json()
             frames.append(frame)
-            if frame["event"] == "knowledge_assistant_message":
+            if frame["event"] == "support_assistant_message":
                 break
     events = [frame["event"] for frame in frames]
-    assert "knowledge_token" in events
-    assert events[-1] == "knowledge_assistant_message"
+    assert "token_chunk" in events
+    assert "knowledge_token" not in events
+    assert events[-1] == "support_assistant_message"
     assert "message" not in events
     assert PART1_EVENT_NAMES.isdisjoint(events)
     done = frames[-1]
@@ -113,14 +123,14 @@ def test_stream_emits_named_knowledge_tokens_and_restores_the_thread() -> None:
     assert done["session_id"] == session_id
     assert done["thread_id"] == session_id
     assert "not enough information" in done["content"].lower()
-    deltas = "".join(frame["delta"] for frame in frames if frame["event"] == "knowledge_token")
+    deltas = "".join(frame["delta"] for frame in frames if frame["event"] == "token_chunk")
     assert deltas == done["content"]
 
     with client.websocket_connect(
         f"/knowledge/ws?token={token}&session_id={session_id}"
     ) as socket:
         restored = socket.receive_json()
-    assert restored["event"] == "knowledge_session"
+    assert restored["event"] == "support_session"
     assert restored["session_id"] == session_id
     assert [row["role"] for row in restored["messages"]] == ["user", "assistant"]
     assert restored["messages"][0]["content"] == question
@@ -135,10 +145,10 @@ def test_interrupt_stops_the_token_stream(monkeypatch: pytest.MonkeyPatch) -> No
     with client.websocket_connect(
         f"/knowledge/ws?token={token}&session_id={session_id}"
     ) as socket:
-        assert socket.receive_json()["event"] == "knowledge_session"
+        assert socket.receive_json()["event"] == "support_session"
         socket.send_json(
             {
-                "event": "knowledge_user_message",
+                "event": "support_user_message",
                 "content": "What does the House Sauce contain?",
             }
         )
@@ -146,10 +156,10 @@ def test_interrupt_stops_the_token_stream(monkeypatch: pytest.MonkeyPatch) -> No
         final = None
         while final is None:
             frame = socket.receive_json()
-            if frame["event"] == "knowledge_token" and not saw_token:
+            if frame["event"] == "token_chunk" and not saw_token:
                 saw_token = True
-                socket.send_json({"event": "knowledge_interrupt"})
-            if frame["event"] == "knowledge_assistant_message":
+                socket.send_json({"event": "support_interrupt"})
+            if frame["event"] == "support_assistant_message":
                 final = frame
     assert saw_token
     assert final is not None
@@ -157,3 +167,31 @@ def test_interrupt_stops_the_token_stream(monkeypatch: pytest.MonkeyPatch) -> No
     assert final["content"]
     full = answer_question("What does the House Sauce contain?")["answer"]
     assert len(final["content"]) < len(full)
+    assert final["event"] == "support_assistant_message"
+
+
+def test_two_subscribers_receive_the_same_token_chunk() -> None:
+    async def scenario() -> None:
+        session_id = store.create()["session_id"]
+        first = hub.subscribe(session_id)
+        second = hub.subscribe(session_id)
+        await hub.publish(session_id, token_event(session_id, "Brasa"))
+        assert first.get_nowait() == {
+            "event": "token_chunk",
+            "session_id": session_id,
+            "thread_id": session_id,
+            "delta": "Brasa",
+        }
+        assert second.get_nowait()["delta"] == "Brasa"
+        hub.unsubscribe(session_id, first)
+        producer = producers.get(session_id, store, hub)
+        await producer.start_turn("What is the capital of Japan?")
+        assert producer._task is not None
+        await producer._task
+        saved = store.get(session_id)
+        assert saved is not None
+        assert saved["status"] == "idle"
+        assert saved["agent_id"] == "manager_support"
+        assert "not enough information" in saved["messages"][-1]["content"].lower()
+
+    asyncio.run(scenario())

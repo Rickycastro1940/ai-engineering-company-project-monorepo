@@ -1,7 +1,7 @@
-"""Knowledge query and the WebSocket that streams the same assistant.
+"""Knowledge query and the WebSocket that streams manager_support.
 
 ``POST /knowledge/query`` still returns one full answer. ``WS /knowledge/ws``
-streams that answer as ``knowledge_token`` events so a staff member can
+streams that answer as ``token_chunk`` events so a location manager can
 interrupt a reply that is going the wrong way.
 
 Mounted from ``services/api/app.py`` (the app ``uvicorn api.app:app`` loads).
@@ -79,6 +79,14 @@ def knowledge_chat_script() -> FileResponse:
     script = UI_PAGE.with_name("chat.js")
     if not script.is_file():
         raise HTTPException(status_code=404, detail="Knowledge chat script is not installed")
+    return FileResponse(script, media_type="text/javascript")
+
+
+@router.get("/reconnect.js", include_in_schema=False)
+def knowledge_reconnect_script() -> FileResponse:
+    script = UI_PAGE.with_name("reconnect.js")
+    if not script.is_file():
+        raise HTTPException(status_code=404, detail="Reconnect script is not installed")
     return FileResponse(script, media_type="text/javascript")
 
 
