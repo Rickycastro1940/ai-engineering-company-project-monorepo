@@ -192,6 +192,75 @@ def generate_openai(question: str, chunks: list[dict]) -> str:
     return call_external("language model", _run)
 
 
+def _text_deltas(text: str, size: int = 24):
+    """Small slices of a finished extractive answer, same grain as LLM tokens."""
+    cleaned = text or ""
+    if not cleaned:
+        return
+    for start in range(0, len(cleaned), size):
+        yield cleaned[start : start + size]
+
+
+def iter_openai_deltas(question: str, chunks: list[dict]):
+    """OpenAI chat deltas. Each item is ``choices[0].delta.content``."""
+    from data.process.rag import _openai
+
+    prompt = build_prompt(question, chunks)
+    model = os.getenv("BRASALAND_RAG_LLM_MODEL", "gpt-4o-mini")
+
+    def _open():
+        try:
+            client = _openai()
+        except ExternalServiceError as error:
+            raise ExternalServiceError("language model") from error
+        return client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            stream=True,
+        )
+
+    stream = call_external("language model", _open)
+    try:
+        for event in stream:
+            choices = getattr(event, "choices", None) or []
+            if not choices:
+                continue
+            delta = getattr(choices[0].delta, "content", None)
+            if delta:
+                yield delta
+    finally:
+        closer = getattr(stream, "close", None)
+        if closer:
+            closer()
+
+
+def query_stream(question: str, k: int = DEFAULT_K):
+    """Yield answer text as it is produced.
+
+    This assistant is retrieval plus a completion, not a LangGraph graph.
+    LangGraph ``stream_mode="messages"`` is the mode that yields LLM tokens.
+    ``values`` and ``updates`` emit a whole node state, which is too coarse
+    for a token UI, so they are not used. Each yield here is one text delta.
+    """
+    cleaned = (question or "").strip()
+    if not cleaned:
+        yield from _text_deltas(INSUFFICIENT)
+        return
+    sources = retrieve(cleaned, k=k)
+    if not sources:
+        yield from _text_deltas(INSUFFICIENT)
+        return
+    if llm_backend() == "openai":
+        produced = False
+        for delta in iter_openai_deltas(cleaned, sources):
+            produced = True
+            yield delta
+        if produced:
+            return
+    yield from _text_deltas(extractive_answer(sources))
+
+
 def answer_question(question: str, k: int = DEFAULT_K) -> dict:
     """Grounded answer plus the source chunks that support it."""
     cleaned = (question or "").strip()

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Brasaland manager support</title>
+  <style>
+    :root { color-scheme: light; font-family: Georgia, "Iowan Old Style", serif; }
+    body { margin: 0; background: #f6f1e8; color: #1f1a14; }
+    main { max-width: 42rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+    h1 { font-size: 1.6rem; margin-bottom: 0.25rem; }
+    p { line-height: 1.45; }
+    label { display: grid; gap: 0.3rem; margin-bottom: 0.7rem; font-size: 0.95rem; }
+    input, textarea, button { font: inherit; }
+    input, textarea { padding: 0.5rem 0.6rem; border: 1px solid #c8bba6; border-radius: 8px; background: #fff; }
+    button { background: #8c3a1e; color: #fff; border: 0; border-radius: 8px; padding: 0.5rem 0.8rem; cursor: pointer; }
+    button.secondary { background: #3f4a3a; }
+    button:disabled { opacity: 0.55; cursor: wait; }
+    .row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+    #log { display: grid; gap: 0.6rem; margin: 1rem 0; }
+    .bubble { padding: 0.7rem 0.8rem; border-radius: 10px; background: #fff; border: 1px solid #e4d8c6; }
+    .bubble.user { background: #efe4d4; }
+    .bubble.assistant { white-space: pre-wrap; }
+    .bubble.interrupted { box-shadow: inset 3px 0 0 #8c3a1e; }
+    .bubble.interrupted::after { content: "Interrupted"; display: block; margin-top: 0.35rem; font-size: 0.8rem; color: #8c3a1e; }
+    .meta, .status { color: #6b5e4e; font-size: 0.85rem; }
+    .error { color: #8c1e1e; }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="meta">Training · Jake Morrison · Executive · Mariana Restrepo</p>
+    <h1>Brasaland manager support</h1>
+    <p>Location managers can ask about allergens, Brasa Points, ordering, or waste. The answer arrives token by token. Stop it if it heads the wrong way. Amounts stay in COP or USD as written.</p>
+    <form id="login">
+      <label>Email <input id="email" type="email" required autocomplete="username" /></label>
+      <label>Password <input id="password" type="password" required minlength="8" autocomplete="current-password" /></label>
+      <button type="submit">Sign in</button>
+    </form>
+    <p id="status" class="status" role="status"></p>
+    <div id="chat" hidden>
+      <p class="meta">Session <code id="session"></code> · <span id="agent">manager_support</span></p>
+      <div id="log" aria-live="polite"></div>
+      <form id="ask">
+        <label>Question <textarea id="content" rows="3" required placeholder="What does the House Sauce contain?" autocomplete="off"></textarea></label>
+        <div class="row">
+          <button type="submit" id="send">Send</button>
+          <button type="button" class="secondary" id="stop">Stop reply</button>
+          <button type="button" class="secondary" id="reconnect">Reconnect</button>
+        </div>
+      </form>
+    </div>
+  </main>
+  <script type="module" src="/knowledge/chat.js"></script>
+</body>
+</html>
