@@ -30,6 +30,24 @@ Server: `support_session`, `token_chunk` (`delta`), `generation_interrupted` (`c
 
 Generation publishes to an in-memory hub. The socket only forwards. Redis is not required.
 
+## Design answers
+
+### Why WebSockets instead of the Part 1 SSE channel?
+
+Part 1 notifies staff that an RFP ticket was registered. That traffic is server to client only: the browser never sends a ticket back on the stream. Server-Sent Events fit that.
+
+This chat has to carry both directions on one connection while a reply is still being produced. The server sends `token_chunk`. At the same moment the manager must be able to send `interrupt`, with or without `new_input`. SSE cannot accept that frame. A second HTTP call could cancel a job, but it would not be the same channel the tokens are using, and the requirement is that the person watching the tokens can stop them and steer the next turn without leaving the socket. That is what forces a bidirectional channel.
+
+### How do several clients share one session without calling the agent twice?
+
+`ProducerRegistry` keeps one producer per `session_id`. `start_turn` runs `query_stream` once. Each socket only calls `ChatEventHub.subscribe`. `publish` copies the same payload onto every queue for that session (`token_chunk`, `generation_interrupted`, `generation_completed`, `support_session`). A supervisor who connects with the same `BRS-CHAT-` id receives those frames. The second socket does not start another model call. Closing one socket unsubscribes that queue and leaves the turn running for whoever is still subscribed.
+
+### How is stream abort different from LangGraph `interrupt()`, and what happens to the partial reply?
+
+This assistant is not a LangGraph graph, and the socket does not call LangGraph `interrupt()`. That API pauses a node until something resumes the same graph state. Here the manager is stopping a bad reply.
+
+`interrupt` sets a cancel flag and closes the generator, so that turn emits no further `token_chunk`. The text already produced is stored as an assistant message with `status: interrupted` and sent as `generation_interrupted`. The bubble stays on screen. If the frame includes `new_input`, that string is a new user message and a new call to `query_stream`. The next end frame is `generation_completed` for that new turn. The interrupted text is not overwritten.
+
 ## Run
 
 ```bash
