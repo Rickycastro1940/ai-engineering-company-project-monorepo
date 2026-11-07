@@ -120,6 +120,8 @@ def main() -> int:
     os.environ["BRASALAND_RAG_BACKEND"] = "local"
     os.environ["BRASALAND_RAG_EMBEDDINGS"] = "local"
     os.environ["BRASALAND_RAG_LLM"] = "extractive"
+    os.environ["BRASALAND_RAG_RERANK"] = "local"
+    os.environ.pop("COHERE_API_KEY", None)
     report = evaluate()
     print(format_report(report))
     if report["retrieval_hit_rate"] < 1.0 or report["answer_pass_rate"] < 1.0:

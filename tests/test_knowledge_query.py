@@ -19,6 +19,8 @@ def _offline_rag(monkeypatch):
     monkeypatch.setenv("BRASALAND_RAG_BACKEND", "local")
     monkeypatch.setenv("BRASALAND_RAG_EMBEDDINGS", "local")
     monkeypatch.setenv("BRASALAND_RAG_LLM", "extractive")
+    monkeypatch.setenv("BRASALAND_RAG_RERANK", "local")
+    monkeypatch.delenv("COHERE_API_KEY", raising=False)
 
 
 @pytest.fixture(scope="module")
@@ -150,9 +152,10 @@ def test_qdrant_backend_uses_vector_hits(monkeypatch):
     monkeypatch.setenv("BRASALAND_RAG_BACKEND", "qdrant")
     pipelines = importlib.import_module("data.pipelines.rag")
 
-    def _fake(vector, k):
+    def _fake(vector, k, query_text=None):
         assert len(vector) == 384
-        assert k >= 1
+        assert k >= 20
+        assert query_text
         return [
             (
                 0.91,
@@ -180,14 +183,15 @@ def test_qdrant_backend_uses_vector_hits(monkeypatch):
     found = pipelines.retrieve("house sauce")
     assert len(found) == 1
     assert found[0]["source_document"] == "brasaland-menu-allergens.en.md"
-    assert found[0]["score"] == 0.91
+    assert 0.4 < found[0]["score"] <= 1.0
+    assert found[0]["score"] != 0.91
 
 
 def test_qdrant_failure_is_503(client, monkeypatch):
     monkeypatch.setenv("BRASALAND_RAG_BACKEND", "qdrant")
     from services.safe_errors import ExternalServiceError
 
-    def _boom(vector, k):
+    def _boom(vector, k, query_text=None):
         raise ExternalServiceError("vector store")
 
     monkeypatch.setattr("data.pipelines.rag.search_qdrant", _boom)

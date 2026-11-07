@@ -7,7 +7,7 @@ This folder is for **evaluation and validation**: evaluation datasets, golden se
 
 ## Knowledge Q&A golden set
 
-`knowledge_qa.jsonl` is 28 questions grounded in `docs/company-knowledge-base/` (allergens, waste, supplier ordering, Brasa Points). `eval_knowledge_qa.py` scores retrieval hit rate (expected file appears in `sources`) and answer checks (`must_include` / `must_not_include`). It forces the local embedding path so the run does not need an API key.
+`knowledge_qa.jsonl` is 28 questions grounded in `docs/company-knowledge-base/` (allergens, waste, supplier ordering, Brasa Points). `eval_knowledge_qa.py` scores retrieval hit rate (expected file appears in `sources`) and answer checks (`must_include` / `must_not_include`). It forces the local embedding path and the local re-ranker so the run does not need an API key.
 
 ```bash
 python data/eval/eval_knowledge_qa.py
