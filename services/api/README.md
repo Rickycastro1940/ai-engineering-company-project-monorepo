@@ -100,6 +100,10 @@ curl -sS -X POST http://127.0.0.1:8000/knowledge/query \
 
 No API key is required. The default path uses local embeddings. `BRASALAND_RAG_BACKEND=qdrant` and `BRASALAND_RAG_LLM=openai` turn on the vector store and chat model.
 
+## Guest concierge
+
+Menu, allergen, and order answers stream on `WS /concierge/ws` and `GET /realtime/concierge/stream`. Prices come from `/menus` (COP and USD). The kitchen comes from the location roster. `POST /concierge/transcribe` uses `BRASALAND_AUDIO_API_KEY` when it is set and accepts typed text when it is not. Staff read placed orders at `GET /concierge/orders`. The page is `GET /concierge/`. See [`docs/concierge.md`](../../docs/concierge.md).
+
 ## Alternative run command
 
 `services/api/main.py` is deprecated (it used to import a missing knowledge router). It now starts the same central app:

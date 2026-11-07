@@ -10,6 +10,8 @@ The two main projects stored here are:
 
 Also present:
 
+- **`concierge/`** — guest page served by the central API at `GET /concierge/` (menu in COP and USD, allergens, conversational orders, voice clip with a text fallback). The page is static HTML, not a separate build. See [`docs/concierge.md`](../docs/concierge.md).
+
 - **`portal/`** — Next.js App Router portal. Guest Brasa Points (`/points`) and staff sales by location in COP and USD (`/ops/sales`). See [`portal/README.md`](./portal/README.md).
 - **`web/`** — incident-analysis HTML tool (not the public marketing site).
 

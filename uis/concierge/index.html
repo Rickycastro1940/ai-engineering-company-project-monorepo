@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Brasaland concierge</title>
+  <style>
+    :root { color-scheme: light; font-family: Georgia, "Iowan Old Style", serif; }
+    body { margin: 0; background: #f6f1e8; color: #1f1a14; }
+    main { max-width: 42rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+    h1 { font-size: 1.6rem; margin-bottom: 0.25rem; }
+    p { line-height: 1.45; }
+    label { display: grid; gap: 0.3rem; margin: 0.6rem 0; font-size: 0.95rem; }
+    input, button { font: inherit; }
+    input[type="text"] { padding: 0.5rem 0.6rem; border: 1px solid #c8bba6; border-radius: 8px; background: #fff; width: 100%; }
+    button { background: #8c3a1e; color: #fff; border: 0; border-radius: 8px; padding: 0.5rem 0.8rem; cursor: pointer; }
+    button.secondary { background: #3f4a3a; }
+    button:disabled { opacity: 0.55; cursor: wait; }
+    .row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+    #log { display: grid; gap: 0.6rem; margin: 1rem 0; }
+    .bubble { padding: 0.7rem 0.8rem; border-radius: 10px; background: #fff; border: 1px solid #e4d8c6; white-space: pre-wrap; }
+    .bubble.user { background: #efe4d4; }
+    .meta, .status { color: #6b5e4e; font-size: 0.85rem; }
+    .error { color: #8c1e1e; }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="meta">Marketing · Camila Ospina · Operations · Felipe Guerrero</p>
+    <h1>Brasaland concierge</h1>
+    <p>Ask for the menu in COP and USD, check an allergen, or place an order for one of the 14 kitchens. Answers arrive token by token. A voice clip is transcribed when an audio key is configured; otherwise type the order.</p>
+    <div class="row">
+      <button type="button" id="open" class="secondary">Start conversation</button>
+      <span id="status" class="status" role="status"></span>
+    </div>
+    <div id="log" aria-live="polite"></div>
+    <form id="composer">
+      <label>Message
+        <input id="content" type="text" autocomplete="off" placeholder="Two grilled sirloin at Medellín Centro" />
+      </label>
+      <label>Voice order
+        <input id="audio" type="file" accept="audio/*" />
+      </label>
+      <div class="row">
+        <button type="submit" id="send">Send</button>
+        <button type="button" id="stop" class="secondary">Stop reply</button>
+      </div>
+    </form>
+  </main>
+  <script src="/concierge/concierge.js"></script>
+</body>
+</html>
