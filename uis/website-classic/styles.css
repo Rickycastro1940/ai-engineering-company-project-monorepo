@@ -497,16 +497,6 @@ pre code {
     color: var(--ink);
 }
 
-.menu-mark {
-    width: 72px;
-    height: 72px;
-    border-radius: 8px;
-    display: block;
-    background:
-        radial-gradient(circle at 50% 62%, #e36a2c 0 7px, transparent 8px),
-        linear-gradient(#3a2c24, #1c1613);
-}
-
 .menu-row .menu-facts {
     margin: 0;
     padding: 0;
