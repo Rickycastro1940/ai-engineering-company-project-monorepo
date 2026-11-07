@@ -13,6 +13,17 @@ Each subfolder or file under `data/pipelines/` should represent **one pipeline o
 
 Location ids in this snapshot are the labels printed on the public locations page. They are not the 14 `Location.id` values in `services/api/locations.py`.
 
+## Demand forecast (inventory and loyalty)
+
+`demand_forecast.py` builds 180 days of mocked hourly covers for the 14 Brasaland locations (Colombia in COP, Florida in USD). A scikit-learn `Ridge` model forecasts the next day's peak hour, beef/chicken/pork kilograms, produce kilograms, and expected Brasa Points on the physical stamp card. Local holidays and a simple temperature/rain feature change the forecast. It does not read a live POS or supplier invoice.
+
+The central API exposes the same payload at `GET /forecasts/demand` (Bearer JWT).
+
+```bash
+python3 -m data.pipelines.demand_forecast --date 2026-11-09
+python3 -m data.pipelines.demand_forecast --date 2026-11-09 --location co-med-centro
+```
+
 ```bash
 python3 -m data.pipelines.public_site_snapshot \
   --jsonl data/raw/public_site_snapshot.jsonl \

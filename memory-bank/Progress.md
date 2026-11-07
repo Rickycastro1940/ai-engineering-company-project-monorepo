@@ -15,8 +15,8 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Present (seeded)** — `locations`/`menus`/`sales`/`customers`/`suppliers`/`inventory=present` plus `knowledge=present` (`POST /knowledge/query`) and `realtime=present` (`GET /realtime/ops-alerts/stream`) on `uvicorn api.app:app` (`:8000`). Not a live POS or invoice feed |
 | Technology: telemetry + pipeline to dashboards | **Partial** — live no-sales SSE on `GET /realtime/ops-alerts/stream` plus Part 2 weekly location cost/waste ETL, Prefect stage subflows, KPI unit tests, CLI, and backoffice Monday weekly report; engineering `GET /telemetry/report` untouched. Nightly landing copy is `scripts/nightly_export.py` (OS cron `0 2 * * *` America/Bogota, status in `public.job_runs`), not a FastAPI scheduler. `data/pipelines/public_site_snapshot.py` reads the public site into JSON Lines and SQLite (guest menu and the locations printed on the page) |
-| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — seeded `GET /sales` tickets and `/sales/overview` (COP and USD, 14 locations) plus `/sales/alerts`; `POST /sales` stores a ticket and calls `record_sale` so the live no-sales alert on backoffice `/accessible` sees that location; Next.js `uis/portal` `/ops/sales` shows per-location sales in COP and USD. Centralized incident manager is on `/api/incidents` and backoffice `/incidents` (Felipe: branch, category, status). Smart ordering still open |
-| Procurement: supplier price history, consolidated spend | **Partial** — seeded `GET /suppliers` (20 suppliers, Colombia and Florida, price history and alerts); Monday weekly purchase cost / price-alert frequency still separate; invoices are not live |
+| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — seeded `GET /sales` tickets and `/sales/overview` (COP and USD, 14 locations) plus `/sales/alerts`; `POST /sales` stores a ticket and calls `record_sale` so the live no-sales alert on backoffice `/accessible` sees that location; Next.js `uis/portal` `/ops/sales` shows per-location sales in COP and USD. Centralized incident manager is on `/api/incidents` and backoffice `/incidents` (Felipe: branch, category, status). Next-day peak hour and protein/produce kilograms are on `GET /forecasts/demand` (mocked history, local holidays, temperature and rain). Not a live stock or POS feed |
+| Procurement: supplier price history, consolidated spend | **Partial** — seeded `GET /suppliers` (20 suppliers, Colombia and Florida, price history and alerts); Monday weekly purchase cost / price-alert frequency still separate; `GET /forecasts/demand` rolls protein and produce kilograms into an illustrative purchase total kept separate in COP (Colombia) and USD (Florida). Invoices are not live |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `GET /customers` CRM seed with `brasa_points_balance` on physical stamp cards; Next.js `uis/portal` `/points`; public production site is `uis/website-classic/` (dish photos, menu, locations, Brasa Points, allergens, supplier application, EN/ES), restored from commit `2465196`. The Vite app in `uis/website/` is not what Vercel publishes. `CONTEXT.md` still describes stamp cards as today’s in-restaurant programme |
 | People: HR portal / KPIs by country | **Not done** |
 | Training: recipe catalogue, push to 14 locations | **Partial** — `POST /knowledge/query` searches the four English standards (allergens, waste, ordering, Brasa Points) and returns cited chunks. Location managers reach that answer on `WS /knowledge/ws` as `manager_support` (`token_chunk`, stop with `interrupt`, end with `generation_interrupted` or `generation_completed`). Not a full recipe catalogue and not a push to all 14 kitchens |
@@ -659,6 +659,28 @@ python3 -m pytest tests/pipelines/test_public_site_snapshot.py -q → 4 passed
 python3 -m data.pipelines.public_site_snapshot --jsonl /tmp/brasaland-public.jsonl --sqlite /tmp/brasaland-public.sqlite3 --delay 0.3
 → 23 records: 5 pages, 6 menu dishes (Grilled Sirloin through House Sauce), 12 public location rows (11 COP, 1 USD)
 ```
+
+## Latest demand forecast (`cursor/predictive-inventory-loyalty-41bd`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — next-day peak hour and protein/produce for each kitchen) + **Procurement** (Lucía Fernández — those kilograms rolled up for Colombia in COP and Florida in USD). Technology hosts `GET /forecasts/demand` on the central API. Brasa Points in the payload are expected stamp-card points (about 60% of customers do not use the card). `digital_loyalty` stays false.
+
+Mocked history (180 days, 14 locations) is fit with scikit-learn `Ridge` in `data/pipelines/demand_forecast.py`. Features: location, hour, day of week, a local holiday flag (Colombia and Florida calendars differ), temperature, and rain. Not a live POS, weather, or invoice feed. Dependency: `scikit-learn>=1.5.0` in `pyproject.toml`, `requirements.txt`, and `uv.lock` (joblib, scipy, threadpoolctl, narwhals come in with it).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+GET http://127.0.0.1:8000/docs → 200
+locations=present menus=present sales=present customers=present suppliers=present inventory=present
+path_count=50
+/forecasts/demand present
+GET /forecasts/demand?date=2026-11-09 without token → 401
+GET /forecasts/demand?date=2026-11-09&location_id=us-mia-brickell with Bearer → 200
+  1 location, USD, peak 19:00-20:00 local, beef_kg=4.08, brasa_points=120.7, purchase_usd=72.63
+python3 -m data.pipelines.demand_forecast --date 2026-11-09 --location co-med-centro
+  COP, peak 19:00-20:00 local, beef 3.44 kg, chicken 2.23 kg, pork 2.43 kg, greens 1.22 kg, purchase_cop=175544, points=410.3, rain=true
+python3 -m pytest tests/pipelines/test_demand_forecast.py tests/test_demand_forecast_api.py -q → 10 passed
+```
+
+Holiday and weather checks in the unit test hold temperature and the other flags fixed: a holiday scores higher covers, beef, greens, and Brasa Points than the same Monday without the holiday; rain and higher temperature score lower covers.
 
 ## How to update this file
 
