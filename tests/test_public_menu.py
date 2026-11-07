@@ -50,6 +50,29 @@ def test_public_card_lists_every_catalogue_item_in_cop_and_usd() -> None:
     assert "Six dishes" not in MENU_HTML
 
 
+def test_every_catalogue_item_has_a_menu_photo() -> None:
+    """Each public menu row uses the same photo markup as the original six plates."""
+    assert "menu-mark" not in MENU_HTML
+    rows = re.findall(r"<article class=\"card menu-row\">(.*?)</article>", MENU_HTML, flags=re.S)
+    assert len(rows) == len(_ITEMS) == 14
+    for item in _ITEMS:
+        src = f"images/menu-{item.id}.jpg"
+        photo = SITE / "images" / f"menu-{item.id}.jpg"
+        assert photo.is_file(), item.id
+        assert photo.stat().st_size > 10_000
+        assert photo.read_bytes()[:3] == b"\xff\xd8\xff"
+        row = next(block for block in rows if item.name in block)
+        match = re.search(r'<img src="([^"]+)" alt="([^"]+)" width="176" height="176"', row)
+        assert match, item.name
+        assert match.group(1) == src
+        alt_key = re.search(r'data-i18n-alt="([^"]+)"', row)
+        assert alt_key, item.name
+        key = alt_key.group(1)
+        assert f'"{key}": "{match.group(2)}"' in LANG_JS
+        spanish = _lang_keys(LANG_JS, "es")
+        assert key in spanish
+
+
 def test_menu_copy_exists_in_english_and_spanish() -> None:
     english = _lang_keys(LANG_JS, "en")
     spanish = _lang_keys(LANG_JS, "es")
