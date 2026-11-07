@@ -14,6 +14,17 @@ Main dishes and their declared allergens:
 - Tropical Salad: contains nuts (cashew) and dairy (feta cheese).
 - Corn Arepa (side): contains dairy and egg.
 - House Sauce: contains soy and sulfites.
+- Grilled Picanha (Picanha a la brasa): gluten-free, dairy-free, nut-free.
+  Coarse salt only; no soy marinade.
+- Grilled Pork Loin (Lomo de cerdo a la brasa): gluten-free and dairy-free.
+  Marinade contains soy.
+- Grilled Chorizo (Chorizo a la brasa): gluten-free and dairy-free. Contains
+  sulfites.
+- Fried Yuca (side): gluten-free, dairy-free, nut-free.
+- Grilled Ripe Plantain (side): gluten-free, dairy-free, nut-free.
+- Grilled Corn (side): gluten-free, dairy-free, nut-free. Salt and lime only.
+- Chimichurri: gluten-free and dairy-free. Red-wine vinegar contains sulfites.
+- Vinagrete: gluten-free and dairy-free. Vinegar contains sulfites.
 
 Protocol for customer-reported allergies:
 1. The server informs the kitchen before preparation begins.

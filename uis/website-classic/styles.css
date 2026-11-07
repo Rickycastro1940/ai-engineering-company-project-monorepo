@@ -483,6 +483,30 @@ pre code {
     font-size: 0.95rem;
 }
 
+.menu-prices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.85rem;
+    margin: 0.45rem 0 0;
+    font-size: 0.92rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.menu-prices span {
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.menu-mark {
+    width: 72px;
+    height: 72px;
+    border-radius: 8px;
+    display: block;
+    background:
+        radial-gradient(circle at 50% 62%, #e36a2c 0 7px, transparent 8px),
+        linear-gradient(#3a2c24, #1c1613);
+}
+
 .menu-row .menu-facts {
     margin: 0;
     padding: 0;
