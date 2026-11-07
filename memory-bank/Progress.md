@@ -14,7 +14,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Present (seeded)** — `locations`/`menus`/`sales`/`customers`/`suppliers`/`inventory=present` plus `knowledge=present` (`POST /knowledge/query`) and `realtime=present` (`GET /realtime/ops-alerts/stream`) on `uvicorn api.app:app` (`:8000`). Not a live POS or invoice feed |
-| Technology: telemetry + pipeline to dashboards | **Partial** — live no-sales SSE on `GET /realtime/ops-alerts/stream` plus Part 2 weekly location cost/waste ETL, Prefect stage subflows, KPI unit tests, CLI, and backoffice Monday weekly report; engineering `GET /telemetry/report` untouched. Nightly landing copy is `scripts/nightly_export.py` (OS cron `0 2 * * *` America/Bogota, status in `public.job_runs`), not a FastAPI scheduler. `data/pipelines/public_site_snapshot.py` reads the public site into JSON Lines and SQLite (guest menu and the locations printed on the page) |
+| Technology: telemetry + pipeline to dashboards | **Partial** — live no-sales SSE on `GET /realtime/ops-alerts/stream` plus Part 2 weekly location cost/waste ETL, Prefect stage subflows, KPI unit tests, CLI, and backoffice Monday weekly report; engineering `GET /telemetry/report` untouched. Nightly landing copy is `scripts/nightly_export.py` (OS cron `0 2 * * *` America/Bogota, status in `public.job_runs`), not a FastAPI scheduler. `data/pipelines/public_site_snapshot.py` reads the public site into JSON Lines and SQLite (guest menu and the locations printed on the page). Groq inventory-agent calls record latency and token usage, with a `/feedback` score hook: Langfuse when `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` are set, in-process no-op otherwise (`agents/llmops/`). A Llama Guard-style rail keeps that assistant on restaurant operations and blocks proprietary supplier data. Location POS telemetry is still not live |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — seeded `GET /sales` tickets and `/sales/overview` (COP and USD, 14 locations) plus `/sales/alerts`; `POST /sales` stores a ticket and calls `record_sale` so the live no-sales alert on backoffice `/accessible` sees that location; Next.js `uis/portal` `/ops/sales` shows per-location sales in COP and USD. Centralized incident manager is on `/api/incidents` and backoffice `/incidents` (Felipe: branch, category, status). Smart ordering still open |
 | Procurement: supplier price history, consolidated spend | **Partial** — seeded `GET /suppliers` (20 suppliers, Colombia and Florida, price history and alerts); Monday weekly purchase cost / price-alert frequency still separate; invoices are not live |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `GET /customers` CRM seed with `brasa_points_balance` on physical stamp cards; Next.js `uis/portal` `/points`; public production site is `uis/website-classic/` (dish photos, menu, locations, Brasa Points, allergens, supplier application, EN/ES), restored from commit `2465196`. The Vite app in `uis/website/` is not what Vercel publishes. `CONTEXT.md` still describes stamp cards as today’s in-restaurant programme |
@@ -658,6 +658,17 @@ The job reads only `brasalandrestaurant.com` (or a local test host). Static HTML
 python3 -m pytest tests/pipelines/test_public_site_snapshot.py -q → 4 passed
 python3 -m data.pipelines.public_site_snapshot --jsonl /tmp/brasaland-public.jsonl --sqlite /tmp/brasaland-public.sqlite3 --delay 0.3
 → 23 records: 5 pages, 6 menu dishes (Grilled Sirloin through House Sauce), 12 public location rows (11 COP, 1 USD)
+```
+
+## Latest Groq LLMOps (`cursor/groq-llmops-guardrails-83a3`)
+
+Department served: **Technology** (Nicolás Park — telemetry on the Groq inventory assistant). The same rail keeps Operations questions on restaurant work and blocks proprietary supplier commercial terms (Procurement).
+
+`agents/llmops/` wraps each Groq `chat.completions` call. Latency and token usage are recorded in memory always. When `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` are set, those records plus a `user-feedback` score (`/feedback up|down`) post to Langfuse’s ingestion API. Missing keys are a no-op: no network call, the agent still runs. Answers are checked with a Llama Guard-style policy (`safe` / `unsafe`, `S1` off-topic, `S2` proprietary supplier data) before and after the model call. `BRASALAND_LLAMA_GUARD_MODEL` adds a Groq-hosted Llama Guard pass; if that call fails, the local policy still stands. This is not location POS telemetry.
+
+```text
+python3 -m pytest tests/test_llmops.py -q
+# 28 passed
 ```
 
 ## How to update this file

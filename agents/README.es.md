@@ -6,3 +6,4 @@ Cada subcarpeta dentro de `agents/` debería representar **un agente concreto** 
 
 - **Propósito principal**: centralizar el desarrollo de agentes reutilizables para la compañía dentro del monorepo.
 - **Recomendación**: documenta aquí el catálogo de agentes que se vaya creando y enlaza a los READMEs de cada agente.
+- **`llmops/`**: trazas Langfuse (latencia, tokens, `/feedback`) y un control al estilo Llama Guard para el agente Groq de inventario en `agent.py`. Ver [`llmops/README.md`](./llmops/README.md).
