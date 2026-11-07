@@ -73,11 +73,32 @@ def test_menus_are_public_and_priced_in_cop_and_usd(client: TestClient) -> None:
     assert len(items) >= 6
     ids = {item["id"] for item in items}
     assert "grilled-sirloin" in ids
+    for extra in (
+        "grilled-picanha",
+        "grilled-pork-loin",
+        "grilled-chorizo",
+        "fried-yuca",
+        "grilled-plantain",
+        "grilled-corn",
+        "chimichurri",
+        "vinagrete",
+    ):
+        assert extra in ids
+    by_id = {item["id"]: item for item in items}
+    assert by_id["grilled-picanha"]["category"] == "main"
+    assert by_id["grilled-picanha"]["allergens"] == []
+    assert by_id["grilled-picanha"]["price_cop"] == 62000
+    assert by_id["grilled-picanha"]["price_usd"] == 24
+    assert by_id["grilled-chorizo"]["allergens"] == ["sulfites"]
+    assert by_id["fried-yuca"]["category"] == "side"
+    assert by_id["chimichurri"]["category"] == "sauce"
+    assert by_id["vinagrete"]["allergens"] == ["sulfites"]
+    assert {item["category"] for item in items} == {"main", "side", "sauce"}
     for item in items:
-        assert "Colombia" in item["available_in"]
-        assert "Florida" in item["available_in"]
+        assert item["available_in"] == ["Colombia", "Florida"]
         assert item["price_cop"] > 0
         assert item["price_usd"] > 0
+        assert item["name_es"]
 
     catalogue = client.get("/menus/catalogue")
     assert catalogue.status_code == 200
