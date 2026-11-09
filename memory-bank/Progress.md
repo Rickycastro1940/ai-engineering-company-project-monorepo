@@ -701,6 +701,19 @@ GET /images/menu-grilled-picanha.jpg and the other seven new files → 200
 
 Lazy images below the first screen stay blank until they scroll into view. That is the same `loading="lazy"` treatment as chicken, salad, arepa, and house sauce. A 390px-wide header is 23px wider than the viewport; the menu rows themselves are not the overflowing element.
 
+## Advantage AI site look (2026-11-09, 10:58 AM ET)
+
+Not a Brasaland department item. The coverage table above is unchanged. `uis/advantage-ai/` is a separate static redesign of advantageaisolutions.pro (enterprise page structure, Advantage copy and endpoints). It does not replace `uis/website-classic/`.
+
+```text
+node uis/advantage-ai/server.mjs
+GET / /services /contact /styles.css → 200
+POST /api/contact empty → 422 “Please add your name, a valid email and your workflow bottleneck.”
+POST /api/contact honeypot → 200 {ok:true} (no production lead)
+POST /api/chat invoice question → curated_retrieval, source https://advantageaisolutions.pro/services#document-parsing
+Headless Chrome: home, problem grid, assistant answer, services modules, contact error, 390px menu
+```
+
 ## How to update this file
 
 After a verified change, append evidence (command + result) and update the coverage table. Do not log plans that were not run.
