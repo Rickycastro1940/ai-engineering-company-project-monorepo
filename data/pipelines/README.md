@@ -7,6 +7,16 @@ Each subfolder or file under `data/pipelines/` should represent **one pipeline o
 - **Main purpose**: consolidate in one place the data movement and transformation logic that powers the company’s applications and analytics.
 - **Recommendation**: document pipelines as you add them—their goal, data sources and sinks, dependencies, and how to run them in development, testing, and production.
 
+## Knowledge retrieval
+
+`rag.py` answers `POST /knowledge/query` from `docs/company-knowledge-base/` (allergens, waste, supplier ordering, Brasa Points). Those are the operational standards location managers search. Indexing is `data/process/rag.py` (collection `brasaland_kb`).
+
+`BRASALAND_RAG_BACKEND=qdrant` runs hybrid search: dense cosine plus a BM25 sparse vector, fused with reciprocal rank fusion, then a cross-encoder re-rank. `COHERE_API_KEY` calls Cohere Rerank. With no key, the local pairwise scorer still returns a ranked shortlist. Design and env vars: [`docs/knowledge-rag.md`](../../docs/knowledge-rag.md).
+
+```bash
+python3 -m pytest tests/test_hybrid_retrieval.py tests/test_knowledge_query.py -q
+```
+
 ## Public site snapshot
 
 `public_site_snapshot.py` reads Brasaland's own static pages on `https://www.brasalandrestaurant.com` (home, menu, locations, Brasa Points, allergens). It writes JSON Lines and SQLite for Marketing's guest copy and a later knowledge load. It does not crawl other sites, log in, or replace `pipeline.py` (the weekly location cost and waste load).

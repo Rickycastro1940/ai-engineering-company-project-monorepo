@@ -14,6 +14,6 @@ Request:
 
 Response: `answer` plus `sources[]` (`source_document`, `section`, `text`, `score`, `chunk_index`, `language`).
 
-Default mode needs no API key: local hashed embeddings and an extractive answer. Set `BRASALAND_RAG_BACKEND=qdrant` and/or `BRASALAND_RAG_LLM=openai` to use Qdrant and a chat model. See `docs/knowledge-rag.md`.
+Default mode needs no API key: local hashed embeddings, a local cross-encoder re-rank, and an extractive answer. Set `BRASALAND_RAG_BACKEND=qdrant` for hybrid dense + BM25 search on `brasaland_kb`. Set `COHERE_API_KEY` to re-rank with Cohere; without that key the local re-ranker still runs. `BRASALAND_RAG_LLM=openai` turns on the chat model. See `docs/knowledge-rag.md`.
 
 The retired entry points are `scripts/rag.py` (collection `company_knowledge_base`) and `services/api/main.py` (broken `api.routers.knowledge` import). Both now delegate to this path.

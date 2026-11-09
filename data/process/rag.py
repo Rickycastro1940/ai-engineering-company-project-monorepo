@@ -9,7 +9,8 @@ Optional live backends (env):
 - ``BRASALAND_RAG_EMBEDDINGS=openai`` plus ``OPENAI_API_KEY`` — OpenAI
   embeddings (``text-embedding-3-small``).
 - ``BRASALAND_RAG_BACKEND=qdrant`` plus a reachable Qdrant — ``setup()``
-  upserts collection ``brasaland_kb``. Requires the ``qdrant-client``
+  upserts collection ``brasaland_kb`` with a dense vector and a BM25
+  sparse vector (``Modifier.IDF``). Requires the ``qdrant-client``
   package, which is imported only on that path.
 
 ``scripts/rag.py`` is a deprecated delegate of this stack. It used to
@@ -39,6 +40,11 @@ logger = logging.getLogger("brasaland.embeddings")
 COLLECTION_NAME = "brasaland_kb"
 EMBEDDING_MODEL = "text-embedding-3-small"
 LOCAL_DIM = 384
+# Named vectors on ``brasaland_kb``. Dense is cosine; sparse is term frequency
+# and Qdrant applies IDF at query time (BM25-style).
+DENSE_VECTOR_NAME = "dense"
+SPARSE_VECTOR_NAME = "bm25"
+SPARSE_BUCKETS = 2**18
 _NAMESPACE = uuid.UUID("6f0b9a3e-4c21-5e1a-9b7c-0a1b2c3d4e5f")
 
 _TOKEN = re.compile(r"[a-z0-9]+")
@@ -85,6 +91,36 @@ def tokens(text: str) -> list[str]:
 
 def content_tokens(text: str) -> list[str]:
     return [token for token in tokens(text) if token not in _STOP and len(token) > 1]
+
+
+def merge_sparse(indices: list[int], values: list[float]) -> tuple[list[int], list[float]]:
+    """Sum weights that hash to the same bucket. Qdrant rejects duplicate indices."""
+    totals: dict[int, float] = {}
+    for index, value in zip(indices, values):
+        bucket = int(index)
+        totals[bucket] = totals.get(bucket, 0.0) + float(value)
+    ordered = sorted(totals)
+    return ordered, [totals[index] for index in ordered]
+
+
+def sparse_term_vector(text: str) -> tuple[list[int], list[float]]:
+    """Term-frequency sparse vector for the ``bm25`` Qdrant field.
+
+    Indices are SHA-256 buckets so the same token always lands in the same
+    dimension. Values are raw counts. ``Modifier.IDF`` on the collection
+    turns those counts into a BM25-style score at query time. No model
+    download and no API key.
+    """
+    counts: dict[str, int] = {}
+    for token in content_tokens(text):
+        counts[token] = counts.get(token, 0) + 1
+    indices: list[int] = []
+    values: list[float] = []
+    for token, count in counts.items():
+        digest = hashlib.sha256(token.encode("utf-8")).digest()
+        indices.append(int.from_bytes(digest[:4], "big") % SPARSE_BUCKETS)
+        values.append(float(count))
+    return merge_sparse(indices, values)
 
 
 def embed_local(text: str) -> list[float]:
@@ -250,24 +286,33 @@ def setup(docs_dir: str | None = None) -> int:
 
 def _setup_qdrant(directory: Path) -> int:
     def _ensure(store, size: int) -> None:
-        from qdrant_client.models import Distance, VectorParams
+        from qdrant_client.models import Distance, Modifier, SparseVectorParams, VectorParams
 
         if store.collection_exists(collection_name=COLLECTION_NAME):
             store.delete_collection(collection_name=COLLECTION_NAME)
         store.create_collection(
             collection_name=COLLECTION_NAME,
-            vectors_config=VectorParams(size=size, distance=Distance.COSINE),
+            vectors_config={
+                DENSE_VECTOR_NAME: VectorParams(size=size, distance=Distance.COSINE),
+            },
+            sparse_vectors_config={
+                SPARSE_VECTOR_NAME: SparseVectorParams(modifier=Modifier.IDF),
+            },
         )
 
     store = qdrant_client()
     sample = embed("brasaland knowledge")
     call_external("vector store", lambda: _ensure(store, len(sample)))
 
-    from qdrant_client.models import PointStruct
+    from qdrant_client.models import PointStruct, SparseVector
 
     points = []
     for chunk in load_chunks(directory):
-        vector = embed(match_blob(chunk))
+        blob = match_blob(chunk)
+        vector = embed(blob)
+        indices, values = sparse_term_vector(blob)
+        if not indices:
+            indices, values = [0], [0.0]
         payload = {
             "company": chunk["company"],
             "source_document": chunk["source_document"],
@@ -276,7 +321,16 @@ def _setup_qdrant(directory: Path) -> int:
             "chunk_index": chunk["chunk_index"],
             "text": chunk["text"],
         }
-        points.append(PointStruct(id=chunk["id"], vector=vector, payload=payload))
+        points.append(
+            PointStruct(
+                id=chunk["id"],
+                vector={
+                    DENSE_VECTOR_NAME: vector,
+                    SPARSE_VECTOR_NAME: SparseVector(indices=indices, values=values),
+                },
+                payload=payload,
+            )
+        )
 
     if points:
         call_external(

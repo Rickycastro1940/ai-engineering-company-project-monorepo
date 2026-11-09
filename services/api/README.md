@@ -98,7 +98,7 @@ curl -sS -X POST http://127.0.0.1:8000/knowledge/query \
   -d '{"question":"What allergens are in the House Sauce?"}'
 ```
 
-No API key is required. The default path uses local embeddings. `BRASALAND_RAG_BACKEND=qdrant` and `BRASALAND_RAG_LLM=openai` turn on the vector store and chat model.
+No API key is required. The default path uses local embeddings and a local cross-encoder re-rank. `BRASALAND_RAG_BACKEND=qdrant` turns on hybrid dense + BM25 search. `COHERE_API_KEY` selects Cohere Rerank; the local re-ranker runs when that key is absent. `BRASALAND_RAG_LLM=openai` turns on the chat model.
 
 ## Alternative run command
 
