@@ -17,7 +17,7 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | Technology: telemetry + pipeline to dashboards | **Partial** — live no-sales SSE on `GET /realtime/ops-alerts/stream` plus Part 2 weekly location cost/waste ETL, Prefect stage subflows, KPI unit tests, CLI, and backoffice Monday weekly report; engineering `GET /telemetry/report` untouched. Nightly landing copy is `scripts/nightly_export.py` (OS cron `0 2 * * *` America/Bogota, status in `public.job_runs`), not a FastAPI scheduler. `data/pipelines/public_site_snapshot.py` reads the public site into JSON Lines and SQLite (guest menu and the locations printed on the page) |
 | Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — seeded `GET /sales` tickets and `/sales/overview` (COP and USD, 14 locations) plus `/sales/alerts`; `POST /sales` stores a ticket and calls `record_sale` so the live no-sales alert on backoffice `/accessible` sees that location; Next.js `uis/portal` `/ops/sales` shows per-location sales in COP and USD. Centralized incident manager is on `/api/incidents` and backoffice `/incidents` (Felipe: branch, category, status). Guest concierge drafts an order for one of the 14 kitchens in that location's currency and shows the other list price (`WS /concierge/ws`, `GET /realtime/concierge/stream`); placed orders are `GET /concierge/orders` and are not POS tickets. Smart ingredient ordering from stock is still open |
 | Procurement: supplier price history, consolidated spend | **Partial** — seeded `GET /suppliers` (20 suppliers, Colombia and Florida, price history and alerts); Monday weekly purchase cost / price-alert frequency still separate; invoices are not live |
-| Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `GET /customers` CRM seed with `brasa_points_balance` on physical stamp cards; Next.js `uis/portal` `/points`; public production site is `uis/website-classic/` (dish photos, menu, locations, Brasa Points, allergens, supplier application, EN/ES), restored from commit `2465196`. The Vite app in `uis/website/` is not what Vercel publishes. `CONTEXT.md` still describes stamp cards as today’s in-restaurant programme. Guests can ask the menu (COP and USD), allergens, and place an order at `GET /concierge/`; a voice clip uses `BRASALAND_AUDIO_MODEL` when `BRASALAND_AUDIO_API_KEY` is set, and typed text when it is not |
+| Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `GET /customers` CRM seed with `brasa_points_balance` on physical stamp cards; Next.js `uis/portal` `/points`; public production site is `uis/website-classic/` (dish photos, menu, locations, Brasa Points, allergens, supplier application, EN/ES), restored from commit `2465196`. The guest card and `GET /menus/catalogue` now share grill, sides, and sauces (14 plates) with COP and USD list prices in every kitchen. Every plate on `uis/website-classic/menu.html` has a photo. The Vite app in `uis/website/` is not what Vercel publishes. `CONTEXT.md` still describes stamp cards as today’s in-restaurant programme. Guests can ask that menu (COP and USD), allergens, and place an order at `GET /concierge/`; a voice clip uses `BRASALAND_AUDIO_MODEL` when `BRASALAND_AUDIO_API_KEY` is set, and typed text when it is not |
 | People: HR portal / KPIs by country | **Not done** |
 | Training: recipe catalogue, push to 14 locations | **Partial** — `POST /knowledge/query` searches the four English standards (allergens, waste, ordering, Brasa Points) and returns cited chunks. Location managers reach that answer on `WS /knowledge/ws` as `manager_support` (`token_chunk`, stop with `interrupt`, end with `generation_interrupted` or `generation_completed`). Not a full recipe catalogue and not a push to all 14 kitchens |
 | Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial** — seeded `GET /sales/overview` and portal `/ops/sales` chain totals in COP and USD; Monday weekly ops & finance report in the backoffice; n8n export `workflows/brasaland-monday-leadership-report.n8n.json` schedules Monday 07:00 America/Bogota, logs into the central API, pulls `GET /reporting/weekly-location-performance`, and delivers COP/USD leadership copy (email, Slack, CSV) with a failure branch. Standards questions can go to `POST /knowledge/query` or the streamed chat at `GET /knowledge/ui`. A chain sales dashboard remains open |
@@ -660,6 +660,47 @@ python3 -m data.pipelines.public_site_snapshot --jsonl /tmp/brasaland-public.jso
 → 23 records: 5 pages, 6 menu dishes (Grilled Sirloin through House Sauce), 12 public location rows (11 COP, 1 USD)
 ```
 
+## Latest guest menu card (`cursor/expand-public-menu-f173`)
+
+Department served: **Marketing** (Camila Ospina — the public menu guests read). Technology keeps the same catalogue on `GET /menus` for all 14 kitchens.
+
+The published photo site and the chain catalogue now share one longer grilled card: the original six plates plus picanha, pork loin, chorizo, fried yuca, ripe plantain, grilled corn, chimichurri, and vinagrete. Every item has a COP list price, a USD list price, allergen copy in English and Spanish, and availability in Colombia and Florida. Desserts and drinks stay off the card because those categories are not on the catalogue. List prices are the card, not a live register total.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+GET http://127.0.0.1:8000/docs → 200
+locations=present
+menus=present
+sales=present
+customers=present
+suppliers=present
+inventory=present
+path_count=49
+GET /menus/catalogue → 14 items, currencies COP+USD, location_count 14, categories main/side/sauce
+python3 -m pytest tests/test_public_menu.py tests/test_central_api_domains.py::test_menus_are_public_and_priced_in_cop_and_usd -q → 3 passed
+GET http://127.0.0.1:4188/menu.html → 200, 14 menu rows, COP and USD on each
+headless Chrome desktop /menu.html shows grill, sides, and sauces with prices
+headless Chrome ES toggle → “Qué cocinamos”, Picanha a la brasa, Yuca frita, Chimichurri
+mobile 390px → 14 dishes and 14 price lines; menu rows stay inside the viewport
+```
+
+## Latest menu photos (`cursor/menu-item-photos-94db`)
+
+Department served: **Marketing** (Camila Ospina — the public menu guests read). Dishes, COP and USD list prices, allergen lines, and Colombia/Florida availability are unchanged.
+
+Eight plates on `menu.html` had a placeholder mark and no file: Grilled Picanha, Grilled Pork Loin, Grilled Chorizo, Fried Yuca, Grilled Ripe Plantain, Grilled Corn, Chimichurri, and Vinagrete. Each now uses the same `img` markup as the six plates that already had photos (`images/menu-<id>.jpg`, 1200×800, English `alt` plus `data-i18n-alt` so Spanish switches with the page). The home page still shows only its original six-photo sample.
+
+```text
+python3 -m pytest tests/test_public_menu.py -q → 3 passed
+GET http://127.0.0.1:4188/menu.html → 200
+14 menu rows, each with an image that decoded to 1200×800
+ES toggle → “Qué cocinamos”; new alts include “Picanha a la brasa con costra de sal”, “Yuca frita crujiente”, “Chimichurri de perejil, ajo y ají”, “Vinagrete de tomate, cebolla y pimentón”
+Prices and allergen lines unchanged (COP $62.000 / USD $24 picanha through COP $3.500 / USD $2 vinagrete)
+GET /images/menu-grilled-picanha.jpg and the other seven new files → 200
+```
+
+Lazy images below the first screen stay blank until they scroll into view. That is the same `loading="lazy"` treatment as chicken, salad, arepa, and house sauce. A 390px-wide header is 23px wider than the viewport; the menu rows themselves are not the overflowing element.
+
 ## Latest guest concierge (`cursor/streaming-concierge-f888`)
 
 Department served: **Restaurant Operations** (Felipe Guerrero — an order names one of the 14 kitchens and the currency that kitchen charges) + **Marketing** (Camila Ospina — a guest can ask the menu, an allergen, or place an order, including a voice clip) + **Technology** (Nicolás Park — tokens on the existing WebSocket event contract and the `/realtime` SSE path).
@@ -686,6 +727,18 @@ Narrow viewport 390px: document scroll width stays within the viewport
 ```
 
 Skill **passed** (criteria 1–4 and 6). Criterion 5: locations, menus, sales, customers, and suppliers are **present**. A live POS feed and a digital Brasa Points wallet are still open.
+
+## Latest merge of the 14-dish menu into the concierge (`cursor/streaming-concierge-f888`)
+
+Department served: **Marketing** (Camila Ospina — the 14 photographed plates stay on the public card and on `GET /menus`) + **Restaurant Operations** and **Technology** (the guest concierge still streams COP/USD answers, allergens, and orders, and still falls back to typed text when no audio key is set).
+
+`origin/main` (`9803f7c`, PRs #124 and #125) merged into this branch. The only conflict was `memory-bank/Progress.md`. The catalogue in `services/api/menus.py` and the eight new photos were kept as main wrote them. The concierge still reads that catalogue rather than a private six-dish list.
+
+```text
+NO_SALES_MONITOR=0 python3 -m pytest tests/test_concierge.py tests/test_public_menu.py tests/test_central_api_domains.py tests/test_websocket_chat.py tests/test_no_sales_alerts.py -q → 50 passed
+GET /menus catalogue length stays 14, including grilled-picanha through vinagrete
+POST /concierge/transcribe with no BRASALAND_AUDIO_API_KEY → text_fallback
+```
 
 ## How to update this file
 
