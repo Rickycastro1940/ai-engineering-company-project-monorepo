@@ -1,4 +1,4 @@
-"""Supplier approval handoff: Supplier, Compliance (knowledge base), Operations."""
+"""Supplier approval LangGraph: Supplier, Compliance (knowledge base), Operations."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from agents.supplier_approval.graph import supplier_approval_graph  # noqa: E402
 from agents.supplier_approval.orchestrator import review_supplier_application  # noqa: E402
 from api.app import app  # noqa: E402
 
@@ -80,7 +81,7 @@ def _documents(result: dict) -> set[str]:
 def test_roles_run_in_order_and_approve_colombia_protein() -> None:
     result = review_supplier_application({"raw_text": COLOMBIA_PROTEIN})
     assert result["roles"] == ["supplier", "compliance", "operations"]
-    assert result["orchestration"] == "plain-python-handoff"
+    assert result["orchestration"] == "langgraph"
     assert result["llm"] == "not_used"
     assert result["decision"] == "approve"
     assert result["market"] == "Colombia"
@@ -93,6 +94,15 @@ def test_roles_run_in_order_and_approve_colombia_protein() -> None:
     assert "brasaland-menu-allergens.en.md" in _documents(result)
     assert any(item["id"] == "emergency_surcharge" and item["status"] == "pass" for item in result["compliance"]["checks"])
     assert any(item["id"] == "health_authority" and item["status"] == "pass" for item in result["compliance"]["checks"])
+
+
+def test_langgraph_edges_follow_the_three_roles() -> None:
+    drawing = supplier_approval_graph.get_graph()
+    edges = {(edge.source, edge.target) for edge in drawing.edges}
+    assert ("__start__", "supplier") in edges
+    assert ("supplier", "compliance") in edges
+    assert ("compliance", "operations") in edges
+    assert ("operations", "__end__") in edges
 
 
 def test_florida_packaging_uses_usd() -> None:

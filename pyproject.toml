@@ -16,6 +16,7 @@ dependencies = [
     "pandas>=2.3.3",
     "python-dotenv>=1.2.1",
     "supabase>=2.31.0",
+    "langgraph>=0.6.11",
 ]
 
 [dependency-groups]

@@ -44,7 +44,7 @@ Could not reach the API. Start it first with: uvicorn api.app:app --reload
 
 ### Agent design note
 
-`python agent.py review-supplier "<application text>"` runs the supplier-approval handoff (no Groq key and no running API). The interactive inventory loop is unchanged.
+`python agent.py review-supplier "<application text>"` runs the supplier-approval LangGraph (Supplier → Compliance → Operations; no Groq key and no running API). The interactive inventory loop is unchanged.
 
 The inventory agent in [`agent.py`](../../agent.py) is implemented **manually in plain Python**:
 

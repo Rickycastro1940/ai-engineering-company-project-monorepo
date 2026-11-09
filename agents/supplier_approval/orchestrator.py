@@ -1,39 +1,37 @@
 """Collaborative supplier-approval handoff.
 
-Three roles share one state object, in order:
+Three roles share one LangGraph state, in order:
 
 1. Supplier Agent parses the application.
 2. Compliance Agent checks health and ordering standards in the knowledge base.
 3. Operations Agent writes the approval summary for management.
 
-LangGraph and CrewAI are not used. The monorepo agent loop is plain Python
-on the Groq client (`agent.py`), and those frameworks are not installed.
-This handoff is the same shape: each role reads the previous role's output
-and appends its own. Groq rewrites only the operations narrative when
-`BRASALAND_SUPPLIER_AGENTS=groq`.
+The inventory loop in ``agent.py`` stays a manual Groq client. This handoff
+is the LangGraph graph in ``graph.py``. Groq rewrites only the operations
+narrative when ``BRASALAND_SUPPLIER_AGENTS=groq``.
 """
 
 from __future__ import annotations
 
-from agents.supplier_approval import compliance_agent, operations_agent, supplier_agent
+from agents.supplier_approval.graph import supplier_approval_graph
 
 ROLES = ("supplier", "compliance", "operations")
+ORCHESTRATION = "langgraph"
 
 
 def review_supplier_application(payload: dict) -> dict:
-    state = {
-        "input": payload or {},
-        "trace": [],
-        "parsed": None,
-        "compliance": None,
-        "decision": None,
-        "conditions": [],
-        "summary": None,
-        "llm": "not_used",
-    }
-    state = supplier_agent.run(state)
-    state = compliance_agent.run(state)
-    state = operations_agent.run(state)
+    state = supplier_approval_graph.invoke(
+        {
+            "input": payload or {},
+            "trace": [],
+            "parsed": None,
+            "compliance": None,
+            "decision": None,
+            "conditions": [],
+            "summary": None,
+            "llm": "not_used",
+        }
+    )
     if tuple(state["trace"]) != ROLES:
         raise RuntimeError("supplier approval handoff is out of order")
     parsed = state["parsed"]
@@ -45,7 +43,7 @@ def review_supplier_application(payload: dict) -> dict:
         "currency": parsed.get("currency"),
         "market": parsed.get("market"),
         "roles": list(state["trace"]),
-        "orchestration": "plain-python-handoff",
+        "orchestration": ORCHESTRATION,
         "llm": state["llm"],
         "parsed": {
             "name": parsed.get("name"),

@@ -12,7 +12,7 @@ The handoff is fixed. Each role reads the previous role's output.
 | 2 | Compliance Agent | Ask the existing knowledge base (`data/pipelines/rag.py`, the same path as `POST /knowledge/query`) and apply a rule only when a retrieved chunk states it. |
 | 3 | Operations Agent | Write the approval summary for Lucía Fernández. Decision is `approve`, `approve_with_conditions`, or `reject`. |
 
-Orchestration is a plain-Python handoff (`orchestration: plain-python-handoff`). LangGraph and CrewAI are not used: `agent.py` is a manual Groq loop, and those packages are not dependencies. Groq rewrites only the operations narrative when `BRASALAND_SUPPLIER_AGENTS=groq` and `GROQ_API_KEY` is set, through the same OpenAI-compatible client as `agent.py`. The default path does not call Groq.
+Orchestration is a LangGraph graph (`orchestration: langgraph`) in `graph.py`. The nodes are Supplier, then Compliance, then Operations. The inventory loop in `agent.py` stays a manual Groq client. Groq rewrites only the operations narrative when `BRASALAND_SUPPLIER_AGENTS=groq` and `GROQ_API_KEY` is set, through the same OpenAI-compatible client as `agent.py`. The default path does not call Groq.
 
 ## How to run
 
