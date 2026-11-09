@@ -57,7 +57,13 @@ const server = createServer(async (req, res) => {
     res.end(req.method === "HEAD" ? undefined : data);
   } catch (error) {
     if (error && error.code === "ENOENT") {
-      send(res, 404, "Not found", "text/plain; charset=utf-8");
+      try {
+        const missing = await readFile(join(root, "404.html"));
+        res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(req.method === "HEAD" ? undefined : missing);
+      } catch {
+        send(res, 404, "Not found", "text/plain; charset=utf-8");
+      }
       return;
     }
     if (error instanceof SyntaxError) {

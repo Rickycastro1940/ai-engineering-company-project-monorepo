@@ -1,9 +1,10 @@
 import net from "node:net";
 import tls from "node:tls";
+import { site } from "../site.config.mjs";
 
-const DEFAULT_HOST = "smtp.hostinger.com";
-const DEFAULT_PORT = 465;
-export const MAILBOX = "info@advantageaisolutions.pro";
+const DEFAULT_HOST = site.smtpHost;
+const DEFAULT_PORT = site.smtpPort;
+export const MAILBOX = site.mailbox;
 
 function headerValue(value) {
   return String(value ?? "").replace(/[\r\n]+/g, " ").trim();

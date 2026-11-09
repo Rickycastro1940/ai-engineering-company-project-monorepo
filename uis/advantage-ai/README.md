@@ -15,9 +15,11 @@ Until that password is set, `/api/contact` delivers the same JSON to the current
 ## Run
 
 ```bash
-node --test uis/advantage-ai/api/contact.test.mjs
+node uis/advantage-ai/build.mjs
 node uis/advantage-ai/server.mjs
 ```
+
+`build.mjs` runs the contact tests, checks that every page includes `info@advantageaisolutions.pro`, and writes `dist/`. The dev server reads the source folder. Serve `dist/` with `PORT=4174 node dist/server.mjs` after a build.
 
 Open `http://127.0.0.1:4173`. Routes: `/`, `/services`, `/contact`. The contact tests use a local mail sink and do not send a message to the mailbox.
 

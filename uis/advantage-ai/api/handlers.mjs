@@ -1,6 +1,7 @@
+import { site } from "../site.config.mjs";
 import { sendEvaluation } from "./smtp.mjs";
 
-export const LIVE_CONTACT = "https://advantageaisolutions.pro/api/contact";
+export const LIVE_CONTACT = `${site.origin}/api/contact`;
 
 const CHAT_URL = "https://advantage-ai-solutions-api.vercel.app/chat";
 const VALIDATION_ERROR = "Please add your name, a valid email and your workflow bottleneck.";

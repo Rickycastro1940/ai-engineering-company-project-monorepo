@@ -716,6 +716,9 @@ node --test uis/advantage-ai/api/contact.test.mjs
 # 4 passed. Incomplete form → 422. Honeypot → 200 with no socket.
 # Mailbox is fixed as info@advantageaisolutions.pro. Missing SMTP_PASS forwards to the live /api/contact (mocked in test).
 # Local SMTP sink receives From/To info@advantageaisolutions.pro and Reply-To the visitor.
+node uis/advantage-ai/build.mjs
+# 5 passed, then dist for info@advantageaisolutions.pro via smtp.hostinger.com:465
+# Built server :4174 GET / /services /contact /sitemap.xml → 200; unknown path → 404 page; empty contact POST → 422
 ```
 
 ## How to update this file
