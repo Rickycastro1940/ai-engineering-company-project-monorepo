@@ -31,6 +31,7 @@ if str(REPO_ROOT) not in sys.path:
 from services.reporting.routes import router as reporting_router  # noqa: E402
 from no_sales_router import register as register_ops_alerts  # noqa: E402
 from services.knowledge.routes import router as knowledge_router  # noqa: E402
+from supplier_approval import router as supplier_approval_router  # noqa: E402
 
 UI_ROOT = REPO_ROOT / "uis" / "web"
 UPLOAD_DIR = REPO_ROOT / "data" / "uploads"
@@ -141,6 +142,7 @@ app.include_router(locations_router)
 app.include_router(menus_router)
 app.include_router(sales_router)
 app.include_router(customers_router)
+app.include_router(supplier_approval_router)
 app.include_router(suppliers_router)
 app.include_router(inventory_router)
 app.include_router(users_router)

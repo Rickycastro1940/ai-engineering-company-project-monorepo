@@ -44,6 +44,8 @@ Could not reach the API. Start it first with: uvicorn api.app:app --reload
 
 ### Agent design note
 
+`python agent.py review-supplier "<application text>"` runs the supplier-approval handoff (no Groq key and no running API). The interactive inventory loop is unchanged.
+
 The inventory agent in [`agent.py`](../../agent.py) is implemented **manually in plain Python**:
 
 - No LangChain, LlamaIndex, AutoGen, or similar frameworks
@@ -151,6 +153,11 @@ Seeded Brasaland data on this same app. Detail and curl examples: [`docs/central
 | `POST` | `/sales` | Bearer | Record a ticket (location, amount, COP or USD) and notify the no-sales monitor |
 | `GET` | `/customers`, `/customers/overview`, `/customers/{customer_id}` | Bearer | CRM; `brasa_points_balance` on the stamp card |
 | `GET` | `/suppliers`, `/suppliers/overview`, `/suppliers/{supplier_id}` | Bearer | About 20 suppliers, two markets, price history |
+| `POST` | `/suppliers/applications/review` | Bearer | Supplier → Compliance (knowledge base) → Operations approval summary. Does not add a directory row |
+
+```bash
+python -m pytest tests/test_supplier_approval.py -q
+```
 
 ```bash
 python -m pytest tests/test_central_api_domains.py -q
