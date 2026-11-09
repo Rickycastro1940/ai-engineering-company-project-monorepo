@@ -12,6 +12,7 @@ Also present:
 
 - **`portal/`** — Next.js App Router portal. Guest Brasa Points (`/points`) and staff sales by location in COP and USD (`/ops/sales`). See [`portal/README.md`](./portal/README.md).
 - **`web/`** — incident-analysis HTML tool (not the public marketing site).
+- **`advantage-ai/`** — static redesign of the separate Advantage AI Solutions site (`advantageaisolutions.pro`). Not a Brasaland surface. See [`advantage-ai/README.md`](./advantage-ai/README.md).
 
 Organize `uis/` by **different concerns** — each subfolder covers a distinct area of the company (for example, public web vs internal operations) and includes its own technical and functional documentation.
 
