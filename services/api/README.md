@@ -151,6 +151,15 @@ Seeded Brasaland data on this same app. Detail and curl examples: [`docs/central
 | `POST` | `/sales` | Bearer | Record a ticket (location, amount, COP or USD) and notify the no-sales monitor |
 | `GET` | `/customers`, `/customers/overview`, `/customers/{customer_id}` | Bearer | CRM; `brasa_points_balance` on the stamp card |
 | `GET` | `/suppliers`, `/suppliers/overview`, `/suppliers/{supplier_id}` | Bearer | About 20 suppliers, two markets, price history |
+| `GET` | `/forecasts/demand` | Bearer | Next-day peak hour, protein/produce kg, stamp-card points (mocked history) |
+
+### Demand forecast
+
+Restaurant Operations and Procurement: `GET /forecasts/demand?date=YYYY-MM-DD&location_id=` returns a scikit-learn Ridge forecast for the 14 locations. Colombia rows stay in COP and Florida rows stay in USD. Holidays are local (Colombia vs Florida). Brasa Points in the payload are expected stamp-card points, not a digital wallet. The fit is `data/pipelines/demand_forecast.py`.
+
+```bash
+python -m pytest tests/pipelines/test_demand_forecast.py tests/test_demand_forecast_api.py -q
+```
 
 ```bash
 python -m pytest tests/test_central_api_domains.py -q

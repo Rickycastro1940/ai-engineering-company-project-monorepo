@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from customers import router as customers_router
+from forecasts import router as forecasts_router
 from incidents import router as incidents_router
 from inventory import router as inventory_router
 from locations import router as locations_router
@@ -140,6 +141,7 @@ app.add_middleware(
 app.include_router(locations_router)
 app.include_router(menus_router)
 app.include_router(sales_router)
+app.include_router(forecasts_router)
 app.include_router(customers_router)
 app.include_router(suppliers_router)
 app.include_router(inventory_router)
