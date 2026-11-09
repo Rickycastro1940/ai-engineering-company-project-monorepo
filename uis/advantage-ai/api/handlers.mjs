@@ -1,5 +1,7 @@
 import { sendEvaluation } from "./smtp.mjs";
 
+export const LIVE_CONTACT = "https://advantageaisolutions.pro/api/contact";
+
 const CHAT_URL = "https://advantage-ai-solutions-api.vercel.app/chat";
 const VALIDATION_ERROR = "Please add your name, a valid email and your workflow bottleneck.";
 const SEND_ERROR = "We couldn't send your message right now.";
@@ -41,9 +43,9 @@ export async function handleContact(body, env = process.env) {
     return { status: 422, body: { error: VALIDATION_ERROR } };
   }
 
-  const upstream = (env.CONTACT_UPSTREAM || "").trim();
-  if (!env.SMTP_USER || !env.SMTP_PASS) {
-    if (!upstream) {
+  const upstream = (env.CONTACT_UPSTREAM || LIVE_CONTACT).trim();
+  if (!env.SMTP_PASS) {
+    if (upstream === "off") {
       return { status: 501, body: { error: "Contact delivery is not configured on this deployment." } };
     }
     const response = await fetch(upstream, {

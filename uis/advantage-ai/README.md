@@ -8,17 +8,9 @@ The assistant still calls Advantage’s curated retrieval API through `/api/chat
 
 ## Contact email
 
-Set these on the deployment. `SMTP_USER` and `SMTP_PASS` are the mailbox login, not values to put in the repo.
+The recipient and sender are fixed in the project as `info@advantageaisolutions.pro`. Hostinger’s server is `smtp.hostinger.com` on port 465. The only deployment value left is `SMTP_PASS`, the password for that mailbox.
 
-```bash
-SMTP_HOST=smtp.hostinger.com
-SMTP_PORT=465
-SMTP_USER=info@advantageaisolutions.pro
-SMTP_PASS=
-CONTACT_TO=info@advantageaisolutions.pro
-```
-
-The message is sent from `SMTP_USER`, with the visitor’s address as Reply-To. Hostinger accepts mail from the authenticated mailbox. A filled honeypot field returns success and sends nothing. Without `SMTP_USER` and `SMTP_PASS`, the form responds that delivery is not configured. Set `CONTACT_UPSTREAM` only when a different contact endpoint should receive the JSON instead.
+Until that password is set, `/api/contact` delivers the same JSON to the current live contact endpoint, which already emails that inbox. A filled honeypot returns success and sends nothing. Set `CONTACT_UPSTREAM=off` to refuse delivery instead of using the live endpoint.
 
 ## Run
 

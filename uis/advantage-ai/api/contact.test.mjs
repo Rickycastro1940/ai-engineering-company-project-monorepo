@@ -78,10 +78,37 @@ test("honeypot does not open a mail connection", async () => {
   assert.deepEqual(result, { status: 200, body: { ok: true } });
 });
 
-test("missing mailbox credentials reports that delivery is not configured", async () => {
-  const result = await handleContact(lead, {});
-  assert.equal(result.status, 501);
-  assert.match(result.body.error, /not configured/);
+test("without a mailbox password, the note is handed to the live contact endpoint", async () => {
+  const calls = [];
+  const original = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url, body: options.body });
+    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+  };
+  try {
+    const result = await handleContact(lead, {});
+    assert.equal(result.status, 200);
+    assert.equal(result.body.ok, true);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, "https://advantageaisolutions.pro/api/contact");
+    assert.match(calls[0].body, /ada@example.com/);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test("a loop back to this deployment reports that delivery is not configured", async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: "loop" }), {
+    status: 508,
+    headers: { "x-advantage-loop": "1" },
+  });
+  try {
+    const result = await handleContact(lead, {});
+    assert.equal(result.status, 501);
+  } finally {
+    globalThis.fetch = original;
+  }
 });
 
 test("a configured mailbox receives the evaluation", async () => {
@@ -91,9 +118,7 @@ test("a configured mailbox receives the evaluation", async () => {
     SMTP_HOST: "127.0.0.1",
     SMTP_PORT: String(port),
     SMTP_SECURE: "0",
-    SMTP_USER: "info@advantageaisolutions.pro",
     SMTP_PASS: "mailbox-secret",
-    CONTACT_TO: "info@advantageaisolutions.pro",
   });
   sink.server.close();
   assert.equal(result.status, 200);

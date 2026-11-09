@@ -714,7 +714,8 @@ POST /api/chat invoice question → curated_retrieval, source https://advantagea
 Headless Chrome: home, problem grid, assistant answer, services modules, contact error, 390px menu
 node --test uis/advantage-ai/api/contact.test.mjs
 # 4 passed. Incomplete form → 422. Honeypot → 200 with no socket.
-# Missing SMTP_USER/SMTP_PASS → 501. Local SMTP sink receives From/To info@advantageaisolutions.pro and Reply-To the visitor.
+# Mailbox is fixed as info@advantageaisolutions.pro. Missing SMTP_PASS forwards to the live /api/contact (mocked in test).
+# Local SMTP sink receives From/To info@advantageaisolutions.pro and Reply-To the visitor.
 ```
 
 ## How to update this file

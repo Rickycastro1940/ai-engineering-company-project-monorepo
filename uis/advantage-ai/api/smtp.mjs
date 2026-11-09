@@ -3,6 +3,7 @@ import tls from "node:tls";
 
 const DEFAULT_HOST = "smtp.hostinger.com";
 const DEFAULT_PORT = 465;
+export const MAILBOX = "info@advantageaisolutions.pro";
 
 function headerValue(value) {
   return String(value ?? "").replace(/[\r\n]+/g, " ").trim();
@@ -68,14 +69,20 @@ function sendLine(socket, line) {
 }
 
 export function mailSettings(env = process.env) {
-  const user = headerValue(env.SMTP_USER);
   const pass = env.SMTP_PASS ?? "";
-  const to = headerValue(env.CONTACT_TO || "info@advantageaisolutions.pro");
-  const from = headerValue(env.CONTACT_FROM || user);
   const host = headerValue(env.SMTP_HOST || DEFAULT_HOST);
   const port = Number(env.SMTP_PORT || DEFAULT_PORT);
   const secure = env.SMTP_SECURE ? env.SMTP_SECURE !== "0" : port === 465;
-  return { user, pass, to, from, host, port, secure, configured: Boolean(user && pass && from && to) };
+  return {
+    user: MAILBOX,
+    pass,
+    to: MAILBOX,
+    from: MAILBOX,
+    host,
+    port,
+    secure,
+    configured: Boolean(pass),
+  };
 }
 
 export async function sendEvaluation(fields, env = process.env) {

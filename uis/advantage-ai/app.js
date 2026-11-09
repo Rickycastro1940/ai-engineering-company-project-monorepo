@@ -109,7 +109,7 @@ if (contactForm && contactStatus) {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Something went wrong.");
       contactForm.hidden = true;
-      contactStatus.innerHTML = `<div class="status" role="status"><h3>Your evaluation request is received</h3><p>Your request is with our team. An engineer will review it and reply within one business day.</p></div>`;
+      contactStatus.innerHTML = `<div class="status" role="status"><h3>Your evaluation request is received</h3><p>Your request was sent to info@advantageaisolutions.pro. An engineer will review it and reply within one business day.</p></div>`;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Something went wrong.";
       contactStatus.innerHTML = `<div class="status error-box" role="alert"><p class="error">${escapeHtml(message)} You can also email <a href="mailto:info@advantageaisolutions.pro">info@advantageaisolutions.pro</a>.</p></div>`;
