@@ -13,11 +13,11 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 
 | `CONTEXT.md` need | Status in monorepo |
 | --- | --- |
-| Technology: central API (locations, menus, sales, customers, suppliers) | **Present (seeded)** — `locations`/`menus`/`sales`/`customers`/`suppliers`/`inventory=present` plus `knowledge=present` (`POST /knowledge/query`) and `realtime=present` (`GET /realtime/ops-alerts/stream`) on `uvicorn api.app:app` (`:8000`). Not a live POS or invoice feed |
+| Technology: central API (locations, menus, sales, customers, suppliers) | **Present (seeded)** — `locations`/`menus`/`sales`/`customers`/`suppliers`/`inventory=present` plus `knowledge=present` (`POST /knowledge/query`) and `realtime=present` (`GET /realtime/ops-alerts/stream` and guest `GET /realtime/concierge/stream`, `WS /concierge/ws`) on `uvicorn api.app:app` (`:8000`). Not a live POS or invoice feed |
 | Technology: telemetry + pipeline to dashboards | **Partial** — live no-sales SSE on `GET /realtime/ops-alerts/stream` plus Part 2 weekly location cost/waste ETL, Prefect stage subflows, KPI unit tests, CLI, and backoffice Monday weekly report; engineering `GET /telemetry/report` untouched. Nightly landing copy is `scripts/nightly_export.py` (OS cron `0 2 * * *` America/Bogota, status in `public.job_runs`), not a FastAPI scheduler. `data/pipelines/public_site_snapshot.py` reads the public site into JSON Lines and SQLite (guest menu and the locations printed on the page) |
-| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — seeded `GET /sales` tickets and `/sales/overview` (COP and USD, 14 locations) plus `/sales/alerts`; `POST /sales` stores a ticket and calls `record_sale` so the live no-sales alert on backoffice `/accessible` sees that location; Next.js `uis/portal` `/ops/sales` shows per-location sales in COP and USD. Centralized incident manager is on `/api/incidents` and backoffice `/incidents` (Felipe: branch, category, status). Smart ordering still open |
+| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — seeded `GET /sales` tickets and `/sales/overview` (COP and USD, 14 locations) plus `/sales/alerts`; `POST /sales` stores a ticket and calls `record_sale` so the live no-sales alert on backoffice `/accessible` sees that location; Next.js `uis/portal` `/ops/sales` shows per-location sales in COP and USD. Centralized incident manager is on `/api/incidents` and backoffice `/incidents` (Felipe: branch, category, status). Guest concierge drafts an order for one of the 14 kitchens in that location's currency and shows the other list price (`WS /concierge/ws`, `GET /realtime/concierge/stream`); placed orders are `GET /concierge/orders` and are not POS tickets. Smart ingredient ordering from stock is still open |
 | Procurement: supplier price history, consolidated spend | **Partial** — seeded `GET /suppliers` (20 suppliers, Colombia and Florida, price history and alerts); Monday weekly purchase cost / price-alert frequency still separate; invoices are not live |
-| Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `GET /customers` CRM seed with `brasa_points_balance` on physical stamp cards; Next.js `uis/portal` `/points`; public production site is `uis/website-classic/` (dish photos, menu, locations, Brasa Points, allergens, supplier application, EN/ES), restored from commit `2465196`. The guest card and `GET /menus/catalogue` now share grill, sides, and sauces (14 plates) with COP and USD list prices in every kitchen. Every plate on `uis/website-classic/menu.html` has a photo. The Vite app in `uis/website/` is not what Vercel publishes. `CONTEXT.md` still describes stamp cards as today’s in-restaurant programme |
+| Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `GET /customers` CRM seed with `brasa_points_balance` on physical stamp cards; Next.js `uis/portal` `/points`; public production site is `uis/website-classic/` (dish photos, menu, locations, Brasa Points, allergens, supplier application, EN/ES), restored from commit `2465196`. The guest card and `GET /menus/catalogue` now share grill, sides, and sauces (14 plates) with COP and USD list prices in every kitchen. Every plate on `uis/website-classic/menu.html` has a photo. The Vite app in `uis/website/` is not what Vercel publishes. `CONTEXT.md` still describes stamp cards as today’s in-restaurant programme. Guests can ask that menu (COP and USD), allergens, and place an order at `GET /concierge/`; a voice clip uses `BRASALAND_AUDIO_MODEL` when `BRASALAND_AUDIO_API_KEY` is set, and typed text when it is not |
 | People: HR portal / KPIs by country | **Not done** |
 | Training: recipe catalogue, push to 14 locations | **Partial** — `POST /knowledge/query` searches the four English standards (allergens, waste, ordering, Brasa Points) and returns cited chunks. Location managers reach that answer on `WS /knowledge/ws` as `manager_support` (`token_chunk`, stop with `interrupt`, end with `generation_interrupted` or `generation_completed`). Not a full recipe catalogue and not a push to all 14 kitchens |
 | Executive: sales USD+COP dashboard, NL assistant, Monday 07:00 report | **Partial** — seeded `GET /sales/overview` and portal `/ops/sales` chain totals in COP and USD; Monday weekly ops & finance report in the backoffice; n8n export `workflows/brasaland-monday-leadership-report.n8n.json` schedules Monday 07:00 America/Bogota, logs into the central API, pulls `GET /reporting/weekly-location-performance`, and delivers COP/USD leadership copy (email, Slack, CSV) with a failure branch. Standards questions can go to `POST /knowledge/query` or the streamed chat at `GET /knowledge/ui`. A chain sales dashboard remains open |
@@ -700,6 +700,45 @@ GET /images/menu-grilled-picanha.jpg and the other seven new files → 200
 ```
 
 Lazy images below the first screen stay blank until they scroll into view. That is the same `loading="lazy"` treatment as chicken, salad, arepa, and house sauce. A 390px-wide header is 23px wider than the viewport; the menu rows themselves are not the overflowing element.
+
+## Latest guest concierge (`cursor/streaming-concierge-f888`)
+
+Department served: **Restaurant Operations** (Felipe Guerrero — an order names one of the 14 kitchens and the currency that kitchen charges) + **Marketing** (Camila Ospina — a guest can ask the menu, an allergen, or place an order, including a voice clip) + **Technology** (Nicolás Park — tokens on the existing WebSocket event contract and the `/realtime` SSE path).
+
+The concierge reads `services/api/menus.py` and `services/api/locations.py`. It does not write `POST /sales`. `WS /concierge/ws` sends `token_chunk` and accepts `interrupt`, the same bidirectional shape as `WS /knowledge/ws`. `GET /realtime/concierge/stream` uses `id` / `event` / `data`, keep-alive comments, and `Last-Event-ID`, the same shape as `GET /realtime/ops-alerts/stream`. `POST /concierge/transcribe` calls `BRASALAND_AUDIO_MODEL` only when `BRASALAND_AUDIO_API_KEY` is set. With no key the typed order is returned as `text_fallback` and audio bytes are not sent to a model.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+GET http://127.0.0.1:8000/docs → 200
+locations=present
+menus=present
+sales=present
+customers=present
+suppliers=present
+inventory=present
+path_count=55
+/realtime/concierge/stream present
+/realtime/ops-alerts/stream present
+NO_SALES_MONITOR=0 python3 -m pytest tests/test_concierge.py tests/test_websocket_chat.py tests/test_no_sales_alerts.py -q → 40 passed
+POST /concierge/transcribe without a key → mode=text_fallback, transcript echoed, audio model not called
+POST /concierge/sessions then House Sauce → soy, sulfites, 4,000 COP and 2.00 USD, cross-contamination never guaranteed
+Browser http://127.0.0.1:8000/concierge/ → Start conversation → allergen answer streams into the bubble → two sirloin at Medellín Centro shows 96,000 COP (listed at 36.00 USD) → confirm places the guest order → voice file with no key shows “No audio key is set. Type the order instead.”
+Narrow viewport 390px: document scroll width stays within the viewport
+```
+
+Skill **passed** (criteria 1–4 and 6). Criterion 5: locations, menus, sales, customers, and suppliers are **present**. A live POS feed and a digital Brasa Points wallet are still open.
+
+## Latest merge of the 14-dish menu into the concierge (`cursor/streaming-concierge-f888`)
+
+Department served: **Marketing** (Camila Ospina — the 14 photographed plates stay on the public card and on `GET /menus`) + **Restaurant Operations** and **Technology** (the guest concierge still streams COP/USD answers, allergens, and orders, and still falls back to typed text when no audio key is set).
+
+`origin/main` (`9803f7c`, PRs #124 and #125) merged into this branch. The only conflict was `memory-bank/Progress.md`. The catalogue in `services/api/menus.py` and the eight new photos were kept as main wrote them. The concierge still reads that catalogue rather than a private six-dish list.
+
+```text
+NO_SALES_MONITOR=0 python3 -m pytest tests/test_concierge.py tests/test_public_menu.py tests/test_central_api_domains.py tests/test_websocket_chat.py tests/test_no_sales_alerts.py -q → 50 passed
+GET /menus catalogue length stays 14, including grilled-picanha through vinagrete
+POST /concierge/transcribe with no BRASALAND_AUDIO_API_KEY → text_fallback
+```
 
 ## How to update this file
 

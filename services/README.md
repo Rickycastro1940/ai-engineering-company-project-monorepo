@@ -7,7 +7,7 @@ Each subfolder inside `services/` must correspond to **one specific service** (f
 - **Main purpose**: to centralize all the backend logic, APIs, and queue consumers that support the company's use cases.
 - **Recommendation**: document in this file (or in sub-READMEs) the services you add, their objective, the technology used, and how to run them.
 
-The central FastAPI app is `services/api/app.py` (`uvicorn api.app:app`). It mounts locations, menus, sales, customers, suppliers, inventory, users, reporting, knowledge (`POST /knowledge/query`), realtime (`GET /realtime/ops-alerts/stream`), and the incident manager (`/api/incidents`). Run notes: [`services/api/README.md`](./api/README.md), [`docs/central-api.md`](../docs/central-api.md), [`docs/knowledge-rag.md`](../docs/knowledge-rag.md), and [`docs/realtime-no-sales.md`](../docs/realtime-no-sales.md).
+The central FastAPI app is `services/api/app.py` (`uvicorn api.app:app`). It mounts locations, menus, sales, customers, suppliers, inventory, users, reporting, knowledge (`POST /knowledge/query`, `WS /knowledge/ws`), the guest concierge (`WS /concierge/ws`, `GET /realtime/concierge/stream`), realtime no-sales alerts (`GET /realtime/ops-alerts/stream`), and the incident manager (`/api/incidents`). Run notes: [`services/api/README.md`](./api/README.md), [`services/concierge/README.md`](./concierge/README.md), [`docs/central-api.md`](../docs/central-api.md), [`docs/knowledge-rag.md`](../docs/knowledge-rag.md), [`docs/concierge.md`](../docs/concierge.md), and [`docs/realtime-no-sales.md`](../docs/realtime-no-sales.md).
 
 ## Celery (Message Queues and Async Tasks)
 
@@ -43,6 +43,10 @@ Task logs (every attempt): `task_id`, `attempt`, `status`, `duration_ms`; failur
 `services/job_runner.py` is the status store for background jobs. It creates, updates, and queries `public.job_runs` (`create_run`, `mark_processing`, `mark_completed`, `mark_failed`, `has_processing_lock`, `has_completed_for_date`). A new row starts `pending`, then `mark_processing` moves it to `processing` (that status is the lock). A `processing` row for `nightly_export` cancels a second start. A `completed` row for that `job_name` and `target_date` skips the export. A failed execution is stored as `failed` with `error_message` so the row does not stay `processing`. Schema: `data/pipelines/job_runs.sql`.
 
 The caller is `scripts/nightly_export.py`. OS crontab runs it (`0 2 * * *`, `America/Bogota`). It is not a FastAPI route and it is not started by `uvicorn`. See `infra/cron/brasaland-nightly-export.cron`.
+
+## Guest concierge
+
+`services/concierge/` streams menu, allergen, and order answers for a guest. `WS /concierge/ws` uses the same token events as the knowledge socket. `GET /realtime/concierge/stream` uses the same SSE frame as the no-sales alert. Voice orders call `BRASALAND_AUDIO_MODEL` only when `BRASALAND_AUDIO_API_KEY` is set; otherwise the guest sends text. Details: [`services/concierge/README.md`](./concierge/README.md).
 
 ## Live operations alerts
 
