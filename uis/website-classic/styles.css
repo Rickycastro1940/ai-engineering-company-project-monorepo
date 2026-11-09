@@ -483,6 +483,20 @@ pre code {
     font-size: 0.95rem;
 }
 
+.menu-prices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.85rem;
+    margin: 0.45rem 0 0;
+    font-size: 0.92rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.menu-prices span {
+    font-weight: 600;
+    color: var(--ink);
+}
+
 .menu-row .menu-facts {
     margin: 0;
     padding: 0;

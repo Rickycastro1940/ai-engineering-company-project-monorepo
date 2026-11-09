@@ -25,7 +25,7 @@
       "@type": "Organization",
       "@id": "https://www.brasalandrestaurant.com/#organization",
       "name": "Brasaland",
-      "description": "Grilled-food restaurant chain operating in Colombia and Florida (US). Sirloin, ribs, and chicken over the brasa, with house sauce and corn arepas. Brasa Points are valid at every location. Florida stays in USD $; Colombia stays in COP $.",
+      "description": "Grilled-food restaurant chain operating in Colombia and Florida (US). Sirloin, picanha, ribs, and chicken over the brasa, with house sauce, chimichurri, arepas, and yuca. Brasa Points are valid at every location. Florida stays in USD $; Colombia stays in COP $.",
       "url": "https://www.brasalandrestaurant.com/",
       "logo": {
         "@type": "ImageObject",
@@ -116,39 +116,259 @@
             {
               "@type": "MenuItem",
               "name": "Grilled Sirloin",
+              "description": "Beef sirloin over the brasa, with a marinade.",
               "alternateName": "Lomo a la Brasa",
-              "description": "Beef sirloin over the brasa, with a marinade."
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "48000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "18",
+                  "priceCurrency": "USD"
+                }
+              ]
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Grilled Picanha",
+              "description": "Salt-crusted picanha, the fat cap rendered over the coals.",
+              "alternateName": "Picanha a la brasa",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "62000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "24",
+                  "priceCurrency": "USD"
+                }
+              ]
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Grilled Pork Loin",
+              "description": "Pork loin with orange, garlic, and the house soy marinade.",
+              "alternateName": "Lomo de cerdo a la brasa",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "44000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "17",
+                  "priceCurrency": "USD"
+                }
+              ]
             },
             {
               "@type": "MenuItem",
               "name": "Brasaland BBQ Ribs",
-              "description": "Grilled ribs with imported sauce."
+              "description": "Grilled ribs with imported sauce.",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "52000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "20",
+                  "priceCurrency": "USD"
+                }
+              ]
             },
             {
               "@type": "MenuItem",
               "name": "Classic Grilled Chicken",
-              "description": "Chicken cooked over the brasa."
+              "description": "Chicken cooked over the brasa.",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "32000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "12",
+                  "priceCurrency": "USD"
+                }
+              ]
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Grilled Chorizo",
+              "description": "Pork chorizo with garlic and cumin, blistered over the coals.",
+              "alternateName": "Chorizo a la brasa",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "24000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "9",
+                  "priceCurrency": "USD"
+                }
+              ]
             }
           ]
         },
         {
           "@type": "MenuSection",
-          "name": "Salad, side, and sauce",
+          "name": "Sides",
           "hasMenuItem": [
             {
               "@type": "MenuItem",
               "name": "Tropical Salad",
-              "description": "With cashew and feta."
+              "description": "With cashew and feta.",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "28000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "11",
+                  "priceCurrency": "USD"
+                }
+              ]
             },
             {
               "@type": "MenuItem",
               "name": "Corn Arepa",
-              "description": "Served with the grill."
+              "description": "Served with the grill.",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "8000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "4",
+                  "priceCurrency": "USD"
+                }
+              ]
             },
             {
               "@type": "MenuItem",
+              "name": "Fried Yuca",
+              "description": "Crisp fried cassava, salted, beside the grill.",
+              "alternateName": "Yuca frita",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "9000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "4",
+                  "priceCurrency": "USD"
+                }
+              ]
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Grilled Ripe Plantain",
+              "description": "Ripe plantain with caramelized edges from the brasa.",
+              "alternateName": "Plátano maduro a la brasa",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "7000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "3",
+                  "priceCurrency": "USD"
+                }
+              ]
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Grilled Corn",
+              "description": "Charred sweet corn with salt and lime.",
+              "alternateName": "Mazorca a la brasa",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "6000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "3",
+                  "priceCurrency": "USD"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "@type": "MenuSection",
+          "name": "Sauces",
+          "hasMenuItem": [
+            {
+              "@type": "MenuItem",
               "name": "House Sauce",
-              "description": "Brasaland house sauce."
+              "description": "Brasaland house sauce.",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "4000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "2",
+                  "priceCurrency": "USD"
+                }
+              ]
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Chimichurri",
+              "description": "Parsley, garlic, chili, and red-wine vinegar.",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "4000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "2",
+                  "priceCurrency": "USD"
+                }
+              ]
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Vinagrete",
+              "description": "Diced tomato, onion, and bell pepper in vinegar.",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "3500",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "2",
+                  "priceCurrency": "USD"
+                }
+              ]
             }
           ]
         }
