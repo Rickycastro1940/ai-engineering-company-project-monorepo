@@ -250,7 +250,25 @@ def check_api_available() -> bool:
         return False
 
 
+def _review_supplier_cli(argv: list[str]) -> int:
+    """Run the supplier-approval handoff. Does not require the inventory API or Groq."""
+    from agents.supplier_approval.orchestrator import review_supplier_application
+
+    text = " ".join(argv).strip()
+    if not text and not sys.stdin.isatty():
+        text = sys.stdin.read()
+    if not text.strip():
+        print("Pass the supplier application text after review-supplier.", file=sys.stderr)
+        return 1
+    result = review_supplier_application({"raw_text": text})
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0
+
+
 def main() -> int:
+    if len(sys.argv) > 1 and sys.argv[1] in {"review-supplier", "supplier-approval"}:
+        return _review_supplier_cli(sys.argv[2:])
+
     if not GROQ_API_KEY or GROQ_API_KEY == "your_key_here":
         print("Set GROQ_API_KEY in .env before running the agent.", file=sys.stderr)
         return 1

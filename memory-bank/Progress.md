@@ -15,8 +15,8 @@ Verified **2026-09-16** on clone `Rickycastro1940/ai-engineering-company-project
 | --- | --- |
 | Technology: central API (locations, menus, sales, customers, suppliers) | **Present (seeded)** — `locations`/`menus`/`sales`/`customers`/`suppliers`/`inventory=present` plus `knowledge=present` (`POST /knowledge/query`) and `realtime=present` (`GET /realtime/ops-alerts/stream`) on `uvicorn api.app:app` (`:8000`). Not a live POS or invoice feed |
 | Technology: telemetry + pipeline to dashboards | **Partial** — live no-sales SSE on `GET /realtime/ops-alerts/stream` plus Part 2 weekly location cost/waste ETL, Prefect stage subflows, KPI unit tests, CLI, and backoffice Monday weekly report; engineering `GET /telemetry/report` untouched. Nightly landing copy is `scripts/nightly_export.py` (OS cron `0 2 * * *` America/Bogota, status in `public.job_runs`), not a FastAPI scheduler. `data/pipelines/public_site_snapshot.py` reads the public site into JSON Lines and SQLite (guest menu and the locations printed on the page) |
-| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — seeded `GET /sales` tickets and `/sales/overview` (COP and USD, 14 locations) plus `/sales/alerts`; `POST /sales` stores a ticket and calls `record_sale` so the live no-sales alert on backoffice `/accessible` sees that location; Next.js `uis/portal` `/ops/sales` shows per-location sales in COP and USD. Centralized incident manager is on `/api/incidents` and backoffice `/incidents` (Felipe: branch, category, status). Smart ordering still open |
-| Procurement: supplier price history, consolidated spend | **Partial** — seeded `GET /suppliers` (20 suppliers, Colombia and Florida, price history and alerts); Monday weekly purchase cost / price-alert frequency still separate; invoices are not live |
+| Operations: sales per location COP/USD; no-sales alerts; smart ordering | **Partial** — seeded `GET /sales` tickets and `/sales/overview` (COP and USD, 14 locations) plus `/sales/alerts`; `POST /sales` stores a ticket and calls `record_sale` so the live no-sales alert on backoffice `/accessible` sees that location; Next.js `uis/portal` `/ops/sales` shows per-location sales in COP and USD. Centralized incident manager is on `/api/incidents` and backoffice `/incidents` (Felipe: branch, category, status). `POST /suppliers/applications/review` lets Restaurant Operations write the approval summary on a LangGraph handoff before a new supplier feeds the kitchens. Smart ordering still open |
+| Procurement: supplier price history, consolidated spend | **Partial** — seeded `GET /suppliers` (20 suppliers, Colombia and Florida, price history and alerts); `POST /suppliers/applications/review` runs a LangGraph graph (Supplier → Compliance (knowledge base) → Operations) and returns an approval summary for Lucía Fernández (COP or USD by market). Monday weekly purchase cost / price-alert frequency still separate; invoices are not live |
 | Marketing: digital Brasa Points, CRM, personalisation | **Partial** — `GET /customers` CRM seed with `brasa_points_balance` on physical stamp cards; Next.js `uis/portal` `/points`; public production site is `uis/website-classic/` (dish photos, menu, locations, Brasa Points, allergens, supplier application, EN/ES), restored from commit `2465196`. The guest card and `GET /menus/catalogue` now share grill, sides, and sauces (14 plates) with COP and USD list prices in every kitchen. Every plate on `uis/website-classic/menu.html` has a photo. The Vite app in `uis/website/` is not what Vercel publishes. `CONTEXT.md` still describes stamp cards as today’s in-restaurant programme |
 | People: HR portal / KPIs by country | **Not done** |
 | Training: recipe catalogue, push to 14 locations | **Partial** — `POST /knowledge/query` searches the four English standards (allergens, waste, ordering, Brasa Points) and returns cited chunks. Location managers reach that answer on `WS /knowledge/ws` as `manager_support` (`token_chunk`, stop with `interrupt`, end with `generation_interrupted` or `generation_completed`). Not a full recipe catalogue and not a push to all 14 kitchens |
@@ -700,6 +700,65 @@ GET /images/menu-grilled-picanha.jpg and the other seven new files → 200
 ```
 
 Lazy images below the first screen stay blank until they scroll into view. That is the same `loading="lazy"` treatment as chicken, salad, arepa, and house sauce. A 390px-wide header is 23px wider than the viewport; the menu rows themselves are not the overflowing element.
+
+## Latest supplier approval handoff (`cursor/supplier-approval-agents-b651`)
+
+Department served: **Procurement** (Lucía Fernández — review an incoming supplier before it joins the directory) + **Restaurant Operations** (Felipe Guerrero — the Operations Agent writes the management summary, including health standards that protect the kitchens). Technology hosts `POST /suppliers/applications/review` on the central API. The same handoff is `python agent.py review-supplier`.
+
+Three roles share one state object, in order: Supplier Agent parses the application (Colombia → COP, United States → Florida and USD); Compliance Agent calls `data.pipelines.rag.answer_question` (the `POST /knowledge/query` path) and applies a rule only when a retrieved chunk states it; Operations Agent writes approve / approve with conditions / reject for Lucía Fernández. The handoff is plain Python. LangGraph and CrewAI are not dependencies of this monorepo, and `agent.py` stays a manual Groq loop. Groq rewrites only the operations narrative when `BRASALAND_SUPPLIER_AGENTS=groq`.
+
+The route does not insert a supplier row. The seeded directory is unchanged. Rebased onto `main` after the 14-plate guest menu (#124) and menu photos (#125).
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+GET http://127.0.0.1:8000/docs → 200
+locations=present
+menus=present
+sales=present
+customers=present
+suppliers=present
+inventory=present
+path_count=50
+/suppliers/applications/review present
+/knowledge/query present
+python3 -m pytest tests/test_supplier_approval.py tests/test_central_api_domains.py tests/test_public_menu.py -q → 20 passed
+Colombia proteins, 8% surcharge, INVIMA cited → decision=approve, currency=COP, sources include brasaland-supplier-ordering.en.md and brasaland-menu-allergens.en.md
+United States packaging → decision=approve, market=Florida, currency=USD
+Guarantee of zero cross-contamination → decision=reject, allergen guide cited
+Empty retrieval → approve_with_conditions, no invented 8% or INVIMA pass
+python3 agent.py review-supplier (Florida packaging) → exit 0, roles supplier, compliance, operations
+```
+
+Skill **passed** (criteria 1–4 and 6). Criterion 5: locations, menus, sales, customers, and suppliers are **present**. That does not make POS integration, live invoices, or a digital loyalty wallet complete.
+
+## Latest supplier approval LangGraph (`cursor/supplier-approval-langgraph-ecc6`)
+
+Department served: **Procurement** (Lucía Fernández — the approval summary she reads before a supplier joins the directory) + **Restaurant Operations** (Felipe Guerrero — the Operations node writes approve / approve with conditions / reject, including health standards that protect the kitchens). Technology hosts `POST /suppliers/applications/review`. The same graph is `python agent.py review-supplier`.
+
+The three roles are LangGraph nodes on one state (`orchestration: langgraph`). Supplier parses the application (Colombia → COP, United States → Florida and USD). Compliance calls `data.pipelines.rag.answer_question` and applies a rule only when a retrieved chunk states it. Operations writes the decision. A promised zero cross-contamination risk is a reject. An emergency protein surcharge other than 8% is approve with conditions. Groq rewrites only the operations narrative when `BRASALAND_SUPPLIER_AGENTS=groq`. The inventory loop in `agent.py` is still a manual Groq client. `langgraph` is in `pyproject.toml`, `requirements.txt`, and `uv.lock` (1.2.20 on Python ≥ 3.10, 0.6.11 on Python 3.9). This branch starts from `cursor/supplier-approval-agents-b651` (PR 119) and should merge after that PR.
+
+```text
+head -n 5 CONTEXT.md → # Welcome to Brasaland
+GET http://127.0.0.1:8000/docs → 200
+locations=present
+menus=present
+sales=present
+customers=present
+suppliers=present
+inventory=present
+path_count=50
+/suppliers/applications/review present
+/knowledge/query present
+.venv/bin/python -m pytest tests/test_supplier_approval.py tests/test_central_api_domains.py -q → 18 passed
+Colombia proteins, 8% surcharge, INVIMA cited → decision=approve, currency=COP
+United States packaging → decision=approve, market=Florida, currency=USD, orchestration=langgraph
+Guarantee of zero cross-contamination → decision=reject
+Surcharge 12% → approve_with_conditions, condition text includes 8%
+Empty retrieval → approve_with_conditions, no invented 8% or INVIMA pass
+.venv/bin/python agent.py review-supplier (Florida packaging) → exit 0, roles supplier, compliance, operations, orchestration langgraph
+```
+
+Skill **passed** (criteria 1–4 and 6). Criterion 5: locations, menus, sales, customers, and suppliers are **present**. That does not make POS integration, live invoices, or a digital loyalty wallet complete.
 
 ## How to update this file
 
