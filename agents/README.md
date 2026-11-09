@@ -6,5 +6,6 @@ Each subfolder under `agents/` should represent **one concrete agent** (for exam
 
 - **Main purpose**: centralize reusable agent development for the company in one monorepo.
 - **Recommendation**: maintain a catalog of agents here as they are created and link to each agent’s README.
+- **`llmops/`**: Langfuse tracing (latency, tokens, `/feedback`) and Llama Guard-style rails for the Groq inventory agent in root `agent.py`. See [`llmops/README.md`](./llmops/README.md).
 
 > _Spanish version: [README.es.md](./README.es.md)._

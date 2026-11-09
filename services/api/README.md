@@ -49,6 +49,18 @@ The inventory agent in [`agent.py`](../../agent.py) is implemented **manually in
 - No LangChain, LlamaIndex, AutoGen, or similar frameworks
 - Tool definitions, the observe/think/act/update loop, API calls, and CLI are all written directly in `agent.py`
 - The only external LLM dependency is the OpenAI-compatible Groq client (`openai` package)
+- Each Groq call is traced (latency and token usage) and checked by a Llama Guard-style rail. See [`agents/llmops/README.md`](../../agents/llmops/README.md).
+
+### LLMOps environment
+
+| Variable | Required | Effect |
+| --- | --- | --- |
+| `LANGFUSE_PUBLIC_KEY` | No | With `LANGFUSE_SECRET_KEY`, export traces to Langfuse. Absent → in-memory no-op |
+| `LANGFUSE_SECRET_KEY` | No | Ingestion secret |
+| `LANGFUSE_HOST` | No | Defaults to `https://cloud.langfuse.com` |
+| `BRASALAND_LLAMA_GUARD_MODEL` | No | Extra Groq Llama Guard pass. Local S1/S2 policy always runs |
+
+In the agent CLI, `/feedback up` or `/feedback down optional comment` scores the previous answer. Off-topic questions and proprietary supplier terms (negotiated prices, contracts, margins, payment details) are refused before the answer is shown.
 
 ## Local development summary
 
