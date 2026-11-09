@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Menu — Brasaland</title>
-    <meta name="description" content="Brasaland guest menu: grilled sirloin (Lomo a la Brasa), BBQ ribs, classic grilled chicken, tropical salad, corn arepa, and house sauce." />
+    <meta name="description" content="Brasaland guest menu: sirloin, picanha, pork loin, ribs, chicken, and chorizo, with sides and sauces. List prices in COP and USD." />
     <link rel="stylesheet" href="styles.css" />
     <script src="theme.js"></script>
     <script>
@@ -25,7 +25,7 @@
       "@type": "Organization",
       "@id": "https://www.brasalandrestaurant.com/#organization",
       "name": "Brasaland",
-      "description": "Grilled-food restaurant chain operating in Colombia and Florida (US). Sirloin, ribs, and chicken over the brasa, with house sauce and corn arepas. Brasa Points are valid at every location. Florida stays in USD $; Colombia stays in COP $.",
+      "description": "Grilled-food restaurant chain operating in Colombia and Florida (US). Sirloin, picanha, ribs, and chicken over the brasa, with house sauce, chimichurri, arepas, and yuca. Brasa Points are valid at every location. Florida stays in USD $; Colombia stays in COP $.",
       "url": "https://www.brasalandrestaurant.com/",
       "logo": {
         "@type": "ImageObject",
@@ -116,39 +116,259 @@
             {
               "@type": "MenuItem",
               "name": "Grilled Sirloin",
+              "description": "Beef sirloin over the brasa, with a marinade.",
               "alternateName": "Lomo a la Brasa",
-              "description": "Beef sirloin over the brasa, with a marinade."
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "48000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "18",
+                  "priceCurrency": "USD"
+                }
+              ]
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Grilled Picanha",
+              "description": "Salt-crusted picanha, the fat cap rendered over the coals.",
+              "alternateName": "Picanha a la brasa",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "62000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "24",
+                  "priceCurrency": "USD"
+                }
+              ]
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Grilled Pork Loin",
+              "description": "Pork loin with orange, garlic, and the house soy marinade.",
+              "alternateName": "Lomo de cerdo a la brasa",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "44000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "17",
+                  "priceCurrency": "USD"
+                }
+              ]
             },
             {
               "@type": "MenuItem",
               "name": "Brasaland BBQ Ribs",
-              "description": "Grilled ribs with imported sauce."
+              "description": "Grilled ribs with imported sauce.",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "52000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "20",
+                  "priceCurrency": "USD"
+                }
+              ]
             },
             {
               "@type": "MenuItem",
               "name": "Classic Grilled Chicken",
-              "description": "Chicken cooked over the brasa."
+              "description": "Chicken cooked over the brasa.",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "32000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "12",
+                  "priceCurrency": "USD"
+                }
+              ]
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Grilled Chorizo",
+              "description": "Pork chorizo with garlic and cumin, blistered over the coals.",
+              "alternateName": "Chorizo a la brasa",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "24000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "9",
+                  "priceCurrency": "USD"
+                }
+              ]
             }
           ]
         },
         {
           "@type": "MenuSection",
-          "name": "Salad, side, and sauce",
+          "name": "Sides",
           "hasMenuItem": [
             {
               "@type": "MenuItem",
               "name": "Tropical Salad",
-              "description": "With cashew and feta."
+              "description": "With cashew and feta.",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "28000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "11",
+                  "priceCurrency": "USD"
+                }
+              ]
             },
             {
               "@type": "MenuItem",
               "name": "Corn Arepa",
-              "description": "Served with the grill."
+              "description": "Served with the grill.",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "8000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "4",
+                  "priceCurrency": "USD"
+                }
+              ]
             },
             {
               "@type": "MenuItem",
+              "name": "Fried Yuca",
+              "description": "Crisp fried cassava, salted, beside the grill.",
+              "alternateName": "Yuca frita",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "9000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "4",
+                  "priceCurrency": "USD"
+                }
+              ]
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Grilled Ripe Plantain",
+              "description": "Ripe plantain with caramelized edges from the brasa.",
+              "alternateName": "Plátano maduro a la brasa",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "7000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "3",
+                  "priceCurrency": "USD"
+                }
+              ]
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Grilled Corn",
+              "description": "Charred sweet corn with salt and lime.",
+              "alternateName": "Mazorca a la brasa",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "6000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "3",
+                  "priceCurrency": "USD"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "@type": "MenuSection",
+          "name": "Sauces",
+          "hasMenuItem": [
+            {
+              "@type": "MenuItem",
               "name": "House Sauce",
-              "description": "Brasaland house sauce."
+              "description": "Brasaland house sauce.",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "4000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "2",
+                  "priceCurrency": "USD"
+                }
+              ]
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Chimichurri",
+              "description": "Parsley, garlic, chili, and red-wine vinegar.",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "4000",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "2",
+                  "priceCurrency": "USD"
+                }
+              ]
+            },
+            {
+              "@type": "MenuItem",
+              "name": "Vinagrete",
+              "description": "Diced tomato, onion, and bell pepper in vinegar.",
+              "offers": [
+                {
+                  "@type": "Offer",
+                  "price": "3500",
+                  "priceCurrency": "COP"
+                },
+                {
+                  "@type": "Offer",
+                  "price": "2",
+                  "priceCurrency": "USD"
+                }
+              ]
             }
           ]
         }
@@ -442,13 +662,13 @@
             <header class="page-intro">
             <p class="kicker" data-i18n="menu.kicker">Guest menu</p>
             <h1 id="menu-heading" class="page-title" data-i18n="home.cook.h2">What we cook</h1>
-            <p class="lede" data-i18n="menu.lede">Six dishes. No prices here — Florida is USD, Colombia is COP.</p>
+            <p class="lede" data-i18n="menu.lede">Same plates in every kitchen. List prices: Colombia in COP, Florida in USD. We do not convert one into the other.</p>
             </header>
 
             <section class="page-block" aria-labelledby="grill-heading">
             <div class="section-head">
                 <h2 id="grill-heading" data-i18n="home.grill.h3">From the grill</h2>
-                <p class="lede" data-i18n="menu.grill.lede">Sirloin, ribs, and chicken.</p>
+                <p class="lede" data-i18n="menu.grill.lede">Sirloin, picanha, pork loin, ribs, chicken, and chorizo.</p>
             </div>
             <div class="menu-list">
                 <article class="card menu-row">
@@ -458,6 +678,7 @@
                         <h3 data-i18n="dish.sirloin">Grilled Sirloin</h3>
                         <p class="menu-also" data-i18n="dish.sirloinAlso">Lomo a la Brasa</p>
                         <p class="menu-copy" data-i18n="menu.sirloin.copy">Beef sirloin over the brasa, with a marinade.</p>
+                        <p class="menu-prices"><span>COP $48.000</span><span>USD $18</span></p>
                         <p class="menu-allergens" data-i18n="menu.allergens.sirloin">Contains soy.</p>
                     </div>
                 </article>
@@ -468,6 +689,7 @@
                         <h3 data-i18n="dish.ribs">Brasaland BBQ Ribs</h3>
                         <p class="menu-also" data-i18n="menu.ribsAlso">With imported sauce</p>
                         <p class="menu-copy" data-i18n="menu.ribs.copy">Grilled ribs with imported sauce.</p>
+                        <p class="menu-prices"><span>COP $52.000</span><span>USD $20</span></p>
                         <p class="menu-allergens" data-i18n="menu.allergens.ribs">Contains soy. Not certified gluten-free.</p>
                     </div>
                 </article>
@@ -477,7 +699,41 @@
                         <p class="menu-kind" data-i18n="kind.mainGrill">Main · grilled</p>
                         <h3 data-i18n="dish.chicken">Classic Grilled Chicken</h3>
                         <p class="menu-copy" data-i18n="menu.chicken.copy">Chicken cooked over the brasa.</p>
+                        <p class="menu-prices"><span>COP $32.000</span><span>USD $12</span></p>
                         <p class="menu-allergens" data-i18n="menu.allergens.chicken">Gluten-free, dairy-free, nut-free.</p>
+                    </div>
+                </article>
+                <article class="card menu-row">
+                    <img src="images/menu-grilled-picanha.jpg" alt="Salt-crusted grilled picanha" width="176" height="176" loading="lazy" data-i18n-alt="alt.picanha" />
+                    <div class="menu-body">
+                        <p class="menu-kind" data-i18n="kind.mainGrill">Main · grilled</p>
+                        <h3 data-i18n="dish.picanha">Grilled Picanha</h3>
+                        <p class="menu-also" data-i18n="dish.picanhaAlso">Picanha a la brasa</p>
+                        <p class="menu-copy" data-i18n="menu.picanha.copy">Salt-crusted picanha, the fat cap rendered over the coals.</p>
+                        <p class="menu-prices"><span>COP $62.000</span><span>USD $24</span></p>
+                        <p class="menu-allergens" data-i18n="menu.allergens.picanha">Gluten-free, dairy-free, nut-free.</p>
+                    </div>
+                </article>
+                <article class="card menu-row">
+                    <img src="images/menu-grilled-pork-loin.jpg" alt="Grilled pork loin with citrus and garlic" width="176" height="176" loading="lazy" data-i18n-alt="alt.pork" />
+                    <div class="menu-body">
+                        <p class="menu-kind" data-i18n="kind.mainGrill">Main · grilled</p>
+                        <h3 data-i18n="dish.pork">Grilled Pork Loin</h3>
+                        <p class="menu-also" data-i18n="dish.porkAlso">Lomo de cerdo a la brasa</p>
+                        <p class="menu-copy" data-i18n="menu.pork.copy">Pork loin with orange, garlic, and the house soy marinade.</p>
+                        <p class="menu-prices"><span>COP $44.000</span><span>USD $17</span></p>
+                        <p class="menu-allergens" data-i18n="menu.allergens.pork">Contains soy.</p>
+                    </div>
+                </article>
+                <article class="card menu-row">
+                    <img src="images/menu-grilled-chorizo.jpg" alt="Grilled pork chorizo with garlic and cumin" width="176" height="176" loading="lazy" data-i18n-alt="alt.chorizo" />
+                    <div class="menu-body">
+                        <p class="menu-kind" data-i18n="kind.mainGrill">Main · grilled</p>
+                        <h3 data-i18n="dish.chorizo">Grilled Chorizo</h3>
+                        <p class="menu-also" data-i18n="dish.chorizoAlso">Chorizo a la brasa</p>
+                        <p class="menu-copy" data-i18n="menu.chorizo.copy">Pork chorizo with garlic and cumin, blistered over the coals.</p>
+                        <p class="menu-prices"><span>COP $24.000</span><span>USD $9</span></p>
+                        <p class="menu-allergens" data-i18n="menu.allergens.chorizo">Contains sulfites.</p>
                     </div>
                 </article>
             </div>
@@ -485,7 +741,8 @@
 
             <section class="page-block" aria-labelledby="sides-heading">
             <div class="section-head">
-                <h2 id="sides-heading" data-i18n="home.sides.h3">Salad, side, and sauce</h2>
+                <h2 id="sides-heading" data-i18n="menu.sides.h2">Sides</h2>
+                <p class="lede" data-i18n="menu.sides.lede">Salad, arepa, yuca, plantain, and corn.</p>
             </div>
             <div class="menu-list">
                 <article class="card menu-row">
@@ -494,6 +751,7 @@
                         <p class="menu-kind" data-i18n="kind.main">Main</p>
                         <h3 data-i18n="dish.salad">Tropical Salad</h3>
                         <p class="menu-copy" data-i18n="menu.salad.copy">With cashew and feta.</p>
+                        <p class="menu-prices"><span>COP $28.000</span><span>USD $11</span></p>
                         <p class="menu-allergens" data-i18n="menu.allergens.salad">Contains nuts and dairy.</p>
                     </div>
                 </article>
@@ -503,22 +761,88 @@
                         <p class="menu-kind" data-i18n="kind.side">Side</p>
                         <h3 data-i18n="dish.arepa">Corn Arepa</h3>
                         <p class="menu-copy" data-i18n="menu.arepa.copy">Served with the grill.</p>
+                        <p class="menu-prices"><span>COP $8.000</span><span>USD $4</span></p>
                         <p class="menu-allergens" data-i18n="menu.allergens.arepa">Contains dairy and egg.</p>
                     </div>
                 </article>
+                <article class="card menu-row">
+                    <img src="images/menu-fried-yuca.jpg" alt="Crisp fried yuca" width="176" height="176" loading="lazy" data-i18n-alt="alt.yuca" />
+                    <div class="menu-body">
+                        <p class="menu-kind" data-i18n="kind.side">Side</p>
+                        <h3 data-i18n="dish.yuca">Fried Yuca</h3>
+                        <p class="menu-also" data-i18n="dish.yucaAlso">Yuca frita</p>
+                        <p class="menu-copy" data-i18n="menu.yuca.copy">Crisp fried cassava, salted, beside the grill.</p>
+                        <p class="menu-prices"><span>COP $9.000</span><span>USD $4</span></p>
+                        <p class="menu-allergens" data-i18n="menu.allergens.yuca">Gluten-free, dairy-free, nut-free.</p>
+                    </div>
+                </article>
+                <article class="card menu-row">
+                    <img src="images/menu-grilled-plantain.jpg" alt="Ripe plantain caramelized on the grill" width="176" height="176" loading="lazy" data-i18n-alt="alt.plantain" />
+                    <div class="menu-body">
+                        <p class="menu-kind" data-i18n="kind.side">Side</p>
+                        <h3 data-i18n="dish.plantain">Grilled Ripe Plantain</h3>
+                        <p class="menu-also" data-i18n="dish.plantainAlso">Plátano maduro a la brasa</p>
+                        <p class="menu-copy" data-i18n="menu.plantain.copy">Ripe plantain with caramelized edges from the brasa.</p>
+                        <p class="menu-prices"><span>COP $7.000</span><span>USD $3</span></p>
+                        <p class="menu-allergens" data-i18n="menu.allergens.plantain">Gluten-free, dairy-free, nut-free.</p>
+                    </div>
+                </article>
+                <article class="card menu-row">
+                    <img src="images/menu-grilled-corn.jpg" alt="Charred sweet corn with salt and lime" width="176" height="176" loading="lazy" data-i18n-alt="alt.corn" />
+                    <div class="menu-body">
+                        <p class="menu-kind" data-i18n="kind.side">Side</p>
+                        <h3 data-i18n="dish.corn">Grilled Corn</h3>
+                        <p class="menu-also" data-i18n="dish.cornAlso">Mazorca a la brasa</p>
+                        <p class="menu-copy" data-i18n="menu.corn.copy">Charred sweet corn with salt and lime.</p>
+                        <p class="menu-prices"><span>COP $6.000</span><span>USD $3</span></p>
+                        <p class="menu-allergens" data-i18n="menu.allergens.corn">Gluten-free, dairy-free, nut-free.</p>
+                    </div>
+                </article>
+            </div>
+            </section>
+
+            <section class="page-block" aria-labelledby="sauces-heading">
+            <div class="section-head">
+                <h2 id="sauces-heading" data-i18n="menu.sauces.h2">Sauces</h2>
+                <p class="lede" data-i18n="menu.sauces.lede">House sauce, chimichurri, and vinagrete.</p>
+            </div>
+            <div class="menu-list">
                 <article class="card menu-row">
                     <img src="images/menu-house-sauce.jpg" alt="Brasaland house sauce in a small ramekin" width="176" height="176" loading="lazy" data-i18n-alt="alt.sauceLong" />
                     <div class="menu-body">
                         <p class="menu-kind" data-i18n="kind.sauce">Sauce</p>
                         <h3 data-i18n="dish.sauce">House Sauce</h3>
                         <p class="menu-copy" data-i18n="menu.sauce.copy">Brasaland house sauce.</p>
+                        <p class="menu-prices"><span>COP $4.000</span><span>USD $2</span></p>
                         <p class="menu-allergens" data-i18n="menu.allergens.sauce">Contains soy and sulfites.</p>
+                    </div>
+                </article>
+                <article class="card menu-row">
+                    <img src="images/menu-chimichurri.jpg" alt="Chimichurri of parsley, garlic, and chili" width="176" height="176" loading="lazy" data-i18n-alt="alt.chimichurri" />
+                    <div class="menu-body">
+                        <p class="menu-kind" data-i18n="kind.sauce">Sauce</p>
+                        <h3 data-i18n="dish.chimichurri">Chimichurri</h3>
+                        <p class="menu-also" data-i18n="dish.chimichurriAlso">Parsley and garlic sauce</p>
+                        <p class="menu-copy" data-i18n="menu.chimichurri.copy">Parsley, garlic, chili, and red-wine vinegar.</p>
+                        <p class="menu-prices"><span>COP $4.000</span><span>USD $2</span></p>
+                        <p class="menu-allergens" data-i18n="menu.allergens.chimichurri">Contains sulfites.</p>
+                    </div>
+                </article>
+                <article class="card menu-row">
+                    <img src="images/menu-vinagrete.jpg" alt="Vinagrete of tomato, onion, and bell pepper" width="176" height="176" loading="lazy" data-i18n-alt="alt.vinagrete" />
+                    <div class="menu-body">
+                        <p class="menu-kind" data-i18n="kind.sauce">Sauce</p>
+                        <h3 data-i18n="dish.vinagrete">Vinagrete</h3>
+                        <p class="menu-also" data-i18n="dish.vinagreteAlso">Tomato and onion relish</p>
+                        <p class="menu-copy" data-i18n="menu.vinagrete.copy">Diced tomato, onion, and bell pepper in vinegar.</p>
+                        <p class="menu-prices"><span>COP $3.500</span><span>USD $2</span></p>
+                        <p class="menu-allergens" data-i18n="menu.allergens.vinagrete">Contains sulfites.</p>
                     </div>
                 </article>
             </div>
             </section>
 
-            <p class="note" data-i18n="menu.note" data-i18n-html>Allergens and kitchen steps: <a href="allergens.html">Allergens</a>.</p>
+            <p class="note" data-i18n="menu.note" data-i18n-html>Allergens and kitchen steps: <a href="allergens.html">Allergens</a>. List prices are the card, not a live register total.</p>
         </div>
     </main>
 
